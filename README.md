@@ -23,6 +23,12 @@ Everything else (tmux, lazygit, broot, Claude Code) is installed automatically b
 ## Setup
 
 ```sh
+curl -fsSL https://raw.githubusercontent.com/JackUait/vibecode-editor/main/setup.sh | bash
+```
+
+Or clone and run locally:
+
+```sh
 git clone https://github.com/JackUait/vibecode-editor.git
 cd vibecode-editor
 ./setup.sh
