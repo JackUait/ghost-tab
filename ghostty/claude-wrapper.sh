@@ -83,13 +83,14 @@ cleanup() {
 }
 trap cleanup EXIT HUP TERM INT
 
-"$TMUX_CMD" new-session -s "$SESSION_NAME" -e "PATH=$PATH" -c "$PROJECT_DIR" \
-  set-option destroy-unattached on \; \
-  "$LAZYGIT_CMD; exec bash" \; \
-  split-window -h -p 50 -c "$PROJECT_DIR" \
-  "$CLAUDE_CMD $*; exec bash" \; \
-  select-pane -t 0 \; \
-  split-window -v -p 50 -c "$PROJECT_DIR" \
-  "trap exit TERM; while true; do $BROOT_CMD $PROJECT_DIR; done" \; \
-  split-window -v -p 60 -c "$PROJECT_DIR" \; \
-  select-pane -t 3
+"$TMUX_CMD" new-session -d -s "$SESSION_NAME" -e "PATH=$PATH" -c "$PROJECT_DIR" \
+  "$LAZYGIT_CMD; exec bash"
+"$TMUX_CMD" set-option -t "$SESSION_NAME" exit-unattached on
+"$TMUX_CMD" split-window -h -p 50 -t "$SESSION_NAME" -c "$PROJECT_DIR" \
+  "$CLAUDE_CMD $*; exec bash"
+"$TMUX_CMD" select-pane -t "$SESSION_NAME:0.0"
+"$TMUX_CMD" split-window -v -p 50 -t "$SESSION_NAME" -c "$PROJECT_DIR" \
+  "trap exit TERM; while true; do $BROOT_CMD $PROJECT_DIR; done"
+"$TMUX_CMD" split-window -v -p 60 -t "$SESSION_NAME" -c "$PROJECT_DIR"
+"$TMUX_CMD" select-pane -t "$SESSION_NAME:0.3"
+"$TMUX_CMD" attach-session -t "$SESSION_NAME"
