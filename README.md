@@ -34,30 +34,31 @@ brew install tmux lazygit broot
 
 ```sh
 git clone https://github.com/JackUait/vibecode-editor.git
+cd vibecode-editor
 ```
 
-2. Copy the wrapper script to your Ghostty config:
+2. Copy the files to your Ghostty config:
 
 ```sh
-mkdir -p ~/.config/ghostty
-cp vibecode-editor/ghostty/claude-wrapper.sh ~/.config/ghostty/claude-wrapper.sh
+mkdir -p ~/.config/ghostty ~/.config/vibecode-editor
+cp ghostty/claude-wrapper.sh ~/.config/ghostty/claude-wrapper.sh
 chmod +x ~/.config/ghostty/claude-wrapper.sh
 ```
 
-3. Edit the `projects` array in `claude-wrapper.sh` to list your own project directories:
+3. Add the Ghostty config (or merge with your existing config):
 
-```bash
-projects=(
-    "my-app:/path/to/my-app"
-    "another-project:/path/to/another-project"
-)
+```sh
+cp ghostty/config ~/.config/ghostty/config
 ```
 
-4. Configure Ghostty to use the wrapper. Add to `~/.config/ghostty/config`:
+4. Add your projects to `~/.config/vibecode-editor/projects`, one per line in `name:path` format:
 
 ```
-command = /Users/YOUR_USERNAME/.config/ghostty/claude-wrapper.sh
+my-app:~/Projects/my-app
+another-project:~/Projects/another-project
 ```
+
+Lines starting with `#` are ignored. If the file doesn't exist or is empty, the wrapper opens in the current directory.
 
 ## Usage
 
