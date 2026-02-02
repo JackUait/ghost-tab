@@ -47,7 +47,7 @@ for pkg in tmux lazygit broot claude; do
   brew_pkg="$pkg"
   [ "$pkg" = "claude" ] && brew_pkg="claude-code"
 
-  if command -v "$pkg" &>/dev/null; then
+  if brew list "$brew_pkg" &>/dev/null; then
     success "$pkg already installed"
   else
     info "Installing $pkg..."
