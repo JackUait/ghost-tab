@@ -44,7 +44,7 @@ Select project:
 | `Cmd+T` | New tab |
 | `Cmd+Shift+Left` | Previous tab |
 | `Cmd+Shift+Right` | Next tab |
-| `Left Alt` | Used as Alt key (macOS option-as-alt) |
+| `Left Option` | Acts as Alt instead of typing special characters |
 
 ## What the Setup Script Does
 
