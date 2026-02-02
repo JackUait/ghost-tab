@@ -18,9 +18,7 @@ A Ghostty + tmux wrapper that launches a four-pane dev session with Claude Code,
 
 - macOS
 - [Ghostty](https://ghostty.org)
-- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (authenticated)
-
-Everything else (tmux, lazygit, broot) is installed automatically by the setup script.
+Everything else (tmux, lazygit, broot, Claude Code) is installed automatically by the setup script.
 
 ## Setup
 
@@ -33,8 +31,7 @@ cd vibecode-editor
 The setup script will:
 
 1. Install Homebrew (if needed)
-2. Install tmux, lazygit, and broot
-3. Verify Claude Code is available
+2. Install tmux, lazygit, broot, and Claude Code
 4. Set up the Ghostty config (with merge/replace option if you have an existing one)
 5. Walk you through adding your project directories
 
