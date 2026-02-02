@@ -16,46 +16,39 @@ A Ghostty + tmux wrapper that launches a four-pane dev session with Claude Code,
 
 ## Prerequisites
 
+- macOS
 - [Ghostty](https://ghostty.org)
-- [tmux](https://github.com/tmux/tmux)
-- [Claude Code](https://docs.anthropic.com/en/docs/claude-code)
-- [lazygit](https://github.com/jesseduffield/lazygit)
-- [broot](https://dystroy.org/broot/)
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (authenticated)
 
-Install on macOS:
-
-```sh
-brew install tmux lazygit broot
-```
+Everything else (tmux, lazygit, broot) is installed automatically by the setup script.
 
 ## Setup
-
-1. Clone this repo:
 
 ```sh
 git clone https://github.com/JackUait/vibecode-editor.git
 cd vibecode-editor
+./setup.sh
 ```
 
-2. Copy the files to your Ghostty config:
+The setup script will:
 
-```sh
-mkdir -p ~/.config/ghostty ~/.config/vibecode-editor
-cp ghostty/claude-wrapper.sh ~/.config/ghostty/claude-wrapper.sh
-chmod +x ~/.config/ghostty/claude-wrapper.sh
+1. Install Homebrew (if needed)
+2. Install tmux, lazygit, and broot
+3. Verify Claude Code is available
+4. Set up the Ghostty config (with merge/replace option if you have an existing one)
+5. Walk you through adding your project directories
+
+### Manual setup
+
+If you prefer to set things up manually:
+
+1. Copy `ghostty/claude-wrapper.sh` to `~/.config/ghostty/` and make it executable
+2. Add `command = ~/.config/ghostty/claude-wrapper.sh` to `~/.config/ghostty/config`
+3. Add your projects to `~/.config/vibecode-editor/projects`, one per line in `name:path` format:
+
 ```
-
-3. Add the Ghostty config (or merge with your existing config):
-
-```sh
-cp ghostty/config ~/.config/ghostty/config
-```
-
-4. Add your projects to `~/.config/vibecode-editor/projects`, one per line in `name:path` format:
-
-```
-my-app:~/Projects/my-app
-another-project:~/Projects/another-project
+my-app:/path/to/my-app
+another-project:/path/to/another-project
 ```
 
 Lines starting with `#` are ignored. If the file doesn't exist or is empty, the wrapper opens in the current directory.
