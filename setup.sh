@@ -1,6 +1,11 @@
 #!/bin/bash
 set -e
 
+# Wrap everything in a function so `curl | bash` reads the entire
+# script into memory before executing.  Without this, bash reads
+# line-by-line from the pipe and `read` consumes script lines as input.
+main() {
+
 # Colors (with fallback)
 if [ -t 1 ] && [ "$(tput colors 2>/dev/null)" -ge 8 ] 2>/dev/null; then
   GREEN='\033[0;32m'
@@ -249,3 +254,7 @@ success "Ghostty config:  ~/.config/ghostty/config"
 success "Projects file:   $PROJECTS_FILE"
 echo ""
 info "Open a new Ghostty window to start coding."
+
+} # end main
+
+main "$@"
