@@ -43,36 +43,29 @@ fi
 
 # ---------- Dependencies ----------
 header "Installing dependencies..."
-for pkg in tmux lazygit broot; do
-  if brew list "$pkg" &>/dev/null; then
+for pkg in tmux lazygit broot claude; do
+  brew_pkg="$pkg"
+  [ "$pkg" = "claude" ] && brew_pkg="claude-code"
+
+  if command -v "$pkg" &>/dev/null; then
     success "$pkg already installed"
   else
     info "Installing $pkg..."
-    if brew install "$pkg"; then
+    if brew install "$brew_pkg"; then
       success "$pkg installed"
+      [ "$pkg" = "claude" ] && info "Run 'claude' to authenticate before opening Ghostty."
     else
-      warn "Failed to install $pkg — install it manually with: brew install $pkg"
+      if [ "$pkg" = "claude" ]; then
+        error "Claude Code installation failed."
+        info "Install manually: brew install claude-code"
+        info "Then run 'claude' to authenticate before re-running this script."
+        exit 1
+      else
+        warn "Failed to install $pkg — install it manually with: brew install $brew_pkg"
+      fi
     fi
   fi
 done
-
-# ---------- Claude Code ----------
-header "Checking Claude Code..."
-if command -v claude &>/dev/null; then
-  success "Claude Code found"
-else
-  warn "Claude Code not found in PATH."
-  info "Installing Claude Code..."
-  if brew install claude-code; then
-    success "Claude Code installed"
-    info "Run 'claude' to authenticate before opening Ghostty."
-  else
-    error "Claude Code installation failed."
-    info "Install manually: brew install claude-code"
-    info "Then run 'claude' to authenticate before re-running this script."
-    exit 1
-  fi
-fi
 
 # ---------- Ghostty ----------
 header "Checking Ghostty..."
