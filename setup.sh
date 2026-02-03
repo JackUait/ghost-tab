@@ -89,9 +89,9 @@ elif [ -z "$1" ]; then
       menu_types+=("project")
       menu_hi+=("${_INVERSE}")
     done
-    menu_labels+=("Add new project" "Delete a project" "Current directory")
-    menu_subs+=("" "" "$(pwd)")
-    menu_types+=("add" "delete" "cwd")
+    menu_labels+=("Add new project" "Delete a project" "Open once")
+    menu_subs+=("" "" "")
+    menu_types+=("add" "delete" "open_once")
     menu_hi+=("${_BG_BLUE}${_WHITE}" "${_BG_RED}${_WHITE}" "${_INVERSE}")
 
     total=${#menu_labels[@]}
@@ -208,6 +208,7 @@ elif [ -z "$1" ]; then
     _add_input=""
     _add_msg=""
     _del_mode=0
+    _open_mode=0
 
     printf "${_HIDE_CURSOR}${_MOUSE_ON}"
     printf '\''\033[2J'\''
@@ -248,6 +249,45 @@ elif [ -z "$1" ]; then
         printf "${_HIDE_CURSOR}"
         # Redraw with new project list
         break
+      fi
+
+      if [ "$_open_mode" -eq 1 ]; then
+        # Open once mode: read path and open without saving
+        _sub_row=$(( _top_row + 3 + _open_idx * 2 + _sep_count + 1 ))
+        printf "${_SHOW_CURSOR}"
+        moveto "$_sub_row" "$_left_col"
+        printf "    ${_CYAN}\033[K"
+        read -r _open_input
+        printf "${_NC}"
+
+        if [ -z "$_open_input" ]; then
+          # Empty = cancel
+          _open_mode=0
+          menu_labels[$_open_idx]="Open once"
+          menu_subs[$_open_idx]=""
+          printf "${_HIDE_CURSOR}${_MOUSE_ON}"
+          draw_menu
+          continue
+        fi
+
+        expanded="${_open_input/#\~/$HOME}"
+        if [ -d "$expanded" ]; then
+          printf "${_SHOW_CURSOR}${_MOUSE_OFF}"
+          printf '\''\033[2J\033[H'\''
+          cd "$expanded"
+          break 2
+        else
+          _open_mode=0
+          menu_labels[$_open_idx]="Open once"
+          menu_subs[$_open_idx]=""
+          draw_menu
+          moveto "$_sub_row" "$_left_col"
+          printf "    ${_YELLOW}!${_NC} Directory not found\033[K"
+          sleep 0.8
+          printf "${_HIDE_CURSOR}${_MOUSE_ON}"
+          draw_menu
+          continue
+        fi
       fi
 
       if [ "$_del_mode" -eq 1 ]; then
@@ -357,10 +397,13 @@ elif [ -z "$1" ]; then
               draw_menu
             fi
             ;;
-          cwd)
-            printf "${_SHOW_CURSOR}${_MOUSE_OFF}"
-            printf '\''\033[2J\033[H'\''
-            break 2
+          open_once)
+            printf "${_MOUSE_OFF}"
+            _open_mode=1
+            _open_idx=$selected
+            menu_labels[$selected]="Enter path to open:  ${_DIM}(empty to cancel)${_NC}"
+            menu_subs[$selected]=""
+            draw_menu
             ;;
         esac
       fi
