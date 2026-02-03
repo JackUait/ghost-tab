@@ -18,7 +18,7 @@ curl -fsSL https://raw.githubusercontent.com/JackUait/vibecode-editor/main/setup
 That's it. The script installs all dependencies, sets up **`Ghostty`**, and walks you through adding your projects. Then open a new **`Ghostty`** window.
 
 > [!IMPORTANT]
-> **Only requirement:** **`macOS`** with [**`Ghostty`**](https://ghostty.org) installed. Everything else (**`Homebrew`**, **`tmux`**, **`lazygit`**, **`broot`**, **`Claude Code`**) is installed automatically.
+> **Only requirement:** **`macOS`**. Everything (**`Homebrew`**, **`Ghostty`**, **`tmux`**, **`lazygit`**, **`broot`**, **`Claude Code`**) is installed automatically.
 
 ---
 
@@ -26,15 +26,27 @@ That's it. The script installs all dependencies, sets up **`Ghostty`**, and walk
 
 **Step 1.** Open a new **`Ghostty`** window (`Cmd+N`)
 
-**Step 2.** Pick a project from the list:
+**Step 2.** Use the interactive project selector:
 
 ```
-Select project:
-  1) my-app
-  2) another-project
-  0) current directory
->
+⬡  Ghost Tab
+──────────────────────────────────────
+
+ 1❯ my-app
+    ~/Projects/my-app
+  2 another-project
+    ~/Projects/another-project
+──────────────────────────────────────
+  · Add new project
+  · Delete a project
+  · Open once
+──────────────────────────────────────
+  ↑↓ navigate  ⏎ select
 ```
+
+- **Arrow keys** or **mouse click** to navigate
+- **Number keys** (1-9) to jump directly to a project
+- **Enter** to select
 
 **Step 3.** The four-pane **`tmux`** session launches automatically with **`Claude Code`** already focused — start typing your prompt right away.
 
@@ -61,8 +73,9 @@ Select project:
 
 1. Installs **`Homebrew`** (if needed)
 2. Installs **`tmux`**, **`lazygit`**, **`broot`**, and **`Claude Code`** via **`Homebrew`**
-3. Sets up the **`Ghostty`** config (with merge/replace option if you have an existing one)
-4. Walks you through adding your **project directories**
+3. Installs **`Ghostty`** via **`Homebrew`** cask (if needed)
+4. Sets up the **`Ghostty`** config (with merge/replace option if you have an existing one)
+5. Walks you through adding your **project directories**
 
 <details>
 <summary><strong>Alternative: Clone and Run</strong></summary>
@@ -89,7 +102,7 @@ my-app:/path/to/my-app
 another-project:/path/to/another-project
 ```
 
-Lines starting with `#` are ignored. If the file doesn't exist or is empty, the wrapper opens in the current directory.
+Lines starting with `#` are ignored. You can also add/delete projects directly from the interactive menu.
 
 </details>
 
