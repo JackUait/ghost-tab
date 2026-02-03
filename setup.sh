@@ -65,6 +65,9 @@ elif [ -z "$1" ]; then
   # Wait for terminal to fully initialize and report correct size
   sleep 0.1
 
+  # Set terminal title for project selection screen
+  printf '\''\033]0;👻 Ghost Tab\007'\''
+
   # Padding helper: prints N spaces
   pad() { printf "%*s" "$1" ""; }
 
