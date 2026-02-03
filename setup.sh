@@ -62,6 +62,9 @@ elif [ -z "$1" ]; then
   # Restore cursor and disable mouse on exit
   trap '\''printf "${_SHOW_CURSOR}${_MOUSE_OFF}"; printf "\\033[?7h"'\'' EXIT
 
+  # Wait for terminal to fully initialize and report correct size
+  sleep 0.1
+
   # Padding helper: prints N spaces
   pad() { printf "%*s" "$1" ""; }
 
@@ -139,11 +142,12 @@ elif [ -z "$1" ]; then
     draw_menu() {
       local i r c
 
-      # Read terminal dimensions fresh each draw
-      _cols="${COLUMNS:-$(tput cols 2>/dev/null)}"
-      _rows="${LINES:-$(tput lines 2>/dev/null)}"
-      _cols="${_cols:-80}"
-      _rows="${_rows:-24}"
+      # Read terminal dimensions using cursor position trick
+      # Move cursor to far corner, query position to get actual size
+      printf '\''\033[s\033[9999;9999H'\''
+      IFS='\''[;'\'' read -rs -d R -p $'\''\033[6n'\'' _ _rows _cols </dev/tty
+      printf '\''\033[u'\''
+      : "${_rows:=24}" "${_cols:=80}"
 
       _sep_count=0
       [ "${#projects[@]}" -gt 0 ] && _sep_count=1
@@ -211,7 +215,7 @@ elif [ -z "$1" ]; then
     _open_mode=0
 
     printf "${_HIDE_CURSOR}${_MOUSE_ON}"
-    printf '\''\033[2J'\''
+    printf '\''\033[2J\033[H'\''
     draw_menu
 
     # Input loop
