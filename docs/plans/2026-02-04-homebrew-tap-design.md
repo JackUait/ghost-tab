@@ -13,12 +13,14 @@ Distribute ghost-tab as a Homebrew package with semantic versioning.
 
 ## Repository Structure
 
-### Main repo: `ghost-tab`
+Single repo: `ghost-tab` (no separate tap repo needed)
 
 ```
 ghost-tab/
 ├── VERSION
 ├── README.md
+├── HomebrewFormula/
+│   └── ghost-tab.rb
 ├── bin/
 │   └── ghost-tab
 ├── ghostty/
@@ -32,14 +34,7 @@ ghost-tab/
 - `setup.sh` moves to `bin/ghost-tab`
 - Embedded wrapper script extracted back into `ghostty/claude-wrapper.sh` as standalone file
 - `VERSION` file at repo root contains `1.0.0`
-
-### Tap repo: `homebrew-ghost-tab`
-
-```
-homebrew-ghost-tab/
-└── Formula/
-    └── ghost-tab.rb
-```
+- Formula lives in `HomebrewFormula/` inside the same repo
 
 ## Homebrew Formula
 
@@ -60,7 +55,7 @@ The formula:
 
 ```bash
 # Homebrew
-brew tap JackUait/ghost-tab
+brew tap JackUait/ghost-tab https://github.com/JackUait/ghost-tab
 brew install ghost-tab
 ghost-tab
 
@@ -87,7 +82,7 @@ All references to `ghostty/config` and `ghostty/claude-wrapper.sh` use `$SHARE_D
 1. Update `VERSION` file
 2. Tag the commit: `git tag v1.0.0 && git push --tags`
 3. Create GitHub Release from the tag
-4. Update formula in `homebrew-ghost-tab` with new tarball URL and SHA256 hash
+4. Update formula in `HomebrewFormula/ghost-tab.rb` with new tarball URL and SHA256 hash
 
 No CI/CD automation to start. Automate later if needed.
 
