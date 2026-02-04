@@ -7,7 +7,7 @@ BROOT_CMD="$(command -v broot)"
 CLAUDE_CMD="$(command -v claude)"
 
 # Load user projects from config file if it exists
-PROJECTS_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/vibecode-editor/projects"
+PROJECTS_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/ghost-tab/projects"
 
 # Select working directory
 if [ -n "$1" ] && [ -d "$1" ]; then

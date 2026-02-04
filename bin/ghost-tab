@@ -154,9 +154,17 @@ else
   success "Created Ghostty config at $GHOSTTY_CONFIG"
 fi
 
+# Migrate from old config location
+OLD_PROJECTS_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/vibecode-editor"
+NEW_PROJECTS_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/ghost-tab"
+if [ -d "$OLD_PROJECTS_DIR" ] && [ ! -d "$NEW_PROJECTS_DIR" ]; then
+  mv "$OLD_PROJECTS_DIR" "$NEW_PROJECTS_DIR"
+  info "Migrated config from vibecode-editor to ghost-tab"
+fi
+
 # ---------- Projects ----------
 header "Setting up projects..."
-PROJECTS_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/vibecode-editor"
+PROJECTS_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/ghost-tab"
 PROJECTS_FILE="$PROJECTS_DIR/projects"
 mkdir -p "$PROJECTS_DIR"
 
