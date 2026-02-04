@@ -95,11 +95,12 @@ elif [ -z "$1" ]; then
       menu_types+=("project")
       menu_hi+=("${_INVERSE}")
     done
-    menu_labels+=("Add new project" "Delete a project" "Open once")
-    menu_subs+=("" "" "")
-    menu_types+=("add" "delete" "open_once")
-    menu_hi+=("${_BG_BLUE}${_WHITE}" "${_BG_RED}${_WHITE}" "${_INVERSE}")
+    menu_labels+=("Add new project" "Delete a project" "Open once" "Plain terminal")
+    menu_subs+=("" "" "" "")
+    menu_types+=("add" "delete" "open_once" "plain")
+    menu_hi+=("${_BG_BLUE}${_WHITE}" "${_BG_RED}${_WHITE}" "${_INVERSE}" "${_DIM}")
 
+    _action_hints=("A" "D" "O" "P")
     total=${#menu_labels[@]}
     selected=0
     box_w=44
@@ -342,13 +343,13 @@ elif [ -z "$1" ]; then
           if [ "$i" -lt "${#projects[@]}" ]; then
             printf "${menu_hi[$i]}${_BOLD} %d❯ %s  ${_NC}\033[K" "$((i+1))" "${menu_labels[$i]}"
           else
-            printf "${menu_hi[$i]}${_BOLD}  ❯ %s  ${_NC}\033[K" "${menu_labels[$i]}"
+            printf "${menu_hi[$i]}${_BOLD} %s❯ %s  ${_NC}\033[K" "${_action_hints[$((i - ${#projects[@]}))]}" "${menu_labels[$i]}"
           fi
         else
           if [ "$i" -lt "${#projects[@]}" ]; then
             printf "  ${_DIM}%d${_NC} %s\033[K" "$((i+1))" "${menu_labels[$i]}"
           else
-            printf "  ${_DIM}·${_NC} %s\033[K" "${menu_labels[$i]}"
+            printf "  ${_DIM}%s${_NC} %s\033[K" "${_action_hints[$((i - ${#projects[@]}))]}" "${menu_labels[$i]}"
           fi
         fi
         r=$((r+1))
@@ -551,6 +552,13 @@ elif [ -z "$1" ]; then
         selected=$((key - 1))
         _do_select=1
       fi
+      _n=${#projects[@]}
+      case "$key" in
+        a|A) selected=$((_n)); _do_select=1 ;;
+        d|D) selected=$((_n + 1)); _do_select=1 ;;
+        o|O) selected=$((_n + 2)); _do_select=1 ;;
+        p|P) selected=$((_n + 3)); _do_select=1 ;;
+      esac
       if [[ "$key" == "" ]] || [ "$_do_select" -eq 1 ]; then
         case "${menu_types[$selected]}" in
           project)
@@ -593,6 +601,11 @@ elif [ -z "$1" ]; then
             menu_labels[$selected]="Enter path to open:  ${_DIM}(empty to cancel)${_NC}"
             menu_subs[$selected]=""
             draw_menu
+            ;;
+          plain)
+            printf "${_SHOW_CURSOR}${_MOUSE_OFF}"
+            printf '\''\033[2J\033[H'\''
+            exec bash
             ;;
         esac
       fi
