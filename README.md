@@ -128,7 +128,7 @@ Lines starting with `#` are ignored. You can also add/delete projects directly f
 
 ## Status Line
 
-The `ghost-tab` command configures a custom **Claude Code** status line:
+The `ghost-tab` command configures a custom **Claude Code** status line based on [Matt Pocock's guide](https://www.aihero.dev/creating-the-perfect-claude-code-status-line):
 
 ```
 my-project | main | S: 0 | U: 2 | A: 1 | 23.5%
