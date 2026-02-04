@@ -2,20 +2,22 @@
 
 A **`Ghostty`** + **`tmux`** wrapper that launches a four-pane dev session with **`Claude Code`**, **`lazygit`**, **`broot`**, and a spare terminal. Automatically cleans up all processes when the window is closed — no zombie **`Claude Code`** processes.
 
-![vibecode-editor screenshot](docs/screenshot.png)
+![ghost-tab screenshot](docs/screenshot.png)
 
 ---
 
 ## Quick Start
 
 > [!NOTE]
-> **One command to install everything:**
+> **Homebrew (recommended):**
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/JackUait/vibecode-editor/main/setup.sh | bash
+brew tap JackUait/ghost-tab https://github.com/JackUait/ghost-tab
+brew install ghost-tab
+ghost-tab
 ```
 
-That's it. The script installs all dependencies, sets up **`Ghostty`**, and walks you through adding your projects. Then open a new **`Ghostty`** window.
+That's it. Homebrew installs all dependencies. Then run `ghost-tab` to set up **`Ghostty`** and add your projects.
 
 > [!IMPORTANT]
 > **Only requirement:** **`macOS`**. Everything (**`Homebrew`**, **`Ghostty`**, **`tmux`**, **`lazygit`**, **`broot`**, **`Claude Code`**) is installed automatically.
@@ -73,7 +75,7 @@ That's it. The script installs all dependencies, sets up **`Ghostty`**, and walk
 
 ---
 
-## What the Setup Script Does
+## What `ghost-tab` Does
 
 1. Installs **`Homebrew`** (if needed)
 2. Installs **`tmux`**, **`lazygit`**, **`broot`**, and **`Claude Code`** via **`Homebrew`**
@@ -86,9 +88,21 @@ That's it. The script installs all dependencies, sets up **`Ghostty`**, and walk
 <summary><strong>Alternative: Clone and Run</strong></summary>
 
 ```sh
-git clone https://github.com/JackUait/vibecode-editor.git
-cd vibecode-editor
-./setup.sh
+git clone https://github.com/JackUait/ghost-tab.git
+cd ghost-tab
+./bin/ghost-tab
+```
+
+</details>
+
+<details>
+<summary><strong>Alternative: One-liner</strong></summary>
+
+> [!CAUTION]
+> The one-liner requires cloning the repo first. It cannot run standalone via curl pipe.
+
+```sh
+git clone https://github.com/JackUait/ghost-tab.git && cd ghost-tab && ./bin/ghost-tab
 ```
 
 </details>
@@ -100,7 +114,7 @@ If you prefer to set things up by hand:
 
 1. Copy `ghostty/claude-wrapper.sh` to `~/.config/ghostty/` and make it executable
 2. Add `command = ~/.config/ghostty/claude-wrapper.sh` to `~/.config/ghostty/config`
-3. Add your projects to `~/.config/vibecode-editor/projects`, one per line in `name:path` format:
+3. Add your projects to `~/.config/ghost-tab/projects`, one per line in `name:path` format:
 
 ```
 my-app:/path/to/my-app
@@ -115,7 +129,7 @@ Lines starting with `#` are ignored. You can also add/delete projects directly f
 
 ## Status Line
 
-The setup script configures a custom **Claude Code** status line:
+The `ghost-tab` command configures a custom **Claude Code** status line:
 
 ```
 my-project | main | S: 0 | U: 2 | A: 1 | 23.5%
