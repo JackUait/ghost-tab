@@ -12,8 +12,7 @@ A **`Ghostty`** + **`tmux`** wrapper that launches a four-pane dev session with 
 > **Homebrew (recommended):**
 
 ```sh
-brew tap JackUait/ghost-tab https://github.com/JackUait/ghost-tab
-brew install ghost-tab
+brew install JackUait/ghost-tab/ghost-tab
 ghost-tab
 ```
 
