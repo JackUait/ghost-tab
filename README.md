@@ -37,17 +37,20 @@ That's it. The script installs all dependencies, sets up **`Ghostty`**, and walk
   2 another-project
     ~/Projects/another-project
 ──────────────────────────────────────
-  · Add new project
-  · Delete a project
-  · Open once
+  A Add new project
+  D Delete a project
+  O Open once
+  P Plain terminal
 ──────────────────────────────────────
   ↑↓ navigate  ⏎ select
 ```
 
 - **Arrow keys** or **mouse click** to navigate
 - **Number keys** (1-9) to jump directly to a project
+- **Letter keys** — **A** add, **D** delete, **O** open once, **P** plain terminal
 - **Enter** to select
 - **Path autocomplete** when adding projects (with Tab completion)
+- **Plain terminal** opens a bare shell with no tmux overhead
 
 **Step 3.** The four-pane **`tmux`** session launches automatically with **`Claude Code`** already focused — start typing your prompt right away.
 
