@@ -77,11 +77,12 @@ That's it. Homebrew installs all dependencies. Then run `ghost-tab` to set up **
 ## What `ghost-tab` Does
 
 1. Installs **`Homebrew`** (if needed)
-2. Installs **`tmux`**, **`lazygit`**, **`broot`**, and **`Claude Code`** via **`Homebrew`**
-3. Installs **`Ghostty`** via **`Homebrew`** cask (if needed)
-4. Sets up the **`Ghostty`** config (with merge/replace option if you have an existing one)
-5. Walks you through adding your **project directories**
-6. Installs **`Node.js`** LTS (if needed) and sets up **Claude Code status line** showing git info and context usage
+2. Installs **`tmux`**, **`lazygit`**, and **`broot`** via **`Homebrew`**
+3. Installs **`Claude Code`** via native installer (auto-updates)
+4. Installs **`Ghostty`** via **`Homebrew`** cask (if needed)
+5. Sets up the **`Ghostty`** config (with merge/replace option if you have an existing one)
+6. Walks you through adding your **project directories**
+7. Installs **`Node.js`** LTS (if needed) and sets up **Claude Code status line** showing git info and context usage
 
 <details>
 <summary><strong>Alternative: Clone and Run</strong></summary>

@@ -54,29 +54,63 @@ fi
 
 # ---------- Dependencies ----------
 header "Installing dependencies..."
-for pkg in tmux lazygit broot claude; do
-  brew_pkg="$pkg"
-  [ "$pkg" = "claude" ] && brew_pkg="claude-code"
-
-  if brew list "$brew_pkg" &>/dev/null; then
+for pkg in tmux lazygit broot; do
+  if brew list "$pkg" &>/dev/null; then
     success "$pkg already installed"
   else
     info "Installing $pkg..."
-    if brew install "$brew_pkg"; then
+    if brew install "$pkg"; then
       success "$pkg installed"
-      [ "$pkg" = "claude" ] && info "Run 'claude' to authenticate before opening Ghostty."
     else
-      if [ "$pkg" = "claude" ]; then
-        error "Claude Code installation failed."
-        info "Install manually: brew install claude-code"
-        info "Then run 'claude' to authenticate before re-running this script."
-        exit 1
-      else
-        warn "Failed to install $pkg — install it manually with: brew install $brew_pkg"
-      fi
+      warn "Failed to install $pkg — install it manually with: brew install $pkg"
     fi
   fi
 done
+
+# ---------- Claude Code (native) ----------
+header "Checking Claude Code..."
+CLAUDE_NATIVE="$HOME/.local/bin/claude"
+
+if [ -x "$CLAUDE_NATIVE" ]; then
+  success "Claude Code already installed (native)"
+elif command -v claude &>/dev/null; then
+  # Check if it's the Homebrew version
+  CLAUDE_PATH=$(command -v claude)
+  if [[ "$CLAUDE_PATH" == *"homebrew"* ]] || [[ "$CLAUDE_PATH" == *"Cellar"* ]] || [[ "$CLAUDE_PATH" == *"Caskroom"* ]]; then
+    warn "Found Homebrew installation of Claude Code"
+    info "The native version auto-updates and is recommended."
+    echo ""
+    read -rn1 -p "$(echo -e "${BLUE}Switch to native version? (y/n):${NC} ")" switch_native </dev/tty
+    echo ""
+    if [[ "$switch_native" =~ ^[yY]$ ]]; then
+      info "Uninstalling Homebrew version..."
+      brew uninstall --cask claude-code 2>/dev/null || brew uninstall claude-code 2>/dev/null || true
+      info "Installing native version..."
+      if curl -fsSL https://claude.ai/install.sh | bash; then
+        success "Claude Code installed (native)"
+        info "Run 'claude' to authenticate before opening Ghostty."
+      else
+        error "Claude Code installation failed."
+        info "Install manually: curl -fsSL https://claude.ai/install.sh | bash"
+        exit 1
+      fi
+    else
+      success "Keeping Homebrew version"
+    fi
+  else
+    success "Claude Code already installed"
+  fi
+else
+  info "Installing Claude Code (native)..."
+  if curl -fsSL https://claude.ai/install.sh | bash; then
+    success "Claude Code installed"
+    info "Run 'claude' to authenticate before opening Ghostty."
+  else
+    error "Claude Code installation failed."
+    info "Install manually: curl -fsSL https://claude.ai/install.sh | bash"
+    exit 1
+  fi
+fi
 
 # ---------- Ghostty ----------
 header "Checking Ghostty..."
