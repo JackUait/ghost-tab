@@ -322,6 +322,74 @@ CSEOF
   fi
 fi
 
+# ---------- Sound Notification ----------
+header "Sound notification..."
+echo ""
+echo -e "  Claude Code can play a sound when it finishes generating"
+echo -e "  and is waiting for your input."
+echo ""
+read -rn1 -p "$(echo -e "${BLUE}Enable sound notification? (y/n):${NC} ")" enable_sound </dev/tty
+echo ""
+
+if [[ "$enable_sound" =~ ^[yY]$ ]]; then
+  CLAUDE_SETTINGS="$HOME/.claude/settings.json"
+  mkdir -p ~/.claude
+
+  # Use Python (ships with macOS) to safely merge hook into settings.json
+  if python3 - "$CLAUDE_SETTINGS" << 'PYEOF'
+import json, sys, os
+
+settings_path = sys.argv[1]
+
+# Load existing settings or start fresh
+if os.path.exists(settings_path):
+    try:
+        with open(settings_path, "r") as f:
+            settings = json.load(f)
+    except (json.JSONDecodeError, ValueError):
+        settings = {}
+else:
+    settings = {}
+
+# Build the hook entry we want
+new_hook_entry = {
+    "matcher": "idle_prompt",
+    "hooks": [
+        {
+            "type": "command",
+            "command": "afplay /System/Library/Sounds/Bottle.aiff &"
+        }
+    ]
+}
+
+# Ensure hooks.Notification exists
+hooks = settings.setdefault("hooks", {})
+notification_list = hooks.setdefault("Notification", [])
+
+# Check if idle_prompt hook already exists
+already_exists = any(
+    entry.get("matcher") == "idle_prompt"
+    for entry in notification_list
+)
+
+if not already_exists:
+    notification_list.append(new_hook_entry)
+    with open(settings_path, "w") as f:
+        json.dump(settings, f, indent=2)
+        f.write("\n")
+    print("added")
+else:
+    print("exists")
+PYEOF
+  then
+    success "Sound notification configured"
+  else
+    warn "Failed to configure sound notification"
+  fi
+else
+  info "Skipping sound notification"
+fi
+
 # ---------- Summary ----------
 header "Setup complete!"
 echo ""
@@ -330,6 +398,9 @@ success "Ghostty config:  ~/.config/ghostty/config"
 success "Projects file:   $PROJECTS_FILE"
 if [ -f ~/.claude/statusline-wrapper.sh ]; then
   success "Status line:     ~/.claude/statusline-wrapper.sh"
+fi
+if grep -q '"idle_prompt"' ~/.claude/settings.json 2>/dev/null; then
+  success "Sound:           Notification on idle"
 fi
 echo ""
 info "Open a new Ghostty window to start coding."
