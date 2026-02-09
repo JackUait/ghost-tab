@@ -34,7 +34,12 @@ draw_menu() {
     _logo_col=$(( _left_col + box_w + 3 ))
     _logo_row=$(( _top_row + (_menu_h - _LOGO_HEIGHT) / 2 ))
     [ "$_logo_row" -lt 1 ] && _logo_row=1
-  elif [ "$_rows" -ge "$(( _menu_h + _LOGO_HEIGHT + 2 ))" ]; then
+    # Ensure room for full bob range
+    if [ $((_logo_row + _LOGO_HEIGHT + _BOB_MAX)) -gt "$_rows" ]; then
+      _logo_row=$((_rows - _LOGO_HEIGHT - _BOB_MAX))
+      [ "$_logo_row" -lt 1 ] && _logo_row=1
+    fi
+  elif [ "$_rows" -ge "$(( _menu_h + _LOGO_HEIGHT + _BOB_MAX + 1 ))" ]; then
     _LOGO_LAYOUT="above"
     _top_row=$(( (_rows - _menu_h - _LOGO_HEIGHT - 1) / 2 + _LOGO_HEIGHT + 1 ))
     [ "$_top_row" -lt $(( _LOGO_HEIGHT + 2 )) ] && _top_row=$(( _LOGO_HEIGHT + 2 ))

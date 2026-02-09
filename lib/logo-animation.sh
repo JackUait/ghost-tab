@@ -171,29 +171,36 @@ clear_logo_area() {
   done
 }
 
+# Bob offsets following a sine-wave pattern (range 0–2 rows).
+# 16 entries: slow at extremes (ease), faster through middle.
+# Max 1-row difference between consecutive entries.
+_BOB_OFFSETS=(0 0 0 1 1 2 2 2 2 2 1 1 0 0 0 0)
+_BOB_MAX=2
+
 # start_logo_animation row col tool_name
-#   Launch a background bobbing animation: the ghost alternates
-#   between (row) and (row+1) with 0.8 s pauses between frames.
+#   Launch a background bobbing animation: the ghost floats smoothly
+#   following a sine-wave offset pattern with 0.12 s per step.
 #   A flag file gates the loop so stop_logo_animation can halt it.
 start_logo_animation() {
   local row=$1 col=$2 tool=$3
   local flagfile="/tmp/ghost-tab-anim-$$"
 
   touch "$flagfile"
+  # Pre-populate art arrays so the subshell inherits them
+  "logo_art_${tool}"
 
   (
+    local prev_off=-1 off idx=0 n=${#_BOB_OFFSETS[@]}
     while [ -f "$flagfile" ]; do
-      draw_logo "$row" "$col" "$tool"
-      sleep 0.8
-
-      [ -f "$flagfile" ] || break
-      clear_logo_area "$row" "$col" "$_LOGO_HEIGHT" "$_LOGO_WIDTH"
-
-      draw_logo $((row + 1)) "$col" "$tool"
-      sleep 0.8
-
-      [ -f "$flagfile" ] || break
-      clear_logo_area $((row + 1)) "$col" "$_LOGO_HEIGHT" "$_LOGO_WIDTH"
+      off=${_BOB_OFFSETS[$idx]}
+      if [ "$off" -ne "$prev_off" ]; then
+        # Only redraw when position actually changes
+        [ "$prev_off" -ge 0 ] && clear_logo_area $((row + prev_off)) "$col" "$_LOGO_HEIGHT" "$_LOGO_WIDTH"
+        draw_logo $((row + off)) "$col" "$tool"
+        prev_off=$off
+      fi
+      sleep 0.12
+      idx=$(( (idx + 1) % n ))
     done
   ) &
 
@@ -204,7 +211,7 @@ start_logo_animation() {
 }
 
 # stop_logo_animation
-#   Tear down the background animation and erase the ghost at both
+#   Tear down the background animation and erase the ghost at all
 #   possible bob positions so no artefacts remain on screen.
 stop_logo_animation() {
   rm -f "/tmp/ghost-tab-anim-$$"
@@ -215,8 +222,10 @@ stop_logo_animation() {
   fi
 
   if [ -n "$_LOGO_CUR_ROW" ]; then
-    clear_logo_area "$_LOGO_CUR_ROW" "$_LOGO_CUR_COL" "$_LOGO_HEIGHT" "$_LOGO_WIDTH"
-    clear_logo_area $((_LOGO_CUR_ROW + 1)) "$_LOGO_CUR_COL" "$_LOGO_HEIGHT" "$_LOGO_WIDTH"
+    local i
+    for i in $(seq 0 "$_BOB_MAX"); do
+      clear_logo_area $((_LOGO_CUR_ROW + i)) "$_LOGO_CUR_COL" "$_LOGO_HEIGHT" "$_LOGO_WIDTH"
+    done
   fi
 
   unset _LOGO_ANIM_PID
