@@ -12,6 +12,7 @@ A dedicated toggle row in the project selector lets users cycle between installe
 |------|----------------|--------|-------------------|
 | Claude Code | `curl -fsSL https://claude.ai/install.sh \| bash` | `claude` | `claude` |
 | Codex CLI | `brew install --cask codex` | `codex` | `codex --cd "$PROJECT_DIR"` |
+| Copilot CLI | `brew install copilot-cli` | `copilot` | `copilot` |
 | OpenCode | `brew install anomalyco/tap/opencode` | `opencode` | `opencode "$PROJECT_DIR"` |
 
 ## Setup flow

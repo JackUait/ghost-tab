@@ -6,6 +6,7 @@ LAZYGIT_CMD="$(command -v lazygit)"
 BROOT_CMD="$(command -v broot)"
 CLAUDE_CMD="$(command -v claude)"
 CODEX_CMD="$(command -v codex)"
+COPILOT_CMD="$(command -v copilot)"
 OPENCODE_CMD="$(command -v opencode)"
 
 # AI tool preference
@@ -13,6 +14,7 @@ AI_TOOL_PREF_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/ghost-tab/ai-tool"
 AI_TOOLS_AVAILABLE=()
 [ -n "$CLAUDE_CMD" ] && AI_TOOLS_AVAILABLE+=("claude")
 [ -n "$CODEX_CMD" ] && AI_TOOLS_AVAILABLE+=("codex")
+[ -n "$COPILOT_CMD" ] && AI_TOOLS_AVAILABLE+=("copilot")
 [ -n "$OPENCODE_CMD" ] && AI_TOOLS_AVAILABLE+=("opencode")
 
 # Read saved preference, default to first available
@@ -349,6 +351,7 @@ elif [ -z "$1" ]; then
       case "$1" in
         claude)   echo "Claude Code" ;;
         codex)    echo "Codex CLI" ;;
+        copilot)  echo "Copilot CLI" ;;
         opencode) echo "OpenCode" ;;
         *)        echo "$1" ;;
       esac
@@ -358,6 +361,7 @@ elif [ -z "$1" ]; then
       case "$1" in
         claude)   printf '\033[38;5;209m' ;;
         codex)    printf '\033[38;5;114m' ;;
+        copilot)  printf '\033[38;5;141m' ;;
         opencode) printf '\033[38;5;75m' ;;
         *)        printf '\033[0;36m' ;;
       esac
@@ -787,6 +791,9 @@ trap cleanup EXIT HUP TERM INT
 case "$SELECTED_AI_TOOL" in
   codex)
     AI_LAUNCH_CMD="$CODEX_CMD --cd \"$PROJECT_DIR\""
+    ;;
+  copilot)
+    AI_LAUNCH_CMD="$COPILOT_CMD"
     ;;
   opencode)
     AI_LAUNCH_CMD="$OPENCODE_CMD \"$PROJECT_DIR\""
