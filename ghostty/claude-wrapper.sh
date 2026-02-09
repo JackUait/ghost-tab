@@ -1,6 +1,13 @@
 #!/bin/bash
 export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
 
+# Load shared library functions
+_WRAPPER_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "$_WRAPPER_DIR/lib/ai-tools.sh"
+source "$_WRAPPER_DIR/lib/projects.sh"
+source "$_WRAPPER_DIR/lib/process.sh"
+source "$_WRAPPER_DIR/lib/input.sh"
+
 TMUX_CMD="$(command -v tmux)"
 LAZYGIT_CMD="$(command -v lazygit)"
 BROOT_CMD="$(command -v broot)"
@@ -23,13 +30,7 @@ if [ -f "$AI_TOOL_PREF_FILE" ]; then
   SELECTED_AI_TOOL="$(cat "$AI_TOOL_PREF_FILE" 2>/dev/null | tr -d '[:space:]')"
 fi
 # Validate saved preference is still installed
-_valid=0
-for _t in "${AI_TOOLS_AVAILABLE[@]}"; do
-  [ "$_t" == "$SELECTED_AI_TOOL" ] && _valid=1
-done
-if [ "$_valid" -eq 0 ] && [ ${#AI_TOOLS_AVAILABLE[@]} -gt 0 ]; then
-  SELECTED_AI_TOOL="${AI_TOOLS_AVAILABLE[0]}"
-fi
+validate_ai_tool
 
 # Load user projects from config file if it exists
 PROJECTS_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/ghost-tab/projects"
@@ -345,26 +346,6 @@ elif [ -z "$1" ]; then
           _esc_seq="$_b2"
         fi
       fi
-    }
-
-    ai_tool_display_name() {
-      case "$1" in
-        claude)   echo "Claude Code" ;;
-        codex)    echo "Codex CLI" ;;
-        copilot)  echo "Copilot CLI" ;;
-        opencode) echo "OpenCode" ;;
-        *)        echo "$1" ;;
-      esac
-    }
-
-    ai_tool_color() {
-      case "$1" in
-        claude)   printf '\033[38;5;209m' ;;
-        codex)    printf '\033[38;5;114m' ;;
-        copilot)  printf '\033[38;5;141m' ;;
-        opencode) printf '\033[38;5;75m' ;;
-        *)        printf '\033[0;36m' ;;
-      esac
     }
 
     draw_menu() {
@@ -757,17 +738,6 @@ printf '\033]0;%s\007' "$PROJECT_NAME"
   done
 ) &
 WATCHER_PID=$!
-
-# Kill all processes in the tmux session when the terminal closes
-kill_tree() {
-  local pid=$1
-  local sig=${2:-TERM}
-  # Kill children first (depth-first), then the process itself
-  for child in $(pgrep -P "$pid" 2>/dev/null); do
-    kill_tree "$child" "$sig"
-  done
-  kill -"$sig" "$pid" 2>/dev/null
-}
 
 cleanup() {
   kill $WATCHER_PID 2>/dev/null

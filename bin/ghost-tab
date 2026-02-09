@@ -254,6 +254,12 @@ cp "$SHARE_DIR/ghostty/claude-wrapper.sh" ~/.config/ghostty/claude-wrapper.sh
 chmod +x ~/.config/ghostty/claude-wrapper.sh
 success "Created claude-wrapper.sh in ~/.config/ghostty/"
 
+# Copy shared libraries
+if [ -d "$SHARE_DIR/lib" ]; then
+  cp -R "$SHARE_DIR/lib" ~/.config/ghostty/lib
+  success "Copied shared libraries to ~/.config/ghostty/lib/"
+fi
+
 # ---------- Ghostty config ----------
 header "Setting up Ghostty config..."
 GHOSTTY_CONFIG="$HOME/.config/ghostty/config"
