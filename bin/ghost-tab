@@ -698,6 +698,8 @@ header "Setup complete!"
 echo ""
 success "Wrapper script:  ~/.config/ghostty/claude-wrapper.sh"
 success "Ghostty config:  ~/.config/ghostty/config"
+_ai_default="$(cat "${XDG_CONFIG_HOME:-$HOME/.config}/ghost-tab/ai-tool" 2>/dev/null)"
+success "AI tool:         $(echo "$_ai_default" | sed 's/claude/Claude Code/;s/codex/Codex CLI/;s/opencode/OpenCode/')"
 success "Projects file:   $PROJECTS_FILE"
 if [ -f ~/.claude/statusline-wrapper.sh ]; then
   success "Status line:     ~/.claude/statusline-wrapper.sh"
