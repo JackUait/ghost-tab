@@ -449,6 +449,24 @@ elif [ -z "$1" ]; then
       fi
     }
 
+    cycle_ai_tool() {
+      local direction="$1" i
+      [ ${#AI_TOOLS_AVAILABLE[@]} -le 1 ] && return
+      for i in "${!AI_TOOLS_AVAILABLE[@]}"; do
+        if [ "${AI_TOOLS_AVAILABLE[$i]}" == "$SELECTED_AI_TOOL" ]; then
+          if [ "$direction" == "next" ]; then
+            SELECTED_AI_TOOL="${AI_TOOLS_AVAILABLE[$(( (i + 1) % ${#AI_TOOLS_AVAILABLE[@]} ))]}"
+          else
+            SELECTED_AI_TOOL="${AI_TOOLS_AVAILABLE[$(( (i - 1 + ${#AI_TOOLS_AVAILABLE[@]}) % ${#AI_TOOLS_AVAILABLE[@]} ))]}"
+          fi
+          break
+        fi
+      done
+      # Save preference
+      mkdir -p "$(dirname "$AI_TOOL_PREF_FILE")"
+      echo "$SELECTED_AI_TOOL" > "$AI_TOOL_PREF_FILE"
+    }
+
     _add_mode=0
     _add_input=""
     _add_msg=""
@@ -622,6 +640,8 @@ elif [ -z "$1" ]; then
           case "$_esc_seq" in
             "A") selected=$(( (selected - 1 + total) % total )); draw_menu ;;
             "B") selected=$(( (selected + 1) % total )); draw_menu ;;
+            "C") cycle_ai_tool "next"; draw_menu ;;
+            "D") cycle_ai_tool "prev"; draw_menu ;;
           esac
         fi
       fi
