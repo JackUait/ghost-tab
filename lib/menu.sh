@@ -37,7 +37,7 @@ draw_menu() {
   _hline="${_hline// /─}"
 
   # Helper: print right border at fixed column and clear rest of line
-  _rbdr() { printf "\033[K"; moveto "$1" "$_right_col"; printf "${_bdr_clr}│${_NC}"; }
+  _rbdr() { moveto "$1" "$_right_col"; printf "${_bdr_clr}│${_NC}\033[K"; }
 
   # ── Top border ──
   moveto "$r" "$c"
@@ -47,7 +47,7 @@ draw_menu() {
   # ── Title row ──
   local _title_w=13 _layout_w=$(( _inner_w - 2 ))
   moveto "$r" "$c"
-  printf "${_bdr_clr}│${_NC}"
+  printf "${_bdr_clr}│${_NC}\033[K"
   if [ ${#AI_TOOLS_AVAILABLE[@]} -gt 1 ]; then
     local _ai_name
     _ai_name="$(ai_tool_display_name "$SELECTED_AI_TOOL")"
@@ -75,7 +75,7 @@ draw_menu() {
   # ── Update notification ──
   if [ -n "$_update_version" ]; then
     moveto "$r" "$c"
-    printf "${_bdr_clr}│${_NC}  ${_YELLOW}Update available: v${_update_version}${_NC} ${_DIM}(brew upgrade ghost-tab)${_NC}"
+    printf "${_bdr_clr}│${_NC}\033[K  ${_YELLOW}Update available: v${_update_version}${_NC} ${_DIM}(brew upgrade ghost-tab)${_NC}"
     _rbdr "$r"
     r=$((r+1))
   fi
@@ -87,7 +87,7 @@ draw_menu() {
 
   # ── Blank row ──
   moveto "$r" "$c"
-  printf "${_bdr_clr}│${_NC}"
+  printf "${_bdr_clr}│${_NC}\033[K"
   _rbdr "$r"
   r=$((r+1))
 
@@ -110,7 +110,7 @@ draw_menu() {
 
     _item_rows+=("$r")
     moveto "$r" "$c"
-    printf "${_bdr_clr}│${_NC}"
+    printf "${_bdr_clr}│${_NC}\033[K"
     if [ "$i" -eq "$selected" ]; then
       if [ "$i" -lt "${#projects[@]}" ]; then
         printf "  ${_acc_clr}▎${_NC} ${_DIM}%d${_NC}  ${_acc_clr}${_BOLD}%s${_NC}" "$((i+1))" "$_label"
@@ -130,7 +130,7 @@ draw_menu() {
 
     # Subtitle line
     moveto "$r" "$c"
-    printf "${_bdr_clr}│${_NC}"
+    printf "${_bdr_clr}│${_NC}\033[K"
     if [ -n "${menu_subs[$i]}" ]; then
       local _sub="${menu_subs[$i]}"
       local _max_sub=$(( _inner_w - 7 ))
@@ -155,7 +155,7 @@ draw_menu() {
 
   # ── Help row ──
   moveto "$r" "$c"
-  printf "${_bdr_clr}│${_NC}"
+  printf "${_bdr_clr}│${_NC}\033[K"
   if [ ${#AI_TOOLS_AVAILABLE[@]} -gt 1 ]; then
     printf "  ${_DIM}↑↓${_NC} navigate  ${_DIM}←→${_NC} AI tool  ${_DIM}⏎${_NC} select"
   else
