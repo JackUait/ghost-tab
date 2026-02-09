@@ -5,6 +5,29 @@ TMUX_CMD="$(command -v tmux)"
 LAZYGIT_CMD="$(command -v lazygit)"
 BROOT_CMD="$(command -v broot)"
 CLAUDE_CMD="$(command -v claude)"
+CODEX_CMD="$(command -v codex)"
+OPENCODE_CMD="$(command -v opencode)"
+
+# AI tool preference
+AI_TOOL_PREF_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/ghost-tab/ai-tool"
+AI_TOOLS_AVAILABLE=()
+[ -n "$CLAUDE_CMD" ] && AI_TOOLS_AVAILABLE+=("claude")
+[ -n "$CODEX_CMD" ] && AI_TOOLS_AVAILABLE+=("codex")
+[ -n "$OPENCODE_CMD" ] && AI_TOOLS_AVAILABLE+=("opencode")
+
+# Read saved preference, default to first available
+SELECTED_AI_TOOL=""
+if [ -f "$AI_TOOL_PREF_FILE" ]; then
+  SELECTED_AI_TOOL="$(cat "$AI_TOOL_PREF_FILE" 2>/dev/null | tr -d '[:space:]')"
+fi
+# Validate saved preference is still installed
+_valid=0
+for _t in "${AI_TOOLS_AVAILABLE[@]}"; do
+  [ "$_t" == "$SELECTED_AI_TOOL" ] && _valid=1
+done
+if [ "$_valid" -eq 0 ] && [ ${#AI_TOOLS_AVAILABLE[@]} -gt 0 ]; then
+  SELECTED_AI_TOOL="${AI_TOOLS_AVAILABLE[0]}"
+fi
 
 # Load user projects from config file if it exists
 PROJECTS_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/ghost-tab/projects"
