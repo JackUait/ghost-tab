@@ -53,3 +53,45 @@ teardown() {
 @test "run_ai_tool_select: function is defined" {
   declare -f run_ai_tool_select >/dev/null
 }
+
+# Helper: run run_ai_tool_select in a child bash process where </dev/tty is
+# replaced with a file descriptor fed from a prepared byte sequence.
+# Usage: _run_ai_select_with_keys <key_bytes_file> <cc> <codex> <copilot> <oc>
+# Prints _sel_claude _sel_codex _sel_copilot _sel_opencode on stdout.
+_run_ai_select_with_keys() {
+  local keyfile="$1" cc="$2" codex="$3" copilot="$4" oc="$5"
+  bash -c '
+    source "'"$PROJECT_ROOT"'/lib/tui.sh"
+    source "'"$PROJECT_ROOT"'/lib/ai-select.sh"
+    # Re-declare run_ai_tool_select with </dev/tty replaced by <&3
+    new_body="$(declare -f run_ai_tool_select | sed "s|</dev/tty|<\&3|g")"
+    eval "$new_body"
+    exec 3< "'"$keyfile"'"
+    run_ai_tool_select '"$cc"' '"$codex"' '"$copilot"' '"$oc"' >/dev/null 2>&1
+    echo "$_sel_claude $_sel_codex $_sel_copilot $_sel_opencode"
+  '
+}
+
+@test "run_ai_tool_select: defaults claude on, others match installed state" {
+  # Input: just press Enter (empty byte = newline) to confirm defaults
+  local keyfile="$TEST_TMP/keys"
+  printf '\n' > "$keyfile"
+
+  run _run_ai_select_with_keys "$keyfile" 0 1 0 1
+  assert_success
+  # _sel_claude=1 (always pre-checked), _sel_codex=1 (installed),
+  # _sel_copilot=0 (not installed), _sel_opencode=1 (installed)
+  assert_output "1 1 0 1"
+}
+
+@test "run_ai_tool_select: rejects empty selection then accepts after toggle" {
+  # Sequence: Space (uncheck claude) -> Enter (rejected) -> Space (recheck) -> Enter (accepted)
+  # Space = 0x20, Enter = 0x0a (newline)
+  local keyfile="$TEST_TMP/keys"
+  printf ' \n \n' > "$keyfile"
+
+  run _run_ai_select_with_keys "$keyfile" 0 0 0 0
+  assert_success
+  # After re-checking claude, _sel_claude=1; all others stay 0
+  assert_output "1 0 0 0"
+}

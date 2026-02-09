@@ -62,3 +62,33 @@ teardown() {
   get_suggestions "/nonexistent_path_xyz/"
   [ "${#_suggestions[@]}" -eq 0 ]
 }
+
+# --- draw_suggestions ---
+
+@test "draw_suggestions: renders all items in suggestion box" {
+  tui_init_interactive
+  _suggestions=("alpha/" "beta/" "file.txt")
+  _sug_sel=0
+  run draw_suggestions 10 5
+  assert_output --partial "alpha/"
+  assert_output --partial "beta/"
+  assert_output --partial "file.txt"
+}
+
+@test "draw_suggestions: highlights selected item" {
+  tui_init_interactive
+  _suggestions=("alpha/" "beta/")
+  _sug_sel=1
+  run draw_suggestions 10 5
+  # _INVERSE is \033[7m — the selected item should be wrapped in inverse video
+  assert_output --partial $'\033[7m'
+}
+
+@test "draw_suggestions: empty suggestions produces no box" {
+  tui_init_interactive
+  _suggestions=()
+  _sug_sel=0
+  run draw_suggestions 10 5
+  refute_output --partial "┌"
+  refute_output --partial "└"
+}
