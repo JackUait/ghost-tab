@@ -183,7 +183,7 @@ EOF
 
 # --- draw_settings_screen tests ---
 
-@test "draw_settings_screen: clears screen before drawing" {
+@test "draw_settings_screen: does not clear full screen (preserves ghost)" {
   # Mock terminal dimensions
   export _rows=24
   export _cols=80
@@ -191,20 +191,20 @@ EOF
   # Capture output
   output=$(draw_settings_screen 2>&1)
 
-  # Should contain clear screen escape sequence \033[2J\033[H
-  echo "$output" | grep -q $'\033\[2J\033\[H'
+  # Should NOT contain full screen clear escape sequence
+  ! echo "$output" | grep -q $'\033\[2J\033\[H'
 }
 
-@test "draw_settings_screen: outputs clear screen as first action" {
+@test "draw_settings_screen: draws box with borders" {
   export _rows=24
   export _cols=80
 
-  # Capture output and check first escape sequence
+  # Capture output
   output=$(draw_settings_screen 2>&1)
 
-  # First escape sequence should be clear screen
-  first_escape=$(echo "$output" | grep -o $'\033\[[^m]*[mHJ]' | head -1)
-  echo "$first_escape" | grep -q $'\033\[2J\033\[H'
+  # Should contain box-drawing characters
+  echo "$output" | grep -q '┌'
+  echo "$output" | grep -q '└'
 }
 
 @test "draw_settings_screen: legacy - migrates and displays [Animated] when animation=on" {

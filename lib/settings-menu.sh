@@ -77,8 +77,8 @@ draw_settings_screen() {
       ;;
   esac
 
-  # Clear screen completely
-  printf '\033[2J\033[H'
+  # Don't clear entire screen - settings box will overlay on menu
+  # This preserves the ghost mascot animation
 
   # Box dimensions (matching main menu style)
   local box_w=48

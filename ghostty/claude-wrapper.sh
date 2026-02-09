@@ -303,8 +303,10 @@ elif [ -z "$1" ]; then
         o|O) selected=$((_n + 2)); _do_select=1 ;;
         p|P) selected=$((_n + 3)); _do_select=1 ;;
         s|S)
-          stop_logo_animation 2>/dev/null
+          # Show settings menu without stopping ghost animation
           show_settings_menu
+          # Clear screen and redraw everything when returning from settings
+          printf '\033[2J\033[H'
           _redraw
           continue
           ;;

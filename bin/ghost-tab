@@ -267,7 +267,7 @@ has_status = any(l.strip().startswith("status_line") for l in lines)
 with open(config_path, "a") as f:
     if not has_notify and sound:
         f.write("\n")
-        f.write('notify = ["afplay", "/System/Library/Sounds/Bottle.aiff"]\n')
+        f.write('notify = "afplay /System/Library/Sounds/Bottle.aiff"\n')
 
     if not has_tui:
         f.write("\n[tui]\n")
