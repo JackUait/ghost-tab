@@ -104,9 +104,10 @@ elif [ -z "$1" ]; then
     menu_hi+=("${_BG_BLUE}${_WHITE}" "${_BG_RED}${_WHITE}" "${_INVERSE}" "${_DIM}")
 
     _action_hints=("A" "D" "O" "P")
+    _action_bar=("\033[38;5;27m" "\033[38;5;160m" "" "${_DIM}")
     total=${#menu_labels[@]}
     selected=0
-    box_w=44
+    box_w=46
 
     _add_mode=0
     _add_input=""
@@ -122,8 +123,8 @@ elif [ -z "$1" ]; then
     while true; do
       if [ "$_add_mode" -eq 1 ]; then
         # Add mode: read path with autocomplete
-        _sub_row=$(( _top_row + 3 + _update_line + _add_idx * 2 + _sep_count + 1 ))
-        read_path_autocomplete "$_sub_row" "$_left_col"
+        _sub_row=$(( _top_row + 4 + _update_line + _add_idx * 2 + _sep_count + 1 ))
+        read_path_autocomplete "$_sub_row" "$_content_col"
         _add_input="$_path_result"
 
         if [ -z "$_add_input" ]; then
@@ -141,7 +142,7 @@ elif [ -z "$1" ]; then
           menu_labels[$_add_idx]="Add new project"
           menu_subs[$_add_idx]=""
           draw_menu
-          moveto "$_sub_row" "$_left_col"
+          moveto "$_sub_row" "$_content_col"
           printf "    ${_YELLOW}!${_NC} Project ${_BOLD}${_validated_name}${_NC} already exists\033[K"
           sleep 1
           printf "${_HIDE_CURSOR}"
@@ -154,7 +155,7 @@ elif [ -z "$1" ]; then
         menu_labels[$_add_idx]="Add new project"
         menu_subs[$_add_idx]=""
         draw_menu
-        moveto "$_sub_row" "$_left_col"
+        moveto "$_sub_row" "$_content_col"
         printf "    ${_GREEN}✓${_NC} Added ${_BOLD}${_validated_name}${_NC}\033[K"
         sleep 0.8
         printf "${_HIDE_CURSOR}"
@@ -164,8 +165,8 @@ elif [ -z "$1" ]; then
 
       if [ "$_open_mode" -eq 1 ]; then
         # Open once mode: read path with autocomplete
-        _sub_row=$(( _top_row + 3 + _update_line + _open_idx * 2 + _sep_count + 1 ))
-        read_path_autocomplete "$_sub_row" "$_left_col"
+        _sub_row=$(( _top_row + 4 + _update_line + _open_idx * 2 + _sep_count + 1 ))
+        read_path_autocomplete "$_sub_row" "$_content_col"
         _open_input="$_path_result"
 
         if [ -z "$_open_input" ]; then
@@ -189,7 +190,7 @@ elif [ -z "$1" ]; then
           menu_labels[$_open_idx]="Open once"
           menu_subs[$_open_idx]=""
           draw_menu
-          moveto "$_sub_row" "$_left_col"
+          moveto "$_sub_row" "$_content_col"
           printf "    ${_YELLOW}!${_NC} Directory not found\033[K"
           sleep 0.8
           printf "${_HIDE_CURSOR}${_MOUSE_ON}"
@@ -200,10 +201,10 @@ elif [ -z "$1" ]; then
 
       if [ "$_del_mode" -eq 1 ]; then
         # In delete mode: arrow-navigate or number-select project to delete
-        _del_sub_row=$(( _top_row + 3 + _update_line + _del_idx * 2 + _sep_count + 1 ))
+        _del_sub_row=$(( _top_row + 4 + _update_line + _del_idx * 2 + _sep_count + 1 ))
         # Render current selection on subtitle line
         _dn="${projects[$_del_sel]%%:*}"
-        moveto "$_del_sub_row" "$_left_col"
+        moveto "$_del_sub_row" "$_content_col"
         printf "    ${_BG_RED}${_WHITE}${_BOLD} %d) %s ${_NC}  ${_DIM}↑↓ navigate  1-9 jump  ⏎ delete  q cancel${_NC}\033[K" "$((_del_sel+1))" "$_dn"
 
         read -rsn1 key
@@ -239,7 +240,7 @@ elif [ -z "$1" ]; then
         menu_subs[$_del_idx]=""
         printf "${_HIDE_CURSOR}"
         draw_menu
-        moveto "$_del_sub_row" "$_left_col"
+        moveto "$_del_sub_row" "$_content_col"
         printf "    ${_GREEN}✓${_NC} Deleted ${_BOLD}${del_name}${_NC}\033[K"
         sleep 0.5
         break
@@ -301,7 +302,7 @@ elif [ -z "$1" ]; then
           delete)
             if [ ${#projects[@]} -eq 0 ]; then
               draw_menu
-              moveto "$(( _top_row + 3 + _update_line + selected * 2 + _sep_count + 1 ))" "$_left_col"
+              moveto "$(( _top_row + 4 + _update_line + selected * 2 + _sep_count + 1 ))" "$_content_col"
               printf "    ${_DIM}No projects to delete.${_NC}\033[K"
               sleep 0.8
               draw_menu
