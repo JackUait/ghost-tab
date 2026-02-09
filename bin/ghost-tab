@@ -186,37 +186,65 @@ else
   info "Status line features are only available with Claude Code"
 fi
 
-# ---------- Sound Notification ----------
-header "Sound notification..."
-echo ""
-echo -e "  Claude Code can play a sound when it finishes generating"
-echo -e "  and is waiting for your input."
-echo ""
-read -rn1 -p "$(echo -e "${_BLUE}Enable sound notification? (y/n):${_NC} ")" enable_sound </dev/tty
-echo ""
+# Check if any selected tool supports sound/spinner
+_supports_sound=0
+_supports_spinner=0
+[ "$_sel_claude" -eq 1 ] && { _supports_sound=1; _supports_spinner=1; }
+[ "$_sel_codex" -eq 1 ] && { _supports_sound=1; _supports_spinner=1; }
+[ "$_sel_opencode" -eq 1 ] && { _supports_sound=1; _supports_spinner=1; }
 
-if [[ "$enable_sound" =~ ^[yY]$ ]]; then
-  CLAUDE_SETTINGS="$HOME/.claude/settings.json"
-  setup_sound_notification "$CLAUDE_SETTINGS" "afplay /System/Library/Sounds/Bottle.aiff &"
+# ---------- Sound Notification ----------
+_sound_enabled=0
+if [ "$_supports_sound" -eq 1 ]; then
+  header "Sound notification..."
+  echo ""
+  echo -e "  Play a sound when the AI finishes generating"
+  echo -e "  and is waiting for your input."
+  echo ""
+  read -rn1 -p "$(echo -e "${_BLUE}Enable sound notification? (y/n):${_NC} ")" enable_sound </dev/tty
+  echo ""
+
+  if [[ "$enable_sound" =~ ^[yY]$ ]]; then
+    _sound_enabled=1
+  else
+    info "Skipping sound notification"
+  fi
 else
-  info "Skipping sound notification"
+  header "Skipping sound notification..."
+  info "Sound notification requires a supported AI tool"
 fi
 
 # ---------- Tab Title Animation ----------
-header "Tab title animation..."
-echo ""
-echo -e "  Show a spinning animation in the tab title when Claude"
-echo -e "  is waiting for your input."
-echo ""
-read -rn1 -p "$(echo -e "${_BLUE}Enable tab animation? (y/n):${_NC} ")" enable_spinner </dev/tty
-echo ""
+_spinner_enabled=0
+if [ "$_supports_spinner" -eq 1 ]; then
+  header "Tab title animation..."
+  echo ""
+  echo -e "  Show a spinning animation in the tab title when the AI"
+  echo -e "  is waiting for your input."
+  echo ""
+  read -rn1 -p "$(echo -e "${_BLUE}Enable tab animation? (y/n):${_NC} ")" enable_spinner </dev/tty
+  echo ""
 
-if [[ "$enable_spinner" =~ ^[yY]$ ]]; then
-  CLAUDE_SETTINGS="$HOME/.claude/settings.json"
-  setup_tab_spinner "$SHARE_DIR" "$CLAUDE_SETTINGS" \
-    "bash ~/.claude/tab-spinner-start.sh &" "bash ~/.claude/tab-spinner-stop.sh" "$HOME"
+  if [[ "$enable_spinner" =~ ^[yY]$ ]]; then
+    _spinner_enabled=1
+  else
+    info "Skipping tab animation"
+  fi
 else
-  info "Skipping tab animation"
+  header "Skipping tab title animation..."
+  info "Tab animation requires a supported AI tool"
+fi
+
+# ---------- Claude Code notification hooks ----------
+if [ "$_sel_claude" -eq 1 ]; then
+  CLAUDE_SETTINGS="$HOME/.claude/settings.json"
+  if [ "$_sound_enabled" -eq 1 ]; then
+    setup_sound_notification "$CLAUDE_SETTINGS" "afplay /System/Library/Sounds/Bottle.aiff &"
+  fi
+  if [ "$_spinner_enabled" -eq 1 ]; then
+    setup_tab_spinner "$SHARE_DIR" "$CLAUDE_SETTINGS" \
+      "bash ~/.claude/tab-spinner-start.sh &" "bash ~/.claude/tab-spinner-stop.sh" "$HOME"
+  fi
 fi
 
 # ---------- Summary ----------
