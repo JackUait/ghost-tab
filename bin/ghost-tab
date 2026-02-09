@@ -320,6 +320,7 @@ else
 fi
 
 # ---------- Claude Code Status Line ----------
+if [ "$_sel_claude" -eq 1 ]; then
 header "Setting up Claude Code status line..."
 
 # Check for npm, install Node.js LTS if needed
@@ -467,6 +468,10 @@ CSEOF
       success "Created Claude settings with status line"
     fi
   fi
+fi
+else
+  header "Skipping Claude Code status line..."
+  info "Status line features are only available with Claude Code"
 fi
 
 # ---------- Sound Notification ----------
