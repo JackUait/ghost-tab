@@ -312,6 +312,59 @@ json.dump({'sound': ${_sound_enabled}, 'spinner': ${_spinner_enabled}}, open(pat
 print('ok')
 "
   success "Saved Codex CLI feature flags"
+
+  # Configure Codex config.toml
+  mkdir -p ~/.codex
+
+  if python3 - ~/.codex/config.toml "$_sound_enabled" "$_spinner_enabled" << 'PYEOF'
+import sys, os
+
+config_path = sys.argv[1]
+sound = int(sys.argv[2])
+spinner = int(sys.argv[3])
+
+lines = []
+if os.path.exists(config_path):
+    with open(config_path, "r") as f:
+        lines = f.readlines()
+
+has_notify = any(l.strip().startswith("notify") for l in lines)
+has_tui = any(l.strip() == "[tui]" for l in lines)
+has_status = any(l.strip().startswith("status_line") for l in lines)
+
+with open(config_path, "a") as f:
+    if not has_notify and (sound or spinner):
+        f.write("\n")
+        if spinner:
+            f.write('notify = ["bash", "~/.config/ghost-tab/codex-notify.sh"]\n')
+        else:
+            f.write('notify = ["afplay", "/System/Library/Sounds/Bottle.aiff"]\n')
+
+    if not has_tui:
+        f.write("\n[tui]\n")
+
+    if not has_status:
+        f.write('status_line = ["model-with-reasoning", "git-branch", "context-remaining", "used-tokens"]\n')
+
+print("ok")
+PYEOF
+  then
+    success "Configured Codex CLI (config.toml)"
+  else
+    warn "Failed to configure Codex CLI config"
+  fi
+fi
+
+# Codex CLI status line (always configure if Codex is selected)
+if [ "$_sel_codex" -eq 1 ]; then
+  mkdir -p ~/.codex
+  # Only add status_line if not already present
+  if [ ! -f ~/.codex/config.toml ] || ! grep -q 'status_line' ~/.codex/config.toml 2>/dev/null; then
+    if ! grep -q '^\[tui\]' ~/.codex/config.toml 2>/dev/null; then
+      printf '\n[tui]\n' >> ~/.codex/config.toml
+    fi
+    printf 'status_line = ["model-with-reasoning", "git-branch", "context-remaining", "used-tokens"]\n' >> ~/.codex/config.toml
+  fi
 fi
 
 # ---------- OpenCode Features ----------
