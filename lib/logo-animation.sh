@@ -203,8 +203,8 @@ start_logo_animation() {
             # Moving down: clear top exposed row
             clear_logo_area $((row + prev_off)) "$col" 1 "$_LOGO_WIDTH"
           else
-            # Moving up: clear bottom exposed row
-            clear_logo_area $((row + prev_off + _LOGO_HEIGHT)) "$col" 1 "$_LOGO_WIDTH"
+            # Moving up: clear bottom exposed row (last line of old position)
+            clear_logo_area $((row + prev_off + _LOGO_HEIGHT - 1)) "$col" 1 "$_LOGO_WIDTH"
           fi
         fi
 
