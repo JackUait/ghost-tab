@@ -2,11 +2,16 @@ setup() {
   load 'test_helper/common'
   _common_setup
   source "$PROJECT_ROOT/lib/tui.sh"
+  source "$PROJECT_ROOT/lib/ai-tools.sh"
   source "$PROJECT_ROOT/lib/logo-animation.sh"
   source "$PROJECT_ROOT/lib/settings-menu.sh"
 
   # Create temp settings file for testing
   export SETTINGS_FILE="${BATS_TEST_TMPDIR}/settings"
+
+  # Mock AI tool selection for color functions
+  export SELECTED_AI_TOOL="claude"
+  export AI_TOOLS_AVAILABLE=("claude")
 }
 
 teardown() {

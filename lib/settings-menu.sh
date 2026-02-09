@@ -80,34 +80,67 @@ draw_settings_screen() {
   # Clear screen completely
   printf '\033[2J\033[H'
 
-  # Center calculation
-  local settings_w=48
-  local left_col=$(( (_cols - settings_w) / 2 ))
-  local top_row=$(( (_rows - 6) / 2 ))
+  # Box dimensions (matching main menu style)
+  local box_w=48
+  local box_h=6
+  local left_col=$(( (_cols - box_w) / 2 + 1 ))
+  [ "$left_col" -lt 1 ] && left_col=1
+  local top_row=$(( (_rows - box_h) / 2 ))
+  [ "$top_row" -lt 1 ] && top_row=1
+  local content_col=$((left_col + 1))
+  local r="$top_row"
 
-  # Header
-  moveto "$top_row" "$left_col"
-  printf '%b' "$(_c 75)⬡  Settings$(_r)"
+  # Border colors matching AI tool (same as main menu)
+  local _bdr_clr _acc_clr _inner_w _right_col _hline
+  _bdr_clr="$(ai_tool_dim_color "$SELECTED_AI_TOOL")"
+  _acc_clr="$(ai_tool_color "$SELECTED_AI_TOOL")"
+  _inner_w=$((box_w - 2))
+  _right_col=$((left_col + box_w - 1))
+  printf -v _hline '%*s' "$_inner_w" ""
+  _hline="${_hline// /─}"
 
-  # Top border
-  top_row=$((top_row + 1))
-  moveto "$top_row" "$left_col"
-  printf '%b' "$(_c 240)────────────────────────────────────────────────$(_r)"
+  # Helper: print right border and clear rest of line
+  _rbdr() { moveto "$1" "$_right_col"; printf "${_bdr_clr}│${_NC}\\033[K"; }
 
-  # Ghost display setting
-  top_row=$((top_row + 1))
-  moveto "$top_row" "$left_col"
-  printf ' Ghost Display    %b  Press A to cycle' "$state_display"
+  # ── Top border ──
+  moveto "$r" "$left_col"
+  printf "${_bdr_clr}┌%s┐${_NC}\\033[K" "$_hline"
+  r=$((r+1))
 
-  # Bottom border
-  top_row=$((top_row + 1))
-  moveto "$top_row" "$left_col"
-  printf '%b' "$(_c 240)────────────────────────────────────────────────$(_r)"
+  # ── Title row ──
+  moveto "$r" "$left_col"
+  printf "${_bdr_clr}│${_NC}\\033[K"
+  printf " ${_BOLD}${_acc_clr}⬡  Settings${_NC}"
+  _rbdr "$r"
+  r=$((r+1))
 
-  # Footer
-  top_row=$((top_row + 1))
-  moveto "$top_row" "$left_col"
-  printf '%b' "$(_c 240) ESC or B to go back$(_r)"
+  # ── Separator ──
+  moveto "$r" "$left_col"
+  printf "${_bdr_clr}├%s┤${_NC}\\033[K" "$_hline"
+  r=$((r+1))
+
+  # ── Ghost Display setting ──
+  moveto "$r" "$left_col"
+  printf "${_bdr_clr}│${_NC}\\033[K"
+  printf " Ghost Display    %b  ${_DIM}Press A to cycle${_NC}" "$state_display"
+  _rbdr "$r"
+  r=$((r+1))
+
+  # ── Separator ──
+  moveto "$r" "$left_col"
+  printf "${_bdr_clr}├%s┤${_NC}\\033[K" "$_hline"
+  r=$((r+1))
+
+  # ── Footer ──
+  moveto "$r" "$left_col"
+  printf "${_bdr_clr}│${_NC}\\033[K"
+  printf "  ${_DIM}ESC or B to go back${_NC}"
+  _rbdr "$r"
+  r=$((r+1))
+
+  # ── Bottom border ──
+  moveto "$r" "$left_col"
+  printf "${_bdr_clr}└%s┘${_NC}\\033[K" "$_hline"
 }
 
 # ── Cycle Ghost Display Immediately ────────────────────────────────
