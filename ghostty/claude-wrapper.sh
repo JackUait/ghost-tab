@@ -354,6 +354,15 @@ elif [ -z "$1" ]; then
       esac
     }
 
+    ai_tool_color() {
+      case "$1" in
+        claude)   printf '\033[38;5;209m' ;;
+        codex)    printf '\033[38;5;114m' ;;
+        opencode) printf '\033[38;5;75m' ;;
+        *)        printf '\033[0;36m' ;;
+      esac
+    }
+
     draw_menu() {
       local i r c
 
@@ -386,14 +395,18 @@ elif [ -z "$1" ]; then
         _ai_name="$(ai_tool_display_name "$SELECTED_AI_TOOL")"
         local _pad=$(( _sep_w - _title_w - ${#_ai_name} - 4 ))
         [ "$_pad" -lt 2 ] && _pad=2
-        printf "${_BOLD}${_CYAN}⬡  Ghost Tab${_NC}%*s${_DIM}◀${_NC} ${_CYAN}%s${_NC} ${_DIM}▶${_NC}\033[K" \
+        local _ai_clr
+        _ai_clr="$(ai_tool_color "$SELECTED_AI_TOOL")"
+        printf "${_BOLD}${_CYAN}⬡  Ghost Tab${_NC}%*s${_DIM}◀${_NC} ${_ai_clr}%s${_NC} ${_DIM}▶${_NC}\033[K" \
           "$_pad" "" "$_ai_name"
       elif [ ${#AI_TOOLS_AVAILABLE[@]} -eq 1 ]; then
         local _ai_name
         _ai_name="$(ai_tool_display_name "$SELECTED_AI_TOOL")"
         local _pad=$(( _sep_w - _title_w - ${#_ai_name} ))
         [ "$_pad" -lt 2 ] && _pad=2
-        printf "${_BOLD}${_CYAN}⬡  Ghost Tab${_NC}%*s${_CYAN}%s${_NC}\033[K" \
+        local _ai_clr
+        _ai_clr="$(ai_tool_color "$SELECTED_AI_TOOL")"
+        printf "${_BOLD}${_CYAN}⬡  Ghost Tab${_NC}%*s${_ai_clr}%s${_NC}\033[K" \
           "$_pad" "" "$_ai_name"
       else
         printf "${_BOLD}${_CYAN}⬡  Ghost Tab${_NC}\033[K"
