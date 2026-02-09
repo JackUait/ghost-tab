@@ -12,7 +12,7 @@ if [ ! -d "$_WRAPPER_DIR/lib" ]; then
   exit 1
 fi
 
-_gt_libs=(ai-tools projects process input tui logo-animation update menu autocomplete project-actions tmux-session)
+_gt_libs=(ai-tools projects process input tui logo-animation update menu autocomplete project-actions tmux-session settings-menu)
 for _gt_lib in "${_gt_libs[@]}"; do
   if [ ! -f "$_WRAPPER_DIR/lib/${_gt_lib}.sh" ]; then
     printf '\033[31mError:\033[0m Missing library %s/lib/%s.sh\n' "$_WRAPPER_DIR" "$_gt_lib" >&2
@@ -77,7 +77,7 @@ elif [ -z "$1" ]; then
   _redraw() {
     stop_logo_animation 2>/dev/null
     draw_menu
-    [ "$_LOGO_LAYOUT" != "hidden" ] && start_logo_animation "$_logo_row" "$_logo_col" "$SELECTED_AI_TOOL"
+    [ "$_LOGO_LAYOUT" != "hidden" ] && [ "$(get_animation_setting)" = "on" ] && start_logo_animation "$_logo_row" "$_logo_col" "$SELECTED_AI_TOOL"
   }
 
   while true; do
@@ -286,6 +286,12 @@ elif [ -z "$1" ]; then
         d|D) selected=$((_n + 1)); _do_select=1 ;;
         o|O) selected=$((_n + 2)); _do_select=1 ;;
         p|P) selected=$((_n + 3)); _do_select=1 ;;
+        s|S)
+          stop_logo_animation 2>/dev/null
+          show_settings_menu
+          _redraw
+          continue
+          ;;
       esac
       if [[ "$key" == "" ]] || [ "$_do_select" -eq 1 ]; then
         case "${menu_types[$selected]}" in
