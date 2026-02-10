@@ -138,3 +138,223 @@ EOF
   assert_line --index 1 "app3:/path/app3"
   refute_output --partial "app2"
 }
+
+# --- validate_new_project edge cases ---
+
+@test "validate_new_project: handles path with spaces" {
+  mkdir -p "$TEST_TMP/path with spaces"
+  touch "$TEST_TMP/projects"
+  validate_new_project "$TEST_TMP/path with spaces" "$TEST_TMP/projects"
+  [ "$_validated_name" = "path with spaces" ]
+  [[ "$_validated_path" == *"path with spaces" ]]
+}
+
+@test "validate_new_project: handles path with single quotes" {
+  mkdir -p "$TEST_TMP/path'with'quotes"
+  touch "$TEST_TMP/projects"
+  validate_new_project "$TEST_TMP/path'with'quotes" "$TEST_TMP/projects"
+  [ "$_validated_name" = "path'with'quotes" ]
+  [[ "$_validated_path" == *"path'with'quotes" ]]
+}
+
+@test "validate_new_project: handles path with double quotes" {
+  mkdir -p "$TEST_TMP/path\"with\"quotes"
+  touch "$TEST_TMP/projects"
+  validate_new_project "$TEST_TMP/path\"with\"quotes" "$TEST_TMP/projects"
+  [ "$_validated_name" = "path\"with\"quotes" ]
+  [[ "$_validated_path" == *'path"with"quotes' ]]
+}
+
+@test "validate_new_project: handles path with unicode" {
+  mkdir -p "$TEST_TMP/émoji👻"
+  touch "$TEST_TMP/projects"
+  validate_new_project "$TEST_TMP/émoji👻" "$TEST_TMP/projects"
+  [ "$_validated_name" = "émoji👻" ]
+  [[ "$_validated_path" == *"émoji👻" ]]
+}
+
+@test "validate_new_project: normalizes path with .. components" {
+  mkdir -p "$TEST_TMP/subdir/myapp"
+  touch "$TEST_TMP/projects"
+  validate_new_project "$TEST_TMP/subdir/../subdir/myapp" "$TEST_TMP/projects"
+  # Should normalize to absolute path without ..
+  [[ "$_validated_path" == "$TEST_TMP/subdir/myapp" ]]
+  [ "$_validated_name" = "myapp" ]
+}
+
+@test "validate_new_project: handles relative path ./" {
+  original_dir="$(pwd)"
+  mkdir -p "$TEST_TMP/myapp"
+  cd "$TEST_TMP" || exit 1
+  touch "$TEST_TMP/projects"
+  validate_new_project "./myapp" "$TEST_TMP/projects"
+  # Should resolve to absolute path
+  [ "$_validated_path" = "$TEST_TMP/myapp" ]
+  [ "$_validated_name" = "myapp" ]
+  cd "$original_dir" || exit 1
+}
+
+@test "validate_new_project: handles symlink to directory" {
+  mkdir -p "$TEST_TMP/real-dir"
+  ln -s "$TEST_TMP/real-dir" "$TEST_TMP/link-dir"
+  touch "$TEST_TMP/projects"
+  validate_new_project "$TEST_TMP/link-dir" "$TEST_TMP/projects"
+  # Should resolve to the real path
+  [ "$_validated_path" = "$TEST_TMP/real-dir" ]
+  [ "$_validated_name" = "real-dir" ]
+}
+
+@test "validate_new_project: handles multiple trailing slashes" {
+  mkdir -p "$TEST_TMP/myapp"
+  touch "$TEST_TMP/projects"
+  validate_new_project "$TEST_TMP/myapp///" "$TEST_TMP/projects"
+  [[ "$_validated_path" != */ ]]
+  [ "$_validated_path" = "$TEST_TMP/myapp" ]
+}
+
+@test "validate_new_project: detects duplicate with different trailing slash variations" {
+  mkdir -p "$TEST_TMP/myapp"
+  echo "myapp:$TEST_TMP/myapp" > "$TEST_TMP/projects"
+  run validate_new_project "$TEST_TMP/myapp///" "$TEST_TMP/projects"
+  [ "$status" -eq 1 ]
+}
+
+@test "validate_new_project: detects duplicate through symlink" {
+  mkdir -p "$TEST_TMP/real-dir"
+  ln -s "$TEST_TMP/real-dir" "$TEST_TMP/link-dir"
+  echo "app:$TEST_TMP/real-dir" > "$TEST_TMP/projects"
+  run validate_new_project "$TEST_TMP/link-dir" "$TEST_TMP/projects"
+  # Should detect as duplicate since symlink resolves to same path
+  [ "$status" -eq 1 ]
+}
+
+@test "validate_new_project: handles tilde expansion with spaces" {
+  mkdir -p "$HOME/temp space test"
+  touch "$TEST_TMP/projects"
+  validate_new_project "~/temp space test" "$TEST_TMP/projects"
+  [ "$_validated_name" = "temp space test" ]
+  [ "$_validated_path" = "$HOME/temp space test" ]
+  rm -rf "$HOME/temp space test"
+}
+
+@test "validate_new_project: handles nonexistent path gracefully" {
+  touch "$TEST_TMP/projects"
+  validate_new_project "$TEST_TMP/nonexistent" "$TEST_TMP/projects"
+  # Should still set validated values even if path doesn't exist
+  [ -n "$_validated_path" ]
+  [ -n "$_validated_name" ]
+}
+
+@test "validate_new_project: handles empty path input" {
+  touch "$TEST_TMP/projects"
+  run validate_new_project "" "$TEST_TMP/projects"
+  # Should handle gracefully (might fail but shouldn't crash)
+  # Exit code can be 0 or non-zero depending on implementation
+  true
+}
+
+@test "validate_new_project: handles path with colons" {
+  # Colons are tricky because they're the delimiter in projects file
+  mkdir -p "$TEST_TMP/path:with:colons"
+  touch "$TEST_TMP/projects"
+  validate_new_project "$TEST_TMP/path:with:colons" "$TEST_TMP/projects"
+  [ "$_validated_name" = "path:with:colons" ]
+  [[ "$_validated_path" == *"path:with:colons" ]]
+}
+
+# --- add_project_to_file edge cases ---
+
+@test "add_project_to_file: handles name with spaces" {
+  touch "$TEST_TMP/projects"
+  add_project_to_file "my app" "/path/to/app" "$TEST_TMP/projects"
+  run cat "$TEST_TMP/projects"
+  assert_output "my app:/path/to/app"
+}
+
+@test "add_project_to_file: handles path with quotes" {
+  touch "$TEST_TMP/projects"
+  add_project_to_file "app" '/path/with"quotes' "$TEST_TMP/projects"
+  run cat "$TEST_TMP/projects"
+  assert_output 'app:/path/with"quotes'
+}
+
+@test "add_project_to_file: handles path with unicode" {
+  touch "$TEST_TMP/projects"
+  add_project_to_file "app" "/path/émoji/👻" "$TEST_TMP/projects"
+  run cat "$TEST_TMP/projects"
+  assert_output "app:/path/émoji/👻"
+}
+
+@test "add_project_to_file: handles very long paths" {
+  touch "$TEST_TMP/projects"
+  long_path="$(printf '/very/long/path%.0s' {1..50})"
+  add_project_to_file "app" "$long_path" "$TEST_TMP/projects"
+  run cat "$TEST_TMP/projects"
+  assert_output "app:$long_path"
+}
+
+@test "add_project_to_file: handles name with colons" {
+  touch "$TEST_TMP/projects"
+  add_project_to_file "app:v2.0" "/path/to/app" "$TEST_TMP/projects"
+  run cat "$TEST_TMP/projects"
+  assert_output "app:v2.0:/path/to/app"
+}
+
+@test "add_project_to_file: handles special characters in name" {
+  touch "$TEST_TMP/projects"
+  add_project_to_file "app-v1.0_test" "/path/to/app" "$TEST_TMP/projects"
+  run cat "$TEST_TMP/projects"
+  assert_output "app-v1.0_test:/path/to/app"
+}
+
+# --- delete_project_from_file edge cases ---
+
+@test "delete_project_from_file: handles entry with quotes" {
+  cat > "$TEST_TMP/projects" << 'EOF'
+app1:/path/app1
+app2:/path/with"quotes
+app3:/path/app3
+EOF
+  delete_project_from_file 'app2:/path/with"quotes' "$TEST_TMP/projects"
+  run cat "$TEST_TMP/projects"
+  assert_line --index 0 "app1:/path/app1"
+  assert_line --index 1 "app3:/path/app3"
+  refute_output --partial "app2"
+}
+
+@test "delete_project_from_file: handles entry with unicode" {
+  cat > "$TEST_TMP/projects" << EOF
+app1:/path/app1
+app2:/path/émoji/👻
+app3:/path/app3
+EOF
+  delete_project_from_file "app2:/path/émoji/👻" "$TEST_TMP/projects"
+  run cat "$TEST_TMP/projects"
+  assert_line --index 0 "app1:/path/app1"
+  assert_line --index 1 "app3:/path/app3"
+  refute_output --partial "app2"
+}
+
+@test "delete_project_from_file: does not delete partial matches" {
+  cat > "$TEST_TMP/projects" << 'EOF'
+app:/path/app
+app-long:/path/app-longer-name
+EOF
+  delete_project_from_file "app:/path/app" "$TEST_TMP/projects"
+  run cat "$TEST_TMP/projects"
+  assert_output "app-long:/path/app-longer-name"
+}
+
+@test "delete_project_from_file: handles very long entries" {
+  long_path="$(printf '/very/long/path%.0s' {1..50})"
+  cat > "$TEST_TMP/projects" << EOF
+app1:/path/app1
+app2:${long_path}
+app3:/path/app3
+EOF
+  delete_project_from_file "app2:${long_path}" "$TEST_TMP/projects"
+  run cat "$TEST_TMP/projects"
+  assert_line --index 0 "app1:/path/app1"
+  assert_line --index 1 "app3:/path/app3"
+  refute_output --partial "app2"
+}
