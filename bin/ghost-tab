@@ -44,7 +44,8 @@ fi
 
 # ---------- Dependencies ----------
 header "Installing dependencies..."
-for pkg in tmux lazygit broot; do
+ensure_base_requirements
+for pkg in lazygit broot; do
   ensure_brew_pkg "$pkg"
 done
 
@@ -78,8 +79,7 @@ save_ai_tool_preference "$_sel_claude" "$_sel_codex" "$_sel_copilot" "$_sel_open
 success "Default AI tool set to $(cat "$AI_TOOL_PREF_DIR/ai-tool")"
 
 # ---------- Ghostty ----------
-header "Checking Ghostty..."
-ensure_cask "ghostty" "Ghostty"
+# (Ghostty is now installed via ensure_base_requirements above)
 
 # Verify supporting files exist (will fail if run via curl|bash without clone)
 if [ ! -f "$SHARE_DIR/ghostty/claude-wrapper.sh" ] || [ ! -f "$SHARE_DIR/ghostty/config" ] || [ ! -d "$SHARE_DIR/templates" ]; then

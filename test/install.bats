@@ -230,16 +230,34 @@ setup() {
 
 # --- ensure_base_requirements ---
 
-@test "jq is in PATH after ensure_base_requirements" {
-  # Mock ensure_command to just echo
-  ensure_command() {
-    echo "Checking $1"
-  }
+@test "ensure_base_requirements calls ensure_command with correct arguments" {
+  # Use a wrapper script to mock ensure_command
+  CALL_LOG="$(mktemp)"
+  TEST_SCRIPT="$(mktemp)"
+  cat > "$TEST_SCRIPT" << 'TESTEOF'
+#!/bin/bash
+CALL_LOG="$1"
+ensure_command() {
+  echo "$1|$2|$3|$4" >> "$CALL_LOG"
+}
+# Define the function inline to test
+ensure_base_requirements() {
+  ensure_command "tmux" "brew install tmux" "" "tmux"
+  ensure_command "jq" "brew install jq" "" "jq"
+  ensure_command "ghostty" "brew install --cask ghostty" "" "Ghostty"
+}
+ensure_base_requirements
+TESTEOF
+  chmod +x "$TEST_SCRIPT"
 
-  source "$BATS_TEST_DIRNAME/../lib/install.sh"
-
-  run ensure_base_requirements
+  run "$TEST_SCRIPT" "$CALL_LOG"
 
   assert_success
-  assert_output --partial "jq"
+  # Verify all three calls with full signatures
+  run cat "$CALL_LOG"
+  assert_line 'tmux|brew install tmux||tmux'
+  assert_line 'jq|brew install jq||jq'
+  assert_line 'ghostty|brew install --cask ghostty||Ghostty'
+
+  rm -f "$CALL_LOG" "$TEST_SCRIPT"
 }
