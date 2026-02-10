@@ -45,7 +45,7 @@ teardown() {
 
   # Verify a backup file exists
   local backup_count
-  backup_count=$(ls "$TEST_TMP"/config.backup.* 2>/dev/null | wc -l | tr -d ' ')
+  backup_count=$(find "$TEST_TMP" -maxdepth 1 -name 'config.backup.*' 2>/dev/null | wc -l | tr -d ' ')
   [ "$backup_count" -eq 1 ]
 }
 
@@ -246,7 +246,7 @@ EOF
 
   # Verify two backup files exist
   local backup_count
-  backup_count=$(ls "$TEST_TMP"/config.backup.* 2>/dev/null | wc -l | tr -d ' ')
+  backup_count=$(find "$TEST_TMP" -maxdepth 1 -name 'config.backup.*' 2>/dev/null | wc -l | tr -d ' ')
   [ "$backup_count" -eq 2 ]
 }
 

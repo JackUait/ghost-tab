@@ -97,7 +97,7 @@ setup() {
 @test "parse_cwd_from_json: handles path with special JSON chars" {
   run parse_cwd_from_json '{"current_dir":"/tmp/test\"quoted"}'
   # sed stops at first unescaped quote
-  assert_output '/tmp/test\'
+  assert_output "/tmp/test\\"
 }
 
 @test "parse_cwd_from_json: handles very long path" {
