@@ -76,3 +76,13 @@ setup() {
   run type draw_logo_sleeping
   assert_success
 }
+
+@test "initiate_sleep_transition function exists" {
+  run type initiate_sleep_transition
+  assert_success
+}
+
+@test "wake_ghost function exists" {
+  run type wake_ghost
+  assert_success
+}

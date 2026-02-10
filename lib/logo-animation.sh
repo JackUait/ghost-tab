@@ -330,6 +330,45 @@ draw_logo_sleeping() {
   done
 }
 
+# initiate_sleep_transition
+#   Transition the ghost from awake to sleeping state.
+#   Stops bobbing animation, pauses briefly, then draws sleeping ghost with Zzz.
+#   Uses global variables: _logo_row, _logo_col, SELECTED_AI_TOOL, _ghost_sleeping
+initiate_sleep_transition() {
+  # Stop bobbing animation
+  stop_logo_animation
+
+  # Pause for gradual transition effect (2.5 seconds)
+  sleep 2.5
+
+  # Draw sleeping ghost with closed eyes and dimmed colors
+  # shellcheck disable=SC2154  # _logo_row, _logo_col, SELECTED_AI_TOOL are globals set by caller
+  draw_logo_sleeping "$_logo_row" "$_logo_col" "$SELECTED_AI_TOOL"
+
+  # Draw Zzz indicator above ghost
+  draw_zzz $((_logo_row - 3)) "$_logo_col"
+
+  _ghost_sleeping=1
+}
+
+# wake_ghost
+#   Wake the ghost from sleeping to awake state.
+#   Clears Zzz indicator and resumes bobbing animation.
+#   Uses global variables: _logo_row, _logo_col, SELECTED_AI_TOOL, _ghost_sleeping, _last_interaction
+wake_ghost() {
+  # Clear Zzz indicator
+  clear_zzz $((_logo_row - 3)) "$_logo_col"
+
+  # Resume bobbing animation (this redraws awake ghost)
+  # shellcheck disable=SC2154  # _logo_row, _logo_col, SELECTED_AI_TOOL are globals set by caller
+  start_logo_animation "$_logo_row" "$_logo_col" "$SELECTED_AI_TOOL"
+
+  # Update state
+  _ghost_sleeping=0
+  # shellcheck disable=SC2034  # _last_interaction is used by caller to track timing
+  _last_interaction=$SECONDS
+}
+
 # Bob offsets following a sine-wave pattern (range 0–1 rows).
 # 14 entries: slow at extremes (ease), smooth gentle bob.
 # Max 1-row difference between consecutive entries.
