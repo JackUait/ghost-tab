@@ -78,6 +78,11 @@ elif [ -z "$1" ]; then
     stop_logo_animation 2>/dev/null
     draw_menu
 
+    # Wake ghost if sleeping (before restarting animation)
+    if [ "${_ghost_sleeping:-0}" -eq 1 ]; then
+      _ghost_sleeping=0
+    fi
+
     # Apply ghost display setting if layout allows
     if [ "$_LOGO_LAYOUT" != "hidden" ]; then
       local ghost_display=$(get_ghost_display_setting)
@@ -140,6 +145,11 @@ elif [ -z "$1" ]; then
     printf "${_HIDE_CURSOR}${_MOUSE_ON}"
     printf '\033[2J\033[H'
     _redraw
+
+    # Initialize sleep timer
+    _last_interaction=$SECONDS
+    _ghost_sleeping=0
+    _sleep_timeout=120  # 2 minutes
 
     # Input loop
     while true; do
@@ -231,6 +241,7 @@ elif [ -z "$1" ]; then
         printf "    ${_BG_RED}${_WHITE}${_BOLD} %d) %s ${_NC}  ${_DIM}↑↓ navigate  1-9 jump  ⏎ delete  q cancel${_NC}\033[K" "$((_del_sel+1))" "$_dn"
 
         read -rsn1 key
+        _last_interaction=$SECONDS  # Reset timer on interaction
         if [[ "$key" == $'\x1b' ]]; then
           _esc_seq="$(parse_esc_sequence)"
           case "$_esc_seq" in
@@ -270,7 +281,27 @@ elif [ -z "$1" ]; then
       fi
 
       _do_select=0
-      read -rsn1 key
+      # Non-blocking read with 0.5s timeout to allow sleep checking
+      read -rsn1 -t 0.5 key || {
+        # Check for sleep timeout when no input
+        if [ "$_ghost_sleeping" -eq 0 ] && [ "$_LOGO_LAYOUT" != "hidden" ]; then
+          if [ $((SECONDS - _last_interaction)) -ge "$_sleep_timeout" ]; then
+            initiate_sleep_transition
+            _ghost_sleeping=1
+          fi
+        fi
+        continue
+      }
+
+      # Wake ghost if sleeping and any key pressed
+      if [ "$_ghost_sleeping" -eq 1 ]; then
+        wake_ghost
+        _ghost_sleeping=0
+      fi
+
+      # Reset interaction timer on any keypress
+      _last_interaction=$SECONDS
+
       if [[ "$key" == $'\x1b' ]]; then
         _esc_seq="$(parse_esc_sequence)"
         if [[ "$_esc_seq" == click:* ]]; then
