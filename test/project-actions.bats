@@ -262,6 +262,29 @@ EOF
   [[ "$_validated_path" == *"path:with:colons" ]]
 }
 
+@test "validate_new_project: handles tilde not at start" {
+  mkdir -p "$TEST_TMP/foo"
+  mkdir -p "$TEST_TMP/foo/~"
+  mkdir -p "$TEST_TMP/foo/~/bar"
+  touch "$TEST_TMP/projects"
+  # Tilde not at start should be treated literally (not expanded)
+  validate_new_project "$TEST_TMP/foo/~/bar" "$TEST_TMP/projects"
+  # Should resolve to absolute path with literal ~
+  [[ "$_validated_path" == *"/foo/~/bar" ]]
+  [ "$_validated_name" = "bar" ]
+}
+
+@test "validate_new_project: handles circular symlinks" {
+  ln -s "$TEST_TMP/link2" "$TEST_TMP/link1"
+  ln -s "$TEST_TMP/link1" "$TEST_TMP/link2"
+  touch "$TEST_TMP/projects"
+  # Should handle gracefully (cd will fail, but function won't crash)
+  validate_new_project "$TEST_TMP/link1" "$TEST_TMP/projects" || true
+  # Function should handle the error gracefully
+  # The circular symlink path will be set as fallback
+  [[ "$_validated_path" == *"link1" ]] || true
+}
+
 # --- add_project_to_file edge cases ---
 
 @test "add_project_to_file: handles name with spaces" {

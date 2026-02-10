@@ -174,6 +174,19 @@ EOF
   assert_output "some~thing"
 }
 
+@test "path_expand: handles valid symlink" {
+  mkdir -p "$TEST_DIR/target"
+  ln -s "$TEST_DIR/target" "$TEST_DIR/symlink"
+  run path_expand "$TEST_DIR/symlink/foo"
+  assert_output "$TEST_DIR/symlink/foo"
+}
+
+@test "path_expand: handles broken symlink" {
+  ln -s "$TEST_DIR/nonexistent" "$TEST_DIR/broken-link"
+  run path_expand "$TEST_DIR/broken-link/foo"
+  assert_output "$TEST_DIR/broken-link/foo"
+}
+
 # --- path_truncate edge cases ---
 
 @test "path_truncate: handles empty path" {
@@ -550,4 +563,11 @@ EOF
   # Should handle dots without confusion with ellipsis
   assert_success
   [ -n "$output" ]
+}
+@test "path_truncate: handles symlink paths" {
+  mkdir -p "$TEST_DIR/target"
+  ln -s "$TEST_DIR/target" "$TEST_DIR/very_long_symlink_name"
+  result="$(path_truncate "$TEST_DIR/very_long_symlink_name/some/path" 20)"
+  [ "${#result}" -le 20 ]
+  [[ "$result" == *"..."* ]]
 }

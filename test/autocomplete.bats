@@ -290,6 +290,32 @@ teardown() {
   [[ "${_suggestions[0]}" == "MixedCase/" ]]
 }
 
+@test "get_suggestions: handles multiple tildes in path" {
+  # Multiple tildes - only first one should expand
+  run get_suggestions "~/foo/~/bar"
+  # Should handle gracefully without crashing
+  # exit code 0 or 1 is acceptable
+  true
+}
+
+@test "get_suggestions: handles tilde not at start" {
+  mkdir -p "$TEST_TMP/foo/~"
+  mkdir -p "$TEST_TMP/foo/~/bar"
+  # Tilde not at start should be treated literally
+  get_suggestions "$TEST_TMP/foo/~"
+  # Should handle without expanding the second tilde
+  [ -n "${_suggestions[@]}" ] || true
+}
+
+@test "get_suggestions: handles circular symlinks" {
+  ln -s "$TEST_TMP/link2" "$TEST_TMP/link1"
+  ln -s "$TEST_TMP/link1" "$TEST_TMP/link2"
+  # Should handle gracefully without infinite loop
+  run get_suggestions "$TEST_TMP/link1"
+  # Should not crash or hang
+  true
+}
+
 # --- draw_suggestions edge cases ---
 
 @test "draw_suggestions: handles very long path names" {

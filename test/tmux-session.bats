@@ -208,6 +208,22 @@ newline"
   [[ "$result" == *'"/path/with spaces"'* ]]
 }
 
+@test "build_ai_launch_cmd: handles multiple tildes in path" {
+  # Multiple tildes - only first expands, rest are literal
+  run build_ai_launch_cmd "codex" "" "/usr/bin/codex" "" "" "~/foo/~/bar"
+  assert_success
+  # Should quote path properly (shell will interpret ~ literally if not at start)
+  assert_output '/usr/bin/codex --cd "~/foo/~/bar"'
+}
+
+@test "build_ai_launch_cmd: handles .. components in path" {
+  # Path with .. should be preserved as-is (not normalized)
+  run build_ai_launch_cmd "codex" "" "/usr/bin/codex" "" "" "/foo/../bar"
+  assert_success
+  # Should quote path to preserve .. (not normalize)
+  assert_output '/usr/bin/codex --cd "/foo/../bar"'
+}
+
 # --- cleanup_tmux_session edge cases ---
 
 @test "cleanup_tmux_session: handles multiple panes with process trees" {
