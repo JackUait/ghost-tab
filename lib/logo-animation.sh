@@ -300,9 +300,9 @@ clear_logo_area() {
 draw_zzz() {
   local row=$1 col=$2
   moveto "$row" "$((col + _LOGO_WIDTH - 8))"
-  printf '%s' "${_DIM}z${_NC}"
+  printf '\033[2mz\033[0m'
   moveto "$((row + 1))" "$((col + _LOGO_WIDTH - 6))"
-  printf '%s' "${_DIM}Z${_NC}"
+  printf '\033[2mZ\033[0m'
   moveto "$((row + 2))" "$((col + _LOGO_WIDTH - 4))"
   printf "Z"
 }
