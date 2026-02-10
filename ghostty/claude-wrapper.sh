@@ -242,7 +242,24 @@ elif [ -z "$1" ]; then
         moveto "$_del_sub_row" "$_content_col"
         printf "    ${_BG_RED}${_WHITE}${_BOLD} %d) %s ${_NC}  ${_DIM}↑↓ navigate  1-9 jump  ⏎ delete  q cancel${_NC}\033[K" "$((_del_sel+1))" "$_dn"
 
-        read -rsn1 key
+        # Non-blocking read with 0.5s timeout (same as main menu)
+        read -rsn1 -t 0.5 key || {
+          # Check for sleep timeout when no input
+          if [ "$_ghost_sleeping" -eq 0 ] && [ "$_LOGO_LAYOUT" != "hidden" ]; then
+            if [ $((SECONDS - _last_interaction)) -ge "$_sleep_timeout" ]; then
+              initiate_sleep_transition
+              _ghost_sleeping=1
+            fi
+          fi
+          continue
+        }
+
+        # Wake ghost if sleeping
+        if [ "$_ghost_sleeping" -eq 1 ]; then
+          wake_ghost
+          _ghost_sleeping=0
+        fi
+
         _last_interaction=$SECONDS  # Reset timer on interaction
         if [[ "$key" == $'\x1b' ]]; then
           _esc_seq="$(parse_esc_sequence)"
