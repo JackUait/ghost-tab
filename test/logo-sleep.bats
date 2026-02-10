@@ -23,7 +23,20 @@ setup() {
 @test "logo_art_claude_sleeping has closed eyes" {
   logo_art_claude_sleeping
 
-  # Lines 5 and 6 should have closed eyes (no white 255 color in eyes area)
+  # Line 5 should have closed eyes (line 6 is solid body in sleeping variant)
   # Check that line 5 contains the closed eye pattern
   [[ "${_LOGO_LINES[5]}" =~ "▬▬▬▬" ]]
+}
+
+@test "all sleeping ghost lines are exactly 28 visible characters" {
+  logo_art_claude_sleeping
+
+  for i in $(seq 0 14); do
+    # Strip ANSI codes and count visible chars
+    local line="${_LOGO_LINES[$i]}"
+    # Remove all ANSI escape sequences
+    line=$(echo -e "$line" | sed 's/\x1b\[[0-9;]*m//g')
+    local len=${#line}
+    assert [ "$len" -eq 28 ]
+  done
 }
