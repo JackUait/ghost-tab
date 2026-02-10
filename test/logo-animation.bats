@@ -1,4 +1,5 @@
 #!/usr/bin/env bats
+# shellcheck disable=SC2218  # Test mocks override functions sourced from lib/logo-animation.sh
 
 setup() {
   load 'test_helper/common'
