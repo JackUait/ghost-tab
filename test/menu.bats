@@ -792,3 +792,24 @@ teardown() {
   assert_output --partial "←→"
   assert_output --partial "AI tool"
 }
+
+# --- Logo Integration Tests ---
+
+@test "draw_logo calls ghost-tab-tui show-logo" {
+  # Mock ghost-tab-tui
+  ghost-tab-tui() {
+    if [[ "$1" == "show-logo" ]]; then
+      echo "MOCK_LOGO_OUTPUT"
+      return 0
+    fi
+    return 1
+  }
+  export -f ghost-tab-tui
+
+  source "$BATS_TEST_DIRNAME/../lib/tui.sh"
+
+  run draw_logo "claude"
+
+  assert_success
+  assert_output "MOCK_LOGO_OUTPUT"
+}
