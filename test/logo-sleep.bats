@@ -40,3 +40,24 @@ setup() {
     assert [ "$len" -eq 28 ]
   done
 }
+
+@test "logo_art_codex_sleeping function exists and sets variables" {
+  logo_art_codex_sleeping
+  assert [ "${#_LOGO_LINES[@]}" -eq 15 ]
+  assert [ "$_LOGO_HEIGHT" -eq 15 ]
+  assert [ "$_LOGO_WIDTH" -eq 28 ]
+}
+
+@test "logo_art_copilot_sleeping function exists and sets variables" {
+  logo_art_copilot_sleeping
+  assert [ "${#_LOGO_LINES[@]}" -eq 15 ]
+  assert [ "$_LOGO_HEIGHT" -eq 15 ]
+  assert [ "$_LOGO_WIDTH" -eq 28 ]
+}
+
+@test "logo_art_opencode_sleeping function exists and sets variables" {
+  logo_art_opencode_sleeping
+  assert [ "${#_LOGO_LINES[@]}" -eq 15 ]
+  assert [ "$_LOGO_HEIGHT" -eq 15 ]
+  assert [ "$_LOGO_WIDTH" -eq 28 ]
+}
