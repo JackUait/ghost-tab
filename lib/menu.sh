@@ -187,9 +187,9 @@ draw_menu() {
   moveto "$r" "$c"
   printf "${_bdr_clr}│${_NC}\033[K"
   if [ ${#AI_TOOLS_AVAILABLE[@]} -gt 1 ]; then
-    printf "  ${_DIM}↑↓${_NC} navigate  ${_DIM}←→${_NC} AI tool  ${_DIM}S${_NC} settings  ${_DIM}⏎${_NC} select"
+    printf "  ${_DIM}↑↓${_NC} navigate ${_DIM}←→${_NC} AI tool ${_DIM}S${_NC} settings ${_DIM}⏎${_NC} select"
   else
-    printf "  ${_DIM}↑↓${_NC} navigate  ${_DIM}S${_NC} settings  ${_DIM}⏎${_NC} select"
+    printf "  ${_DIM}↑↓${_NC} navigate ${_DIM}S${_NC} settings ${_DIM}⏎${_NC} select"
   fi
   _rbdr "$r"
   r=$((r+1))
