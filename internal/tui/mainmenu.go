@@ -4,11 +4,28 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/jackuait/ghost-tab/internal/models"
 )
+
+// bobTickMsg is sent on each bob animation tick.
+type bobTickMsg struct{}
+
+// sleepTickMsg is sent on each sleep timer tick.
+type sleepTickMsg struct{}
+
+// bobOffsets is the 14-step sine-wave offset pattern for ghost bobbing.
+var bobOffsets = []int{0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0}
+
+// BobOffsets returns a copy of the bob animation offset pattern.
+func BobOffsets() []int {
+	out := make([]int, len(bobOffsets))
+	copy(out, bobOffsets)
+	return out
+}
 
 // MainMenuResult represents the JSON output when the main menu exits.
 type MainMenuResult struct {
@@ -164,6 +181,21 @@ func (m *MainMenuModel) GhostDisplay() string {
 	return m.ghostDisplay
 }
 
+// SetSleepTimer sets the sleep inactivity timer to the given number of seconds.
+func (m *MainMenuModel) SetSleepTimer(seconds int) { m.sleepTimer = seconds }
+
+// ShouldSleep returns true if the sleep timer has reached the threshold (120s).
+func (m *MainMenuModel) ShouldSleep() bool { return m.sleepTimer >= 120 }
+
+// IsSleeping returns true if the ghost is currently in sleeping state.
+func (m *MainMenuModel) IsSleeping() bool { return m.ghostSleeping }
+
+// Wake resets the ghost to awake state and clears the sleep timer.
+func (m *MainMenuModel) Wake() { m.ghostSleeping = false; m.sleepTimer = 0 }
+
+// BobStep returns the current bob animation step index.
+func (m *MainMenuModel) BobStep() int { return m.bobStep }
+
 // Result returns the menu result, or nil if the menu has not exited.
 func (m *MainMenuModel) Result() *MainMenuResult {
 	return m.result
@@ -230,19 +262,61 @@ func (m *MainMenuModel) setActionResult(action string) {
 	m.quitting = true
 }
 
-// Init implements tea.Model. Returns nil for now (Task 5 will add tick commands).
-func (m *MainMenuModel) Init() tea.Cmd {
-	return nil
+// bobTickCmd returns a command that sends a bobTickMsg after 180ms.
+func (m *MainMenuModel) bobTickCmd() tea.Cmd {
+	return tea.Tick(180*time.Millisecond, func(t time.Time) tea.Msg {
+		return bobTickMsg{}
+	})
 }
 
-// Update implements tea.Model. Handles key bindings and window resize.
+// sleepTickCmd returns a command that sends a sleepTickMsg after 1 second.
+func (m *MainMenuModel) sleepTickCmd() tea.Cmd {
+	return tea.Tick(time.Second, func(t time.Time) tea.Msg {
+		return sleepTickMsg{}
+	})
+}
+
+// Init implements tea.Model. Starts animation ticks when in animated mode.
+func (m *MainMenuModel) Init() tea.Cmd {
+	var cmds []tea.Cmd
+	if m.ghostDisplay == "animated" {
+		cmds = append(cmds, m.bobTickCmd())
+		cmds = append(cmds, m.sleepTickCmd())
+	}
+	return tea.Batch(cmds...)
+}
+
+// Update implements tea.Model. Handles key bindings, window resize, and animation ticks.
 func (m *MainMenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case bobTickMsg:
+		if m.ghostDisplay == "animated" {
+			m.bobStep = (m.bobStep + 1) % len(BobOffsets())
+			return m, m.bobTickCmd()
+		}
+		return m, nil
+
+	case sleepTickMsg:
+		if m.ghostDisplay == "animated" && !m.ghostSleeping {
+			m.sleepTimer++
+			if m.sleepTimer >= 120 {
+				m.ghostSleeping = true
+			}
+			return m, m.sleepTickCmd()
+		}
+		return m, nil
+
 	case tea.WindowSizeMsg:
 		m.SetSize(msg.Width, msg.Height)
 		return m, nil
 
 	case tea.KeyMsg:
+		// Reset sleep state on any keypress
+		m.sleepTimer = 0
+		if m.ghostSleeping {
+			m.ghostSleeping = false
+		}
+
 		switch msg.Type {
 		case tea.KeyUp:
 			m.MoveUp()
@@ -503,12 +577,18 @@ func (m *MainMenuModel) View() string {
 	case "side":
 		ghostLines := GhostForTool(m.CurrentAITool(), m.ghostSleeping)
 		ghostStr := RenderGhost(ghostLines)
+		if m.ghostDisplay == "animated" && bobOffsets[m.bobStep] == 1 {
+			ghostStr = "\n" + ghostStr
+		}
 		spacer := strings.Repeat(" ", 3)
 		return lipgloss.JoinHorizontal(lipgloss.Top, menuBox, spacer, ghostStr)
 
 	case "above":
 		ghostLines := GhostForTool(m.CurrentAITool(), m.ghostSleeping)
 		ghostStr := RenderGhost(ghostLines)
+		if m.ghostDisplay == "animated" && bobOffsets[m.bobStep] == 1 {
+			ghostStr = "\n" + ghostStr
+		}
 		return lipgloss.JoinVertical(lipgloss.Center, ghostStr, "", menuBox)
 
 	default:

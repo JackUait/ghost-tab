@@ -628,10 +628,11 @@ func TestMainMenu_SetSize(t *testing.T) {
 }
 
 func TestMainMenu_Init(t *testing.T) {
-	m := tui.NewMainMenu(testProjects(), testAITools(), "claude", "animated")
+	// Static mode: Init returns nil (no ticks)
+	m := tui.NewMainMenu(testProjects(), testAITools(), "claude", "static")
 	cmd := m.Init()
 	if cmd != nil {
-		t.Error("Init() should return nil for now")
+		t.Error("Init() should return nil for static mode")
 	}
 }
 
@@ -836,5 +837,75 @@ func TestMainMenu_ViewGhostAbove(t *testing.T) {
 	}
 	if !strings.Contains(view, "Ghost Tab") {
 		t.Error("view should contain menu title in above layout")
+	}
+}
+
+func TestMainMenu_BobOffsets(t *testing.T) {
+	offsets := tui.BobOffsets()
+	if len(offsets) != 14 {
+		t.Errorf("expected 14 bob offsets, got %d", len(offsets))
+	}
+	expected := []int{0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0}
+	for i, v := range offsets {
+		if v != expected[i] {
+			t.Errorf("bob offset[%d]: expected %d, got %d", i, expected[i], v)
+		}
+	}
+}
+
+func TestMainMenu_SleepAfterInactivity(t *testing.T) {
+	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
+	m.SetSleepTimer(120)
+	if !m.ShouldSleep() {
+		t.Error("should sleep after 120 seconds of inactivity")
+	}
+}
+
+func TestMainMenu_WakeOnKeypress(t *testing.T) {
+	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
+	m.SetSleepTimer(120)
+	m.Wake()
+	if m.IsSleeping() {
+		t.Error("should be awake after Wake()")
+	}
+	if m.ShouldSleep() {
+		t.Error("sleep timer should be reset after Wake()")
+	}
+}
+
+func TestMainMenu_GhostHiddenWhenNone(t *testing.T) {
+	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "none")
+	m.SetSize(100, 40)
+	view := m.View()
+	if strings.Contains(view, "\u2588\u2588\u2588\u2588") {
+		t.Error("ghost should be hidden when display mode is 'none'")
+	}
+}
+
+func TestMainMenu_NoAnimationWhenStatic(t *testing.T) {
+	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "static")
+	cmd := m.Init()
+	if cmd != nil {
+		t.Error("static mode should not start animation ticks")
+	}
+}
+
+func TestMainMenu_AnimationStartsWhenAnimated(t *testing.T) {
+	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
+	cmd := m.Init()
+	if cmd == nil {
+		t.Error("animated mode should start animation ticks")
+	}
+}
+
+func TestMainMenu_SleepTimerResetOnKeypress(t *testing.T) {
+	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
+	m.SetSleepTimer(100)
+	// Simulate a keypress
+	msg := tea.KeyMsg{Type: tea.KeyDown}
+	m.Update(msg)
+	// Sleep timer should be reset
+	if m.ShouldSleep() {
+		t.Error("sleep timer should be reset after keypress")
 	}
 }
