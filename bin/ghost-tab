@@ -22,6 +22,8 @@ source "$SHARE_DIR/lib/settings-json.sh"
 source "$SHARE_DIR/lib/ai-select.sh"
 source "$SHARE_DIR/lib/statusline-setup.sh"
 source "$SHARE_DIR/lib/notification-setup.sh"
+source "$SHARE_DIR/lib/project-actions.sh"
+source "$SHARE_DIR/lib/project-actions-tui.sh"
 
 # ---------- OS check ----------
 header "Checking platform..."
@@ -151,18 +153,11 @@ read -rn1 -p "$(echo -e "${_BLUE}Add a project? (y/n):${_NC} ")" add_project </d
 echo ""
 
 while [[ "$add_project" =~ ^[yY]$ ]]; do
-  read -rp "$(echo -e "${_BLUE}Project name:${_NC} ")" proj_name </dev/tty
-  read -rp "$(echo -e "${_BLUE}Project path:${_NC} ")" proj_path </dev/tty
-
-  # Expand ~ to $HOME for validation
-  expanded_path="${proj_path/#\~/$HOME}"
-
-  if [ -d "$expanded_path" ]; then
-    echo "$proj_name:$expanded_path" >> "$PROJECTS_FILE"
-    success "Added $proj_name"
+  if add_project_interactive; then
+    add_project_to_file "$_add_project_name" "$_add_project_path" "$PROJECTS_FILE"
+    success "Added project: $_add_project_name"
   else
-    warn "Path $proj_path does not exist yet — adding anyway"
-    echo "$proj_name:$expanded_path" >> "$PROJECTS_FILE"
+    info "Cancelled"
   fi
 
   echo ""
