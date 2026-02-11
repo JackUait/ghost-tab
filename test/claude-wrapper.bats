@@ -131,10 +131,13 @@ EOF
 
   # Create isolated environment without ghost-tab-tui
   export SHARE_DIR="$TEST_SHARE_DIR"
-  export HOME="$TEST_TMP/home"
+  export HOME="$TEST_TMP/home-rebuild"
   # Remove both .local/bin and current directory from PATH
   export PATH="/usr/local/bin:/usr/bin:/bin:$(command -v go | xargs dirname)"
   mkdir -p "$HOME/.local/bin"
+
+  # Ensure ghost-tab-tui doesn't exist before test
+  rm -f "$HOME/.local/bin/ghost-tab-tui"
 
   run bash "$TEST_WRAPPER_DIR/test-wrapper.sh"
 
@@ -151,10 +154,14 @@ EOF
   # Minimal PATH without go or ghost-tab-tui
   export PATH="/usr/local/bin:/usr/bin:/bin"
   export SHARE_DIR="$TEST_SHARE_DIR"
-  export HOME="$TEST_TMP/home"
+  export HOME="$TEST_TMP/home-no-go"
+  mkdir -p "$HOME/.local/bin"
 
-  # Need to simulate user pressing a key
-  run bash -c "echo '' | bash '$TEST_WRAPPER_DIR/test-wrapper.sh'"
+  # Ensure ghost-tab-tui doesn't exist
+  rm -f "$HOME/.local/bin/ghost-tab-tui"
+
+  # Need to simulate user pressing a key - use proper variable expansion
+  run bash -c "echo '' | bash \"$TEST_WRAPPER_DIR/test-wrapper.sh\""
 
   assert_failure
   assert_output --partial "ghost-tab-tui binary not found and Go not installed"
@@ -168,20 +175,30 @@ EOF
     skip "Go not installed on test system"
   fi
 
+  # Create a separate test directory for this test to avoid polluting others
+  local TEST_SHARE_BAD="$TEST_TMP/share-bad"
+  mkdir -p "$TEST_SHARE_BAD/cmd/ghost-tab-tui"
+
+  # Copy go.mod
+  cp "$TEST_SHARE_DIR/go.mod" "$TEST_SHARE_BAD/"
+
   # Create invalid Go source that won't compile
-  cat > "$TEST_SHARE_DIR/cmd/ghost-tab-tui/main.go" <<'EOF'
+  cat > "$TEST_SHARE_BAD/cmd/ghost-tab-tui/main.go" <<'EOF'
 package main
 this is invalid go code!
 EOF
 
   # Minimal PATH with go but not ghost-tab-tui
   export PATH="/usr/local/bin:/usr/bin:/bin:$(command -v go | xargs dirname)"
-  export SHARE_DIR="$TEST_SHARE_DIR"
-  export HOME="$TEST_TMP/home"
+  export SHARE_DIR="$TEST_SHARE_BAD"
+  export HOME="$TEST_TMP/home-bad-build"
   mkdir -p "$HOME/.local/bin"
 
-  # Simulate user pressing key
-  run bash -c "echo '' | bash '$TEST_WRAPPER_DIR/test-wrapper.sh'"
+  # Ensure ghost-tab-tui doesn't exist
+  rm -f "$HOME/.local/bin/ghost-tab-tui"
+
+  # Simulate user pressing key - use proper variable expansion
+  run bash -c "echo '' | bash \"$TEST_WRAPPER_DIR/test-wrapper.sh\""
 
   assert_failure
   assert_output --partial "Failed to rebuild ghost-tab-tui"
@@ -198,8 +215,11 @@ EOF
   # Minimal PATH with go but not ghost-tab-tui
   export PATH="/usr/local/bin:/usr/bin:/bin:$(command -v go | xargs dirname)"
   export SHARE_DIR="$TEST_SHARE_DIR"
-  export HOME="$TEST_TMP/home"
+  export HOME="$TEST_TMP/home-path-test"
   mkdir -p "$HOME/.local/bin"
+
+  # Ensure ghost-tab-tui doesn't exist before test
+  rm -f "$HOME/.local/bin/ghost-tab-tui"
 
   run bash "$TEST_WRAPPER_DIR/test-wrapper.sh"
 
