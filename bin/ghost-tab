@@ -24,6 +24,7 @@ source "$SHARE_DIR/lib/statusline-setup.sh"
 source "$SHARE_DIR/lib/notification-setup.sh"
 source "$SHARE_DIR/lib/project-actions.sh"
 source "$SHARE_DIR/lib/project-actions-tui.sh"
+source "$SHARE_DIR/lib/input.sh"
 
 # ---------- OS check ----------
 header "Checking platform..."
@@ -149,10 +150,8 @@ PROJECTS_FILE="$PROJECTS_DIR/projects"
 mkdir -p "$PROJECTS_DIR"
 
 echo ""
-read -rn1 -p "$(echo -e "${_BLUE}Add a project? (y/n):${_NC} ")" add_project </dev/tty
-echo ""
 
-while [[ "$add_project" =~ ^[yY]$ ]]; do
+while confirm_tui "Add a project?"; do
   if add_project_interactive; then
     # Variables set by add_project_interactive: _add_project_name, _add_project_path
     if [[ -z "$_add_project_name" || -z "$_add_project_path" ]]; then
@@ -165,8 +164,6 @@ while [[ "$add_project" =~ ^[yY]$ ]]; do
     info "Cancelled"
   fi
 
-  echo ""
-  read -rn1 -p "$(echo -e "${_BLUE}Add another? (y/n):${_NC} ")" add_project </dev/tty
   echo ""
 done
 
@@ -200,10 +197,8 @@ if [ "$_supports_sound" -eq 1 ]; then
   echo -e "  Play a sound when the AI finishes generating"
   echo -e "  and is waiting for your input."
   echo ""
-  read -rn1 -p "$(echo -e "${_BLUE}Enable sound notification? (y/n):${_NC} ")" enable_sound </dev/tty
-  echo ""
 
-  if [[ "$enable_sound" =~ ^[yY]$ ]]; then
+  if confirm_tui "Enable sound notification?"; then
     _sound_enabled=1
   else
     info "Skipping sound notification"
