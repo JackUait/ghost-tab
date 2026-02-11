@@ -183,7 +183,6 @@ func (m ProjectInputModel) View() string {
 	if m.err != nil {
 		b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Render("Error: " + m.err.Error()))
 		b.WriteString("\n\n")
-		m.err = nil // Clear error after showing
 	}
 
 	b.WriteString(hintStyle.Render("Tab: autocomplete path | Enter: next/confirm | Esc: cancel"))

@@ -159,7 +159,7 @@ func (m MultiSelectModel) View() string {
 		}
 
 		// Tool display name
-		displayName := toolDisplayName(tool.Name)
+		displayName := installerToolDisplayName(tool.Name)
 		if i == m.cursor {
 			b.WriteString(selectedItemStyle.Render(displayName))
 		} else {
@@ -189,18 +189,18 @@ func (m MultiSelectModel) View() string {
 	return b.String()
 }
 
-// toolDisplayName returns the human-friendly name for an AI tool.
-func toolDisplayName(name string) string {
+// installerToolDisplayName returns the display name for an AI tool in the
+// installer context, including the organization in parentheses.
+func installerToolDisplayName(name string) string {
+	base := AIToolDisplayName(name)
 	switch name {
-	case "claude":
-		return "Claude Code"
 	case "codex":
-		return "Codex CLI (OpenAI)"
+		return base + " (OpenAI)"
 	case "copilot":
-		return "Copilot CLI (GitHub)"
+		return base + " (GitHub)"
 	case "opencode":
-		return "OpenCode (anomalyco)"
+		return base + " (anomalyco)"
 	default:
-		return name
+		return base
 	}
 }
