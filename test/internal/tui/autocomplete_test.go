@@ -120,3 +120,96 @@ func TestPathSuggestionProvider_NonexistentDir(t *testing.T) {
 		t.Errorf("expected 0 for nonexistent dir, got %d", len(suggestions))
 	}
 }
+
+func TestAutocompleteModel_InitialState(t *testing.T) {
+	provider := func(input string) []string {
+		return []string{"a/", "b/", "c/"}
+	}
+	m := tui.NewAutocomplete(provider, 8)
+	if m.ShowSuggestions() {
+		t.Error("suggestions should not show initially")
+	}
+	if m.Selected() != 0 {
+		t.Errorf("initial selection should be 0, got %d", m.Selected())
+	}
+}
+
+func TestAutocompleteModel_SuggestionsAppear(t *testing.T) {
+	provider := func(input string) []string {
+		if input == "foo" {
+			return []string{"foo-bar/", "foo-baz/"}
+		}
+		return nil
+	}
+	m := tui.NewAutocomplete(provider, 8)
+
+	m.SetInput("foo")
+	m.RefreshSuggestions()
+
+	if !m.ShowSuggestions() {
+		t.Error("suggestions should show after setting input")
+	}
+	if len(m.Suggestions()) != 2 {
+		t.Errorf("expected 2 suggestions, got %d", len(m.Suggestions()))
+	}
+}
+
+func TestAutocompleteModel_NavigateDown(t *testing.T) {
+	provider := func(input string) []string {
+		return []string{"a/", "b/", "c/"}
+	}
+	m := tui.NewAutocomplete(provider, 8)
+	m.SetInput("x")
+	m.RefreshSuggestions()
+
+	m.MoveDown()
+	if m.Selected() != 1 {
+		t.Errorf("after MoveDown: expected 1, got %d", m.Selected())
+	}
+}
+
+func TestAutocompleteModel_NavigateUpWraps(t *testing.T) {
+	provider := func(input string) []string {
+		return []string{"a/", "b/", "c/"}
+	}
+	m := tui.NewAutocomplete(provider, 8)
+	m.SetInput("x")
+	m.RefreshSuggestions()
+
+	m.MoveUp()
+	if m.Selected() != 2 {
+		t.Errorf("after MoveUp from 0: expected 2 (wrap), got %d", m.Selected())
+	}
+}
+
+func TestAutocompleteModel_AcceptSuggestion(t *testing.T) {
+	provider := func(input string) []string {
+		if input == "~/co" {
+			return []string{"~/code/", "~/config/"}
+		}
+		return nil
+	}
+	m := tui.NewAutocomplete(provider, 8)
+	m.SetInput("~/co")
+	m.RefreshSuggestions()
+	m.MoveDown() // select "~/config/"
+
+	accepted := m.AcceptSelected()
+	if accepted != "~/config/" {
+		t.Errorf("expected ~/config/, got %q", accepted)
+	}
+}
+
+func TestAutocompleteModel_DismissClearsSuggestions(t *testing.T) {
+	provider := func(input string) []string {
+		return []string{"a/", "b/"}
+	}
+	m := tui.NewAutocomplete(provider, 8)
+	m.SetInput("x")
+	m.RefreshSuggestions()
+
+	m.Dismiss()
+	if m.ShowSuggestions() {
+		t.Error("suggestions should be hidden after dismiss")
+	}
+}
