@@ -1,6 +1,11 @@
 setup() {
   load 'test_helper/common'
   _common_setup
+  TEST_TMP="$(mktemp -d)"
+}
+
+teardown() {
+  rm -rf "$TEST_TMP"
 }
 
 @test "select_ai_tool_interactive calls ghost-tab-tui select-ai-tool" {
@@ -27,9 +32,11 @@ setup() {
   }
   export -f jq
 
-  run select_ai_tool_interactive
+  # Don't use run - need to check variable in current shell
+  select_ai_tool_interactive
+  local result=$?
 
-  assert_success
+  [[ $result -eq 0 ]]
   [[ "$_selected_ai_tool" == "claude" ]]
 }
 
@@ -63,6 +70,12 @@ setup() {
 @test "select_ai_tool_interactive handles binary missing" {
   source "$PROJECT_ROOT/lib/ai-select-tui.sh"
 
+  # Mock error function
+  error() {
+    echo "ERROR: $*" >&2
+  }
+  export -f error
+
   # Override command to simulate missing binary
   command() {
     if [[ "$1" == "-v" && "$2" == "ghost-tab-tui" ]]; then
@@ -80,6 +93,12 @@ setup() {
 
 @test "select_ai_tool_interactive handles jq parse failure for selected" {
   source "$PROJECT_ROOT/lib/ai-select-tui.sh"
+
+  # Mock error function
+  error() {
+    echo "ERROR: $*" >&2
+  }
+  export -f error
 
   # Mock ghost-tab-tui
   ghost-tab-tui() {
@@ -103,6 +122,12 @@ setup() {
 @test "select_ai_tool_interactive handles jq parse failure for tool" {
   source "$PROJECT_ROOT/lib/ai-select-tui.sh"
 
+  # Mock error function
+  error() {
+    echo "ERROR: $*" >&2
+  }
+  export -f error
+
   # Mock ghost-tab-tui
   ghost-tab-tui() {
     echo '{"tool":"claude","selected":true}'
@@ -110,17 +135,22 @@ setup() {
   }
   export -f ghost-tab-tui
 
-  # Mock jq (first call succeeds, second fails)
-  _jq_call_count=0
+  # Mock jq (first call succeeds, second fails) - use file to track calls
+  echo "0" > "$TEST_TMP/jq_calls"
   jq() {
-    _jq_call_count=$((_jq_call_count + 1))
-    if [[ $_jq_call_count -eq 1 ]]; then
+    local count
+    count=$(<"$TEST_TMP/jq_calls")
+    count=$((count + 1))
+    echo "$count" > "$TEST_TMP/jq_calls"
+
+    if [[ $count -eq 1 ]]; then
       echo "true"
       return 0
     fi
     return 1
   }
   export -f jq
+  export TEST_TMP
 
   run select_ai_tool_interactive
 
@@ -130,6 +160,12 @@ setup() {
 
 @test "select_ai_tool_interactive validates against null selected" {
   source "$PROJECT_ROOT/lib/ai-select-tui.sh"
+
+  # Mock error function
+  error() {
+    echo "ERROR: $*" >&2
+  }
+  export -f error
 
   # Mock ghost-tab-tui
   ghost-tab-tui() {
@@ -156,6 +192,12 @@ setup() {
 @test "select_ai_tool_interactive validates against null tool" {
   source "$PROJECT_ROOT/lib/ai-select-tui.sh"
 
+  # Mock error function
+  error() {
+    echo "ERROR: $*" >&2
+  }
+  export -f error
+
   # Mock ghost-tab-tui
   ghost-tab-tui() {
     echo '{"tool":"null","selected":true}'
@@ -163,11 +205,15 @@ setup() {
   }
   export -f ghost-tab-tui
 
-  # Mock jq
-  _jq_call_count=0
+  # Mock jq - use file to track calls
+  echo "0" > "$TEST_TMP/jq_calls"
   jq() {
-    _jq_call_count=$((_jq_call_count + 1))
-    if [[ $_jq_call_count -eq 1 ]]; then
+    local count
+    count=$(<"$TEST_TMP/jq_calls")
+    count=$((count + 1))
+    echo "$count" > "$TEST_TMP/jq_calls"
+
+    if [[ $count -eq 1 ]]; then
       echo "true"
     else
       echo "null"
@@ -175,6 +221,7 @@ setup() {
     return 0
   }
   export -f jq
+  export TEST_TMP
 
   run select_ai_tool_interactive
 
@@ -185,6 +232,12 @@ setup() {
 @test "select_ai_tool_interactive validates against empty tool" {
   source "$PROJECT_ROOT/lib/ai-select-tui.sh"
 
+  # Mock error function
+  error() {
+    echo "ERROR: $*" >&2
+  }
+  export -f error
+
   # Mock ghost-tab-tui
   ghost-tab-tui() {
     echo '{"tool":"","selected":true}'
@@ -192,11 +245,15 @@ setup() {
   }
   export -f ghost-tab-tui
 
-  # Mock jq
-  _jq_call_count=0
+  # Mock jq - use file to track calls
+  echo "0" > "$TEST_TMP/jq_calls"
   jq() {
-    _jq_call_count=$((_jq_call_count + 1))
-    if [[ $_jq_call_count -eq 1 ]]; then
+    local count
+    count=$(<"$TEST_TMP/jq_calls")
+    count=$((count + 1))
+    echo "$count" > "$TEST_TMP/jq_calls"
+
+    if [[ $count -eq 1 ]]; then
       echo "true"
     else
       echo ""
@@ -204,6 +261,7 @@ setup() {
     return 0
   }
   export -f jq
+  export TEST_TMP
 
   run select_ai_tool_interactive
 
