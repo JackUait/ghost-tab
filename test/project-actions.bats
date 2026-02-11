@@ -422,3 +422,64 @@ EOF
 
   assert_failure
 }
+
+@test "add_project_interactive handles missing jq gracefully" {
+  ghost-tab-tui() {
+    if [[ "$1" == "add-project" ]]; then
+      echo '{"name":"test","path":"/tmp","confirmed":true}'
+      return 0
+    fi
+    return 1
+  }
+  export -f ghost-tab-tui
+
+  # Mock jq to fail
+  jq() {
+    return 127
+  }
+  export -f jq
+
+  source "$BATS_TEST_DIRNAME/../lib/project-actions-tui.sh"
+  source "$BATS_TEST_DIRNAME/../lib/tui.sh"
+
+  run add_project_interactive
+  assert_failure
+  assert_output --partial "Failed to parse"
+}
+
+@test "add_project_interactive handles malformed JSON" {
+  ghost-tab-tui() {
+    if [[ "$1" == "add-project" ]]; then
+      echo 'not valid json at all'
+      return 0
+    fi
+    return 1
+  }
+  export -f ghost-tab-tui
+
+  source "$BATS_TEST_DIRNAME/../lib/project-actions-tui.sh"
+  source "$BATS_TEST_DIRNAME/../lib/tui.sh"
+
+  run add_project_interactive
+  assert_failure
+  assert_output --partial "Failed to parse"
+}
+
+@test "add_project_interactive fails when TUI binary missing" {
+  # Override command -v to return false for ghost-tab-tui
+  command() {
+    if [[ "$1" == "-v" && "$2" == "ghost-tab-tui" ]]; then
+      return 1
+    fi
+    # shellcheck disable=SC2312
+    builtin command "$@"
+  }
+  export -f command
+
+  source "$BATS_TEST_DIRNAME/../lib/project-actions-tui.sh"
+  source "$BATS_TEST_DIRNAME/../lib/tui.sh"
+
+  run add_project_interactive
+  assert_failure
+  assert_output --partial "not found"
+}

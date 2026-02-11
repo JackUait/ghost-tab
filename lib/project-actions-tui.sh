@@ -16,14 +16,28 @@ add_project_interactive() {
   fi
 
   local confirmed
-  confirmed=$(echo "$result" | jq -r '.confirmed')
+  if ! confirmed=$(echo "$result" | jq -r '.confirmed' 2>/dev/null); then
+    error "Failed to parse TUI response"
+    return 1
+  fi
 
   if [[ "$confirmed" != "true" ]]; then
     return 1
   fi
 
-  _add_project_name=$(echo "$result" | jq -r '.name')
-  _add_project_path=$(echo "$result" | jq -r '.path')
+  local name path
+  if ! name=$(echo "$result" | jq -r '.name' 2>/dev/null); then
+    error "Failed to parse project name"
+    return 1
+  fi
+
+  if ! path=$(echo "$result" | jq -r '.path' 2>/dev/null); then
+    error "Failed to parse project path"
+    return 1
+  fi
+
+  _add_project_name="$name"
+  _add_project_path="$path"
 
   return 0
 }
