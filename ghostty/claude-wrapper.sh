@@ -7,15 +7,21 @@ if ! command -v ghost-tab-tui &>/dev/null; then
   if command -v go &>/dev/null; then
     printf 'Rebuilding ghost-tab-tui...\n' >&2
     mkdir -p "$HOME/.local/bin"
-    # Determine SHARE_DIR location (Homebrew or local install)
-    if [ -d "/opt/homebrew/share/ghost-tab" ]; then
+    # Determine SHARE_DIR location
+    # 1. Try wrapper script's actual location (for dev/symlink setups)
+    _wrapper_real_path="$(cd "$(dirname "$(readlink "$0" || echo "$0")")" && pwd)"
+    _candidate_share_dir="$(cd "$_wrapper_real_path/.." && pwd)"
+    if [ -f "$_candidate_share_dir/cmd/ghost-tab-tui/main.go" ]; then
+      SHARE_DIR="$_candidate_share_dir"
+    # 2. Try standard install locations
+    elif [ -f "/opt/homebrew/share/ghost-tab/cmd/ghost-tab-tui/main.go" ]; then
       SHARE_DIR="/opt/homebrew/share/ghost-tab"
-    elif [ -d "/usr/local/share/ghost-tab" ]; then
+    elif [ -f "/usr/local/share/ghost-tab/cmd/ghost-tab-tui/main.go" ]; then
       SHARE_DIR="/usr/local/share/ghost-tab"
-    elif [ -d "$HOME/.local/share/ghost-tab" ]; then
+    elif [ -f "$HOME/.local/share/ghost-tab/cmd/ghost-tab-tui/main.go" ]; then
       SHARE_DIR="$HOME/.local/share/ghost-tab"
     else
-      printf '\033[31mError:\033[0m Cannot find ghost-tab installation directory\n' >&2
+      printf '\033[31mError:\033[0m Cannot find ghost-tab source code\n' >&2
       printf 'Run \033[1mghost-tab\033[0m to reinstall.\n' >&2
       printf 'Press any key to exit...\n' >&2
       read -rsn1
