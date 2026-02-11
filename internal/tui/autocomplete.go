@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/jackuait/ghost-tab/internal/util"
 )
 
@@ -155,4 +156,50 @@ func (m *AutocompleteModel) AcceptSelected() string {
 func (m *AutocompleteModel) Dismiss() {
 	m.showSuggestions = false
 	m.suggestions = nil
+}
+
+// View renders the suggestion dropdown box.
+// Returns empty string if no suggestions are visible.
+func (m *AutocompleteModel) View() string {
+	if !m.showSuggestions || len(m.suggestions) == 0 {
+		return ""
+	}
+
+	borderColor := lipgloss.Color("241")
+	borderStyle := lipgloss.NewStyle().Foreground(borderColor)
+	selectedStyle := lipgloss.NewStyle().Reverse(true)
+
+	maxWidth := 0
+	for _, s := range m.suggestions {
+		if len(s) > maxWidth {
+			maxWidth = len(s)
+		}
+	}
+	if maxWidth < 20 {
+		maxWidth = 20
+	}
+	boxWidth := maxWidth + 2
+
+	var b strings.Builder
+
+	b.WriteString(borderStyle.Render("┌" + strings.Repeat("─", boxWidth) + "┐"))
+	b.WriteString("\n")
+
+	for i, s := range m.suggestions {
+		padded := s + strings.Repeat(" ", boxWidth-2-len(s))
+		var content string
+		if i == m.selected {
+			content = selectedStyle.Render(" " + padded + " ")
+		} else {
+			content = " " + padded + " "
+		}
+		b.WriteString(borderStyle.Render("│") + content + borderStyle.Render("│"))
+		b.WriteString("\n")
+	}
+
+	b.WriteString(borderStyle.Render("└" + strings.Repeat("─", boxWidth) + "┘"))
+	b.WriteString("\n")
+	b.WriteString(hintStyle.Render("↑↓ navigate  ⏎ complete  Esc cancel"))
+
+	return b.String()
 }
