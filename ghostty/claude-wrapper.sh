@@ -1,6 +1,46 @@
 #!/bin/bash
 export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
 
+# Self-healing: Check if ghost-tab-tui exists, rebuild if missing
+if ! command -v ghost-tab-tui &>/dev/null; then
+  # Simple inline rebuild without TUI functions (not loaded yet)
+  if command -v go &>/dev/null; then
+    printf 'Rebuilding ghost-tab-tui...\n' >&2
+    mkdir -p "$HOME/.local/bin"
+    # Determine SHARE_DIR location (Homebrew or local install)
+    if [ -d "/opt/homebrew/share/ghost-tab" ]; then
+      SHARE_DIR="/opt/homebrew/share/ghost-tab"
+    elif [ -d "/usr/local/share/ghost-tab" ]; then
+      SHARE_DIR="/usr/local/share/ghost-tab"
+    elif [ -d "$HOME/.local/share/ghost-tab" ]; then
+      SHARE_DIR="$HOME/.local/share/ghost-tab"
+    else
+      printf '\033[31mError:\033[0m Cannot find ghost-tab installation directory\n' >&2
+      printf 'Run \033[1mghost-tab\033[0m to reinstall.\n' >&2
+      printf 'Press any key to exit...\n' >&2
+      read -rsn1
+      exit 1
+    fi
+    # Build from module root with relative path to cmd
+    if (cd "$SHARE_DIR" && go build -o "$HOME/.local/bin/ghost-tab-tui" ./cmd/ghost-tab-tui) 2>/dev/null; then
+      printf 'ghost-tab-tui rebuilt successfully\n' >&2
+      export PATH="$HOME/.local/bin:$PATH"
+    else
+      printf '\033[31mError:\033[0m Failed to rebuild ghost-tab-tui\n' >&2
+      printf 'Run \033[1mghost-tab\033[0m to reinstall.\n' >&2
+      printf 'Press any key to exit...\n' >&2
+      read -rsn1
+      exit 1
+    fi
+  else
+    printf '\033[31mError:\033[0m ghost-tab-tui binary not found and Go not installed\n' >&2
+    printf 'Run \033[1mghost-tab\033[0m to reinstall.\n' >&2
+    printf 'Press any key to exit...\n' >&2
+    read -rsn1
+    exit 1
+  fi
+fi
+
 # Load shared library functions
 _WRAPPER_DIR="$(cd "$(dirname "$0")" && pwd)"
 

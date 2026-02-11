@@ -18,7 +18,8 @@ ensure_ghost_tab_tui() {
 
   info "Building ghost-tab-tui..."
   mkdir -p "$HOME/.local/bin"
-  if go build -o "$HOME/.local/bin/ghost-tab-tui" "$share_dir/cmd/ghost-tab-tui"; then
+  # Build from module root with relative path to cmd
+  if (cd "$share_dir" && go build -o "$HOME/.local/bin/ghost-tab-tui" ./cmd/ghost-tab-tui); then
     success "ghost-tab-tui built and installed"
   else
     error "Failed to build ghost-tab-tui"
