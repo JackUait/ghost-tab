@@ -80,3 +80,12 @@ func ThemeForTool(tool string) AIToolTheme {
 	}
 	return themes["claude"]
 }
+
+// ApplyTheme updates the package-level styles (titleStyle, selectedItemStyle,
+// questionStyle) to use the given theme's Primary color. Call this before
+// creating any TUI model so that all components reflect the AI tool's colors.
+func ApplyTheme(theme AIToolTheme) {
+	titleStyle = lipgloss.NewStyle().Foreground(theme.Primary).Bold(true)
+	selectedItemStyle = lipgloss.NewStyle().Foreground(theme.Primary)
+	questionStyle = lipgloss.NewStyle().Foreground(theme.Primary).Bold(true)
+}

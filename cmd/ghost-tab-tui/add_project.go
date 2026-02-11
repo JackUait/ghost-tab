@@ -22,6 +22,8 @@ func init() {
 }
 
 func runAddProject(cmd *cobra.Command, args []string) error {
+	tui.ApplyTheme(tui.ThemeForTool(aiToolFlag))
+
 	model := tui.NewProjectInput()
 
 	ttyOpts, cleanup, err := util.TUITeaOptions()

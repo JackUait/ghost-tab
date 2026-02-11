@@ -23,6 +23,8 @@ func init() {
 }
 
 func runConfirm(cmd *cobra.Command, args []string) error {
+	tui.ApplyTheme(tui.ThemeForTool(aiToolFlag))
+
 	message := args[0]
 
 	model := tui.NewConfirmDialog(message)

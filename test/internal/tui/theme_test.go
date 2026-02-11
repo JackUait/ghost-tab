@@ -53,6 +53,25 @@ func TestThemeForTool_Unknown(t *testing.T) {
 	}
 }
 
+func TestApplyTheme(t *testing.T) {
+	tools := []string{"claude", "codex", "copilot", "opencode"}
+
+	for _, tool := range tools {
+		t.Run(tool, func(t *testing.T) {
+			theme := tui.ThemeForTool(tool)
+			// ApplyTheme should not panic for any valid theme
+			tui.ApplyTheme(theme)
+		})
+	}
+}
+
+func TestApplyTheme_UnknownFallback(t *testing.T) {
+	// Applying a theme from an unknown tool (falls back to claude) should work
+	theme := tui.ThemeForTool("unknown-tool")
+	tui.ApplyTheme(theme)
+	// No panic means success
+}
+
 func TestAllThemes(t *testing.T) {
 	expectedNames := map[string]string{
 		"claude":   "claude",
