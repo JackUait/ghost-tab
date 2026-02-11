@@ -58,7 +58,7 @@ if [ ! -d "$_WRAPPER_DIR/lib" ]; then
   exit 1
 fi
 
-_gt_libs=(ai-tools projects process input tui update menu-tui project-actions tmux-session settings-menu-tui)
+_gt_libs=(ai-tools projects process input tui update menu-tui project-actions project-actions-tui tmux-session settings-menu-tui)
 for _gt_lib in "${_gt_libs[@]}"; do
   if [ ! -f "$_WRAPPER_DIR/lib/${_gt_lib}.sh" ]; then
     printf '\033[31mError:\033[0m Missing library %s/lib/%s.sh\n' "$_WRAPPER_DIR" "$_gt_lib" >&2
@@ -114,16 +114,64 @@ elif [ -z "$1" ]; then
   # Use TUI for project selection
   printf '\033]0;👻 Ghost Tab\007'
 
-  if select_project_interactive "$PROJECTS_FILE"; then
-    # User selected a project (variables set by select_project_interactive)
-    # shellcheck disable=SC2154
-    PROJECT_NAME="$_selected_project_name"
-    # shellcheck disable=SC2154
-    cd "$_selected_project_path" || exit 1
-  else
-    # User quit (ESC/Ctrl-C) or no projects
-    exit 0
-  fi
+  while true; do
+    if select_project_interactive "$PROJECTS_FILE"; then
+      # shellcheck disable=SC2154
+      case "$_selected_project_action" in
+        select-project)
+          PROJECT_NAME="$_selected_project_name"
+          # shellcheck disable=SC2154
+          cd "$_selected_project_path" || exit 1
+          # Update AI tool if user cycled it in the menu
+          if [[ -n "${_selected_ai_tool:-}" ]]; then
+            SELECTED_AI_TOOL="$_selected_ai_tool"
+          fi
+          break
+          ;;
+        add-project)
+          if add_project_interactive; then
+            # shellcheck disable=SC2154
+            if validate_new_project "$_add_project_path" "$PROJECTS_FILE"; then
+              add_project_to_file "$_add_project_name" "$_validated_path" "$PROJECTS_FILE"
+            fi
+          fi
+          continue
+          ;;
+        delete-project)
+          # Show project list for deletion — reuse select-project TUI
+          # For now, loop back to main menu (delete handled in TUI in future)
+          continue
+          ;;
+        open-once)
+          # Prompt for path via /dev/tty
+          printf 'Project path: ' >/dev/tty
+          read -r open_path </dev/tty
+          if [[ -n "$open_path" ]]; then
+            open_path="${open_path/#\~/$HOME}"
+            if [[ -d "$open_path" ]]; then
+              cd "$open_path" || exit 1
+              PROJECT_NAME="$(basename "$open_path")"
+              if [[ -n "${_selected_ai_tool:-}" ]]; then
+                SELECTED_AI_TOOL="$_selected_ai_tool"
+              fi
+              break
+            fi
+          fi
+          continue
+          ;;
+        plain-terminal)
+          exit 0
+          ;;
+        *)
+          # settings or unknown — loop back to menu
+          continue
+          ;;
+      esac
+    else
+      # User quit (ESC/Ctrl-C)
+      exit 0
+    fi
+  done
 fi
 
 PROJECT_DIR="$(pwd)"

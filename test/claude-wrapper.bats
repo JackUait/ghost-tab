@@ -30,6 +30,7 @@ setup() {
   cp "$PROJECT_ROOT/lib/update.sh" "$TEST_WRAPPER_DIR/lib/"
   cp "$PROJECT_ROOT/lib/menu-tui.sh" "$TEST_WRAPPER_DIR/lib/"
   cp "$PROJECT_ROOT/lib/project-actions.sh" "$TEST_WRAPPER_DIR/lib/"
+  cp "$PROJECT_ROOT/lib/project-actions-tui.sh" "$TEST_WRAPPER_DIR/lib/"
   cp "$PROJECT_ROOT/lib/tmux-session.sh" "$TEST_WRAPPER_DIR/lib/"
   cp "$PROJECT_ROOT/lib/settings-menu-tui.sh" "$TEST_WRAPPER_DIR/lib/"
 

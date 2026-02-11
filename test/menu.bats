@@ -2,123 +2,261 @@ setup() {
   load 'test_helper/common'
   _common_setup
   TEST_TMP="$(mktemp -d)"
+
+  # Source required libs for every test
+  source "$PROJECT_ROOT/lib/tui.sh" 2>/dev/null || true
+  source "$PROJECT_ROOT/lib/menu-tui.sh"
+
+  # Default mocks/vars used by most tests
+  PROJECTS_FILE="$TEST_TMP/projects"
+  echo "proj1:/tmp/p1" > "$PROJECTS_FILE"
+  AI_TOOLS_AVAILABLE=("claude")
+  SELECTED_AI_TOOL="claude"
+  _update_version=""
+
+  # Mock error function
+  error() { echo "ERROR: $*" >&2; }
+  export -f error
 }
 
 teardown() {
   rm -rf "$TEST_TMP"
 }
 
-@test "select_project_interactive calls ghost-tab-tui and parses JSON" {
-  source "$PROJECT_ROOT/lib/menu-tui.sh"
-
-  PROJECTS_FILE="$TEST_TMP/projects"
-  echo "proj1:/tmp/p1" > "$PROJECTS_FILE"
-
-  # Mock ghost-tab-tui
+@test "select_project_interactive calls main-menu and parses select-project JSON" {
   ghost-tab-tui() {
-    if [[ "$1" == "select-project" ]]; then
-      echo '{"name":"proj1","path":"/tmp/p1","selected":true}'
+    if [[ "$1" == "main-menu" ]]; then
+      echo '{"action":"select-project","name":"proj1","path":"/tmp/p1","ai_tool":"claude"}'
       return 0
     fi
     return 1
   }
   export -f ghost-tab-tui
 
-  # Mock jq
-  echo "0" > "$TEST_TMP/jq_calls"
-  jq() {
-    local count
-    count=$(<"$TEST_TMP/jq_calls")
-    count=$((count + 1))
-    echo "$count" > "$TEST_TMP/jq_calls"
-
-    case $count in
-      1) echo "true" ;;      # .selected
-      2) echo "proj1" ;;     # .name
-      3) echo "/tmp/p1" ;;   # .path
-    esac
-    return 0
-  }
-  export -f jq
-  export TEST_TMP
-
-  # Call function without run to preserve variable assignments
   select_project_interactive "$PROJECTS_FILE"
   local result=$?
 
-  # Check return code and variables
   [[ $result -eq 0 ]]
   [[ "$_selected_project_name" == "proj1" ]]
   [[ "$_selected_project_path" == "/tmp/p1" ]]
+  [[ "$_selected_project_action" == "select-project" ]]
 }
 
-@test "select_project_interactive handles cancellation" {
-  source "$PROJECT_ROOT/lib/menu-tui.sh"
+@test "select_project_interactive passes correct flags to main-menu" {
+  AI_TOOLS_AVAILABLE=("claude" "codex")
+  SELECTED_AI_TOOL="codex"
+  _update_version="2.0.0"
 
-  PROJECTS_FILE="$TEST_TMP/projects"
-  echo "proj1:/tmp/p1" > "$PROJECTS_FILE"
+  # Override XDG path
+  XDG_CONFIG_HOME="$TEST_TMP"
+  mkdir -p "$TEST_TMP/ghost-tab"
+  echo "ghost_display=static" > "$TEST_TMP/ghost-tab/settings"
 
-  # Mock ghost-tab-tui to return cancelled
   ghost-tab-tui() {
-    if [[ "$1" == "select-project" ]]; then
-      echo '{"selected":false}'
-      return 0
-    fi
-    return 1
+    echo "$*" > "$TEST_TMP/captured_args"
+    echo '{"action":"quit"}'
+    return 0
+  }
+  export -f ghost-tab-tui
+  export TEST_TMP
+
+  # Run it (will return failure for quit, but we want to check args)
+  select_project_interactive "$PROJECTS_FILE" || true
+
+  # Verify main-menu was called with correct flags
+  local captured_args
+  captured_args=$(<"$TEST_TMP/captured_args")
+  [[ "$captured_args" == *"main-menu"* ]]
+  [[ "$captured_args" == *"--projects-file"* ]]
+  [[ "$captured_args" == *"--ai-tool"* ]]
+  [[ "$captured_args" == *"codex"* ]]
+  [[ "$captured_args" == *"--ai-tools"* ]]
+  [[ "$captured_args" == *"claude,codex"* ]]
+  [[ "$captured_args" == *"--ghost-display"* ]]
+  [[ "$captured_args" == *"static"* ]]
+  [[ "$captured_args" == *"--update-version"* ]]
+  [[ "$captured_args" == *"2.0.0"* ]]
+}
+
+@test "select_project_interactive handles AI tool change" {
+  AI_TOOLS_AVAILABLE=("claude" "codex")
+  SELECTED_AI_TOOL="claude"
+
+  ghost-tab-tui() {
+    echo '{"action":"select-project","name":"proj1","path":"/tmp/p1","ai_tool":"codex"}'
+    return 0
   }
   export -f ghost-tab-tui
 
-  # Mock jq
-  jq() {
-    if [[ "$2" == ".selected" ]]; then
-      echo "false"
-    fi
+  select_project_interactive "$PROJECTS_FILE"
+
+  [[ "$_selected_ai_tool" == "codex" ]]
+}
+
+@test "select_project_interactive handles quit action" {
+  ghost-tab-tui() {
+    echo '{"action":"quit"}'
     return 0
   }
-  export -f jq
+  export -f ghost-tab-tui
 
   run select_project_interactive "$PROJECTS_FILE"
 
   assert_failure
 }
 
-@test "select_project_interactive validates null name" {
-  source "$PROJECT_ROOT/lib/menu-tui.sh"
-
-  PROJECTS_FILE="$TEST_TMP/projects"
-
-  # Mock error function
-  error() {
-    echo "ERROR: $*" >&2
-  }
-  export -f error
-
-  # Mock ghost-tab-tui to return null name
+@test "select_project_interactive handles add-project action" {
   ghost-tab-tui() {
-    if [[ "$1" == "select-project" ]]; then
-      echo '{"name":null,"path":"/tmp/p1","selected":true}'
-      return 0
-    fi
-    return 1
+    echo '{"action":"add-project","ai_tool":"claude"}'
+    return 0
   }
   export -f ghost-tab-tui
 
-  # Mock jq
-  echo "0" > "$TEST_TMP/jq_calls"
-  jq() {
-    local count
-    count=$(<"$TEST_TMP/jq_calls")
-    count=$((count + 1))
-    echo "$count" > "$TEST_TMP/jq_calls"
+  select_project_interactive "$PROJECTS_FILE"
+  local result=$?
 
-    case $count in
-      1) echo "true" ;;   # .selected
-      2) echo "null" ;;   # .name
-    esac
+  [[ $result -eq 0 ]]
+  [[ "$_selected_project_action" == "add-project" ]]
+}
+
+@test "select_project_interactive handles delete-project action" {
+  ghost-tab-tui() {
+    echo '{"action":"delete-project","ai_tool":"claude"}'
     return 0
   }
-  export -f jq
+  export -f ghost-tab-tui
+
+  select_project_interactive "$PROJECTS_FILE"
+  local result=$?
+
+  [[ $result -eq 0 ]]
+  [[ "$_selected_project_action" == "delete-project" ]]
+}
+
+@test "select_project_interactive handles open-once action" {
+  ghost-tab-tui() {
+    echo '{"action":"open-once","ai_tool":"claude"}'
+    return 0
+  }
+  export -f ghost-tab-tui
+
+  select_project_interactive "$PROJECTS_FILE"
+  local result=$?
+
+  [[ $result -eq 0 ]]
+  [[ "$_selected_project_action" == "open-once" ]]
+}
+
+@test "select_project_interactive handles plain-terminal action" {
+  ghost-tab-tui() {
+    echo '{"action":"plain-terminal","ai_tool":"claude"}'
+    return 0
+  }
+  export -f ghost-tab-tui
+
+  select_project_interactive "$PROJECTS_FILE"
+  local result=$?
+
+  [[ $result -eq 0 ]]
+  [[ "$_selected_project_action" == "plain-terminal" ]]
+}
+
+@test "select_project_interactive handles settings action" {
+  ghost-tab-tui() {
+    echo '{"action":"settings","ai_tool":"claude"}'
+    return 0
+  }
+  export -f ghost-tab-tui
+
+  select_project_interactive "$PROJECTS_FILE"
+  local result=$?
+
+  [[ $result -eq 0 ]]
+  [[ "$_selected_project_action" == "settings" ]]
+}
+
+@test "select_project_interactive persists ghost_display change" {
+  XDG_CONFIG_HOME="$TEST_TMP"
+  mkdir -p "$TEST_TMP/ghost-tab"
+
+  ghost-tab-tui() {
+    echo '{"action":"select-project","name":"proj1","path":"/tmp/p1","ai_tool":"claude","ghost_display":"static"}'
+    return 0
+  }
+  export -f ghost-tab-tui
+
+  select_project_interactive "$PROJECTS_FILE"
+
+  # Check settings file was written
+  [[ -f "$TEST_TMP/ghost-tab/settings" ]]
+  grep -q 'ghost_display=static' "$TEST_TMP/ghost-tab/settings"
+}
+
+@test "select_project_interactive updates existing ghost_display in settings" {
+  XDG_CONFIG_HOME="$TEST_TMP"
+  mkdir -p "$TEST_TMP/ghost-tab"
+  echo "ghost_display=animated" > "$TEST_TMP/ghost-tab/settings"
+
+  ghost-tab-tui() {
+    echo '{"action":"select-project","name":"proj1","path":"/tmp/p1","ai_tool":"claude","ghost_display":"none"}'
+    return 0
+  }
+  export -f ghost-tab-tui
+
+  select_project_interactive "$PROJECTS_FILE"
+
+  grep -q 'ghost_display=none' "$TEST_TMP/ghost-tab/settings"
+  # Make sure old value is gone
+  ! grep -q 'ghost_display=animated' "$TEST_TMP/ghost-tab/settings"
+}
+
+@test "select_project_interactive reads ghost_display from settings file" {
+  XDG_CONFIG_HOME="$TEST_TMP"
+  mkdir -p "$TEST_TMP/ghost-tab"
+  echo "ghost_display=none" > "$TEST_TMP/ghost-tab/settings"
+
+  ghost-tab-tui() {
+    echo "$*" > "$TEST_TMP/captured_args"
+    echo '{"action":"quit"}'
+    return 0
+  }
+  export -f ghost-tab-tui
   export TEST_TMP
+
+  select_project_interactive "$PROJECTS_FILE" || true
+
+  local captured_args
+  captured_args=$(<"$TEST_TMP/captured_args")
+  [[ "$captured_args" == *"--ghost-display"* ]]
+  [[ "$captured_args" == *"none"* ]]
+}
+
+@test "select_project_interactive defaults ghost_display to animated" {
+  XDG_CONFIG_HOME="$TEST_TMP"
+  # No settings file
+
+  ghost-tab-tui() {
+    echo "$*" > "$TEST_TMP/captured_args"
+    echo '{"action":"quit"}'
+    return 0
+  }
+  export -f ghost-tab-tui
+  export TEST_TMP
+
+  select_project_interactive "$PROJECTS_FILE" || true
+
+  local captured_args
+  captured_args=$(<"$TEST_TMP/captured_args")
+  [[ "$captured_args" == *"--ghost-display"* ]]
+  [[ "$captured_args" == *"animated"* ]]
+}
+
+@test "select_project_interactive validates null name on select-project" {
+  ghost-tab-tui() {
+    echo '{"action":"select-project","name":null,"path":"/tmp/p1","ai_tool":"claude"}'
+    return 0
+  }
+  export -f ghost-tab-tui
 
   run select_project_interactive "$PROJECTS_FILE"
 
@@ -126,44 +264,12 @@ teardown() {
   assert_output --partial "invalid project name"
 }
 
-@test "select_project_interactive validates null path" {
-  source "$PROJECT_ROOT/lib/menu-tui.sh"
-
-  PROJECTS_FILE="$TEST_TMP/projects"
-
-  # Mock error function
-  error() {
-    echo "ERROR: $*" >&2
-  }
-  export -f error
-
-  # Mock ghost-tab-tui
+@test "select_project_interactive validates null path on select-project" {
   ghost-tab-tui() {
-    if [[ "$1" == "select-project" ]]; then
-      echo '{"name":"proj1","path":null,"selected":true}'
-      return 0
-    fi
-    return 1
-  }
-  export -f ghost-tab-tui
-
-  # Mock jq
-  echo "0" > "$TEST_TMP/jq_calls"
-  jq() {
-    local count
-    count=$(<"$TEST_TMP/jq_calls")
-    count=$((count + 1))
-    echo "$count" > "$TEST_TMP/jq_calls"
-
-    case $count in
-      1) echo "true" ;;    # .selected
-      2) echo "proj1" ;;   # .name
-      3) echo "null" ;;    # .path
-    esac
+    echo '{"action":"select-project","name":"proj1","path":null,"ai_tool":"claude"}'
     return 0
   }
-  export -f jq
-  export TEST_TMP
+  export -f ghost-tab-tui
 
   run select_project_interactive "$PROJECTS_FILE"
 
@@ -172,24 +278,13 @@ teardown() {
 }
 
 @test "select_project_interactive handles jq parse failure" {
-  source "$PROJECT_ROOT/lib/menu-tui.sh"
-
-  PROJECTS_FILE="$TEST_TMP/projects"
-
-  # Mock error function
-  error() {
-    echo "ERROR: $*" >&2
-  }
-  export -f error
-
-  # Mock ghost-tab-tui
   ghost-tab-tui() {
-    echo '{"name":"proj1","path":"/tmp/p1","selected":true}'
+    echo 'not json at all'
     return 0
   }
   export -f ghost-tab-tui
 
-  # Mock jq (fails)
+  # Mock jq to fail
   jq() {
     return 1
   }
@@ -202,16 +297,6 @@ teardown() {
 }
 
 @test "select_project_interactive handles binary missing" {
-  source "$PROJECT_ROOT/lib/menu-tui.sh"
-
-  PROJECTS_FILE="$TEST_TMP/projects"
-
-  # Mock error function
-  error() {
-    echo "ERROR: $*" >&2
-  }
-  export -f error
-
   # Override command to simulate missing binary
   command() {
     if [[ "$1" == "-v" && "$2" == "ghost-tab-tui" ]]; then
@@ -225,4 +310,33 @@ teardown() {
 
   assert_failure
   assert_output --partial "ghost-tab-tui binary not found"
+}
+
+@test "select_project_interactive handles ghost-tab-tui failure" {
+  ghost-tab-tui() {
+    return 1
+  }
+  export -f ghost-tab-tui
+
+  run select_project_interactive "$PROJECTS_FILE"
+
+  assert_failure
+}
+
+@test "select_project_interactive omits update-version flag when empty" {
+  _update_version=""
+
+  ghost-tab-tui() {
+    echo "$*" > "$TEST_TMP/captured_args"
+    echo '{"action":"quit"}'
+    return 0
+  }
+  export -f ghost-tab-tui
+  export TEST_TMP
+
+  select_project_interactive "$PROJECTS_FILE" || true
+
+  local captured_args
+  captured_args=$(<"$TEST_TMP/captured_args")
+  [[ "$captured_args" != *"--update-version"* ]]
 }
