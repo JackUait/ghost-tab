@@ -29,10 +29,11 @@ func BobOffsets() []int {
 
 // MainMenuResult represents the JSON output when the main menu exits.
 type MainMenuResult struct {
-	Action string `json:"action"`
-	Name   string `json:"name,omitempty"`
-	Path   string `json:"path,omitempty"`
-	AITool string `json:"ai_tool"`
+	Action       string `json:"action"`
+	Name         string `json:"name,omitempty"`
+	Path         string `json:"path,omitempty"`
+	AITool       string `json:"ai_tool"`
+	GhostDisplay string `json:"ghost_display,omitempty"`
 }
 
 // MenuLayout describes how the ghost and menu are arranged at a given terminal size.
@@ -76,20 +77,24 @@ func AIToolDisplayName(tool string) string {
 
 // MainMenuModel is the Bubbletea model for the unified main menu.
 type MainMenuModel struct {
-	projects      []models.Project
-	aiTools       []string
-	selectedAI    int
-	selectedItem  int
-	ghostDisplay  string
-	ghostSleeping bool
-	bobStep       int
-	sleepTimer    int
-	width         int
-	height        int
-	theme         AIToolTheme
-	quitting      bool
-	result        *MainMenuResult
-	updateVersion string
+	projects            []models.Project
+	aiTools             []string
+	selectedAI          int
+	selectedItem        int
+	ghostDisplay        string
+	ghostSleeping       bool
+	bobStep             int
+	sleepTimer          int
+	width               int
+	height              int
+	theme               AIToolTheme
+	quitting            bool
+	result              *MainMenuResult
+	updateVersion       string
+	settingsMode        bool
+	settingsSelected    int
+	initialGhostDisplay string
+	ghostDisplayChanged bool
 }
 
 // NewMainMenu creates a new main menu model.
@@ -103,12 +108,13 @@ func NewMainMenu(projects []models.Project, aiTools []string, currentAI string, 
 	}
 
 	return &MainMenuModel{
-		projects:     projects,
-		aiTools:      aiTools,
-		selectedAI:   selectedAI,
-		selectedItem: 0,
-		ghostDisplay: ghostDisplay,
-		theme:        ThemeForTool(currentAI),
+		projects:            projects,
+		aiTools:             aiTools,
+		selectedAI:          selectedAI,
+		selectedItem:        0,
+		ghostDisplay:        ghostDisplay,
+		initialGhostDisplay: ghostDisplay,
+		theme:               ThemeForTool(currentAI),
 	}
 }
 
@@ -179,6 +185,35 @@ func (m *MainMenuModel) SetSize(width, height int) {
 // GhostDisplay returns the ghost display mode.
 func (m *MainMenuModel) GhostDisplay() string {
 	return m.ghostDisplay
+}
+
+// InSettingsMode returns true if the menu is currently showing the settings panel.
+func (m *MainMenuModel) InSettingsMode() bool {
+	return m.settingsMode
+}
+
+// EnterSettings switches the menu to settings mode.
+func (m *MainMenuModel) EnterSettings() {
+	m.settingsMode = true
+	m.settingsSelected = 0
+}
+
+// ExitSettings returns from settings mode to the main menu.
+func (m *MainMenuModel) ExitSettings() {
+	m.settingsMode = false
+}
+
+// CycleGhostDisplay cycles through ghost display modes: animated -> static -> none -> animated.
+func (m *MainMenuModel) CycleGhostDisplay() {
+	switch m.ghostDisplay {
+	case "animated":
+		m.ghostDisplay = "static"
+	case "static":
+		m.ghostDisplay = "none"
+	default:
+		m.ghostDisplay = "animated"
+	}
+	m.ghostDisplayChanged = m.ghostDisplay != m.initialGhostDisplay
 }
 
 // SetSleepTimer sets the sleep inactivity timer to the given number of seconds.
@@ -271,6 +306,15 @@ func (m *MainMenuModel) MapRowToItem(clickY int) int {
 	return -1
 }
 
+// ghostDisplayForResult returns the ghost display value to include in the result,
+// or empty string if unchanged.
+func (m *MainMenuModel) ghostDisplayForResult() string {
+	if m.ghostDisplayChanged {
+		return m.ghostDisplay
+	}
+	return ""
+}
+
 // selectCurrent produces a result for the currently selected item.
 func (m *MainMenuModel) selectCurrent() {
 	idx := m.selectedItem
@@ -278,17 +322,19 @@ func (m *MainMenuModel) selectCurrent() {
 
 	if idx < numProjects {
 		m.result = &MainMenuResult{
-			Action: "select-project",
-			Name:   m.projects[idx].Name,
-			Path:   m.projects[idx].Path,
-			AITool: m.CurrentAITool(),
+			Action:       "select-project",
+			Name:         m.projects[idx].Name,
+			Path:         m.projects[idx].Path,
+			AITool:       m.CurrentAITool(),
+			GhostDisplay: m.ghostDisplayForResult(),
 		}
 	} else {
 		actionIdx := idx - numProjects
 		if actionIdx < len(actionNames) {
 			m.result = &MainMenuResult{
-				Action: actionNames[actionIdx],
-				AITool: m.CurrentAITool(),
+				Action:       actionNames[actionIdx],
+				AITool:       m.CurrentAITool(),
+				GhostDisplay: m.ghostDisplayForResult(),
 			}
 		}
 	}
@@ -298,8 +344,9 @@ func (m *MainMenuModel) selectCurrent() {
 // setActionResult produces a result for the given action name.
 func (m *MainMenuModel) setActionResult(action string) {
 	m.result = &MainMenuResult{
-		Action: action,
-		AITool: m.CurrentAITool(),
+		Action:       action,
+		AITool:       m.CurrentAITool(),
+		GhostDisplay: m.ghostDisplayForResult(),
 	}
 	m.quitting = true
 }
@@ -379,6 +426,11 @@ func (m *MainMenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.ghostSleeping = false
 		}
 
+		// Settings mode intercepts all key handling
+		if m.settingsMode {
+			return m.updateSettings(msg)
+		}
+
 		switch msg.Type {
 		case tea.KeyUp:
 			m.MoveUp()
@@ -433,14 +485,163 @@ func (m *MainMenuModel) handleRune(r rune) (tea.Model, tea.Cmd) {
 		m.setActionResult("plain-terminal")
 		return m, tea.Quit
 	case 's', 'S':
-		m.setActionResult("settings")
-		return m, tea.Quit
+		m.settingsMode = true
+		m.settingsSelected = 0
+		return m, nil
 	case '1', '2', '3', '4', '5', '6', '7', '8', '9':
 		n := int(r - '0')
 		m.JumpTo(n)
 		return m, nil
 	}
 	return m, nil
+}
+
+// updateSettings handles key events while in settings mode.
+func (m *MainMenuModel) updateSettings(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.Type {
+	case tea.KeyEsc:
+		m.settingsMode = false
+		return m, nil
+	case tea.KeyCtrlC:
+		m.settingsMode = false
+		m.setActionResult("quit")
+		return m, tea.Quit
+	case tea.KeyEnter:
+		// Activate current settings item
+		if m.settingsSelected == 0 {
+			m.CycleGhostDisplay()
+		}
+		return m, nil
+	case tea.KeyUp:
+		// Future extensibility: navigate settings items
+		return m, nil
+	case tea.KeyDown:
+		return m, nil
+	case tea.KeyRunes:
+		if len(msg.Runes) == 1 {
+			switch msg.Runes[0] {
+			case 'b', 'B':
+				m.settingsMode = false
+				return m, nil
+			case 'a', 'A':
+				m.CycleGhostDisplay()
+				return m, nil
+			case 'j':
+				return m, nil
+			case 'k':
+				return m, nil
+			}
+		}
+	}
+	return m, nil
+}
+
+// ghostDisplayLabel returns a capitalized display label for the ghost display mode.
+func ghostDisplayLabel(mode string) string {
+	switch mode {
+	case "animated":
+		return "Animated"
+	case "static":
+		return "Static"
+	case "none":
+		return "None"
+	default:
+		return mode
+	}
+}
+
+// renderSettingsBox builds the settings panel box string.
+func (m *MainMenuModel) renderSettingsBox() string {
+	dimStyle := lipgloss.NewStyle().Foreground(m.theme.Dim)
+	primaryStyle := lipgloss.NewStyle().Foreground(m.theme.Primary).Bold(true)
+	brightBoldStyle := lipgloss.NewStyle().Foreground(m.theme.Bright).Bold(true)
+	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+
+	// State color depends on ghost display mode
+	var stateColor lipgloss.Color
+	switch m.ghostDisplay {
+	case "animated":
+		stateColor = lipgloss.Color("114") // green
+	case "static":
+		stateColor = lipgloss.Color("220") // yellow
+	default:
+		stateColor = lipgloss.Color("241") // gray
+	}
+	stateStyle := lipgloss.NewStyle().Foreground(stateColor)
+
+	hLine := strings.Repeat("\u2500", menuInnerWidth)
+	topBorder := dimStyle.Render("\u250c" + hLine + "\u2510")
+	separator := dimStyle.Render("\u251c" + hLine + "\u2524")
+	bottomBorder := dimStyle.Render("\u2514" + hLine + "\u2518")
+	leftBorder := dimStyle.Render("\u2502")
+	rightBorder := dimStyle.Render("\u2502")
+
+	var lines []string
+
+	// Top border
+	lines = append(lines, topBorder)
+
+	// Title row
+	title := primaryStyle.Render("\u2b21  Settings")
+	titlePadding := menuInnerWidth - lipgloss.Width(title) - 1
+	if titlePadding < 0 {
+		titlePadding = 0
+	}
+	titleRow := leftBorder + " " + title + strings.Repeat(" ", titlePadding) + rightBorder
+	lines = append(lines, titleRow)
+
+	// Separator after title
+	lines = append(lines, separator)
+
+	// Empty row
+	emptyRow := leftBorder + strings.Repeat(" ", menuInnerWidth) + rightBorder
+	lines = append(lines, emptyRow)
+
+	// Ghost Display item
+	label := "Ghost Display"
+	stateText := "[" + ghostDisplayLabel(m.ghostDisplay) + "]"
+	if m.settingsSelected == 0 {
+		marker := brightBoldStyle.Render("\u258e")
+		labelText := brightBoldStyle.Render(label)
+		stateRendered := stateStyle.Render(stateText)
+		content := "  " + marker + " " + labelText + "    " + stateRendered
+		padding := menuInnerWidth - lipgloss.Width(content)
+		if padding < 0 {
+			padding = 0
+		}
+		itemRow := leftBorder + content + strings.Repeat(" ", padding) + rightBorder
+		lines = append(lines, itemRow)
+	} else {
+		stateRendered := stateStyle.Render(stateText)
+		content := "    " + label + "    " + stateRendered
+		padding := menuInnerWidth - lipgloss.Width(content)
+		if padding < 0 {
+			padding = 0
+		}
+		itemRow := leftBorder + content + strings.Repeat(" ", padding) + rightBorder
+		lines = append(lines, itemRow)
+	}
+
+	// Empty row
+	lines = append(lines, emptyRow)
+
+	// Separator before help
+	lines = append(lines, separator)
+
+	// Help row
+	helpText := "A cycle  B back  Esc close"
+	helpContent := helpStyle.Render(helpText)
+	helpPadding := menuInnerWidth - lipgloss.Width(helpContent) - 1
+	if helpPadding < 0 {
+		helpPadding = 0
+	}
+	helpRow := leftBorder + " " + helpContent + strings.Repeat(" ", helpPadding) + rightBorder
+	lines = append(lines, helpRow)
+
+	// Bottom border
+	lines = append(lines, bottomBorder)
+
+	return strings.Join(lines, "\n")
 }
 
 const menuInnerWidth = 46
@@ -625,7 +826,12 @@ func (m *MainMenuModel) View() string {
 		return ""
 	}
 
-	menuBox := m.renderMenuBox()
+	var menuBox string
+	if m.settingsMode {
+		menuBox = m.renderSettingsBox()
+	} else {
+		menuBox = m.renderMenuBox()
+	}
 
 	layout := m.CalculateLayout(m.width, m.height)
 

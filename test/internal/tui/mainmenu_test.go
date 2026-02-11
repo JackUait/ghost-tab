@@ -467,17 +467,16 @@ func TestMainMenu_ActionShortcuts(t *testing.T) {
 		}
 	})
 
-	t.Run("s_shortcut", func(t *testing.T) {
+	t.Run("s_shortcut_enters_settings", func(t *testing.T) {
 		m := tui.NewMainMenu(projects, testAITools(), "claude", "animated")
 		newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
 		mm := newModel.(*tui.MainMenuModel)
-		result := mm.Result()
 
-		if result == nil {
-			t.Fatal("Expected result for 's' shortcut, got nil")
+		if !mm.InSettingsMode() {
+			t.Error("Expected settings mode after 's' shortcut")
 		}
-		if result.Action != "settings" {
-			t.Errorf("Expected 'settings', got %q", result.Action)
+		if mm.Result() != nil {
+			t.Error("Should not produce a result when entering settings mode")
 		}
 	})
 }
@@ -1153,5 +1152,248 @@ func TestMainMenu_MouseReleaseIgnored(t *testing.T) {
 	mm := newModel.(*tui.MainMenuModel)
 	if mm.SelectedItem() != 0 {
 		t.Errorf("mouse release should not change selection, got %d", mm.SelectedItem())
+	}
+}
+
+func TestMainMenu_SettingsMode(t *testing.T) {
+	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
+	m.SetSize(80, 30)
+
+	if m.InSettingsMode() {
+		t.Error("should not start in settings mode")
+	}
+
+	m.EnterSettings()
+	if !m.InSettingsMode() {
+		t.Error("should be in settings mode after EnterSettings()")
+	}
+
+	m.ExitSettings()
+	if m.InSettingsMode() {
+		t.Error("should exit settings mode")
+	}
+}
+
+func TestMainMenu_SettingsCycleGhostDisplay(t *testing.T) {
+	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
+
+	m.CycleGhostDisplay()
+	if m.GhostDisplay() != "static" {
+		t.Errorf("expected static after cycling from animated, got %s", m.GhostDisplay())
+	}
+
+	m.CycleGhostDisplay()
+	if m.GhostDisplay() != "none" {
+		t.Errorf("expected none, got %s", m.GhostDisplay())
+	}
+
+	m.CycleGhostDisplay()
+	if m.GhostDisplay() != "animated" {
+		t.Errorf("expected animated, got %s", m.GhostDisplay())
+	}
+}
+
+func TestMainMenu_SettingsViewShowsPanel(t *testing.T) {
+	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
+	m.SetSize(80, 30)
+	m.EnterSettings()
+	view := m.View()
+
+	if !strings.Contains(view, "Settings") {
+		t.Error("settings view should show 'Settings' title")
+	}
+	if !strings.Contains(view, "Ghost Display") {
+		t.Error("settings view should show 'Ghost Display' option")
+	}
+	if !strings.Contains(view, "Animated") {
+		t.Error("settings view should show current state 'Animated'")
+	}
+}
+
+func TestMainMenu_SettingsKeyS(t *testing.T) {
+	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
+	m.SetSize(80, 30)
+
+	// Press S
+	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}}
+	newModel, _ := m.Update(msg)
+	mm := newModel.(*tui.MainMenuModel)
+
+	if !mm.InSettingsMode() {
+		t.Error("pressing S should enter settings mode")
+	}
+}
+
+func TestMainMenu_SettingsEscReturns(t *testing.T) {
+	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
+	m.SetSize(80, 30)
+	m.EnterSettings()
+
+	msg := tea.KeyMsg{Type: tea.KeyEsc}
+	newModel, _ := m.Update(msg)
+	mm := newModel.(*tui.MainMenuModel)
+
+	if mm.InSettingsMode() {
+		t.Error("Esc in settings should return to main menu")
+	}
+}
+
+func TestMainMenu_SettingsKeyBReturns(t *testing.T) {
+	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
+	m.SetSize(80, 30)
+	m.EnterSettings()
+
+	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'b'}}
+	newModel, _ := m.Update(msg)
+	mm := newModel.(*tui.MainMenuModel)
+
+	if mm.InSettingsMode() {
+		t.Error("B in settings should return to main menu")
+	}
+}
+
+func TestMainMenu_SettingsKeyACycles(t *testing.T) {
+	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
+	m.SetSize(80, 30)
+	m.EnterSettings()
+
+	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}}
+	newModel, _ := m.Update(msg)
+	mm := newModel.(*tui.MainMenuModel)
+
+	if mm.GhostDisplay() != "static" {
+		t.Errorf("expected static after pressing A, got %s", mm.GhostDisplay())
+	}
+}
+
+func TestMainMenu_SettingsEnterCycles(t *testing.T) {
+	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
+	m.SetSize(80, 30)
+	m.EnterSettings()
+
+	// Enter on the selected item (ghost display) should cycle
+	msg := tea.KeyMsg{Type: tea.KeyEnter}
+	newModel, _ := m.Update(msg)
+	mm := newModel.(*tui.MainMenuModel)
+
+	if mm.GhostDisplay() != "static" {
+		t.Errorf("expected static after pressing Enter on ghost display, got %s", mm.GhostDisplay())
+	}
+	// Should still be in settings mode
+	if !mm.InSettingsMode() {
+		t.Error("should remain in settings mode after Enter")
+	}
+}
+
+func TestMainMenu_SettingsViewUpdatesAfterCycle(t *testing.T) {
+	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
+	m.SetSize(80, 30)
+	m.EnterSettings()
+	m.CycleGhostDisplay() // animated -> static
+
+	view := m.View()
+	if !strings.Contains(view, "Static") {
+		t.Error("settings view should show 'Static' after cycling")
+	}
+}
+
+func TestMainMenu_SettingsGhostDisplayInResult(t *testing.T) {
+	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
+	m.SetSize(80, 30)
+
+	// Enter settings, cycle ghost display, exit settings
+	m.EnterSettings()
+	m.CycleGhostDisplay() // animated -> static
+	m.ExitSettings()
+
+	// Now quit to get a result
+	newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	mm := newModel.(*tui.MainMenuModel)
+	result := mm.Result()
+
+	if result == nil {
+		t.Fatal("expected result after quit")
+	}
+	if result.GhostDisplay != "static" {
+		t.Errorf("expected ghost_display 'static' in result, got %q", result.GhostDisplay)
+	}
+}
+
+func TestMainMenu_SettingsNoGhostDisplayInResultWhenUnchanged(t *testing.T) {
+	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
+	m.SetSize(80, 30)
+
+	// Quit without changing ghost display
+	newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	mm := newModel.(*tui.MainMenuModel)
+	result := mm.Result()
+
+	if result == nil {
+		t.Fatal("expected result after quit")
+	}
+	if result.GhostDisplay != "" {
+		t.Errorf("expected empty ghost_display when unchanged, got %q", result.GhostDisplay)
+	}
+}
+
+func TestMainMenu_SettingsNavigationKeys(t *testing.T) {
+	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
+	m.SetSize(80, 30)
+	m.EnterSettings()
+
+	// j/k/up/down should not exit settings mode
+	for _, msg := range []tea.KeyMsg{
+		{Type: tea.KeyRunes, Runes: []rune{'j'}},
+		{Type: tea.KeyRunes, Runes: []rune{'k'}},
+		{Type: tea.KeyUp},
+		{Type: tea.KeyDown},
+	} {
+		newModel, _ := m.Update(msg)
+		mm := newModel.(*tui.MainMenuModel)
+		if !mm.InSettingsMode() {
+			t.Errorf("navigation key %v should not exit settings mode", msg)
+		}
+	}
+}
+
+func TestMainMenu_SettingsDoesNotQuit(t *testing.T) {
+	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
+	m.SetSize(80, 30)
+	m.EnterSettings()
+
+	// Pressing A (cycle) should not produce a quit command
+	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}}
+	_, cmd := m.Update(msg)
+
+	if cmd != nil {
+		t.Error("pressing A in settings should not produce a quit command")
+	}
+}
+
+func TestMainMenu_SettingsUpperS(t *testing.T) {
+	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
+	m.SetSize(80, 30)
+
+	// Press uppercase S
+	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'S'}}
+	newModel, _ := m.Update(msg)
+	mm := newModel.(*tui.MainMenuModel)
+
+	if !mm.InSettingsMode() {
+		t.Error("pressing uppercase S should enter settings mode")
+	}
+}
+
+func TestMainMenu_SettingsHelpRow(t *testing.T) {
+	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
+	m.SetSize(80, 30)
+	m.EnterSettings()
+	view := m.View()
+
+	if !strings.Contains(view, "cycle") {
+		t.Error("settings help row should mention 'cycle'")
+	}
+	if !strings.Contains(view, "back") {
+		t.Error("settings help row should mention 'back'")
 	}
 }
