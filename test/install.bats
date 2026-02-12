@@ -385,15 +385,15 @@ setup() {
 }
 
 @test "jq is in PATH after ensure_base_requirements" {
-  # Mock ensure_command to just echo
+  # Source install.sh FIRST so ensure_base_requirements is defined
+  source "$BATS_TEST_DIRNAME/../lib/install.sh"
+
+  # Mock ensure_command AFTER sourcing (so it doesn't get overwritten)
   ensure_command() {
     echo "Checking $1"
   }
 
-  source "$BATS_TEST_DIRNAME/../lib/install.sh"
-
   run ensure_base_requirements
-
   assert_success
   assert_output --partial "jq"
 }
