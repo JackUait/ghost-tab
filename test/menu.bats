@@ -425,6 +425,69 @@ teardown() {
   [[ "$_selected_ai_tool" == "codex" ]]
 }
 
+@test "ai tool persists between sessions (full cycle: write → read → verify)" {
+  XDG_CONFIG_HOME="$TEST_TMP"
+  mkdir -p "$TEST_TMP/ghost-tab"
+
+  AI_TOOLS_AVAILABLE=("claude" "codex" "copilot" "opencode")
+  SELECTED_AI_TOOL="claude"
+
+  # Session 1: user cycles to codex and selects a project
+  ghost-tab-tui() {
+    echo '{"action":"select-project","name":"proj1","path":"/tmp/p1","ai_tool":"codex"}'
+    return 0
+  }
+  export -f ghost-tab-tui
+
+  select_project_interactive "$PROJECTS_FILE"
+
+  # Verify file was written
+  [[ -f "$TEST_TMP/ghost-tab/ai-tool" ]]
+  [[ "$(cat "$TEST_TMP/ghost-tab/ai-tool")" == "codex" ]]
+
+  # Session 2: simulate wrapper reading the file (like claude-wrapper.sh does)
+  local AI_TOOL_PREF_FILE="$TEST_TMP/ghost-tab/ai-tool"
+  SELECTED_AI_TOOL=""
+  if [ -f "$AI_TOOL_PREF_FILE" ]; then
+    SELECTED_AI_TOOL="$(cat "$AI_TOOL_PREF_FILE" 2>/dev/null | tr -d '[:space:]')"
+  fi
+
+  # Validate (same as wrapper does)
+  source "$PROJECT_ROOT/lib/ai-tools.sh"
+  validate_ai_tool
+
+  [[ "$SELECTED_AI_TOOL" == "codex" ]]
+
+  # Session 2: user selects project without cycling (tool unchanged)
+  ghost-tab-tui() {
+    # Capture the --ai-tool flag to verify it's passed correctly
+    local ai_flag=""
+    while [[ $# -gt 0 ]]; do
+      if [[ "$1" == "--ai-tool" ]]; then
+        ai_flag="$2"
+        break
+      fi
+      shift
+    done
+    echo "$ai_flag" > "$TEST_TMP/captured_ai_tool"
+    echo "{\"action\":\"select-project\",\"name\":\"proj1\",\"path\":\"/tmp/p1\",\"ai_tool\":\"$ai_flag\"}"
+    return 0
+  }
+  export -f ghost-tab-tui
+  export TEST_TMP
+
+  select_project_interactive "$PROJECTS_FILE"
+
+  # Verify the TUI received "codex" from the saved preference
+  [[ "$(cat "$TEST_TMP/captured_ai_tool")" == "codex" ]]
+
+  # Verify _selected_ai_tool is still codex
+  [[ "$_selected_ai_tool" == "codex" ]]
+
+  # File should still have codex (no change, no write needed)
+  [[ "$(cat "$TEST_TMP/ghost-tab/ai-tool")" == "codex" ]]
+}
+
 @test "select_project_interactive updates existing tab_title in settings" {
   XDG_CONFIG_HOME="$TEST_TMP"
   mkdir -p "$TEST_TMP/ghost-tab"
