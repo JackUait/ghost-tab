@@ -113,3 +113,92 @@ func TestThemeTextColors(t *testing.T) {
 		})
 	}
 }
+
+// TestThemeBrightColors corresponds to the BATS ai_tool_bright_color tests.
+// The bash bright_color function uses the same ANSI-256 codes for claude/codex/copilot
+// as the normal color (209/114/141) while the Go theme uses slightly different shades
+// (208/113/140) for visual distinction. OpenCode bright is 255 in both implementations.
+func TestThemeBrightColors(t *testing.T) {
+	expectedBright := map[string]lipgloss.Color{
+		"claude":   lipgloss.Color("208"),
+		"codex":    lipgloss.Color("113"),
+		"copilot":  lipgloss.Color("140"),
+		"opencode": lipgloss.Color("255"),
+	}
+
+	for tool, expected := range expectedBright {
+		t.Run(tool, func(t *testing.T) {
+			theme := tui.ThemeForTool(tool)
+			if theme.Bright != expected {
+				t.Errorf("ThemeForTool(%q).Bright: expected %q, got %q", tool, expected, theme.Bright)
+			}
+		})
+	}
+}
+
+// TestThemeBrightColor_UnknownFallback corresponds to the BATS test
+// "ai_tool_bright_color: unknown returns bold white". In bash, unknown tools
+// get bold white (\033[1;37m). In Go, unknown tools fall back to the claude
+// theme, so Bright is "208" (claude's bright orange).
+func TestThemeBrightColor_UnknownFallback(t *testing.T) {
+	theme := tui.ThemeForTool("unknown-tool")
+	if theme.Bright != lipgloss.Color("208") {
+		t.Errorf("Expected unknown tool Bright to fall back to claude's '208', got %q", theme.Bright)
+	}
+}
+
+// TestThemeDimColors corresponds to the bash ai_tool_dim_color function.
+// Bash uses dim-modified ANSI codes (e.g., \033[2;38;5;209m for claude dim).
+// Go stores the dim color as a separate ANSI-256 value in the Dim field.
+func TestThemeDimColors(t *testing.T) {
+	expectedDim := map[string]lipgloss.Color{
+		"claude":   lipgloss.Color("166"),
+		"codex":    lipgloss.Color("71"),
+		"copilot":  lipgloss.Color("98"),
+		"opencode": lipgloss.Color("244"),
+	}
+
+	for tool, expected := range expectedDim {
+		t.Run(tool, func(t *testing.T) {
+			theme := tui.ThemeForTool(tool)
+			if theme.Dim != expected {
+				t.Errorf("ThemeForTool(%q).Dim: expected %q, got %q", tool, expected, theme.Dim)
+			}
+		})
+	}
+}
+
+// TestThemeDimColor_UnknownFallback verifies unknown tools fall back to
+// claude's dim color.
+func TestThemeDimColor_UnknownFallback(t *testing.T) {
+	theme := tui.ThemeForTool("unknown-tool")
+	if theme.Dim != lipgloss.Color("166") {
+		t.Errorf("Expected unknown tool Dim to fall back to claude's '166', got %q", theme.Dim)
+	}
+}
+
+// TestAnsiFromThemeColor_AllTools verifies that AnsiFromThemeColor produces
+// correct ANSI escape sequences for each tool's Primary color. This corresponds
+// to the BATS ai_tool_color tests which check the exact ANSI escape codes.
+func TestAnsiFromThemeColor_AllTools(t *testing.T) {
+	tests := []struct {
+		tool     string
+		color    lipgloss.Color
+		expected string
+	}{
+		{"claude", lipgloss.Color("209"), "\033[38;5;209m"},
+		{"codex", lipgloss.Color("114"), "\033[38;5;114m"},
+		{"copilot", lipgloss.Color("141"), "\033[38;5;141m"},
+		{"opencode", lipgloss.Color("250"), "\033[38;5;250m"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.tool, func(t *testing.T) {
+			theme := tui.ThemeForTool(tt.tool)
+			result := tui.AnsiFromThemeColor(theme.Primary)
+			if result != tt.expected {
+				t.Errorf("AnsiFromThemeColor(%q Primary): expected %q, got %q", tt.tool, tt.expected, result)
+			}
+		})
+	}
+}
