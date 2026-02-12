@@ -30,13 +30,13 @@ is_sound_enabled() {
 import json, sys
 try:
     d = json.load(open(sys.argv[1]))
-    print('true' if d.get('sound') else 'false')
+    print('false' if d.get('sound') is False else 'true')
 except Exception:
-    print('false')
+    print('true')
 " "$features_file" 2>/dev/null)"
-    echo "${val:-false}"
+    echo "${val:-true}"
   else
-    echo "false"
+    echo "true"
   fi
 }
 

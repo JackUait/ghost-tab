@@ -49,17 +49,17 @@ EOF
 
 # --- is_sound_enabled ---
 
-@test "is_sound_enabled: returns false when features file missing" {
+@test "is_sound_enabled: returns true when features file missing (default)" {
   run is_sound_enabled "claude" "$TEST_TMP/nonexistent"
   assert_success
-  assert_output "false"
+  assert_output "true"
 }
 
-@test "is_sound_enabled: returns false when sound key missing" {
+@test "is_sound_enabled: returns true when sound key missing (default)" {
   echo '{}' > "$TEST_TMP/claude-features.json"
   run is_sound_enabled "claude" "$TEST_TMP"
   assert_success
-  assert_output "false"
+  assert_output "true"
 }
 
 @test "is_sound_enabled: returns true when sound is true" {
@@ -159,6 +159,7 @@ EOF
   source "$PROJECT_ROOT/lib/settings-json.sh"
   local config_dir="$TEST_TMP/config"
   mkdir -p "$config_dir"
+  echo '{"sound": false}' > "$config_dir/claude-features.json"
   echo '{}' > "$TEST_TMP/settings.json"
 
   run toggle_sound_notification "claude" "$config_dir" "$TEST_TMP/settings.json"
