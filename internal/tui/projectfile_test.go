@@ -146,3 +146,18 @@ func TestIsDuplicateProject_TrailingSlash(t *testing.T) {
 		t.Error("Should detect duplicate even with trailing slash")
 	}
 }
+
+func TestAppendProject_ErrorOnUnwritablePath(t *testing.T) {
+	// /dev/null is not a directory, so MkdirAll should fail
+	err := tui.AppendProject("test", "/tmp/test", "/dev/null/sub/projects")
+	if err == nil {
+		t.Error("Should return error when parent cannot be created")
+	}
+}
+
+func TestRemoveProject_ErrorOnMissingFile(t *testing.T) {
+	err := tui.RemoveProject("foo:/tmp/foo", "/nonexistent/projects")
+	if err == nil {
+		t.Error("Should return error when file doesn't exist")
+	}
+}

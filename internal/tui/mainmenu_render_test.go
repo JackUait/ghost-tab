@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"os"
 	"strings"
 	"testing"
 
@@ -107,6 +108,66 @@ func TestSettingsBox_StateRightAligned(t *testing.T) {
 				t.Errorf("expected at least 5 chars gap for right-alignment, got %d", len(gap))
 			}
 		}
+	}
+}
+
+func TestGhostDisplayLabel_AllModes(t *testing.T) {
+	tests := []struct {
+		mode     string
+		expected string
+	}{
+		{"animated", "Animated"},
+		{"static", "Static"},
+		{"none", "None"},
+		{"custom", "custom"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.mode, func(t *testing.T) {
+			result := ghostDisplayLabel(tt.mode)
+			if result != tt.expected {
+				t.Errorf("ghostDisplayLabel(%q) = %q, want %q", tt.mode, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestTabTitleLabel_AllModes(t *testing.T) {
+	tests := []struct {
+		mode     string
+		expected string
+	}{
+		{"full", "Project \u00b7 Tool"},
+		{"project", "Project Only"},
+		{"other", "other"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.mode, func(t *testing.T) {
+			result := tabTitleLabel(tt.mode)
+			if result != tt.expected {
+				t.Errorf("tabTitleLabel(%q) = %q, want %q", tt.mode, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestShortenHomePath(t *testing.T) {
+	home := os.Getenv("HOME")
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"home prefix", home + "/projects/foo", "~/projects/foo"},
+		{"no home prefix", "/usr/local/bin", "/usr/local/bin"},
+		{"exact home", home, "~"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := shortenHomePath(tt.input)
+			if result != tt.expected {
+				t.Errorf("shortenHomePath(%q) = %q, want %q", tt.input, result, tt.expected)
+			}
+		})
 	}
 }
 

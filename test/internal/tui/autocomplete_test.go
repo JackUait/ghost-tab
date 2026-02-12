@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+
 	"github.com/jackuait/ghost-tab/internal/tui"
 )
 
@@ -261,5 +262,96 @@ func TestAutocompleteModel_DismissClearsSuggestions(t *testing.T) {
 	m.Dismiss()
 	if m.ShowSuggestions() {
 		t.Error("suggestions should be hidden after dismiss")
+	}
+}
+
+func TestAutocompleteModel_View_WithSuggestions(t *testing.T) {
+	provider := func(input string) []string {
+		return []string{"alpha/", "beta/"}
+	}
+	m := tui.NewAutocomplete(provider, 8)
+	m.SetInput("x")
+	m.RefreshSuggestions()
+
+	view := m.View()
+	if view == "" {
+		t.Error("View should not be empty when suggestions exist")
+	}
+	if !strings.Contains(view, "alpha/") {
+		t.Error("View should contain suggestion 'alpha/'")
+	}
+	if !strings.Contains(view, "beta/") {
+		t.Error("View should contain suggestion 'beta/'")
+	}
+	// Should contain border characters
+	if !strings.Contains(view, "\u250c") || !strings.Contains(view, "\u2514") {
+		t.Error("View should contain box border characters")
+	}
+}
+
+func TestAutocompleteModel_View_NoSuggestions(t *testing.T) {
+	provider := func(input string) []string { return nil }
+	m := tui.NewAutocomplete(provider, 8)
+	m.SetInput("nothing")
+	m.RefreshSuggestions()
+
+	if m.View() != "" {
+		t.Error("View should be empty when no suggestions")
+	}
+}
+
+func TestAutocompleteModel_MoveDown_NoSuggestions(t *testing.T) {
+	provider := func(input string) []string { return nil }
+	m := tui.NewAutocomplete(provider, 8)
+	// Should not panic
+	m.MoveDown()
+	if m.Selected() != 0 {
+		t.Errorf("Selected should stay 0 with no suggestions, got %d", m.Selected())
+	}
+}
+
+func TestAutocompleteModel_MoveUp_NoSuggestions(t *testing.T) {
+	provider := func(input string) []string { return nil }
+	m := tui.NewAutocomplete(provider, 8)
+	// Should not panic
+	m.MoveUp()
+	if m.Selected() != 0 {
+		t.Errorf("Selected should stay 0 with no suggestions, got %d", m.Selected())
+	}
+}
+
+func TestAutocompleteModel_AcceptSelected_NoSuggestions(t *testing.T) {
+	provider := func(input string) []string { return nil }
+	m := tui.NewAutocomplete(provider, 8)
+	result := m.AcceptSelected()
+	if result != "" {
+		t.Errorf("AcceptSelected with no suggestions should return empty, got %q", result)
+	}
+}
+
+func TestAutocompleteModel_View_HighlightsSelected(t *testing.T) {
+	provider := func(input string) []string {
+		return []string{"first/", "second/", "third/"}
+	}
+	m := tui.NewAutocomplete(provider, 8)
+	m.SetInput("x")
+	m.RefreshSuggestions()
+	m.MoveDown() // select index 1
+
+	view := m.View()
+	// All items should be in the view
+	if !strings.Contains(view, "first/") || !strings.Contains(view, "second/") || !strings.Contains(view, "third/") {
+		t.Error("View should contain all suggestions")
+	}
+}
+
+func TestAutocompleteModel_NewWithZeroMax(t *testing.T) {
+	provider := func(input string) []string { return []string{"a/"} }
+	m := tui.NewAutocomplete(provider, 0)
+	m.SetInput("x")
+	m.RefreshSuggestions()
+	// Should use default of 8
+	if !m.ShowSuggestions() {
+		t.Error("Should show suggestions even with maxResults=0 (should default to 8)")
 	}
 }
