@@ -122,6 +122,123 @@ func TestDetectAITools_NoneInstalled(t *testing.T) {
 	}
 }
 
+func TestDisplayName(t *testing.T) {
+	tests := []struct {
+		tool string
+		want string
+	}{
+		{"claude", "Claude Code"},
+		{"codex", "Codex CLI"},
+		{"copilot", "Copilot CLI"},
+		{"opencode", "OpenCode"},
+		{"vim", "vim"},
+		{"unknown-tool", "unknown-tool"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.tool, func(t *testing.T) {
+			got := models.DisplayName(tt.tool)
+			if got != tt.want {
+				t.Errorf("DisplayName(%q) = %q, want %q", tt.tool, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCycleTool(t *testing.T) {
+	tests := []struct {
+		name      string
+		tools     []string
+		current   string
+		direction int
+		want      string
+	}{
+		{
+			name:      "next wraps from last to first",
+			tools:     []string{"claude", "codex", "opencode"},
+			current:   "opencode",
+			direction: 1,
+			want:      "claude",
+		},
+		{
+			name:      "next advances by one",
+			tools:     []string{"claude", "codex", "opencode"},
+			current:   "claude",
+			direction: 1,
+			want:      "codex",
+		},
+		{
+			name:      "prev wraps from first to last",
+			tools:     []string{"claude", "codex", "opencode"},
+			current:   "claude",
+			direction: -1,
+			want:      "opencode",
+		},
+		{
+			name:      "no-op with single tool",
+			tools:     []string{"claude"},
+			current:   "claude",
+			direction: 1,
+			want:      "claude",
+		},
+		{
+			name:      "current not found returns first",
+			tools:     []string{"claude", "codex"},
+			current:   "vim",
+			direction: 1,
+			want:      "claude",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := models.CycleTool(tt.tools, tt.current, tt.direction)
+			if got != tt.want {
+				t.Errorf("CycleTool(%v, %q, %d) = %q, want %q",
+					tt.tools, tt.current, tt.direction, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestValidateTool(t *testing.T) {
+	tests := []struct {
+		name  string
+		tools []string
+		pref  string
+		want  string
+	}{
+		{
+			name:  "keeps valid preference",
+			tools: []string{"claude", "codex"},
+			pref:  "codex",
+			want:  "codex",
+		},
+		{
+			name:  "falls back to first when pref is invalid",
+			tools: []string{"claude", "codex"},
+			pref:  "vim",
+			want:  "claude",
+		},
+		{
+			name:  "falls back to first when pref is empty",
+			tools: []string{"codex", "opencode"},
+			pref:  "",
+			want:  "codex",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := models.ValidateTool(tt.tools, tt.pref)
+			if got != tt.want {
+				t.Errorf("ValidateTool(%v, %q) = %q, want %q",
+					tt.tools, tt.pref, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestAIToolString_AllTools(t *testing.T) {
 	tests := []struct {
 		name      string

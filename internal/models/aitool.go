@@ -51,3 +51,55 @@ func isCommandAvailable(command string) bool {
 	_, err := exec.LookPath(command)
 	return err == nil
 }
+
+// DisplayName returns the human-readable name for an AI tool identifier.
+// Unknown tools pass through unchanged.
+func DisplayName(tool string) string {
+	switch tool {
+	case "claude":
+		return "Claude Code"
+	case "codex":
+		return "Codex CLI"
+	case "copilot":
+		return "Copilot CLI"
+	case "opencode":
+		return "OpenCode"
+	default:
+		return tool
+	}
+}
+
+// CycleTool cycles through available tools. direction=1 for next, direction=-1 for prev.
+// Returns the new tool identifier. If there is only one tool, returns it unchanged.
+// If current is not found in tools, returns the first tool.
+func CycleTool(tools []string, current string, direction int) string {
+	if len(tools) <= 1 {
+		if len(tools) == 1 {
+			return tools[0]
+		}
+		return current
+	}
+
+	for i, t := range tools {
+		if t == current {
+			next := (i + direction + len(tools)) % len(tools)
+			return tools[next]
+		}
+	}
+
+	// Current not found, return first tool
+	return tools[0]
+}
+
+// ValidateTool returns the preference if it's in the tools list, otherwise returns the first tool.
+func ValidateTool(tools []string, pref string) string {
+	for _, t := range tools {
+		if t == pref {
+			return pref
+		}
+	}
+	if len(tools) > 0 {
+		return tools[0]
+	}
+	return pref
+}
