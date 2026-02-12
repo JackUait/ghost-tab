@@ -21,8 +21,9 @@ teardown() {
   }
   export -f ghost-tab-tui
 
-  # Mock jq
+  # Mock jq (consume stdin to avoid broken pipe in pipeline)
   jq() {
+    cat > /dev/null
     if [[ "$2" == ".action" ]]; then
       echo "toggle-ghost"
     fi
@@ -49,8 +50,9 @@ teardown() {
   }
   export -f ghost-tab-tui
 
-  # Mock jq
+  # Mock jq (consume stdin to avoid broken pipe in pipeline)
   jq() {
+    cat > /dev/null
     if [[ "$2" == ".action" ]]; then
       echo "quit"
     fi
@@ -104,8 +106,9 @@ teardown() {
   }
   export -f ghost-tab-tui
 
-  # Mock jq (fails)
+  # Mock jq (fails; consume stdin to avoid broken pipe in pipeline)
   jq() {
+    cat > /dev/null
     return 1
   }
   export -f jq
@@ -132,8 +135,9 @@ teardown() {
   }
   export -f ghost-tab-tui
 
-  # Mock jq
+  # Mock jq (consume stdin to avoid broken pipe in pipeline)
   jq() {
+    cat > /dev/null
     if [[ "$2" == ".action" ]]; then
       echo "null"
     fi
@@ -157,8 +161,9 @@ teardown() {
   }
   export -f ghost-tab-tui
 
-  # Mock jq
+  # Mock jq (consume stdin to avoid broken pipe in pipeline)
   jq() {
+    cat > /dev/null
     if [[ "$2" == ".action" ]]; then
       echo ""
     fi
