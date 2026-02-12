@@ -180,7 +180,7 @@ export PROJECT_NAME="${PROJECT_NAME:-$(basename "$PROJECT_DIR")}"
 SESSION_NAME="dev-${PROJECT_NAME}-$$"
 
 # Set terminal/tab title
-printf '\033]0;%s\007' "$PROJECT_NAME"
+set_tab_title "$PROJECT_NAME" "$SELECTED_AI_TOOL"
 
 # Background watcher: switch to Claude pane once it's ready
 (
