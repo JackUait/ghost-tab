@@ -4,12 +4,15 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/jackuait/ghost-tab/internal/models"
+	"github.com/jackuait/ghost-tab/internal/util"
 )
 
 // bobTickMsg is sent on each bob animation tick.
@@ -27,6 +30,8 @@ const (
 	bobPhaseStep = 2 * math.Pi / (bobCyclePeriod / 16.0)
 	// ZzzTickEvery controls how many bob ticks between Zzz frame advances (~192ms).
 	ZzzTickEvery = 12
+	// FeedbackDismissTicks is the number of bob ticks before feedback auto-dismisses (~0.8s).
+	FeedbackDismissTicks = 50
 )
 
 // MainMenuResult represents the JSON output when the main menu exits.
@@ -104,6 +109,24 @@ type MainMenuModel struct {
 	tabTitleChanged     bool
 	zzz                 *ZzzAnimation
 	centerOffsetY       int
+
+	// Inline input mode (add-project or open-once)
+	inputMode    string // "", "add-project", "open-once"
+	pathInput    textinput.Model
+	autocomplete AutocompleteModel
+	inputErr     error
+
+	// Delete mode
+	deleteMode     bool
+	deleteSelected int
+
+	// Feedback message
+	feedbackMsg   string
+	feedbackStyle string // "success" or "error"
+	feedbackTimer int    // bob ticks remaining
+
+	// File path for project file operations
+	projectsFile string
 }
 
 // NewMainMenu creates a new main menu model.
@@ -267,6 +290,30 @@ func (m *MainMenuModel) Wake() {
 
 // CenterOffsetY returns the vertical centering offset calculated in View().
 func (m *MainMenuModel) CenterOffsetY() int { return m.centerOffsetY }
+
+// InputMode returns the current inline input mode ("", "add-project", "open-once").
+func (m *MainMenuModel) InputMode() string { return m.inputMode }
+
+// InInputMode returns true if the menu is currently in an inline input mode.
+func (m *MainMenuModel) InInputMode() bool { return m.inputMode != "" }
+
+// InDeleteMode returns true if the menu is currently in delete mode.
+func (m *MainMenuModel) InDeleteMode() bool { return m.deleteMode }
+
+// DeleteSelected returns the index of the selected item in delete mode.
+func (m *MainMenuModel) DeleteSelected() int { return m.deleteSelected }
+
+// FeedbackMsg returns the current feedback message.
+func (m *MainMenuModel) FeedbackMsg() string { return m.feedbackMsg }
+
+// FeedbackStyle returns the current feedback style ("success" or "error").
+func (m *MainMenuModel) FeedbackStyle() string { return m.feedbackStyle }
+
+// SetProjectsFile sets the file path for project file operations.
+func (m *MainMenuModel) SetProjectsFile(path string) { m.projectsFile = path }
+
+// ProjectsFile returns the file path for project file operations.
+func (m *MainMenuModel) ProjectsFile() string { return m.projectsFile }
 
 // BobPhase returns the current bob animation phase (0 to 2*pi).
 func (m *MainMenuModel) BobPhase() float64 { return m.bobPhase }
@@ -465,6 +512,13 @@ func (m *MainMenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.zzz.Tick()
 				}
 			}
+			if m.feedbackTimer > 0 {
+				m.feedbackTimer--
+				if m.feedbackTimer == 0 {
+					m.feedbackMsg = ""
+					m.feedbackStyle = ""
+				}
+			}
 			return m, m.bobTickCmd()
 		}
 		return m, nil
@@ -509,6 +563,16 @@ func (m *MainMenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateSettings(msg)
 		}
 
+		// Input mode intercepts all key handling
+		if m.inputMode != "" {
+			return m.updateInputMode(msg)
+		}
+
+		// Delete mode intercepts all key handling
+		if m.deleteMode {
+			return m.updateDeleteMode(msg)
+		}
+
 		switch msg.Type {
 		case tea.KeyUp:
 			m.MoveUp()
@@ -523,6 +587,22 @@ func (m *MainMenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.CycleAITool("next")
 			return m, nil
 		case tea.KeyEnter:
+			// Check for inline action modes before selecting
+			idx := m.selectedItem
+			numProjects := len(m.projects)
+			if idx >= numProjects {
+				actionIdx := idx - numProjects
+				if actionIdx < len(actionNames) {
+					switch actionNames[actionIdx] {
+					case "add-project":
+						return m.enterInputMode("add-project")
+					case "delete-project":
+						return m.enterDeleteMode()
+					case "open-once":
+						return m.enterInputMode("open-once")
+					}
+				}
+			}
 			m.selectCurrent()
 			return m, tea.Quit
 		case tea.KeyEsc:
@@ -551,14 +631,11 @@ func (m *MainMenuModel) handleRune(r rune) (tea.Model, tea.Cmd) {
 		m.MoveUp()
 		return m, nil
 	case 'a', 'A':
-		m.setActionResult("add-project")
-		return m, tea.Quit
+		return m.enterInputMode("add-project")
 	case 'd', 'D':
-		m.setActionResult("delete-project")
-		return m, tea.Quit
+		return m.enterDeleteMode()
 	case 'o', 'O':
-		m.setActionResult("open-once")
-		return m, tea.Quit
+		return m.enterInputMode("open-once")
 	case 'p', 'P':
 		m.setActionResult("plain-terminal")
 		return m, tea.Quit
@@ -633,6 +710,165 @@ func (m *MainMenuModel) updateSettings(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m *MainMenuModel) enterInputMode(mode string) (tea.Model, tea.Cmd) {
+	m.inputMode = mode
+	m.inputErr = nil
+	ti := textinput.New()
+	ti.Placeholder = "Project path (e.g., ~/code/project)"
+	ti.Focus()
+	ti.Width = menuInnerWidth - 4
+	m.pathInput = ti
+	m.autocomplete = NewAutocomplete(PathSuggestionProvider(8), 8)
+	return m, textinput.Blink
+}
+
+func (m *MainMenuModel) exitInputMode() {
+	m.inputMode = ""
+	m.inputErr = nil
+	m.pathInput.Blur()
+	m.autocomplete.Dismiss()
+}
+
+func (m *MainMenuModel) setFeedback(msg, style string) {
+	m.feedbackMsg = msg
+	m.feedbackStyle = style
+	m.feedbackTimer = FeedbackDismissTicks
+}
+
+func (m *MainMenuModel) updateInputMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.Type {
+	case tea.KeyEsc:
+		if m.autocomplete.ShowSuggestions() {
+			m.autocomplete.Dismiss()
+			return m, nil
+		}
+		m.exitInputMode()
+		return m, nil
+	case tea.KeyCtrlC:
+		m.exitInputMode()
+		m.setActionResult("quit")
+		return m, tea.Quit
+	case tea.KeyUp:
+		if m.autocomplete.ShowSuggestions() && len(m.autocomplete.Suggestions()) > 0 {
+			m.autocomplete.MoveUp()
+			return m, nil
+		}
+	case tea.KeyDown:
+		if m.autocomplete.ShowSuggestions() && len(m.autocomplete.Suggestions()) > 0 {
+			m.autocomplete.MoveDown()
+			return m, nil
+		}
+	case tea.KeyTab:
+		if m.autocomplete.ShowSuggestions() && len(m.autocomplete.Suggestions()) > 0 {
+			accepted := m.autocomplete.AcceptSelected()
+			m.pathInput.SetValue(accepted)
+			m.autocomplete.SetInput(m.pathInput.Value())
+			m.autocomplete.RefreshSuggestions()
+			return m, nil
+		}
+	case tea.KeyEnter:
+		if m.autocomplete.ShowSuggestions() && len(m.autocomplete.Suggestions()) > 0 {
+			accepted := m.autocomplete.AcceptSelected()
+			m.pathInput.SetValue(accepted)
+			m.autocomplete.SetInput(m.pathInput.Value())
+			m.autocomplete.RefreshSuggestions()
+			return m, nil
+		}
+		return m.submitInputMode()
+	}
+
+	var cmd tea.Cmd
+	m.pathInput, cmd = m.pathInput.Update(msg)
+	current := m.pathInput.Value()
+	if current != "" {
+		m.autocomplete.SetInput(current)
+		m.autocomplete.RefreshSuggestions()
+	} else {
+		m.autocomplete.Dismiss()
+	}
+	return m, cmd
+}
+
+func (m *MainMenuModel) submitInputMode() (tea.Model, tea.Cmd) {
+	path := strings.TrimSpace(m.pathInput.Value())
+
+	if path == "" {
+		m.exitInputMode()
+		return m, nil
+	}
+
+	expanded := filepath.Clean(util.ExpandPath(path))
+
+	if err := util.ValidatePath(path); err != nil {
+		m.inputErr = fmt.Errorf("Directory not found")
+		return m, nil
+	}
+
+	name := filepath.Base(expanded)
+
+	if m.inputMode == "add-project" {
+		if IsDuplicateProject(expanded, m.projects) {
+			m.inputErr = fmt.Errorf("Project already exists")
+			return m, nil
+		}
+
+		if err := AppendProject(name, expanded, m.projectsFile); err != nil {
+			m.inputErr = fmt.Errorf("Failed to save: %v", err)
+			return m, nil
+		}
+
+		projects, _ := models.LoadProjects(m.projectsFile)
+		m.projects = projects
+
+		m.exitInputMode()
+		m.setFeedback("Added "+name, "success")
+		return m, nil
+	}
+
+	// open-once: return result with path
+	m.exitInputMode()
+	m.result = &MainMenuResult{
+		Action:       "open-once",
+		Name:         name,
+		Path:         expanded,
+		AITool:       m.CurrentAITool(),
+		GhostDisplay: m.ghostDisplayForResult(),
+		TabTitle:     m.tabTitleForResult(),
+	}
+	m.quitting = true
+	return m, tea.Quit
+}
+
+// enterDeleteMode switches to delete mode (stub - Task 4 will implement fully).
+func (m *MainMenuModel) enterDeleteMode() (tea.Model, tea.Cmd) {
+	if len(m.projects) == 0 {
+		m.setFeedback("No projects to delete", "error")
+		return m, nil
+	}
+	m.deleteMode = true
+	m.deleteSelected = 0
+	return m, nil
+}
+
+func (m *MainMenuModel) exitDeleteMode() {
+	m.deleteMode = false
+	m.deleteSelected = 0
+}
+
+// updateDeleteMode handles key events while in delete mode (stub - Task 4 will fill this in).
+func (m *MainMenuModel) updateDeleteMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.Type {
+	case tea.KeyEsc:
+		m.exitDeleteMode()
+		return m, nil
+	case tea.KeyCtrlC:
+		m.exitDeleteMode()
+		m.setActionResult("quit")
+		return m, tea.Quit
+	}
+	return m, nil
+}
+
 // ghostDisplayLabel returns a capitalized display label for the ghost display mode.
 func ghostDisplayLabel(mode string) string {
 	switch mode {
@@ -684,8 +920,7 @@ func tabTitleLabel(mode string) string {
 // renderSettingsBox builds the settings panel box string.
 func (m *MainMenuModel) renderSettingsBox() string {
 	dimStyle := lipgloss.NewStyle().Foreground(m.theme.Dim)
-	primaryStyle := lipgloss.NewStyle().Foreground(m.theme.Primary).Bold(true)
-	brightBoldStyle := lipgloss.NewStyle().Foreground(m.theme.Bright).Bold(true)
+	primaryBoldStyle := lipgloss.NewStyle().Foreground(m.theme.Primary).Bold(true)
 	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
 
 	// State color depends on ghost display mode
@@ -713,7 +948,7 @@ func (m *MainMenuModel) renderSettingsBox() string {
 	lines = append(lines, topBorder)
 
 	// Title row
-	title := primaryStyle.Render("\u2b21  Settings")
+	title := primaryBoldStyle.Render("\u2b21  Settings")
 	titlePadding := menuInnerWidth - lipgloss.Width(title) - 1
 	if titlePadding < 0 {
 		titlePadding = 0
@@ -731,7 +966,7 @@ func (m *MainMenuModel) renderSettingsBox() string {
 	// Ghost Display item
 	ghostLabel := "Ghost Display"
 	ghostState := "[" + ghostDisplayLabel(m.ghostDisplay) + "]"
-	lines = append(lines, m.renderSettingsItem(0, ghostLabel, ghostState, stateStyle, brightBoldStyle, leftBorder, rightBorder))
+	lines = append(lines, m.renderSettingsItem(0, ghostLabel, ghostState, stateStyle, primaryBoldStyle, leftBorder, rightBorder))
 
 	// Tab Title item
 	var tabTitleColor lipgloss.Color
@@ -743,7 +978,7 @@ func (m *MainMenuModel) renderSettingsBox() string {
 	tabTitleStyle := lipgloss.NewStyle().Foreground(tabTitleColor)
 	tabLabel := "Tab Title"
 	tabState := "[" + tabTitleLabel(m.tabTitle) + "]"
-	lines = append(lines, m.renderSettingsItem(1, tabLabel, tabState, tabTitleStyle, brightBoldStyle, leftBorder, rightBorder))
+	lines = append(lines, m.renderSettingsItem(1, tabLabel, tabState, tabTitleStyle, primaryBoldStyle, leftBorder, rightBorder))
 
 	// Empty row
 	lines = append(lines, emptyRow)
@@ -794,10 +1029,9 @@ func shortenHomePath(path string) string {
 // renderMenuBox builds the complete menu box string.
 func (m *MainMenuModel) renderMenuBox() string {
 	dimStyle := lipgloss.NewStyle().Foreground(m.theme.Dim)
-	primaryStyle := lipgloss.NewStyle().Foreground(m.theme.Primary).Bold(true)
-	brightStyle := lipgloss.NewStyle().Foreground(m.theme.Bright)
-	brightBoldStyle := lipgloss.NewStyle().Foreground(m.theme.Bright).Bold(true)
-	dimPathStyle := lipgloss.NewStyle().Foreground(m.theme.Dim)
+	primaryStyle := lipgloss.NewStyle().Foreground(m.theme.Primary)
+	primaryBoldStyle := lipgloss.NewStyle().Foreground(m.theme.Primary).Bold(true)
+	textStyle := lipgloss.NewStyle().Foreground(m.theme.Text)
 	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
 	updateStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("220"))
 
@@ -814,13 +1048,13 @@ func (m *MainMenuModel) renderMenuBox() string {
 	lines = append(lines, topBorder)
 
 	// Title row
-	title := primaryStyle.Render("\u2b21  Ghost Tab")
+	title := primaryBoldStyle.Render("\u2b21  Ghost Tab")
 	aiDisplay := AIToolDisplayName(m.CurrentAITool())
 	var aiPart string
 	if len(m.aiTools) > 1 {
-		aiPart = dimStyle.Render(" \u25c2 ") + brightStyle.Render(aiDisplay) + dimStyle.Render(" \u25b8")
+		aiPart = dimStyle.Render(" \u25c2 ") + primaryStyle.Render(aiDisplay) + dimStyle.Render(" \u25b8")
 	} else {
-		aiPart = " " + brightStyle.Render(aiDisplay)
+		aiPart = " " + primaryStyle.Render(aiDisplay)
 	}
 	titleContent := title + aiPart
 	// Pad the title row to inner width. We need to calculate visual width.
@@ -862,9 +1096,9 @@ func (m *MainMenuModel) renderMenuBox() string {
 		shortPath := TruncateMiddle(shortenHomePath(proj.Path), menuInnerWidth-7)
 
 		if selected {
-			marker := brightBoldStyle.Render("\u258e")
+			marker := primaryBoldStyle.Render("\u258e")
 			truncName := TruncateMiddle(proj.Name, menuInnerWidth-7-len(num))
-			nameText := brightBoldStyle.Render(num + "  " + truncName)
+			nameText := primaryBoldStyle.Render(num + "  " + truncName)
 			// "  ▎ 1  name" -> 2 spaces + marker + space + num + 2 spaces + name
 			nameContent := "  " + marker + " " + nameText
 			namePadding := menuInnerWidth - lipgloss.Width(nameContent)
@@ -873,7 +1107,7 @@ func (m *MainMenuModel) renderMenuBox() string {
 			}
 			nameLine = leftBorder + nameContent + strings.Repeat(" ", namePadding) + rightBorder
 
-			pathContent := "       " + dimPathStyle.Render(shortPath)
+			pathContent := "       " + primaryStyle.Render(shortPath)
 			pathPadding := menuInnerWidth - lipgloss.Width(pathContent)
 			if pathPadding < 0 {
 				pathPadding = 0
@@ -882,7 +1116,7 @@ func (m *MainMenuModel) renderMenuBox() string {
 		} else {
 			numText := dimStyle.Render(num)
 			truncName := TruncateMiddle(proj.Name, menuInnerWidth-6-len(num))
-			nameText := brightStyle.Render(truncName)
+			nameText := textStyle.Render(truncName)
 			nameContent := "    " + numText + "  " + nameText
 			namePadding := menuInnerWidth - lipgloss.Width(nameContent)
 			if namePadding < 0 {
@@ -890,7 +1124,7 @@ func (m *MainMenuModel) renderMenuBox() string {
 			}
 			nameLine = leftBorder + nameContent + strings.Repeat(" ", namePadding) + rightBorder
 
-			pathContent := "       " + dimPathStyle.Render(shortPath)
+			pathContent := "       " + dimStyle.Render(shortPath)
 			pathPadding := menuInnerWidth - lipgloss.Width(pathContent)
 			if pathPadding < 0 {
 				pathPadding = 0
@@ -914,8 +1148,8 @@ func (m *MainMenuModel) renderMenuBox() string {
 
 		var actionLine string
 		if selected {
-			marker := brightBoldStyle.Render("\u258e")
-			shortcutText := brightBoldStyle.Render(action.shortcut + "  " + action.label)
+			marker := primaryBoldStyle.Render("\u258e")
+			shortcutText := primaryBoldStyle.Render(action.shortcut + "  " + action.label)
 			content := "  " + marker + " " + shortcutText
 			padding := menuInnerWidth - lipgloss.Width(content)
 			if padding < 0 {
@@ -923,8 +1157,8 @@ func (m *MainMenuModel) renderMenuBox() string {
 			}
 			actionLine = leftBorder + content + strings.Repeat(" ", padding) + rightBorder
 		} else {
-			shortcutText := brightStyle.Render(action.shortcut)
-			labelText := brightStyle.Render(action.label)
+			shortcutText := dimStyle.Render(action.shortcut)
+			labelText := textStyle.Render(action.label)
 			content := "    " + shortcutText + "  " + labelText
 			padding := menuInnerWidth - lipgloss.Width(content)
 			if padding < 0 {

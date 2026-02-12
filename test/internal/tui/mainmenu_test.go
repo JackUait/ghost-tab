@@ -1,6 +1,8 @@
 package tui_test
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -1653,6 +1655,108 @@ func TestMainMenu_ViewUnselectedActionHasColor(t *testing.T) {
 	}
 }
 
+func TestMainMenu_ViewUnselectedProjectUsesTextColor(t *testing.T) {
+	prev := lipgloss.ColorProfile()
+	lipgloss.SetColorProfile(termenv.TrueColor)
+	defer lipgloss.SetColorProfile(prev)
+
+	projects := []models.Project{
+		{Name: "p1", Path: "/p1"},
+		{Name: "p2", Path: "/p2"},
+	}
+	m := tui.NewMainMenu(projects, []string{"claude"}, "claude", "animated")
+	m.SetSize(80, 30)
+	view := m.View()
+
+	// Unselected project name "p2" should use theme.Text color (223 for claude)
+	// not theme.Bright (208). ANSI 256 color format: \x1b[38;5;223m
+	lines := strings.Split(view, "\n")
+	for _, line := range lines {
+		if strings.Contains(line, "p2") && !strings.Contains(line, "/p2") {
+			if !strings.Contains(line, "\x1b[38;5;223m") {
+				t.Errorf("unselected project name 'p2' should use Text color (223), line: %q", line)
+			}
+			return
+		}
+	}
+	t.Error("could not find line containing unselected project name 'p2'")
+}
+
+func TestMainMenu_ViewSelectedProjectUsesPrimaryColor(t *testing.T) {
+	prev := lipgloss.ColorProfile()
+	lipgloss.SetColorProfile(termenv.TrueColor)
+	defer lipgloss.SetColorProfile(prev)
+
+	projects := []models.Project{
+		{Name: "selected-proj", Path: "/selected"},
+	}
+	m := tui.NewMainMenu(projects, []string{"claude"}, "claude", "animated")
+	m.SetSize(80, 30)
+	view := m.View()
+
+	// Selected project name should use theme.Primary (209 for claude).
+	// Bold styling produces \x1b[1;38;5;209m (with 1; prefix).
+	lines := strings.Split(view, "\n")
+	for _, line := range lines {
+		if strings.Contains(line, "selected-proj") {
+			if !strings.Contains(line, "38;5;209m") {
+				t.Errorf("selected project name should use Primary color (209), line: %q", line)
+			}
+			return
+		}
+	}
+	t.Error("could not find line containing selected project name")
+}
+
+func TestMainMenu_ViewSelectedPathUsesPrimaryColor(t *testing.T) {
+	prev := lipgloss.ColorProfile()
+	lipgloss.SetColorProfile(termenv.TrueColor)
+	defer lipgloss.SetColorProfile(prev)
+
+	projects := []models.Project{
+		{Name: "proj", Path: "/some/selected/path"},
+	}
+	m := tui.NewMainMenu(projects, []string{"claude"}, "claude", "animated")
+	m.SetSize(80, 30)
+	view := m.View()
+
+	// Selected project path should use theme.Primary (209), not Dim (166)
+	lines := strings.Split(view, "\n")
+	for _, line := range lines {
+		if strings.Contains(line, "/some/selected/path") {
+			if !strings.Contains(line, "\x1b[38;5;209m") {
+				t.Errorf("selected project path should use Primary color (209), line: %q", line)
+			}
+			return
+		}
+	}
+	t.Error("could not find line containing selected project path")
+}
+
+func TestMainMenu_ViewUnselectedActionUsesTextColor(t *testing.T) {
+	prev := lipgloss.ColorProfile()
+	lipgloss.SetColorProfile(termenv.TrueColor)
+	defer lipgloss.SetColorProfile(prev)
+
+	// No projects so actions start at item 0. Item 0 (Add) is selected,
+	// so Delete (item 1) is unselected.
+	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
+	m.SetSize(80, 30)
+	view := m.View()
+
+	// Unselected action label "Delete" should use theme.Text color (223)
+	lines := strings.Split(view, "\n")
+	for _, line := range lines {
+		if strings.Contains(line, "Delete") {
+			if !strings.Contains(line, "\x1b[38;5;223m") {
+				t.Errorf("unselected action label 'Delete' should use Text color (223), line: %q", line)
+			}
+			return
+		}
+	}
+	t.Error("could not find line containing unselected action 'Delete'")
+}
+
 func TestMainMenu_MouseClickWakesAndResetsZzz(t *testing.T) {
 	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
 	m.SetSize(80, 30)
@@ -2133,5 +2237,194 @@ func TestMainMenu_ViewVerticalCenteringIsSymmetric(t *testing.T) {
 	}
 	if diff > 1 {
 		t.Errorf("vertical centering is not symmetric: %d top blank rows, %d bottom blank rows (diff %d > 1)", topBlank, bottomBlank, diff)
+	}
+}
+
+func TestMainMenu_InputMode(t *testing.T) {
+	m := tui.NewMainMenu(testProjects(), testAITools(), "claude", "animated")
+	if m.InputMode() != "" {
+		t.Errorf("Initial InputMode should be empty, got %q", m.InputMode())
+	}
+	if m.InInputMode() {
+		t.Error("Should not be in input mode initially")
+	}
+}
+
+func TestMainMenu_DeleteMode(t *testing.T) {
+	m := tui.NewMainMenu(testProjects(), testAITools(), "claude", "animated")
+	if m.InDeleteMode() {
+		t.Error("Should not be in delete mode initially")
+	}
+}
+
+func TestMainMenu_FeedbackMsg(t *testing.T) {
+	m := tui.NewMainMenu(testProjects(), testAITools(), "claude", "animated")
+	if m.FeedbackMsg() != "" {
+		t.Errorf("Initial FeedbackMsg should be empty, got %q", m.FeedbackMsg())
+	}
+}
+
+func TestMainMenu_SetProjectsFile(t *testing.T) {
+	m := tui.NewMainMenu(testProjects(), testAITools(), "claude", "animated")
+	m.SetProjectsFile("/tmp/test-projects")
+	if m.ProjectsFile() != "/tmp/test-projects" {
+		t.Errorf("ProjectsFile: expected '/tmp/test-projects', got %q", m.ProjectsFile())
+	}
+}
+
+func TestMainMenu_AddProject_EntersInputMode(t *testing.T) {
+	m := tui.NewMainMenu(testProjects(), testAITools(), "claude", "animated")
+	newModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
+	mm := newModel.(*tui.MainMenuModel)
+
+	if !mm.InInputMode() {
+		t.Error("Expected input mode after 'a' press")
+	}
+	if mm.InputMode() != "add-project" {
+		t.Errorf("Expected input mode 'add-project', got %q", mm.InputMode())
+	}
+	if mm.Result() != nil {
+		t.Error("Should not produce result when entering input mode")
+	}
+	if cmd == nil {
+		t.Error("Expected a cmd (textinput.Blink) when entering input mode")
+	}
+}
+
+func TestMainMenu_AddProject_EscCancelsInputMode(t *testing.T) {
+	m := tui.NewMainMenu(testProjects(), testAITools(), "claude", "animated")
+	newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
+	mm := newModel.(*tui.MainMenuModel)
+
+	newModel2, _ := mm.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	mm2 := newModel2.(*tui.MainMenuModel)
+
+	if mm2.InInputMode() {
+		t.Error("Input mode should be cancelled after Esc")
+	}
+	if mm2.Result() != nil {
+		t.Error("Should not produce result on cancel")
+	}
+}
+
+func TestMainMenu_AddProject_EmptyEnterCancels(t *testing.T) {
+	m := tui.NewMainMenu(testProjects(), testAITools(), "claude", "animated")
+	newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
+	mm := newModel.(*tui.MainMenuModel)
+
+	newModel2, _ := mm.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	mm2 := newModel2.(*tui.MainMenuModel)
+
+	if mm2.InInputMode() {
+		t.Error("Input mode should be cancelled on empty Enter")
+	}
+}
+
+func TestMainMenu_AddProject_SubmitValid(t *testing.T) {
+	dir := t.TempDir()
+	projFile := filepath.Join(dir, "projects")
+	os.WriteFile(projFile, []byte("existing:/tmp/existing\n"), 0644)
+
+	targetDir := filepath.Join(dir, "new-project")
+	os.MkdirAll(targetDir, 0755)
+
+	m := tui.NewMainMenu(
+		[]models.Project{{Name: "existing", Path: "/tmp/existing"}},
+		testAITools(), "claude", "animated",
+	)
+	m.SetProjectsFile(projFile)
+
+	// Enter add mode
+	newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
+	mm := newModel.(*tui.MainMenuModel)
+
+	// Type the path character by character
+	for _, r := range targetDir {
+		mm.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+	}
+
+	// First Enter accepts autocomplete suggestion (adds trailing /),
+	// second Enter submits (no suggestions for empty directory)
+	mm.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	newModel3, _ := mm.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	mm3 := newModel3.(*tui.MainMenuModel)
+
+	if mm3.InInputMode() {
+		t.Error("Should exit input mode after valid submit")
+	}
+	if mm3.FeedbackMsg() == "" {
+		t.Error("Expected feedback message after adding project")
+	}
+
+	data, _ := os.ReadFile(projFile)
+	if !strings.Contains(string(data), "new-project:"+targetDir) {
+		t.Errorf("Projects file should contain new entry, got: %q", string(data))
+	}
+}
+
+func TestMainMenu_AddProject_DuplicateShowsError(t *testing.T) {
+	dir := t.TempDir()
+	projFile := filepath.Join(dir, "projects")
+	targetDir := filepath.Join(dir, "existing")
+	os.MkdirAll(targetDir, 0755)
+	os.WriteFile(projFile, []byte("existing:"+targetDir+"\n"), 0644)
+
+	m := tui.NewMainMenu(
+		[]models.Project{{Name: "existing", Path: targetDir}},
+		testAITools(), "claude", "animated",
+	)
+	m.SetProjectsFile(projFile)
+
+	newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
+	mm := newModel.(*tui.MainMenuModel)
+	for _, r := range targetDir {
+		mm.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+	}
+	// First Enter accepts autocomplete suggestion, second Enter submits
+	mm.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	newModel2, _ := mm.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	mm2 := newModel2.(*tui.MainMenuModel)
+
+	if !mm2.InInputMode() {
+		t.Error("Should stay in input mode on duplicate")
+	}
+}
+
+func TestMainMenu_FeedbackTimer_Dismisses(t *testing.T) {
+	dir := t.TempDir()
+	projFile := filepath.Join(dir, "projects")
+	os.WriteFile(projFile, []byte(""), 0644)
+
+	targetDir := filepath.Join(dir, "feedback-test")
+	os.MkdirAll(targetDir, 0755)
+
+	m := tui.NewMainMenu(nil, testAITools(), "claude", "animated")
+	m.SetProjectsFile(projFile)
+
+	// Enter add mode
+	newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
+	mm := newModel.(*tui.MainMenuModel)
+
+	// Type the path
+	for _, r := range targetDir {
+		mm.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+	}
+
+	// First Enter accepts autocomplete suggestion, second Enter submits
+	mm.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	newModel2, _ := mm.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	mm2 := newModel2.(*tui.MainMenuModel)
+
+	if mm2.FeedbackMsg() == "" {
+		t.Error("Expected feedback message")
+	}
+
+	// Tick enough times to dismiss
+	for i := 0; i < tui.FeedbackDismissTicks+1; i++ {
+		mm2.Update(tui.NewBobTickMsg())
+	}
+
+	if mm2.FeedbackMsg() != "" {
+		t.Errorf("Feedback should be dismissed after %d ticks, got %q", tui.FeedbackDismissTicks, mm2.FeedbackMsg())
 	}
 }
