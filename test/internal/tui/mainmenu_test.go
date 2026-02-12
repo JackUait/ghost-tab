@@ -1837,6 +1837,34 @@ func TestMainMenu_SettingsViewShowsTabTitle(t *testing.T) {
 	}
 }
 
+func TestMainMenu_SideLayoutGapCentered(t *testing.T) {
+	// When ghost is rendered to the side, it should be right-padded to match
+	// the menu box width (48 chars). This makes the composite symmetric so
+	// lipgloss.Place() centers the gap between menu and ghost on screen.
+	//
+	// Without padding: content = 48 (menu) + 3 (spacer) + 28 (ghost) = 79
+	//   left margin = (120 - 79) / 2 = 20
+	// With padding:    content = 48 (menu) + 3 (spacer) + 48 (padded ghost) = 99
+	//   left margin = (120 - 99) / 2 = 10
+	projects := []models.Project{{Name: "test", Path: "/test"}}
+	m := tui.NewMainMenu(projects, []string{"claude"}, "claude", "static")
+	width := 120
+	m.SetSize(width, 40)
+	view := m.View()
+
+	lines := strings.Split(view, "\n")
+	for _, line := range lines {
+		if strings.Contains(line, "\u250c") { // ┌ (top border)
+			trimmedLeft := strings.TrimLeft(line, " ")
+			leftMargin := len(line) - len(trimmedLeft)
+			if leftMargin > 15 {
+				t.Errorf("ghost should be right-padded to center gap: left margin is %d (expected ~10), content not symmetric", leftMargin)
+			}
+			break
+		}
+	}
+}
+
 func TestTruncateMiddle_Short(t *testing.T) {
 	got := tui.TruncateMiddle("hello", 10)
 	if got != "hello" {
