@@ -684,7 +684,6 @@ func (m *MainMenuModel) renderMenuBox() string {
 	normalPrimaryStyle := lipgloss.NewStyle().Foreground(m.theme.Primary)
 	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
 	updateStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("220"))
-	boldStyle := lipgloss.NewStyle().Bold(true)
 
 	hLine := strings.Repeat("\u2500", menuInnerWidth)
 	topBorder := dimStyle.Render("\u250c" + hLine + "\u2510")
@@ -806,8 +805,9 @@ func (m *MainMenuModel) renderMenuBox() string {
 			}
 			actionLine = leftBorder + content + strings.Repeat(" ", padding) + rightBorder
 		} else {
-			shortcutText := boldStyle.Render(action.shortcut)
-			content := "    " + shortcutText + "  " + action.label
+			shortcutText := primaryStyle.Render(action.shortcut)
+			labelText := dimStyle.Render(action.label)
+			content := "    " + shortcutText + "  " + labelText
 			padding := menuInnerWidth - lipgloss.Width(content)
 			if padding < 0 {
 				padding = 0

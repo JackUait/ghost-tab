@@ -1554,6 +1554,39 @@ func TestMainMenu_ViewUnselectedProjectHasColor(t *testing.T) {
 	}
 }
 
+func TestMainMenu_ViewUnselectedActionHasColor(t *testing.T) {
+	// Force color output so lipgloss emits ANSI codes in tests.
+	prev := lipgloss.ColorProfile()
+	lipgloss.SetColorProfile(termenv.TrueColor)
+	defer lipgloss.SetColorProfile(prev)
+
+	// Use no projects so actions are items 0-3, and select item 0 (Add).
+	// That makes Delete (item 1) unselected.
+	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
+	m.SetSize(80, 30)
+	view := m.View()
+
+	// Find the line containing "Delete" (unselected action label).
+	// When styled with dimStyle, lipgloss wraps the label in
+	// \x1b[...m...Delete...\x1b[0m so the character immediately
+	// before "Delete" is 'm'. Without styling, it's a space.
+	lines := strings.Split(view, "\n")
+	found := false
+	for _, line := range lines {
+		if strings.Contains(line, "Delete") {
+			found = true
+			idx := strings.Index(line, "Delete")
+			if idx == 0 || line[idx-1] != 'm' {
+				t.Error("unselected action label 'Delete' should have ANSI color codes applied directly (expected 'm' before label)")
+			}
+			break
+		}
+	}
+	if !found {
+		t.Error("could not find line containing unselected action 'Delete'")
+	}
+}
+
 func TestMainMenu_MouseClickWakesAndResetsZzz(t *testing.T) {
 	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
 	m.SetSize(80, 30)
