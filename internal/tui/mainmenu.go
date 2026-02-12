@@ -685,7 +685,6 @@ func (m *MainMenuModel) renderMenuBox() string {
 	brightStyle := lipgloss.NewStyle().Foreground(m.theme.Bright)
 	brightBoldStyle := lipgloss.NewStyle().Foreground(m.theme.Bright).Bold(true)
 	dimPathStyle := lipgloss.NewStyle().Foreground(m.theme.Dim)
-	normalPrimaryStyle := lipgloss.NewStyle().Foreground(m.theme.Primary)
 	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
 	updateStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("220"))
 
@@ -768,7 +767,7 @@ func (m *MainMenuModel) renderMenuBox() string {
 			pathLine = leftBorder + pathContent + strings.Repeat(" ", pathPadding) + rightBorder
 		} else {
 			numText := dimStyle.Render(num)
-			nameText := normalPrimaryStyle.Render(proj.Name)
+			nameText := brightStyle.Render(proj.Name)
 			nameContent := "    " + numText + "  " + nameText
 			namePadding := menuInnerWidth - lipgloss.Width(nameContent)
 			if namePadding < 0 {
@@ -809,8 +808,8 @@ func (m *MainMenuModel) renderMenuBox() string {
 			}
 			actionLine = leftBorder + content + strings.Repeat(" ", padding) + rightBorder
 		} else {
-			shortcutText := primaryStyle.Render(action.shortcut)
-			labelText := dimStyle.Render(action.label)
+			shortcutText := brightStyle.Render(action.shortcut)
+			labelText := brightStyle.Render(action.label)
 			content := "    " + shortcutText + "  " + labelText
 			padding := menuInnerWidth - lipgloss.Width(content)
 			if padding < 0 {
