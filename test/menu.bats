@@ -436,6 +436,56 @@ teardown() {
   [[ ! -f "$TEST_TMP/ghost-tab/ai-tool" ]]
 }
 
+@test "select_project_interactive sets _selected_ai_tool for add-project action" {
+  AI_TOOLS_AVAILABLE=("claude" "codex")
+  SELECTED_AI_TOOL="claude"
+
+  ghost-tab-tui() {
+    echo '{"action":"add-project","ai_tool":"codex"}'
+    return 0
+  }
+  export -f ghost-tab-tui
+
+  select_project_interactive "$PROJECTS_FILE"
+
+  [[ "$_selected_ai_tool" == "codex" ]]
+}
+
+@test "select_project_interactive sets _selected_ai_tool for settings action" {
+  AI_TOOLS_AVAILABLE=("claude" "codex")
+  SELECTED_AI_TOOL="claude"
+
+  ghost-tab-tui() {
+    echo '{"action":"settings","ai_tool":"codex"}'
+    return 0
+  }
+  export -f ghost-tab-tui
+
+  select_project_interactive "$PROJECTS_FILE"
+
+  [[ "$_selected_ai_tool" == "codex" ]]
+}
+
+@test "select_project_interactive persists ai_tool for non-select actions" {
+  XDG_CONFIG_HOME="$TEST_TMP"
+  mkdir -p "$TEST_TMP/ghost-tab"
+
+  AI_TOOLS_AVAILABLE=("claude" "codex")
+  SELECTED_AI_TOOL="claude"
+
+  ghost-tab-tui() {
+    echo '{"action":"add-project","ai_tool":"codex"}'
+    return 0
+  }
+  export -f ghost-tab-tui
+
+  select_project_interactive "$PROJECTS_FILE"
+
+  # AI tool preference file should be updated even for non-select-project actions
+  [[ -f "$TEST_TMP/ghost-tab/ai-tool" ]]
+  [[ "$(cat "$TEST_TMP/ghost-tab/ai-tool")" == "codex" ]]
+}
+
 @test "select_project_interactive updates existing tab_title in settings" {
   XDG_CONFIG_HOME="$TEST_TMP"
   mkdir -p "$TEST_TMP/ghost-tab"

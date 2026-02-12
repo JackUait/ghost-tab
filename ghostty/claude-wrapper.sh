@@ -116,16 +116,16 @@ elif [ -z "$1" ]; then
 
   while true; do
     if select_project_interactive "$PROJECTS_FILE"; then
+      # Update AI tool if user cycled it in the menu (for all actions)
+      if [[ -n "${_selected_ai_tool:-}" ]]; then
+        SELECTED_AI_TOOL="$_selected_ai_tool"
+      fi
       # shellcheck disable=SC2154
       case "$_selected_project_action" in
         select-project)
           PROJECT_NAME="$_selected_project_name"
           # shellcheck disable=SC2154
           cd "$_selected_project_path" || exit 1
-          # Update AI tool if user cycled it in the menu
-          if [[ -n "${_selected_ai_tool:-}" ]]; then
-            SELECTED_AI_TOOL="$_selected_ai_tool"
-          fi
           break
           ;;
         add-project)
@@ -151,9 +151,6 @@ elif [ -z "$1" ]; then
             if [[ -d "$open_path" ]]; then
               cd "$open_path" || exit 1
               PROJECT_NAME="$(basename "$open_path")"
-              if [[ -n "${_selected_ai_tool:-}" ]]; then
-                SELECTED_AI_TOOL="$_selected_ai_tool"
-              fi
               break
             fi
           fi
