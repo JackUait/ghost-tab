@@ -1246,6 +1246,23 @@ func (m *MainMenuModel) renderMenuBox() string {
 		lines = append(lines, actionLine)
 	}
 
+	// Feedback message (if any)
+	if m.feedbackMsg != "" {
+		var feedbackColor lipgloss.Color
+		if m.feedbackStyle == "success" {
+			feedbackColor = lipgloss.Color("114") // green
+		} else {
+			feedbackColor = lipgloss.Color("220") // yellow
+		}
+		fStyle := lipgloss.NewStyle().Foreground(feedbackColor)
+		fbContent := "  " + fStyle.Render(m.feedbackMsg)
+		fbPadding := menuInnerWidth - lipgloss.Width(fbContent)
+		if fbPadding < 0 {
+			fbPadding = 0
+		}
+		lines = append(lines, leftBorder+fbContent+strings.Repeat(" ", fbPadding)+rightBorder)
+	}
+
 	// Separator before help
 	lines = append(lines, separator)
 
@@ -1270,6 +1287,165 @@ func (m *MainMenuModel) renderMenuBox() string {
 	return strings.Join(lines, "\n")
 }
 
+// renderInputBox builds the input mode box string (add-project or open-once).
+func (m *MainMenuModel) renderInputBox() string {
+	dimStyle := lipgloss.NewStyle().Foreground(m.theme.Dim)
+	primaryBoldStyle := lipgloss.NewStyle().Foreground(m.theme.Primary).Bold(true)
+	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
+
+	hLine := strings.Repeat("\u2500", menuInnerWidth)
+	topBorder := dimStyle.Render("\u250c" + hLine + "\u2510")
+	separator := dimStyle.Render("\u251c" + hLine + "\u2524")
+	bottomBorder := dimStyle.Render("\u2514" + hLine + "\u2518")
+	leftBorder := dimStyle.Render("\u2502")
+	rightBorder := dimStyle.Render("\u2502")
+	emptyRow := leftBorder + strings.Repeat(" ", menuInnerWidth) + rightBorder
+
+	var lines []string
+
+	lines = append(lines, topBorder)
+
+	title := primaryBoldStyle.Render("\u2b21  Ghost Tab")
+	var label string
+	if m.inputMode == "add-project" {
+		label = "Add Project"
+	} else {
+		label = "Open Once"
+	}
+	titleContent := title + " " + dimStyle.Render("\u00b7 "+label)
+	titlePadding := menuInnerWidth - lipgloss.Width(titleContent) - 1
+	if titlePadding < 0 {
+		titlePadding = 0
+	}
+	lines = append(lines, leftBorder+" "+titleContent+strings.Repeat(" ", titlePadding)+rightBorder)
+	lines = append(lines, separator)
+	lines = append(lines, emptyRow)
+
+	pathLabel := "  Path: "
+	inputView := m.pathInput.View()
+	inputContent := pathLabel + inputView
+	inputPadding := menuInnerWidth - lipgloss.Width(inputContent)
+	if inputPadding < 0 {
+		inputPadding = 0
+	}
+	lines = append(lines, leftBorder+inputContent+strings.Repeat(" ", inputPadding)+rightBorder)
+
+	if m.inputErr != nil {
+		errMsg := errorStyle.Render(m.inputErr.Error())
+		errContent := "  " + errMsg
+		errPadding := menuInnerWidth - lipgloss.Width(errContent)
+		if errPadding < 0 {
+			errPadding = 0
+		}
+		lines = append(lines, leftBorder+errContent+strings.Repeat(" ", errPadding)+rightBorder)
+	}
+
+	lines = append(lines, emptyRow)
+	lines = append(lines, separator)
+
+	helpText := "Tab complete  \u23ce confirm  Esc cancel"
+	helpContent := helpStyle.Render(helpText)
+	helpPadding := menuInnerWidth - lipgloss.Width(helpContent) - 1
+	if helpPadding < 0 {
+		helpPadding = 0
+	}
+	lines = append(lines, leftBorder+" "+helpContent+strings.Repeat(" ", helpPadding)+rightBorder)
+	lines = append(lines, bottomBorder)
+
+	result := strings.Join(lines, "\n")
+
+	if acView := m.autocomplete.View(); acView != "" {
+		result += "\n" + acView
+	}
+
+	return result
+}
+
+// renderDeleteBox builds the delete mode box string.
+func (m *MainMenuModel) renderDeleteBox() string {
+	dimStyle := lipgloss.NewStyle().Foreground(m.theme.Dim)
+	primaryBoldStyle := lipgloss.NewStyle().Foreground(m.theme.Primary).Bold(true)
+	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	deleteHighlight := lipgloss.NewStyle().Background(lipgloss.Color("196")).Foreground(lipgloss.Color("15"))
+
+	hLine := strings.Repeat("\u2500", menuInnerWidth)
+	topBorder := dimStyle.Render("\u250c" + hLine + "\u2510")
+	separator := dimStyle.Render("\u251c" + hLine + "\u2524")
+	bottomBorder := dimStyle.Render("\u2514" + hLine + "\u2518")
+	leftBorder := dimStyle.Render("\u2502")
+	rightBorder := dimStyle.Render("\u2502")
+	emptyRow := leftBorder + strings.Repeat(" ", menuInnerWidth) + rightBorder
+
+	var lines []string
+
+	lines = append(lines, topBorder)
+
+	title := primaryBoldStyle.Render("\u2b21  Ghost Tab")
+	titleContent := title + " " + dimStyle.Render("\u00b7 Delete")
+	titlePadding := menuInnerWidth - lipgloss.Width(titleContent) - 1
+	if titlePadding < 0 {
+		titlePadding = 0
+	}
+	lines = append(lines, leftBorder+" "+titleContent+strings.Repeat(" ", titlePadding)+rightBorder)
+	lines = append(lines, separator)
+	lines = append(lines, emptyRow)
+
+	for i, proj := range m.projects {
+		num := fmt.Sprintf("%d", i+1)
+		selected := m.deleteSelected == i
+
+		shortPath := TruncateMiddle(shortenHomePath(proj.Path), menuInnerWidth-7)
+
+		if selected {
+			nameText := deleteHighlight.Render(" " + num + "  " + TruncateMiddle(proj.Name, menuInnerWidth-8-len(num)) + " ")
+			nameContent := "  " + nameText
+			namePadding := menuInnerWidth - lipgloss.Width(nameContent)
+			if namePadding < 0 {
+				namePadding = 0
+			}
+			lines = append(lines, leftBorder+nameContent+strings.Repeat(" ", namePadding)+rightBorder)
+
+			pathContent := "       " + dimStyle.Render(shortPath)
+			pathPadding := menuInnerWidth - lipgloss.Width(pathContent)
+			if pathPadding < 0 {
+				pathPadding = 0
+			}
+			lines = append(lines, leftBorder+pathContent+strings.Repeat(" ", pathPadding)+rightBorder)
+		} else {
+			numText := dimStyle.Render(num)
+			nameText := dimStyle.Render(TruncateMiddle(proj.Name, menuInnerWidth-6-len(num)))
+			nameContent := "    " + numText + "  " + nameText
+			namePadding := menuInnerWidth - lipgloss.Width(nameContent)
+			if namePadding < 0 {
+				namePadding = 0
+			}
+			lines = append(lines, leftBorder+nameContent+strings.Repeat(" ", namePadding)+rightBorder)
+
+			pathContent := "       " + dimStyle.Render(shortPath)
+			pathPadding := menuInnerWidth - lipgloss.Width(pathContent)
+			if pathPadding < 0 {
+				pathPadding = 0
+			}
+			lines = append(lines, leftBorder+pathContent+strings.Repeat(" ", pathPadding)+rightBorder)
+		}
+	}
+
+	lines = append(lines, emptyRow)
+	lines = append(lines, separator)
+
+	helpText := "\u2191\u2193 navigate  1-9 jump  \u23ce delete  Q cancel"
+	helpContent := helpStyle.Render(helpText)
+	helpPadding := menuInnerWidth - lipgloss.Width(helpContent) - 1
+	if helpPadding < 0 {
+		helpPadding = 0
+	}
+	lines = append(lines, leftBorder+" "+helpContent+strings.Repeat(" ", helpPadding)+rightBorder)
+	lines = append(lines, bottomBorder)
+
+	return strings.Join(lines, "\n")
+}
+
 // View implements tea.Model. Renders the full box-drawing menu with optional ghost.
 func (m *MainMenuModel) View() string {
 	if m.quitting {
@@ -1279,6 +1455,10 @@ func (m *MainMenuModel) View() string {
 	var menuBox string
 	if m.settingsMode {
 		menuBox = m.renderSettingsBox()
+	} else if m.deleteMode {
+		menuBox = m.renderDeleteBox()
+	} else if m.inputMode != "" {
+		menuBox = m.renderInputBox()
 	} else {
 		menuBox = m.renderMenuBox()
 	}

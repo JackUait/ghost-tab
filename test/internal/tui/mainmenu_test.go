@@ -333,16 +333,15 @@ func TestMainMenu_SelectAction(t *testing.T) {
 		}
 		newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 		mm := newModel.(*tui.MainMenuModel)
-		result := mm.Result()
 
-		if result == nil {
-			t.Fatal("Expected result, got nil")
+		if !mm.InInputMode() {
+			t.Error("Expected input mode after Enter on add-project")
 		}
-		if result.Action != "add-project" {
-			t.Errorf("Expected action 'add-project', got %q", result.Action)
+		if mm.InputMode() != "add-project" {
+			t.Errorf("Expected input mode 'add-project', got %q", mm.InputMode())
 		}
-		if result.AITool != "claude" {
-			t.Errorf("Expected ai_tool 'claude', got %q", result.AITool)
+		if mm.Result() != nil {
+			t.Error("Should not produce result when entering input mode")
 		}
 	})
 
@@ -353,13 +352,12 @@ func TestMainMenu_SelectAction(t *testing.T) {
 		}
 		newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 		mm := newModel.(*tui.MainMenuModel)
-		result := mm.Result()
 
-		if result == nil {
-			t.Fatal("Expected result, got nil")
+		if !mm.InDeleteMode() {
+			t.Error("Expected delete mode after Enter on delete-project")
 		}
-		if result.Action != "delete-project" {
-			t.Errorf("Expected action 'delete-project', got %q", result.Action)
+		if mm.Result() != nil {
+			t.Error("Should not produce result when entering delete mode")
 		}
 	})
 
@@ -370,13 +368,15 @@ func TestMainMenu_SelectAction(t *testing.T) {
 		}
 		newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 		mm := newModel.(*tui.MainMenuModel)
-		result := mm.Result()
 
-		if result == nil {
-			t.Fatal("Expected result, got nil")
+		if !mm.InInputMode() {
+			t.Error("Expected input mode after Enter on open-once")
 		}
-		if result.Action != "open-once" {
-			t.Errorf("Expected action 'open-once', got %q", result.Action)
+		if mm.InputMode() != "open-once" {
+			t.Errorf("Expected input mode 'open-once', got %q", mm.InputMode())
+		}
+		if mm.Result() != nil {
+			t.Error("Should not produce result when entering input mode")
 		}
 	})
 
@@ -405,13 +405,15 @@ func TestMainMenu_ActionShortcuts(t *testing.T) {
 		m := tui.NewMainMenu(projects, testAITools(), "claude", "animated")
 		newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
 		mm := newModel.(*tui.MainMenuModel)
-		result := mm.Result()
 
-		if result == nil {
-			t.Fatal("Expected result for 'a' shortcut, got nil")
+		if !mm.InInputMode() {
+			t.Error("Expected input mode after 'a' shortcut")
 		}
-		if result.Action != "add-project" {
-			t.Errorf("Expected 'add-project', got %q", result.Action)
+		if mm.InputMode() != "add-project" {
+			t.Errorf("Expected input mode 'add-project', got %q", mm.InputMode())
+		}
+		if mm.Result() != nil {
+			t.Error("Should not produce result when entering input mode")
 		}
 	})
 
@@ -419,13 +421,15 @@ func TestMainMenu_ActionShortcuts(t *testing.T) {
 		m := tui.NewMainMenu(projects, testAITools(), "claude", "animated")
 		newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'A'}})
 		mm := newModel.(*tui.MainMenuModel)
-		result := mm.Result()
 
-		if result == nil {
-			t.Fatal("Expected result for 'A' shortcut, got nil")
+		if !mm.InInputMode() {
+			t.Error("Expected input mode after 'A' shortcut")
 		}
-		if result.Action != "add-project" {
-			t.Errorf("Expected 'add-project', got %q", result.Action)
+		if mm.InputMode() != "add-project" {
+			t.Errorf("Expected input mode 'add-project', got %q", mm.InputMode())
+		}
+		if mm.Result() != nil {
+			t.Error("Should not produce result when entering input mode")
 		}
 	})
 
@@ -433,13 +437,12 @@ func TestMainMenu_ActionShortcuts(t *testing.T) {
 		m := tui.NewMainMenu(projects, testAITools(), "claude", "animated")
 		newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
 		mm := newModel.(*tui.MainMenuModel)
-		result := mm.Result()
 
-		if result == nil {
-			t.Fatal("Expected result for 'd' shortcut, got nil")
+		if !mm.InDeleteMode() {
+			t.Error("Expected delete mode after 'd' shortcut")
 		}
-		if result.Action != "delete-project" {
-			t.Errorf("Expected 'delete-project', got %q", result.Action)
+		if mm.Result() != nil {
+			t.Error("Should not produce result when entering delete mode")
 		}
 	})
 
@@ -447,13 +450,15 @@ func TestMainMenu_ActionShortcuts(t *testing.T) {
 		m := tui.NewMainMenu(projects, testAITools(), "claude", "animated")
 		newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'o'}})
 		mm := newModel.(*tui.MainMenuModel)
-		result := mm.Result()
 
-		if result == nil {
-			t.Fatal("Expected result for 'o' shortcut, got nil")
+		if !mm.InInputMode() {
+			t.Error("Expected input mode after 'o' shortcut")
 		}
-		if result.Action != "open-once" {
-			t.Errorf("Expected 'open-once', got %q", result.Action)
+		if mm.InputMode() != "open-once" {
+			t.Errorf("Expected input mode 'open-once', got %q", mm.InputMode())
+		}
+		if mm.Result() != nil {
+			t.Error("Should not produce result when entering input mode")
 		}
 	})
 
@@ -663,16 +668,18 @@ func TestMainMenu_NoProjects_ActionIndices(t *testing.T) {
 	// With 0 projects, actions start at index 0
 	m := tui.NewMainMenu(nil, testAITools(), "claude", "animated")
 
-	// Index 0 = Add, 1 = Delete, 2 = Open Once, 3 = Plain Terminal
+	// Index 0 = Add (now enters input mode instead of quitting with result)
 	newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	mm := newModel.(*tui.MainMenuModel)
-	result := mm.Result()
 
-	if result == nil {
-		t.Fatal("Expected result, got nil")
+	if !mm.InInputMode() {
+		t.Error("Expected input mode after Enter on add-project with no projects")
 	}
-	if result.Action != "add-project" {
-		t.Errorf("Expected 'add-project' at index 0 with no projects, got %q", result.Action)
+	if mm.InputMode() != "add-project" {
+		t.Errorf("Expected input mode 'add-project', got %q", mm.InputMode())
+	}
+	if mm.Result() != nil {
+		t.Error("Should not produce result when entering input mode")
 	}
 }
 
@@ -2682,5 +2689,65 @@ func TestMainMenu_OpenOnce_EscCancels(t *testing.T) {
 
 	if mm2.InInputMode() {
 		t.Error("Input mode should be cancelled after Esc")
+	}
+}
+
+func TestMainMenu_View_InputMode(t *testing.T) {
+	lipgloss.SetColorProfile(termenv.Ascii)
+	m := tui.NewMainMenu(testProjects(), testAITools(), "claude", "animated")
+	newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
+	mm := newModel.(*tui.MainMenuModel)
+
+	view := mm.View()
+	if !strings.Contains(view, "Path") {
+		t.Error("Input mode view should contain 'Path'")
+	}
+	if !strings.Contains(view, "Add Project") {
+		t.Error("Input mode view should show 'Add Project' label")
+	}
+}
+
+func TestMainMenu_View_InputMode_OpenOnce(t *testing.T) {
+	lipgloss.SetColorProfile(termenv.Ascii)
+	m := tui.NewMainMenu(testProjects(), testAITools(), "claude", "animated")
+	newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'o'}})
+	mm := newModel.(*tui.MainMenuModel)
+
+	view := mm.View()
+	if !strings.Contains(view, "Open Once") {
+		t.Error("Input mode view should show 'Open Once' label")
+	}
+}
+
+func TestMainMenu_View_DeleteMode(t *testing.T) {
+	lipgloss.SetColorProfile(termenv.Ascii)
+	m := tui.NewMainMenu(testProjects(), testAITools(), "claude", "animated")
+	newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	mm := newModel.(*tui.MainMenuModel)
+
+	view := mm.View()
+	if !strings.Contains(view, "delete") && !strings.Contains(view, "Delete") {
+		t.Error("Delete mode view should contain 'delete' or 'Delete'")
+	}
+}
+
+func TestMainMenu_View_FeedbackMessage(t *testing.T) {
+	lipgloss.SetColorProfile(termenv.Ascii)
+	dir := t.TempDir()
+	projFile := filepath.Join(dir, "projects")
+	os.WriteFile(projFile, []byte("ghost-tab:/Users/jack/ghost-tab\nmy-app:/Users/jack/my-app\nwebsite:/Users/jack/website\n"), 0644)
+
+	m := tui.NewMainMenu(testProjects(), testAITools(), "claude", "animated")
+	m.SetProjectsFile(projFile)
+
+	// Delete to trigger feedback
+	newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	mm := newModel.(*tui.MainMenuModel)
+	newModel2, _ := mm.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	mm2 := newModel2.(*tui.MainMenuModel)
+
+	view := mm2.View()
+	if !strings.Contains(view, "Deleted") {
+		t.Error("View should show 'Deleted' feedback")
 	}
 }
