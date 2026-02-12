@@ -96,6 +96,7 @@ type MainMenuModel struct {
 	initialGhostDisplay string
 	ghostDisplayChanged bool
 	zzz                 *ZzzAnimation
+	centerOffsetY       int
 }
 
 // NewMainMenu creates a new main menu model.
@@ -235,6 +236,9 @@ func (m *MainMenuModel) Wake() {
 		m.zzz.Reset()
 	}
 }
+
+// CenterOffsetY returns the vertical centering offset calculated in View().
+func (m *MainMenuModel) CenterOffsetY() int { return m.centerOffsetY }
 
 // BobStep returns the current bob animation step index.
 func (m *MainMenuModel) BobStep() int { return m.bobStep }
@@ -429,7 +433,7 @@ func (m *MainMenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.Wake()
 
 		if msg.Button == tea.MouseButtonLeft && msg.Action == tea.MouseActionPress {
-			item := m.MapRowToItem(msg.Y)
+			item := m.MapRowToItem(msg.Y - m.centerOffsetY)
 			if item >= 0 {
 				if m.selectedItem == item {
 					// Already selected, activate (double-click-like behavior)
@@ -896,7 +900,13 @@ func (m *MainMenuModel) View() string {
 	}
 
 	if m.width > 0 && m.height > 0 {
+		contentHeight := strings.Count(content, "\n") + 1
+		m.centerOffsetY = (m.height - contentHeight) / 2
+		if m.centerOffsetY < 0 {
+			m.centerOffsetY = 0
+		}
 		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, content)
 	}
+	m.centerOffsetY = 0
 	return content
 }

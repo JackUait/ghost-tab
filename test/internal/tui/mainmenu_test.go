@@ -1649,3 +1649,36 @@ func TestMainMenu_ViewIsCentered(t *testing.T) {
 		t.Errorf("expected horizontal centering with significant leading spaces, got %d", leadingSpaces)
 	}
 }
+
+func TestMainMenu_MouseClickWorksWithCentering(t *testing.T) {
+	projects := []models.Project{
+		{Name: "p1", Path: "/p1"},
+		{Name: "p2", Path: "/p2"},
+	}
+	m := tui.NewMainMenu(projects, []string{"claude"}, "claude", "none")
+	m.SetSize(80, 40) // Large terminal -> centering will offset content
+
+	// Need to call View() first so centerOffsetY is calculated
+	m.View()
+
+	// With ghost=none, 2 projects + 4 actions = 6 items, 1 separator
+	// Menu box height (lines): top border + title + sep + empty + 2*2 proj + sep + 4 actions + sep + help + bottom = ~16 lines
+	// Vertical offset = (40 - menuLines) / 2
+	// Second project name is at menu row 6, so absolute row = offset + 6
+	offset := m.CenterOffsetY()
+	if offset <= 0 {
+		t.Fatalf("expected positive centering offset with 80x40 and ghost=none, got %d", offset)
+	}
+
+	mouseMsg := tea.MouseMsg{
+		X:      40,
+		Y:      offset + 6,
+		Action: tea.MouseActionPress,
+		Button: tea.MouseButtonLeft,
+	}
+	newModel, _ := m.Update(mouseMsg)
+	mm := newModel.(*tui.MainMenuModel)
+	if mm.SelectedItem() != 1 {
+		t.Errorf("clicking centered second project should select item 1, got %d", mm.SelectedItem())
+	}
+}
