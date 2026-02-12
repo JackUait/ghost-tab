@@ -681,6 +681,7 @@ func (m *MainMenuModel) renderMenuBox() string {
 	brightStyle := lipgloss.NewStyle().Foreground(m.theme.Bright)
 	brightBoldStyle := lipgloss.NewStyle().Foreground(m.theme.Bright).Bold(true)
 	dimPathStyle := lipgloss.NewStyle().Foreground(m.theme.Dim)
+	normalPrimaryStyle := lipgloss.NewStyle().Foreground(m.theme.Primary)
 	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
 	updateStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("220"))
 	boldStyle := lipgloss.NewStyle().Bold(true)
@@ -763,8 +764,10 @@ func (m *MainMenuModel) renderMenuBox() string {
 			}
 			pathLine = leftBorder + pathContent + strings.Repeat(" ", pathPadding) + rightBorder
 		} else {
-			nameContent := "    " + num + "  " + proj.Name
-			namePadding := menuInnerWidth - len([]rune(nameContent))
+			numText := dimStyle.Render(num)
+			nameText := normalPrimaryStyle.Render(proj.Name)
+			nameContent := "    " + numText + "  " + nameText
+			namePadding := menuInnerWidth - lipgloss.Width(nameContent)
 			if namePadding < 0 {
 				namePadding = 0
 			}

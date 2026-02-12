@@ -5,8 +5,10 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/jackuait/ghost-tab/internal/models"
 	"github.com/jackuait/ghost-tab/internal/tui"
+	"github.com/muesli/termenv"
 )
 
 func testProjects() []models.Project {
@@ -1513,6 +1515,42 @@ func TestMainMenu_KeypressWakesAndResetsZzz(t *testing.T) {
 	}
 	if m.ZzzFrame() != 0 {
 		t.Errorf("keypress should reset Zzz frame to 0, got %d", m.ZzzFrame())
+	}
+}
+
+func TestMainMenu_ViewUnselectedProjectHasColor(t *testing.T) {
+	// Force color output so lipgloss emits ANSI codes in tests.
+	prev := lipgloss.ColorProfile()
+	lipgloss.SetColorProfile(termenv.TrueColor)
+	defer lipgloss.SetColorProfile(prev)
+
+	projects := []models.Project{
+		{Name: "p1", Path: "/p1"},
+		{Name: "p2", Path: "/p2"},
+	}
+	m := tui.NewMainMenu(projects, []string{"claude"}, "claude", "animated")
+	m.SetSize(80, 30)
+	view := m.View()
+
+	// The unselected project (p2) should have ANSI color codes applied
+	// directly around the project name. When styled, lipgloss wraps "p2"
+	// in \x1b[38;5;NNNm...p2...\x1b[0m so the character immediately
+	// before "p2" is "m" (the end of the ANSI escape sequence).
+	// Without styling, the character before "p2" is a space.
+	lines := strings.Split(view, "\n")
+	found := false
+	for _, line := range lines {
+		if strings.Contains(line, "p2") && !strings.Contains(line, "/p2") {
+			found = true
+			idx := strings.Index(line, "p2")
+			if idx == 0 || line[idx-1] != 'm' {
+				t.Error("unselected project name 'p2' should have ANSI color codes applied directly (expected 'm' before name)")
+			}
+			break
+		}
+	}
+	if !found {
+		t.Error("could not find line containing unselected project name 'p2'")
 	}
 }
 
