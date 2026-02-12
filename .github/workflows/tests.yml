@@ -21,7 +21,6 @@ jobs:
       - name: Run Go tests
         run: go test -json ./... 2>&1 | tee go-test-output.json
         continue-on-error: true
-        id: go-test
 
       - name: Generate Go test summary
         if: always()
@@ -89,7 +88,6 @@ jobs:
       - name: Run BATS tests
         run: ./run-tests.sh 2>&1 | tee bats-output.tap
         continue-on-error: true
-        id: bats-test
 
       - name: Generate BATS test summary
         if: always()
@@ -104,6 +102,11 @@ jobs:
             current_detail=""
           }
           /^ok [0-9]+ / {
+            # Flush pending failure if any
+            if (in_failure && current_name != "") {
+              failures = failures "| " current_num " | " current_name " | " current_file " | " current_detail " |\n"
+              in_failure=0
+            }
             total++
             if ($0 ~ /# skip/) {
               skip++
@@ -113,6 +116,10 @@ jobs:
             next
           }
           /^not ok [0-9]+ / {
+            # Flush pending failure if any
+            if (in_failure && current_name != "") {
+              failures = failures "| " current_num " | " current_name " | " current_file " | " current_detail " |\n"
+            }
             total++; fail++
             in_failure=1
             # Extract test number and name
@@ -140,20 +147,20 @@ jobs:
             }
             next
           }
+          in_failure && /^# -- / {
+            # Capture "-- command failed --" style detail (check before generic failed)
+            d=$0
+            sub(/^# -- /, "", d)
+            sub(/ --$/, "", d)
+            if (current_detail == "") current_detail=d
+            next
+          }
           in_failure && /^#.*failed/ {
             d=$0
             sub(/^# */, "", d)
             # Trim backticks for clean display
             gsub(/`/, "", d)
             current_detail=d
-            next
-          }
-          in_failure && /^# -- / {
-            # Capture "-- command failed --" style detail
-            d=$0
-            sub(/^# -- /, "", d)
-            sub(/ --$/, "", d)
-            if (current_detail == "") current_detail=d
             next
           }
           in_failure && /^# status : / {
@@ -163,13 +170,10 @@ jobs:
             else current_detail = "exit status " s
             next
           }
-          in_failure && (/^ok / || /^not ok / || /^[0-9]+\.\.[0-9]+/) {
-            # End of failure block - save it
+          in_failure && /^[0-9]+\.\.[0-9]+/ {
+            # Test plan line ends failure block
             failures = failures "| " current_num " | " current_name " | " current_file " | " current_detail " |\n"
             in_failure=0
-            # Re-process this line
-            if ($0 ~ /^ok /) { total++; pass++ }
-            if ($0 ~ /^not ok /) { total++; fail++; in_failure=1 }
             next
           }
           END {
