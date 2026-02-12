@@ -3,6 +3,7 @@ package tui_test
 import (
 	"testing"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/jackuait/ghost-tab/internal/models"
 	"github.com/jackuait/ghost-tab/internal/tui"
 )
@@ -46,5 +47,92 @@ func TestFilterProjects(t *testing.T) {
 				t.Errorf("FilterProjects with %q: expected %d, got %d", tt.filter, tt.expected, len(filtered))
 			}
 		})
+	}
+}
+
+func TestProjectSelector_New(t *testing.T) {
+	projects := []models.Project{
+		{Name: "app", Path: "/tmp/app"},
+		{Name: "web", Path: "/tmp/web"},
+	}
+	m := tui.NewProjectSelector(projects)
+	if m.Selected() != nil {
+		t.Error("Selected should be nil initially")
+	}
+}
+
+func TestProjectSelector_InitReturnsNil(t *testing.T) {
+	m := tui.NewProjectSelector([]models.Project{{Name: "a", Path: "/a"}})
+	if m.Init() != nil {
+		t.Error("Init should return nil")
+	}
+}
+
+func TestProjectSelector_EnterSelectsProject(t *testing.T) {
+	projects := []models.Project{
+		{Name: "app", Path: "/tmp/app"},
+	}
+	m := tui.NewProjectSelector(projects)
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if cmd == nil {
+		t.Error("Enter should return quit command")
+	}
+	result := updated.(tui.ProjectSelectorModel)
+	if result.Selected() == nil {
+		t.Fatal("Enter should select current project")
+	}
+	if result.Selected().Name != "app" {
+		t.Errorf("Expected 'app', got %q", result.Selected().Name)
+	}
+}
+
+func TestProjectSelector_EscCancels(t *testing.T) {
+	m := tui.NewProjectSelector([]models.Project{{Name: "a", Path: "/a"}})
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	if cmd == nil {
+		t.Error("Esc should return quit command")
+	}
+	result := updated.(tui.ProjectSelectorModel)
+	if result.Selected() != nil {
+		t.Error("Esc should not select anything")
+	}
+}
+
+func TestProjectSelector_CtrlCCancels(t *testing.T) {
+	m := tui.NewProjectSelector([]models.Project{{Name: "a", Path: "/a"}})
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
+	if cmd == nil {
+		t.Error("Ctrl+C should return quit command")
+	}
+	result := updated.(tui.ProjectSelectorModel)
+	if result.Selected() != nil {
+		t.Error("Ctrl+C should not select anything")
+	}
+}
+
+func TestProjectSelector_WindowSizeMsg(t *testing.T) {
+	m := tui.NewProjectSelector([]models.Project{{Name: "a", Path: "/a"}})
+	updated, cmd := m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	if cmd != nil {
+		t.Error("WindowSizeMsg should return nil cmd")
+	}
+	_ = updated
+}
+
+func TestProjectSelector_ViewNonEmpty(t *testing.T) {
+	m := tui.NewProjectSelector([]models.Project{{Name: "app", Path: "/tmp/app"}})
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	view := updated.(tui.ProjectSelectorModel).View()
+	if view == "" {
+		t.Error("View should not be empty before quitting")
+	}
+}
+
+func TestProjectSelector_ViewEmptyAfterQuit(t *testing.T) {
+	m := tui.NewProjectSelector([]models.Project{{Name: "a", Path: "/a"}})
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	result := updated.(tui.ProjectSelectorModel)
+	if result.View() != "" {
+		t.Error("View should be empty after quitting")
 	}
 }

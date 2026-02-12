@@ -142,3 +142,184 @@ func TestConfirmDialog_ViewShowsMessage(t *testing.T) {
 		t.Error("view should contain y/n hint")
 	}
 }
+
+func TestProjectInput_New(t *testing.T) {
+	m := tui.NewProjectInput()
+	if m.Confirmed() {
+		t.Error("Should not be confirmed initially")
+	}
+	if m.Name() != "" {
+		t.Errorf("Name should be empty, got %q", m.Name())
+	}
+}
+
+func TestProjectInput_InitReturnsBlink(t *testing.T) {
+	m := tui.NewProjectInput()
+	cmd := m.Init()
+	if cmd == nil {
+		t.Error("Init should return blink command")
+	}
+}
+
+func TestProjectInput_CtrlCCancels(t *testing.T) {
+	m := tui.NewProjectInput()
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
+	if cmd == nil {
+		t.Error("Ctrl+C should return quit command")
+	}
+	result := updated.(tui.ProjectInputModel)
+	if result.Confirmed() {
+		t.Error("Ctrl+C should not confirm")
+	}
+}
+
+func TestProjectInput_EscCancels(t *testing.T) {
+	m := tui.NewProjectInput()
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	if cmd == nil {
+		t.Error("Esc should return quit command")
+	}
+	result := updated.(tui.ProjectInputModel)
+	if result.Confirmed() {
+		t.Error("Esc should not confirm")
+	}
+}
+
+func TestProjectInput_ViewContainsLabels(t *testing.T) {
+	m := tui.NewProjectInput()
+	view := m.View()
+	if !strings.Contains(view, "Project Name") {
+		t.Error("View should contain 'Project Name'")
+	}
+	if !strings.Contains(view, "Project Path") {
+		t.Error("View should contain 'Project Path'")
+	}
+}
+
+func TestProjectInput_ViewEmptyAfterQuit(t *testing.T) {
+	m := tui.NewProjectInput()
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
+	result := updated.(tui.ProjectInputModel)
+	if result.View() != "" {
+		t.Error("View should be empty after quitting")
+	}
+}
+
+func TestProjectInput_EnterWithEmptyNameShowsError(t *testing.T) {
+	m := tui.NewProjectInput()
+	// Press enter without typing anything (name is empty)
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if cmd != nil {
+		t.Error("Should not quit with empty name")
+	}
+	result := updated.(tui.ProjectInputModel)
+	view := result.View()
+	if !strings.Contains(view, "Error") {
+		t.Error("Should show error for empty name")
+	}
+}
+
+func TestProjectInput_EnterWithNameAdvancesToPath(t *testing.T) {
+	m := tui.NewProjectInput()
+	// Type a project name
+	var model tea.Model = m
+	for _, r := range "myproject" {
+		model, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+	}
+	// Press enter to advance to path field
+	updated, cmd := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if cmd == nil {
+		t.Error("Enter with valid name should return blink command for path field")
+	}
+	result := updated.(tui.ProjectInputModel)
+	if result.Confirmed() {
+		t.Error("Should not be confirmed yet (still on path step)")
+	}
+	if result.Name() != "myproject" {
+		t.Errorf("Expected name 'myproject', got %q", result.Name())
+	}
+}
+
+func TestProjectInput_EnterWithEmptyPathShowsError(t *testing.T) {
+	m := tui.NewProjectInput()
+	// Type a project name and advance
+	var model tea.Model = m
+	for _, r := range "test" {
+		model, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+	}
+	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	// Now on path field, press enter with empty path
+	updated, cmd := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if cmd != nil {
+		t.Error("Should not quit with empty path")
+	}
+	result := updated.(tui.ProjectInputModel)
+	view := result.View()
+	if !strings.Contains(view, "Error") {
+		t.Error("Should show error for empty path")
+	}
+}
+
+func TestProjectInput_FullFlowConfirms(t *testing.T) {
+	dir := t.TempDir()
+	m := tui.NewProjectInput()
+	// Type a project name
+	var model tea.Model = m
+	for _, r := range "testproj" {
+		model, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+	}
+	// Advance to path
+	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	// Type a valid path
+	for _, r := range dir {
+		model, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+	}
+	// Dismiss autocomplete before confirming
+	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	// Confirm
+	updated, cmd := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if cmd == nil {
+		t.Error("Should return quit command on confirmation")
+	}
+	result := updated.(tui.ProjectInputModel)
+	if !result.Confirmed() {
+		t.Error("Should be confirmed after entering valid name and path")
+	}
+	if result.Name() != "testproj" {
+		t.Errorf("Expected name 'testproj', got %q", result.Name())
+	}
+	if result.Path() != dir {
+		t.Errorf("Expected path %q, got %q", dir, result.Path())
+	}
+}
+
+func TestProjectInput_InvalidPathShowsError(t *testing.T) {
+	m := tui.NewProjectInput()
+	var model tea.Model = m
+	for _, r := range "proj" {
+		model, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+	}
+	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	// Type a nonexistent path
+	for _, r := range "/nonexistent/path/xyz" {
+		model, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+	}
+	updated, cmd := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if cmd != nil {
+		t.Error("Should not quit with invalid path")
+	}
+	result := updated.(tui.ProjectInputModel)
+	view := result.View()
+	if !strings.Contains(view, "Error") {
+		t.Error("Should show error for invalid path")
+	}
+}
+
+func TestProjectInput_WindowSizeMsg(t *testing.T) {
+	m := tui.NewProjectInput()
+	updated, cmd := m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	if cmd != nil {
+		t.Error("WindowSizeMsg should return nil cmd")
+	}
+	_ = updated
+}
