@@ -13,6 +13,28 @@ type Project struct {
 	Path string
 }
 
+// ParseProjectName extracts the project name from a "name:path" line.
+// Returns everything before the first colon. If no colon is present,
+// returns the entire line (matches bash ${1%%:*} behavior).
+func ParseProjectName(line string) string {
+	idx := strings.Index(line, ":")
+	if idx < 0 {
+		return line
+	}
+	return line[:idx]
+}
+
+// ParseProjectPath extracts the project path from a "name:path" line.
+// Returns everything after the first colon. If no colon is present,
+// returns the entire line (matches bash ${1#*:} behavior).
+func ParseProjectPath(line string) string {
+	idx := strings.Index(line, ":")
+	if idx < 0 {
+		return line
+	}
+	return line[idx+1:]
+}
+
 // LoadProjects reads projects from file (name:path format)
 func LoadProjects(filepath string) ([]Project, error) {
 	file, err := os.Open(filepath)
