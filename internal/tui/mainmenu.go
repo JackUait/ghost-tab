@@ -863,6 +863,8 @@ func (m *MainMenuModel) View() string {
 		ghostPosition = "hidden"
 	}
 
+	var content string
+
 	switch ghostPosition {
 	case "side":
 		ghostLines := GhostForTool(m.CurrentAITool(), m.ghostSleeping)
@@ -875,7 +877,7 @@ func (m *MainMenuModel) View() string {
 			ghostStr += "\n" + m.zzz.ViewColored(zzzColor)
 		}
 		spacer := strings.Repeat(" ", 3)
-		return lipgloss.JoinHorizontal(lipgloss.Top, menuBox, spacer, ghostStr)
+		content = lipgloss.JoinHorizontal(lipgloss.Top, menuBox, spacer, ghostStr)
 
 	case "above":
 		ghostLines := GhostForTool(m.CurrentAITool(), m.ghostSleeping)
@@ -887,9 +889,14 @@ func (m *MainMenuModel) View() string {
 			zzzColor := AnsiFromThemeColor(m.theme.SleepAccent)
 			ghostStr += "\n" + m.zzz.ViewColored(zzzColor)
 		}
-		return lipgloss.JoinVertical(lipgloss.Center, ghostStr, "", menuBox)
+		content = lipgloss.JoinVertical(lipgloss.Center, ghostStr, "", menuBox)
 
 	default:
-		return menuBox
+		content = menuBox
 	}
+
+	if m.width > 0 && m.height > 0 {
+		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, content)
+	}
+	return content
 }

@@ -1614,3 +1614,38 @@ func TestMainMenu_MouseClickWakesAndResetsZzz(t *testing.T) {
 		t.Errorf("mouse click should reset Zzz frame to 0, got %d", m.ZzzFrame())
 	}
 }
+
+func TestMainMenu_ViewIsCentered(t *testing.T) {
+	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "none")
+	m.SetSize(80, 40)
+	view := m.View()
+
+	lines := strings.Split(view, "\n")
+
+	if len(lines) < 2 {
+		t.Fatal("expected multiple lines in centered view")
+	}
+
+	// First few lines should be blank or whitespace-only (vertical centering)
+	firstContentLine := -1
+	for i, line := range lines {
+		if strings.TrimSpace(line) != "" {
+			firstContentLine = i
+			break
+		}
+	}
+	if firstContentLine == 0 {
+		t.Error("expected vertical centering: first non-blank line should not be at row 0")
+	}
+	if firstContentLine < 0 {
+		t.Fatal("no content found in view")
+	}
+
+	// The content line should have leading spaces (horizontal centering)
+	contentLine := lines[firstContentLine]
+	trimmed := strings.TrimLeft(contentLine, " ")
+	leadingSpaces := len(contentLine) - len(trimmed)
+	if leadingSpaces < 5 {
+		t.Errorf("expected horizontal centering with significant leading spaces, got %d", leadingSpaces)
+	}
+}
