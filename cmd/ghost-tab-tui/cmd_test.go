@@ -1,6 +1,11 @@
 package main
 
 import (
+	"bytes"
+	"io"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -88,5 +93,46 @@ func TestMainMenuCmd_HasAllFlags(t *testing.T) {
 				t.Errorf("Expected default %q, got %q", f.defValue, flag.DefValue)
 			}
 		})
+	}
+}
+
+func TestRunSelectProject_EmptyProjectsFile(t *testing.T) {
+	// Create an empty projects file
+	tmpDir := t.TempDir()
+	emptyFile := filepath.Join(tmpDir, "projects")
+	os.WriteFile(emptyFile, []byte(""), 0644)
+
+	// Reset flag and execute
+	rootCmd.SetArgs([]string{"select-project", "--projects-file", emptyFile})
+
+	// Capture stdout
+	old := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	err := rootCmd.Execute()
+
+	w.Close()
+	os.Stdout = old
+
+	if err != nil {
+		t.Fatalf("Expected no error for empty projects, got: %v", err)
+	}
+
+	var buf bytes.Buffer
+	io.Copy(&buf, r)
+	output := buf.String()
+
+	if !strings.Contains(output, `"selected":false`) {
+		t.Errorf("Expected {\"selected\":false} for empty projects, got: %s", output)
+	}
+}
+
+func TestRunSelectProject_MissingFile(t *testing.T) {
+	rootCmd.SetArgs([]string{"select-project", "--projects-file", "/nonexistent/path/projects"})
+	err := rootCmd.Execute()
+
+	if err == nil {
+		t.Error("Expected error for missing projects file")
 	}
 }
