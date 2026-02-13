@@ -354,9 +354,10 @@ fi
 exit 1
 `)
 	// We need ghost-tab-tui to NOT be in PATH, but go to be in PATH.
-	// Use buildEnv to prepend our mock dir. ghost-tab-tui is not in the mock dir.
+	// Explicitly set PATH to only include mock dir and system dirs, excluding
+	// ~/.local/bin where the real ghost-tab-tui may be installed.
 	snippet := installSnippet(t, fmt.Sprintf(`ensure_ghost_tab_tui %q`, root))
-	env := buildEnv(t, []string{binDir}, "HOME="+fakeHome)
+	env := buildEnv(t, nil, "HOME="+fakeHome, "PATH="+binDir+":/usr/bin:/bin")
 	out, code := runBashSnippet(t, snippet, env)
 	assertExitCode(t, code, 0)
 	assertContains(t, out, "Building ghost-tab-tui")
@@ -397,7 +398,8 @@ echo "build error" >&2
 exit 1
 `)
 	snippet := installSnippet(t, fmt.Sprintf(`ensure_ghost_tab_tui %q`, root))
-	env := buildEnv(t, []string{binDir}, "HOME="+fakeHome)
+	// Explicitly set PATH to exclude ~/.local/bin where real ghost-tab-tui lives
+	env := buildEnv(t, nil, "HOME="+fakeHome, "PATH="+binDir+":/usr/bin:/bin")
 	out, code := runBashSnippet(t, snippet, env)
 	if code == 0 {
 		t.Errorf("expected non-zero exit code when go build fails, got 0")
@@ -427,7 +429,8 @@ fi
 exit 1
 `)
 	snippet := installSnippet(t, fmt.Sprintf(`ensure_ghost_tab_tui %q`, root))
-	env := buildEnv(t, []string{binDir}, "HOME="+fakeHome)
+	// Explicitly set PATH to exclude ~/.local/bin where real ghost-tab-tui lives
+	env := buildEnv(t, nil, "HOME="+fakeHome, "PATH="+binDir+":/usr/bin:/bin")
 	_, code := runBashSnippet(t, snippet, env)
 	assertExitCode(t, code, 0)
 
