@@ -132,7 +132,34 @@ go test ./test/bash/... -run "test_name" # Filter by name
 go test ./... -v -count=1              # Verbose with no caching
 shellcheck lib/*.sh bin/ghost-tab ghostty/*.sh  # Lint all scripts
 ./bin/ghost-tab                         # Run main installer/setup
+make release                            # Create a new release
 ```
+
+### Creating Releases
+
+Run `make release` to automate the full release process. Before running:
+
+1. Bump the version in `VERSION` (semver format: `X.Y.Z`)
+2. Commit and push all changes — working tree must be clean
+3. Must be on `main` branch
+4. `gh` CLI must be installed and authenticated (`brew install gh && gh auth login`)
+5. The Homebrew tap repo must exist at `../homebrew-ghost-tab`
+
+The script will:
+- Run preflight checks (clean tree, main branch, valid version, tag doesn't exist, gh auth, formula exists)
+- Show a confirmation prompt (skip with `--yes` flag)
+- Create annotated git tag `vX.Y.Z` and push
+- Create a GitHub release with auto-generated notes
+- Download the tarball, compute SHA256
+- Update `url` and `sha256` in `../homebrew-ghost-tab/Formula/ghost-tab.rb`
+- Commit and push the formula update
+
+```bash
+make release              # Interactive (with confirmation prompt)
+bash scripts/release.sh --yes  # Non-interactive (skip confirmation)
+```
+
+**Note:** The script only updates version/url/sha256 in the formula. Structural changes to the formula (new dependencies, build steps) must be done manually first.
 
 ## Architecture
 
