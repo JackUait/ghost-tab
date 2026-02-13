@@ -61,6 +61,19 @@ check_formula_exists() {
   fi
 }
 
+# --- Formula update function ---
+
+update_formula() {
+  local formula_path="$1"
+  local version="$2"
+  local sha="$3"
+
+  sed -i '' \
+    -e "s|archive/refs/tags/v[0-9]*\.[0-9]*\.[0-9]*\.tar\.gz|archive/refs/tags/v${version}.tar.gz|" \
+    -e "s|sha256 \"[a-zA-Z0-9]*\"|sha256 \"${sha}\"|" \
+    "$formula_path"
+}
+
 # Only run main when executed directly (not sourced for testing)
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
   main "$@"

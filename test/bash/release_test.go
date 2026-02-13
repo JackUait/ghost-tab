@@ -221,3 +221,64 @@ func TestCheckFormulaExists_fails_when_file_missing(t *testing.T) {
 	assertExitCode(t, code, 1)
 	assertContains(t, out, "formula")
 }
+
+// ============================================================
+// update_formula tests
+// ============================================================
+
+func TestUpdateFormula_updates_url_and_sha256(t *testing.T) {
+	dir := t.TempDir()
+	formula := `class GhostTab < Formula
+  url "https://github.com/JackUait/ghost-tab/archive/refs/tags/v1.5.0.tar.gz"
+  sha256 "oldsha256value"
+  license "MIT"
+end
+`
+	formulaPath := writeTempFile(t, dir, "ghost-tab.rb", formula)
+
+	snippet := releaseSnippet(t, `update_formula "`+formulaPath+`" "2.0.0" "newsha256value"`)
+	out, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+	_ = out
+
+	updated, err := os.ReadFile(formulaPath)
+	if err != nil {
+		t.Fatalf("failed to read formula: %v", err)
+	}
+	content := string(updated)
+	assertContains(t, content, "v2.0.0.tar.gz")
+	assertContains(t, content, `sha256 "newsha256value"`)
+	assertNotContains(t, content, "v1.5.0")
+	assertNotContains(t, content, "oldsha256value")
+}
+
+func TestUpdateFormula_preserves_other_content(t *testing.T) {
+	dir := t.TempDir()
+	formula := `class GhostTab < Formula
+  desc "Ghostty + tmux wrapper"
+  homepage "https://github.com/JackUait/ghost-tab"
+  url "https://github.com/JackUait/ghost-tab/archive/refs/tags/v1.5.0.tar.gz"
+  sha256 "oldsha"
+  license "MIT"
+
+  depends_on "tmux"
+
+  def install
+    bin.install "bin/ghost-tab"
+  end
+end
+`
+	formulaPath := writeTempFile(t, dir, "ghost-tab.rb", formula)
+
+	snippet := releaseSnippet(t, `update_formula "`+formulaPath+`" "3.0.0" "newsha"`)
+	_, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+
+	updated, _ := os.ReadFile(formulaPath)
+	content := string(updated)
+	assertContains(t, content, `desc "Ghostty + tmux wrapper"`)
+	assertContains(t, content, `depends_on "tmux"`)
+	assertContains(t, content, `bin.install "bin/ghost-tab"`)
+	assertContains(t, content, "v3.0.0.tar.gz")
+	assertContains(t, content, `sha256 "newsha"`)
+}
