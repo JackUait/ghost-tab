@@ -1,4 +1,4 @@
-.PHONY: build install test clean lint help
+.PHONY: build install test clean lint release help
 
 # Build the Go binary
 build:
@@ -40,6 +40,10 @@ lint:
 	@echo "Running shellcheck..."
 	find lib bin ghostty -name '*.sh' -exec shellcheck {} +
 
+# Create a new release (tag, GitHub release, Homebrew formula update)
+release:
+	@bash scripts/release.sh
+
 # Show help
 help:
 	@echo "Ghost Tab Build Targets:"
@@ -48,3 +52,4 @@ help:
 	@echo "  make test    - Run all tests (Go + bash)"
 	@echo "  make clean   - Remove build artifacts"
 	@echo "  make lint    - Run linters"
+	@echo "  make release - Create a new release"

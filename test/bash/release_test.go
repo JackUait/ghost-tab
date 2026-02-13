@@ -349,3 +349,17 @@ exit 0
 	assertContains(t, string(out), "Release v1.0.0")
 	assertContains(t, string(out), "Aborted")
 }
+
+// ============================================================
+// Makefile integration test
+// ============================================================
+
+func TestMakefile_has_release_target(t *testing.T) {
+	root := projectRoot(t)
+	makefile, err := os.ReadFile(filepath.Join(root, "Makefile"))
+	if err != nil {
+		t.Fatalf("failed to read Makefile: %v", err)
+	}
+	assertContains(t, string(makefile), "release:")
+	assertContains(t, string(makefile), "scripts/release.sh")
+}
