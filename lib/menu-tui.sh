@@ -87,42 +87,6 @@ select_project_interactive() {
     fi
   fi
 
-  # Persist ghost display if changed
-  local ghost_display_new
-  ghost_display_new=$(echo "$result" | jq -r '.ghost_display // ""' 2>/dev/null)
-  if [[ -n "$ghost_display_new" && "$ghost_display_new" != "null" ]]; then
-    mkdir -p "$(dirname "$settings_file")"
-    if [ -f "$settings_file" ] && grep -q '^ghost_display=' "$settings_file" 2>/dev/null; then
-      sed -i '' "s/^ghost_display=.*/ghost_display=$ghost_display_new/" "$settings_file"
-    else
-      echo "ghost_display=$ghost_display_new" >> "$settings_file"
-    fi
-  fi
-
-  # Persist tab title if changed
-  local tab_title_new
-  tab_title_new=$(echo "$result" | jq -r '.tab_title // ""' 2>/dev/null)
-  if [[ -n "$tab_title_new" && "$tab_title_new" != "null" ]]; then
-    mkdir -p "$(dirname "$settings_file")"
-    if [ -f "$settings_file" ] && grep -q '^tab_title=' "$settings_file" 2>/dev/null; then
-      sed -i '' "s/^tab_title=.*/tab_title=$tab_title_new/" "$settings_file"
-    else
-      echo "tab_title=$tab_title_new" >> "$settings_file"
-    fi
-  fi
-
-  # Handle sound name change
-  local sound_name_changed
-  sound_name_changed=$(echo "$result" | jq 'has("sound_name")' 2>/dev/null)
-  if [[ "$sound_name_changed" == "true" ]]; then
-    if type apply_sound_notification &>/dev/null; then
-      local claude_settings="$HOME/.claude/settings.json"
-      local new_sound_name
-      new_sound_name=$(echo "$result" | jq -r '.sound_name // empty' 2>/dev/null)
-      apply_sound_notification "${SELECTED_AI_TOOL:-claude}" "$gt_config_dir" "$claude_settings" "${new_sound_name:-}"
-    fi
-  fi
-
   _selected_project_action="$action"
 
   case "$action" in
