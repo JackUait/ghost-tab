@@ -3240,3 +3240,138 @@ func TestMainMenu_CycleGhostDisplay_CreatesParentDirs(t *testing.T) {
 		t.Errorf("expected ghost_display=static, got %q", string(data))
 	}
 }
+
+func TestMainMenu_CycleSoundName_persists_to_file(t *testing.T) {
+	dir := t.TempDir()
+	soundFile := filepath.Join(dir, "claude-features.json")
+	os.WriteFile(soundFile, []byte(`{"sound":true,"sound_name":"Bottle"}`+"\n"), 0644)
+
+	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
+	m.SetSoundFile(soundFile)
+	m.SetSoundName("Bottle")
+	m.CycleSoundName() // Bottle -> Frog
+
+	data, err := os.ReadFile(soundFile)
+	if err != nil {
+		t.Fatalf("failed to read sound file: %v", err)
+	}
+	content := string(data)
+	if strings.Contains(content, "Bottle") {
+		t.Error("expected sound to change from Bottle")
+	}
+	if !strings.Contains(content, `"sound":true`) && !strings.Contains(content, `"sound": true`) {
+		t.Error("expected sound to be enabled")
+	}
+}
+
+func TestMainMenu_CycleSoundName_to_off_persists(t *testing.T) {
+	dir := t.TempDir()
+	soundFile := filepath.Join(dir, "claude-features.json")
+	os.WriteFile(soundFile, []byte(`{"sound":true,"sound_name":"Tink"}`+"\n"), 0644)
+
+	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
+	m.SetSoundFile(soundFile)
+	m.SetSoundName("Tink")
+	m.CycleSoundName() // Tink -> Off
+
+	data, err := os.ReadFile(soundFile)
+	if err != nil {
+		t.Fatalf("failed to read sound file: %v", err)
+	}
+	content := string(data)
+	if !strings.Contains(content, `"sound":false`) && !strings.Contains(content, `"sound": false`) {
+		t.Errorf("expected sound:false when cycled to Off, got %q", content)
+	}
+}
+
+func TestMainMenu_CycleSoundName_creates_file_if_missing(t *testing.T) {
+	dir := t.TempDir()
+	soundFile := filepath.Join(dir, "claude-features.json")
+
+	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
+	m.SetSoundFile(soundFile)
+	m.SetSoundName("")
+	m.CycleSoundName() // Off -> Basso
+
+	data, err := os.ReadFile(soundFile)
+	if err != nil {
+		t.Fatalf("sound file not created: %v", err)
+	}
+	content := string(data)
+	if !strings.Contains(content, "Basso") {
+		t.Errorf("expected Basso in file, got %q", content)
+	}
+}
+
+func TestMainMenu_CycleSoundNameReverse_persists_to_file(t *testing.T) {
+	dir := t.TempDir()
+	soundFile := filepath.Join(dir, "claude-features.json")
+	os.WriteFile(soundFile, []byte(`{"sound":true,"sound_name":"Blow"}`+"\n"), 0644)
+
+	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
+	m.SetSoundFile(soundFile)
+	m.SetSoundName("Blow")
+	m.CycleSoundNameReverse() // Blow -> Basso
+
+	data, err := os.ReadFile(soundFile)
+	if err != nil {
+		t.Fatalf("failed to read sound file: %v", err)
+	}
+	content := string(data)
+	if !strings.Contains(content, "Basso") {
+		t.Errorf("expected Basso in file, got %q", content)
+	}
+}
+
+func TestMainMenu_CycleSoundName_preserves_other_keys(t *testing.T) {
+	dir := t.TempDir()
+	soundFile := filepath.Join(dir, "claude-features.json")
+	os.WriteFile(soundFile, []byte(`{"sound":true,"sound_name":"Bottle","other_key":"value"}`+"\n"), 0644)
+
+	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
+	m.SetSoundFile(soundFile)
+	m.SetSoundName("Bottle")
+	m.CycleSoundName() // Bottle -> Frog
+
+	data, err := os.ReadFile(soundFile)
+	if err != nil {
+		t.Fatalf("failed to read sound file: %v", err)
+	}
+	content := string(data)
+	if !strings.Contains(content, `"other_key"`) {
+		t.Errorf("expected other_key preserved in file, got %q", content)
+	}
+}
+
+func TestMainMenu_CycleSoundName_does_not_persist_without_file(t *testing.T) {
+	dir := t.TempDir()
+	soundFile := filepath.Join(dir, "claude-features.json")
+
+	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
+	// Do NOT call SetSoundFile
+	m.SetSoundName("Bottle")
+	m.CycleSoundName()
+
+	// File should NOT exist
+	if _, err := os.Stat(soundFile); err == nil {
+		t.Error("sound file should not be created when no file path set")
+	}
+}
+
+func TestMainMenu_CycleSoundName_creates_parent_dirs(t *testing.T) {
+	dir := t.TempDir()
+	soundFile := filepath.Join(dir, "config", "ghost-tab", "claude-features.json")
+
+	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
+	m.SetSoundFile(soundFile)
+	m.SetSoundName("")
+	m.CycleSoundName() // Off -> Basso
+
+	data, err := os.ReadFile(soundFile)
+	if err != nil {
+		t.Fatalf("sound file not created with parent dirs: %v", err)
+	}
+	if !strings.Contains(string(data), "Basso") {
+		t.Errorf("expected Basso in file, got %q", string(data))
+	}
+}

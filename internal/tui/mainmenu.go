@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
 	"os"
@@ -305,6 +306,7 @@ func (m *MainMenuModel) CycleSoundName() {
 	}
 	m.soundNameChanged = m.soundName != m.initialSoundName
 	m.previewSound()
+	m.persistSound()
 }
 
 // CycleSoundNameReverse cycles backward through Off + system sounds.
@@ -327,6 +329,7 @@ func (m *MainMenuModel) CycleSoundNameReverse() {
 	}
 	m.soundNameChanged = m.soundName != m.initialSoundName
 	m.previewSound()
+	m.persistSound()
 }
 
 // previewSound plays the current sound in the background using afplay.
@@ -339,6 +342,31 @@ func (m *MainMenuModel) previewSound() {
 		cmd := exec.Command("afplay", path)
 		_ = cmd.Start()
 	}()
+}
+
+// persistSound writes the current sound state to the features JSON file.
+func (m *MainMenuModel) persistSound() {
+	if m.soundFile == "" {
+		return
+	}
+	_ = os.MkdirAll(filepath.Dir(m.soundFile), 0755)
+
+	// Read existing data to preserve other keys
+	existing := map[string]interface{}{}
+	if data, err := os.ReadFile(m.soundFile); err == nil {
+		_ = json.Unmarshal(data, &existing)
+	}
+
+	if m.soundName == "" {
+		existing["sound"] = false
+		delete(existing, "sound_name")
+	} else {
+		existing["sound"] = true
+		existing["sound_name"] = m.soundName
+	}
+
+	data, _ := json.Marshal(existing)
+	_ = os.WriteFile(m.soundFile, append(data, '\n'), 0644)
 }
 
 // soundNameForResult returns a pointer to the sound name if changed, nil if unchanged.
