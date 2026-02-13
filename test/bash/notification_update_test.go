@@ -481,6 +481,113 @@ func TestNotification_toggle_sound_notification_disables_for_claude(t *testing.T
 	assertNotContains(t, string(data), "afplay")
 }
 
+// --- apply_sound_notification ---
+
+func TestNotification_apply_sound_notification_enables_with_custom_sound(t *testing.T) {
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, "config")
+	os.MkdirAll(configDir, 0755)
+	writeTempFile(t, configDir, "claude-features.json", `{"sound": false}`)
+	settingsFile := writeTempFile(t, tmpDir, "settings.json", `{}`)
+
+	snippet := notificationSnippet(t,
+		fmt.Sprintf(`apply_sound_notification "claude" %q %q "Glass"`, configDir, settingsFile))
+
+	out, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "enabled")
+
+	// Verify feature flag
+	featuresFile := filepath.Join(configDir, "claude-features.json")
+	verifySnippet := fmt.Sprintf(
+		`python3 -c "import json; d=json.load(open('%s')); print(d['sound'], d['sound_name'])"`, featuresFile)
+	flagOut, flagCode := runBashSnippet(t, verifySnippet, nil)
+	assertExitCode(t, flagCode, 0)
+	if strings.TrimSpace(flagOut) != "True Glass" {
+		t.Errorf("expected 'True Glass', got %q", strings.TrimSpace(flagOut))
+	}
+
+	// Verify hook uses Glass sound
+	data, err := os.ReadFile(settingsFile)
+	if err != nil {
+		t.Fatalf("failed to read settings.json: %v", err)
+	}
+	assertContains(t, string(data), "Glass.aiff")
+}
+
+func TestNotification_apply_sound_notification_disables_sound(t *testing.T) {
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, "config")
+	os.MkdirAll(configDir, 0755)
+	writeTempFile(t, configDir, "claude-features.json", `{"sound": true, "sound_name": "Glass"}`)
+	settingsFile := writeTempFile(t, tmpDir, "settings.json", `{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [{"type": "command", "command": "afplay /System/Library/Sounds/Glass.aiff &"}]
+      }
+    ]
+  }
+}
+`)
+
+	snippet := notificationSnippet(t,
+		fmt.Sprintf(`apply_sound_notification "claude" %q %q ""`, configDir, settingsFile))
+
+	out, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "disabled")
+
+	// Verify feature flag
+	featuresFile := filepath.Join(configDir, "claude-features.json")
+	verifySnippet := fmt.Sprintf(
+		`python3 -c "import json; print(json.load(open('%s'))['sound'])"`, featuresFile)
+	flagOut, flagCode := runBashSnippet(t, verifySnippet, nil)
+	assertExitCode(t, flagCode, 0)
+	if strings.TrimSpace(flagOut) != "False" {
+		t.Errorf("expected 'False', got %q", strings.TrimSpace(flagOut))
+	}
+
+	// Verify hook was removed
+	data, err := os.ReadFile(settingsFile)
+	if err != nil {
+		t.Fatalf("failed to read settings.json: %v", err)
+	}
+	assertNotContains(t, string(data), "afplay")
+}
+
+func TestNotification_apply_sound_notification_changes_sound(t *testing.T) {
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, "config")
+	os.MkdirAll(configDir, 0755)
+	writeTempFile(t, configDir, "claude-features.json", `{"sound": true, "sound_name": "Bottle"}`)
+	settingsFile := writeTempFile(t, tmpDir, "settings.json", `{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [{"type": "command", "command": "afplay /System/Library/Sounds/Bottle.aiff &"}]
+      }
+    ]
+  }
+}
+`)
+
+	snippet := notificationSnippet(t,
+		fmt.Sprintf(`apply_sound_notification "claude" %q %q "Ping"`, configDir, settingsFile))
+
+	out, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "enabled")
+
+	// Verify hook uses Ping sound
+	data, err := os.ReadFile(settingsFile)
+	if err != nil {
+		t.Fatalf("failed to read settings.json: %v", err)
+	}
+	assertContains(t, string(data), "Ping.aiff")
+	assertNotContains(t, string(data), "Bottle.aiff")
+}
+
 // ==================== update.sh tests ====================
 
 // --- check_for_update: no brew ---

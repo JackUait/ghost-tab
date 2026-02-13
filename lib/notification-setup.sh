@@ -143,3 +143,35 @@ toggle_sound_notification() {
     success "Sound notifications enabled"
   fi
 }
+
+# Apply sound notification state for the given AI tool.
+# Usage: apply_sound_notification <tool> <config_dir> <settings_path> <sound_name>
+# If sound_name is empty, disables sound. Otherwise enables with that sound.
+apply_sound_notification() {
+  local tool="$1" config_dir="$2" settings_path="$3" sound_name="$4"
+
+  if [[ -z "$sound_name" ]]; then
+    # Disable sound
+    set_sound_feature_flag "$tool" "$config_dir" false
+    # Remove any existing afplay hook
+    case "$tool" in
+      claude)
+        remove_sound_notification "$settings_path" "afplay /System/Library/Sounds/"
+        ;;
+    esac
+    success "Sound notifications disabled"
+  else
+    # Enable sound with specific name
+    set_sound_feature_flag "$tool" "$config_dir" true
+    set_sound_name "$tool" "$config_dir" "$sound_name"
+    local sound_command="afplay /System/Library/Sounds/${sound_name}.aiff &"
+    case "$tool" in
+      claude)
+        # Remove old hook first (any afplay sound), then add new one
+        remove_sound_notification "$settings_path" "afplay /System/Library/Sounds/"
+        setup_sound_notification "$settings_path" "$sound_command"
+        ;;
+    esac
+    success "Sound notifications enabled"
+  fi
+}
