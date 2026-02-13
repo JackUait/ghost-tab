@@ -94,7 +94,7 @@ if [ -f "$AI_TOOL_PREF_FILE" ]; then
   SELECTED_AI_TOOL="$(cat "$AI_TOOL_PREF_FILE" 2>/dev/null | tr -d '[:space:]')"
 fi
 # Validate saved preference is still installed
-validate_ai_tool
+validate_ai_tool "$AI_TOOL_PREF_FILE"
 
 # Load user projects from config file if it exists
 PROJECTS_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/ghost-tab/projects"

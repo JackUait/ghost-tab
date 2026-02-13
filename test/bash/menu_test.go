@@ -1007,6 +1007,105 @@ select_project_interactive %q || true
 	assertContains(t, string(data), "--sound-enabled")
 }
 
+// ---------- ai-tools.sh validate_ai_tool tests (TestAITools_*) ----------
+
+func TestAITools_validate_persists_fallback_to_file(t *testing.T) {
+	dir := t.TempDir()
+	// ai-tool file has "codex" but codex is not available
+	writeTempFile(t, dir, "config/ghost-tab/ai-tool", "codex")
+	aiToolFile := filepath.Join(dir, "config", "ghost-tab", "ai-tool")
+
+	root := projectRoot(t)
+	env := buildEnv(t, nil,
+		"XDG_CONFIG_HOME="+filepath.Join(dir, "config"),
+	)
+
+	script := fmt.Sprintf(`
+source %q
+AI_TOOLS_AVAILABLE=("claude" "copilot")
+SELECTED_AI_TOOL="codex"
+validate_ai_tool %q
+echo "tool=$SELECTED_AI_TOOL"
+`, filepath.Join(root, "lib/ai-tools.sh"),
+		aiToolFile)
+
+	out, code := runBashSnippet(t, script, env)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "tool=claude")
+
+	// File should be updated to "claude"
+	data, err := os.ReadFile(aiToolFile)
+	if err != nil {
+		t.Fatalf("ai-tool file not found: %v", err)
+	}
+	if strings.TrimSpace(string(data)) != "claude" {
+		t.Errorf("ai-tool file should be 'claude' after fallback, got %q", strings.TrimSpace(string(data)))
+	}
+}
+
+func TestAITools_validate_does_not_write_when_valid(t *testing.T) {
+	dir := t.TempDir()
+	configDir := filepath.Join(dir, "config", "ghost-tab")
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	aiToolFile := filepath.Join(configDir, "ai-tool")
+
+	root := projectRoot(t)
+	env := buildEnv(t, nil,
+		"XDG_CONFIG_HOME="+filepath.Join(dir, "config"),
+	)
+
+	script := fmt.Sprintf(`
+source %q
+AI_TOOLS_AVAILABLE=("claude" "codex")
+SELECTED_AI_TOOL="codex"
+validate_ai_tool %q
+echo "tool=$SELECTED_AI_TOOL"
+`, filepath.Join(root, "lib/ai-tools.sh"),
+		aiToolFile)
+
+	out, code := runBashSnippet(t, script, env)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "tool=codex")
+
+	// File should NOT be created (tool was valid, no change needed)
+	if _, err := os.Stat(aiToolFile); err == nil {
+		t.Error("ai-tool file should not be created when tool is valid")
+	}
+}
+
+func TestAITools_validate_without_file_arg_does_not_write(t *testing.T) {
+	dir := t.TempDir()
+	configDir := filepath.Join(dir, "config", "ghost-tab")
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	aiToolFile := filepath.Join(configDir, "ai-tool")
+
+	root := projectRoot(t)
+	env := buildEnv(t, nil,
+		"XDG_CONFIG_HOME="+filepath.Join(dir, "config"),
+	)
+
+	script := fmt.Sprintf(`
+source %q
+AI_TOOLS_AVAILABLE=("claude")
+SELECTED_AI_TOOL="codex"
+validate_ai_tool
+echo "tool=$SELECTED_AI_TOOL"
+`, filepath.Join(root, "lib/ai-tools.sh"))
+
+	out, code := runBashSnippet(t, script, env)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "tool=claude")
+
+	// File should NOT be created (no file arg passed)
+	if _, err := os.Stat(aiToolFile); err == nil {
+		t.Error("ai-tool file should not be created when no file arg passed")
+	}
+}
+
 // ---------- settings-menu-tui.sh tests (TestSettingsMenu_*) ----------
 
 func TestSettingsMenu_calls_ghost_tab_tui_and_parses_JSON(t *testing.T) {
