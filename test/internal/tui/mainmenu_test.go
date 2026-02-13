@@ -3075,6 +3075,14 @@ func TestMainMenu_SoundNameInResultOnQuit(t *testing.T) {
 	}
 }
 
+func TestMainMenu_SetSettingsFile(t *testing.T) {
+	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
+	m.SetSettingsFile("/tmp/test-settings")
+	if m.SettingsFile() != "/tmp/test-settings" {
+		t.Errorf("expected '/tmp/test-settings', got %q", m.SettingsFile())
+	}
+}
+
 func TestMainMenu_SettingsViewShowsSoundName(t *testing.T) {
 	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
 	m.SetSize(80, 30)

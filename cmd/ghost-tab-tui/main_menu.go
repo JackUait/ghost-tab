@@ -28,7 +28,8 @@ var (
 	mainMenuGhostDisplay string
 	mainMenuTabTitle     string
 	mainMenuUpdateVer    string
-	mainMenuSoundName string
+	mainMenuSoundName    string
+	mainMenuSettingsFile string
 )
 
 func init() {
@@ -41,6 +42,7 @@ func init() {
 	mainMenuCmd.Flags().StringVar(&mainMenuTabTitle, "tab-title", "full", "Tab title mode (full, project)")
 	mainMenuCmd.Flags().StringVar(&mainMenuUpdateVer, "update-version", "", "Optional update notification version")
 	mainMenuCmd.Flags().StringVar(&mainMenuSoundName, "sound-name", "", "Sound name for notifications (empty = off)")
+	mainMenuCmd.Flags().StringVar(&mainMenuSettingsFile, "settings-file", "", "Path to settings file for persistence")
 	rootCmd.AddCommand(mainMenuCmd)
 }
 
@@ -65,6 +67,9 @@ func runMainMenu(cmd *cobra.Command, args []string) error {
 	model.SetProjectsFile(mainMenuProjectsFile)
 	if mainMenuAIToolFile != "" {
 		model.SetAIToolFile(mainMenuAIToolFile)
+	}
+	if mainMenuSettingsFile != "" {
+		model.SetSettingsFile(mainMenuSettingsFile)
 	}
 
 	ttyOpts, cleanup, err := util.TUITeaOptions()

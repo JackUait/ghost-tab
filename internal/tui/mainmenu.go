@@ -141,6 +141,9 @@ type MainMenuModel struct {
 
 	// File path for AI tool preference persistence
 	aiToolFile string
+
+	// File path for settings persistence (ghost display, tab title)
+	settingsFile string
 }
 
 // NewMainMenu creates a new main menu model.
@@ -435,6 +438,12 @@ func (m *MainMenuModel) SetAIToolFile(path string) { m.aiToolFile = path }
 
 // AIToolFile returns the file path for AI tool preference persistence.
 func (m *MainMenuModel) AIToolFile() string { return m.aiToolFile }
+
+// SetSettingsFile sets the file path for settings persistence.
+func (m *MainMenuModel) SetSettingsFile(path string) { m.settingsFile = path }
+
+// SettingsFile returns the file path for settings persistence.
+func (m *MainMenuModel) SettingsFile() string { return m.settingsFile }
 
 // BobPhase returns the current bob animation phase (0 to 2*pi).
 func (m *MainMenuModel) BobPhase() float64 { return m.bobPhase }

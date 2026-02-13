@@ -49,6 +49,7 @@ select_project_interactive() {
   cmd_args+=("--ai-tool-file" "$ai_tool_file")
   cmd_args+=("--ghost-display" "$ghost_display")
   cmd_args+=("--tab-title" "$tab_title")
+  cmd_args+=("--settings-file" "$settings_file")
   if [[ -n "$sound_name" ]]; then
     cmd_args+=("--sound-name" "$sound_name")
   fi
