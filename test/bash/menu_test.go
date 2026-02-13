@@ -898,7 +898,7 @@ echo "ai_tool=$_selected_ai_tool"
 	}
 }
 
-func TestMenu_does_not_persist_ai_tool_on_quit(t *testing.T) {
+func TestMenu_persists_ai_tool_on_quit(t *testing.T) {
 	dir := t.TempDir()
 	binDir := mockCommand(t, dir, "ghost-tab-tui", `echo '{"action":"quit","ai_tool":"codex"}'`)
 	projectsFile := writeTempFile(t, dir, "projects", "proj1:/tmp/p1\n")
@@ -930,8 +930,8 @@ select_project_interactive %q || true
 	if err != nil {
 		t.Fatalf("ai-tool file not found: %v", err)
 	}
-	if strings.TrimSpace(string(data)) != "claude" {
-		t.Errorf("ai-tool should still be 'claude' after quit, got %q", strings.TrimSpace(string(data)))
+	if strings.TrimSpace(string(data)) != "codex" {
+		t.Errorf("ai-tool should be 'codex' after quit with tool change, got %q", strings.TrimSpace(string(data)))
 	}
 }
 
