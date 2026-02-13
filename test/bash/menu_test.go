@@ -1244,6 +1244,42 @@ select_project_interactive %q
 	assertContains(t, string(args), settingsFile)
 }
 
+func TestMenu_passes_sound_file_flag(t *testing.T) {
+	dir := t.TempDir()
+	argsFile := filepath.Join(dir, "captured_args")
+	binDir := mockCommand(t, dir, "ghost-tab-tui", fmt.Sprintf(`
+echo "$*" > %q
+echo '{"action":"quit"}'
+`, argsFile))
+	projectsFile := writeTempFile(t, dir, "projects", "proj1:/tmp/p1\n")
+	root := projectRoot(t)
+	env := buildEnv(t, []string{binDir},
+		"XDG_CONFIG_HOME="+filepath.Join(dir, "config"),
+	)
+
+	script := fmt.Sprintf(`
+source %q 2>/dev/null || true
+source %q
+error() { echo "ERROR: $*" >&2; }
+AI_TOOLS_AVAILABLE=("claude")
+SELECTED_AI_TOOL="claude"
+_update_version=""
+get_sound_name() { echo "Bottle"; }
+select_project_interactive %q
+`, filepath.Join(root, "lib/tui.sh"),
+		filepath.Join(root, "lib/menu-tui.sh"),
+		projectsFile)
+
+	runBashSnippet(t, script, env)
+
+	args, err := os.ReadFile(argsFile)
+	if err != nil {
+		t.Fatalf("args file not found: %v", err)
+	}
+	assertContains(t, string(args), "--sound-file")
+	assertContains(t, string(args), "claude-features.json")
+}
+
 // ---------- ai-tools.sh validate_ai_tool tests (TestAITools_*) ----------
 
 func TestAITools_validate_persists_fallback_to_file(t *testing.T) {

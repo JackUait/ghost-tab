@@ -144,6 +144,9 @@ type MainMenuModel struct {
 
 	// File path for settings persistence (ghost display, tab title)
 	settingsFile string
+
+	// File path for sound features persistence ({tool}-features.json)
+	soundFile string
 }
 
 // NewMainMenu creates a new main menu model.
@@ -444,6 +447,12 @@ func (m *MainMenuModel) SetSettingsFile(path string) { m.settingsFile = path }
 
 // SettingsFile returns the file path for settings persistence.
 func (m *MainMenuModel) SettingsFile() string { return m.settingsFile }
+
+// SetSoundFile sets the file path for sound features persistence.
+func (m *MainMenuModel) SetSoundFile(path string) { m.soundFile = path }
+
+// SoundFile returns the file path for sound features persistence.
+func (m *MainMenuModel) SoundFile() string { return m.soundFile }
 
 // BobPhase returns the current bob animation phase (0 to 2*pi).
 func (m *MainMenuModel) BobPhase() float64 { return m.bobPhase }

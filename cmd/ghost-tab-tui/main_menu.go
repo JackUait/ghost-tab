@@ -30,6 +30,7 @@ var (
 	mainMenuUpdateVer    string
 	mainMenuSoundName    string
 	mainMenuSettingsFile string
+	mainMenuSoundFile    string
 )
 
 func init() {
@@ -43,6 +44,7 @@ func init() {
 	mainMenuCmd.Flags().StringVar(&mainMenuUpdateVer, "update-version", "", "Optional update notification version")
 	mainMenuCmd.Flags().StringVar(&mainMenuSoundName, "sound-name", "", "Sound name for notifications (empty = off)")
 	mainMenuCmd.Flags().StringVar(&mainMenuSettingsFile, "settings-file", "", "Path to settings file for persistence")
+	mainMenuCmd.Flags().StringVar(&mainMenuSoundFile, "sound-file", "", "Path to sound features JSON file for persistence")
 	rootCmd.AddCommand(mainMenuCmd)
 }
 
@@ -70,6 +72,9 @@ func runMainMenu(cmd *cobra.Command, args []string) error {
 	}
 	if mainMenuSettingsFile != "" {
 		model.SetSettingsFile(mainMenuSettingsFile)
+	}
+	if mainMenuSoundFile != "" {
+		model.SetSoundFile(mainMenuSoundFile)
 	}
 
 	ttyOpts, cleanup, err := util.TUITeaOptions()

@@ -50,6 +50,8 @@ select_project_interactive() {
   cmd_args+=("--ghost-display" "$ghost_display")
   cmd_args+=("--tab-title" "$tab_title")
   cmd_args+=("--settings-file" "$settings_file")
+  local sound_file="$gt_config_dir/${SELECTED_AI_TOOL:-claude}-features.json"
+  cmd_args+=("--sound-file" "$sound_file")
   if [[ -n "$sound_name" ]]; then
     cmd_args+=("--sound-name" "$sound_name")
   fi
