@@ -173,6 +173,19 @@ exit 0
 	assertExitCode(t, code, 0)
 }
 
+func TestCheckGhAuth_fails_when_not_authenticated(t *testing.T) {
+	dir := t.TempDir()
+	binDir := mockCommand(t, dir, "gh", `
+if [ "$1" = "auth" ] && [ "$2" = "status" ]; then exit 1; fi
+exit 0
+`)
+	snippet := releaseSnippet(t, `check_gh_auth`)
+	env := buildEnv(t, []string{binDir})
+	out, code := runBashSnippet(t, snippet, env)
+	assertExitCode(t, code, 1)
+	assertContains(t, out, "authenticated")
+}
+
 func TestCheckGhAuth_fails_when_not_installed(t *testing.T) {
 	dir := t.TempDir()
 	// Create an empty bin dir with no gh command
