@@ -375,6 +375,7 @@ func (m *MainMenuModel) CycleGhostDisplay() {
 		m.ghostDisplay = "animated"
 	}
 	m.ghostDisplayChanged = m.ghostDisplay != m.initialGhostDisplay
+	m.persistSetting("ghost_display", m.ghostDisplay)
 }
 
 // CycleGhostDisplayReverse cycles ghost display in reverse order: animated → none → static → animated.
@@ -388,6 +389,40 @@ func (m *MainMenuModel) CycleGhostDisplayReverse() {
 		m.ghostDisplay = "animated"
 	}
 	m.ghostDisplayChanged = m.ghostDisplay != m.initialGhostDisplay
+	m.persistSetting("ghost_display", m.ghostDisplay)
+}
+
+// persistSetting writes a key=value pair to the settings file.
+// Creates the file if it doesn't exist, updates the key if it does.
+func (m *MainMenuModel) persistSetting(key, value string) {
+	if m.settingsFile == "" {
+		return
+	}
+	_ = os.MkdirAll(filepath.Dir(m.settingsFile), 0755)
+	entry := key + "=" + value
+	data, err := os.ReadFile(m.settingsFile)
+	if err != nil {
+		_ = os.WriteFile(m.settingsFile, []byte(entry+"\n"), 0644)
+		return
+	}
+	lines := strings.Split(string(data), "\n")
+	found := false
+	for i, line := range lines {
+		if strings.HasPrefix(line, key+"=") {
+			lines[i] = entry
+			found = true
+			break
+		}
+	}
+	if !found {
+		// Insert before any trailing empty line
+		if len(lines) > 0 && lines[len(lines)-1] == "" {
+			lines = append(lines[:len(lines)-1], entry, "")
+		} else {
+			lines = append(lines, entry)
+		}
+	}
+	_ = os.WriteFile(m.settingsFile, []byte(strings.Join(lines, "\n")), 0644)
 }
 
 // SetSleepTimer sets the sleep inactivity timer to the given number of seconds.

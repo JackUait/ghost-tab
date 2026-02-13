@@ -3115,3 +3115,109 @@ func TestMainMenu_SettingsViewShowsOff(t *testing.T) {
 		t.Error("settings view should show '[Off]' when sound is disabled")
 	}
 }
+
+func TestMainMenu_CycleGhostDisplay_PersistsToFile(t *testing.T) {
+	dir := t.TempDir()
+	settingsFile := filepath.Join(dir, "settings")
+	os.WriteFile(settingsFile, []byte("ghost_display=animated\n"), 0644)
+
+	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
+	m.SetSettingsFile(settingsFile)
+	m.CycleGhostDisplay() // animated -> static
+
+	data, err := os.ReadFile(settingsFile)
+	if err != nil {
+		t.Fatalf("failed to read settings file: %v", err)
+	}
+	if !strings.Contains(string(data), "ghost_display=static") {
+		t.Errorf("expected ghost_display=static in file, got %q", string(data))
+	}
+}
+
+func TestMainMenu_CycleGhostDisplay_CreatesFileIfMissing(t *testing.T) {
+	dir := t.TempDir()
+	settingsFile := filepath.Join(dir, "settings")
+
+	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
+	m.SetSettingsFile(settingsFile)
+	m.CycleGhostDisplay() // animated -> static
+
+	data, err := os.ReadFile(settingsFile)
+	if err != nil {
+		t.Fatalf("settings file not created: %v", err)
+	}
+	if !strings.Contains(string(data), "ghost_display=static") {
+		t.Errorf("expected ghost_display=static, got %q", string(data))
+	}
+}
+
+func TestMainMenu_CycleGhostDisplayReverse_PersistsToFile(t *testing.T) {
+	dir := t.TempDir()
+	settingsFile := filepath.Join(dir, "settings")
+	os.WriteFile(settingsFile, []byte("ghost_display=animated\n"), 0644)
+
+	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
+	m.SetSettingsFile(settingsFile)
+	m.CycleGhostDisplayReverse() // animated -> none
+
+	data, err := os.ReadFile(settingsFile)
+	if err != nil {
+		t.Fatalf("failed to read settings file: %v", err)
+	}
+	if !strings.Contains(string(data), "ghost_display=none") {
+		t.Errorf("expected ghost_display=none in file, got %q", string(data))
+	}
+}
+
+func TestMainMenu_CycleGhostDisplay_PreservesOtherSettings(t *testing.T) {
+	dir := t.TempDir()
+	settingsFile := filepath.Join(dir, "settings")
+	os.WriteFile(settingsFile, []byte("ghost_display=animated\ntab_title=full\n"), 0644)
+
+	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
+	m.SetSettingsFile(settingsFile)
+	m.CycleGhostDisplay() // animated -> static
+
+	data, err := os.ReadFile(settingsFile)
+	if err != nil {
+		t.Fatalf("failed to read settings file: %v", err)
+	}
+	content := string(data)
+	if !strings.Contains(content, "ghost_display=static") {
+		t.Errorf("expected ghost_display=static in file, got %q", content)
+	}
+	if !strings.Contains(content, "tab_title=full") {
+		t.Errorf("expected tab_title=full preserved in file, got %q", content)
+	}
+}
+
+func TestMainMenu_CycleGhostDisplay_DoesNotPersistWithoutFile(t *testing.T) {
+	dir := t.TempDir()
+	settingsFile := filepath.Join(dir, "settings")
+
+	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
+	// Do NOT call SetSettingsFile
+	m.CycleGhostDisplay()
+
+	// File should NOT exist
+	if _, err := os.Stat(settingsFile); err == nil {
+		t.Error("settings file should not be created when no file path set")
+	}
+}
+
+func TestMainMenu_CycleGhostDisplay_CreatesParentDirs(t *testing.T) {
+	dir := t.TempDir()
+	settingsFile := filepath.Join(dir, "config", "ghost-tab", "settings")
+
+	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
+	m.SetSettingsFile(settingsFile)
+	m.CycleGhostDisplay() // animated -> static
+
+	data, err := os.ReadFile(settingsFile)
+	if err != nil {
+		t.Fatalf("settings file not created with parent dirs: %v", err)
+	}
+	if !strings.Contains(string(data), "ghost_display=static") {
+		t.Errorf("expected ghost_display=static, got %q", string(data))
+	}
+}
