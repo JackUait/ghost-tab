@@ -42,9 +42,11 @@ select_project_interactive() {
   ai_tools_csv=$(IFS=,; echo "${AI_TOOLS_AVAILABLE[*]}")
 
   # Build command args
+  local ai_tool_file="${XDG_CONFIG_HOME:-$HOME/.config}/ghost-tab/ai-tool"
   local cmd_args=("main-menu" "--projects-file" "$projects_file")
   cmd_args+=("--ai-tool" "${SELECTED_AI_TOOL:-claude}")
   cmd_args+=("--ai-tools" "$ai_tools_csv")
+  cmd_args+=("--ai-tool-file" "$ai_tool_file")
   cmd_args+=("--ghost-display" "$ghost_display")
   cmd_args+=("--tab-title" "$tab_title")
   if [[ "$sound_enabled" == "true" ]]; then

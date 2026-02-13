@@ -131,6 +131,9 @@ type MainMenuModel struct {
 
 	// File path for project file operations
 	projectsFile string
+
+	// File path for AI tool preference persistence
+	aiToolFile string
 }
 
 // NewMainMenu creates a new main menu model.
@@ -179,6 +182,7 @@ func (m *MainMenuModel) CurrentAITool() string {
 }
 
 // CycleAITool cycles the AI tool selection forward ("next") or backward ("prev").
+// If aiToolFile is set, the new tool is persisted to disk immediately.
 func (m *MainMenuModel) CycleAITool(direction string) {
 	n := len(m.aiTools)
 	if n <= 1 {
@@ -190,6 +194,16 @@ func (m *MainMenuModel) CycleAITool(direction string) {
 		m.selectedAI = (m.selectedAI - 1 + n) % n
 	}
 	m.theme = ThemeForTool(m.aiTools[m.selectedAI])
+	m.persistAITool()
+}
+
+// persistAITool writes the current AI tool to the preference file if set.
+func (m *MainMenuModel) persistAITool() {
+	if m.aiToolFile == "" {
+		return
+	}
+	_ = os.MkdirAll(filepath.Dir(m.aiToolFile), 0755)
+	_ = os.WriteFile(m.aiToolFile, []byte(m.CurrentAITool()+"\n"), 0644)
 }
 
 // MoveUp moves the selection up by one, wrapping around.
@@ -352,6 +366,13 @@ func (m *MainMenuModel) SetProjectsFile(path string) { m.projectsFile = path }
 
 // ProjectsFile returns the file path for project file operations.
 func (m *MainMenuModel) ProjectsFile() string { return m.projectsFile }
+
+// SetAIToolFile sets the file path for AI tool preference persistence.
+// When set, CycleAITool writes the new tool to this file immediately.
+func (m *MainMenuModel) SetAIToolFile(path string) { m.aiToolFile = path }
+
+// AIToolFile returns the file path for AI tool preference persistence.
+func (m *MainMenuModel) AIToolFile() string { return m.aiToolFile }
 
 // BobPhase returns the current bob animation phase (0 to 2*pi).
 func (m *MainMenuModel) BobPhase() float64 { return m.bobPhase }

@@ -139,6 +139,48 @@ func TestMainMenu_AIToolCycling(t *testing.T) {
 	}
 }
 
+func TestMainMenu_CycleAITool_PersistsToFile(t *testing.T) {
+	dir := t.TempDir()
+	aiToolFile := filepath.Join(dir, "config", "ghost-tab", "ai-tool")
+
+	m := tui.NewMainMenu(testProjects(), testAITools(), "claude", "animated")
+	m.SetAIToolFile(aiToolFile)
+
+	// Cycle to codex
+	m.CycleAITool("next")
+
+	// File should be written with "codex"
+	data, err := os.ReadFile(aiToolFile)
+	if err != nil {
+		t.Fatalf("ai-tool file not found after cycle: %v", err)
+	}
+	if strings.TrimSpace(string(data)) != "codex" {
+		t.Errorf("ai-tool file should be 'codex', got %q", strings.TrimSpace(string(data)))
+	}
+
+	// Cycle again to copilot
+	m.CycleAITool("next")
+	data, _ = os.ReadFile(aiToolFile)
+	if strings.TrimSpace(string(data)) != "copilot" {
+		t.Errorf("ai-tool file should be 'copilot' after second cycle, got %q", strings.TrimSpace(string(data)))
+	}
+}
+
+func TestMainMenu_CycleAITool_DoesNotPersistWithoutFile(t *testing.T) {
+	dir := t.TempDir()
+	aiToolFile := filepath.Join(dir, "config", "ghost-tab", "ai-tool")
+
+	m := tui.NewMainMenu(testProjects(), testAITools(), "claude", "animated")
+	// Do NOT call SetAIToolFile
+
+	m.CycleAITool("next")
+
+	// File should NOT exist
+	if _, err := os.Stat(aiToolFile); err == nil {
+		t.Error("ai-tool file should not be created when no file path set")
+	}
+}
+
 func TestMainMenu_AIToolCycling_SingleTool(t *testing.T) {
 	m := tui.NewMainMenu(testProjects(), []string{"claude"}, "claude", "animated")
 
@@ -504,6 +546,22 @@ func TestMainMenu_QuitEsc(t *testing.T) {
 	}
 	if cmd == nil {
 		t.Error("Expected tea.Quit cmd, got nil")
+	}
+}
+
+func TestMainMenu_QuitEsc_IncludesCycledAITool(t *testing.T) {
+	m := tui.NewMainMenu(testProjects(), testAITools(), "claude", "animated")
+	// Cycle to codex
+	m.CycleAITool("next")
+	newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	mm := newModel.(*tui.MainMenuModel)
+	result := mm.Result()
+
+	if result == nil {
+		t.Fatal("Expected result for Esc, got nil")
+	}
+	if result.AITool != "codex" {
+		t.Errorf("Expected ai_tool 'codex' after cycling, got %q", result.AITool)
 	}
 }
 

@@ -3,7 +3,9 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/jackuait/ghost-tab/internal/models"
@@ -22,6 +24,7 @@ var (
 	mainMenuProjectsFile string
 	mainMenuAITool       string
 	mainMenuAITools      string
+	mainMenuAIToolFile   string
 	mainMenuGhostDisplay string
 	mainMenuTabTitle     string
 	mainMenuUpdateVer    string
@@ -33,6 +36,7 @@ func init() {
 	mainMenuCmd.MarkFlagRequired("projects-file")
 	mainMenuCmd.Flags().StringVar(&mainMenuAITool, "ai-tool", "claude", "Current AI tool name")
 	mainMenuCmd.Flags().StringVar(&mainMenuAITools, "ai-tools", "claude", "Comma-separated available tool names")
+	mainMenuCmd.Flags().StringVar(&mainMenuAIToolFile, "ai-tool-file", "", "Path to AI tool preference file for persistence")
 	mainMenuCmd.Flags().StringVar(&mainMenuGhostDisplay, "ghost-display", "animated", "Ghost display mode (animated, static, none)")
 	mainMenuCmd.Flags().StringVar(&mainMenuTabTitle, "tab-title", "full", "Tab title mode (full, project)")
 	mainMenuCmd.Flags().StringVar(&mainMenuUpdateVer, "update-version", "", "Optional update notification version")
@@ -41,6 +45,10 @@ func init() {
 }
 
 func runMainMenu(cmd *cobra.Command, args []string) error {
+	// Ignore SIGHUP so the process survives when the terminal window closes.
+	// Bubbletea will detect TTY EOF and shut down gracefully instead.
+	signal.Ignore(syscall.SIGHUP)
+
 	projects, err := models.LoadProjects(mainMenuProjectsFile)
 	if err != nil {
 		return fmt.Errorf("failed to load projects: %w", err)
@@ -55,6 +63,9 @@ func runMainMenu(cmd *cobra.Command, args []string) error {
 	model.SetTabTitle(mainMenuTabTitle)
 	model.SetSoundEnabled(mainMenuSoundEnabled)
 	model.SetProjectsFile(mainMenuProjectsFile)
+	if mainMenuAIToolFile != "" {
+		model.SetAIToolFile(mainMenuAIToolFile)
+	}
 
 	ttyOpts, cleanup, err := util.TUITeaOptions()
 	if err != nil {
@@ -76,7 +87,7 @@ func runMainMenu(cmd *cobra.Command, args []string) error {
 	if result == nil {
 		result = &tui.MainMenuResult{
 			Action: "quit",
-			AITool: mainMenuAITool,
+			AITool: m.CurrentAITool(),
 		}
 	}
 
