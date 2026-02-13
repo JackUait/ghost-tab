@@ -295,6 +295,19 @@ func (m *MainMenuModel) CycleGhostDisplay() {
 	m.ghostDisplayChanged = m.ghostDisplay != m.initialGhostDisplay
 }
 
+// CycleGhostDisplayReverse cycles ghost display in reverse order: animated → none → static → animated.
+func (m *MainMenuModel) CycleGhostDisplayReverse() {
+	switch m.ghostDisplay {
+	case "animated":
+		m.ghostDisplay = "none"
+	case "none":
+		m.ghostDisplay = "static"
+	default:
+		m.ghostDisplay = "animated"
+	}
+	m.ghostDisplayChanged = m.ghostDisplay != m.initialGhostDisplay
+}
+
 // SetSleepTimer sets the sleep inactivity timer to the given number of seconds.
 func (m *MainMenuModel) SetSleepTimer(seconds int) { m.sleepTimer = seconds }
 
@@ -711,23 +724,30 @@ func (m *MainMenuModel) updateSettings(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.settingsSelected++
 		}
 		return m, nil
+	case tea.KeyRight:
+		switch m.settingsSelected {
+		case 0:
+			m.CycleGhostDisplay()
+		case 1:
+			m.CycleTabTitle()
+		case 2:
+			m.CycleSoundEnabled()
+		}
+		return m, nil
+	case tea.KeyLeft:
+		switch m.settingsSelected {
+		case 0:
+			m.CycleGhostDisplayReverse()
+		case 1:
+			m.CycleTabTitle()
+		case 2:
+			m.CycleSoundEnabled()
+		}
+		return m, nil
 	case tea.KeyRunes:
 		if len(msg.Runes) == 1 {
 			r := TranslateRune(msg.Runes[0])
 			switch r {
-			case 'b', 'B':
-				m.settingsMode = false
-				return m, nil
-			case 'a', 'A':
-				switch m.settingsSelected {
-				case 0:
-					m.CycleGhostDisplay()
-				case 1:
-					m.CycleTabTitle()
-				case 2:
-					m.CycleSoundEnabled()
-				}
-				return m, nil
 			case 'j':
 				if m.settingsSelected < 2 {
 					m.settingsSelected++
@@ -1115,7 +1135,7 @@ func (m *MainMenuModel) renderSettingsBox() string {
 	lines = append(lines, separator)
 
 	// Help row
-	helpText := "\u2191\u2193 navigate  A cycle  B back  Esc close"
+	helpText := "\u2191\u2193 navigate  \u2190\u2192 cycle  Esc close"
 	helpContent := helpStyle.Render(helpText)
 	helpPadding := menuInnerWidth - lipgloss.Width(helpContent) - 1
 	if helpPadding < 0 {

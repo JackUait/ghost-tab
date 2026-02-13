@@ -203,7 +203,7 @@ func TestNonEnglish_DeleteMode_RussianQ(t *testing.T) {
 	}
 }
 
-// TestNonEnglish_Settings_RussianB verifies back-from-settings with Russian 'и' (b key).
+// TestNonEnglish_Settings_RussianB verifies 'b' key no longer exits settings (only Esc does).
 func TestNonEnglish_Settings_RussianB(t *testing.T) {
 	m := tui.NewMainMenu(testProjects(), testAITools(), "claude", "animated")
 
@@ -214,10 +214,10 @@ func TestNonEnglish_Settings_RussianB(t *testing.T) {
 		t.Fatal("Should be in settings mode")
 	}
 
-	// Russian 'и' is on physical 'b' key (back from settings)
+	// Russian 'и' is on physical 'b' key — should NOT exit settings anymore
 	newModel, _ = mm.Update(runeKey('и'))
 	mm = newModel.(*tui.MainMenuModel)
-	if mm.InSettingsMode() {
-		t.Error("Russian 'и' (b key) should exit settings mode")
+	if !mm.InSettingsMode() {
+		t.Error("Russian 'и' (b key) should not exit settings mode")
 	}
 }

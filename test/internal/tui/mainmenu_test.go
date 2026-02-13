@@ -1313,7 +1313,7 @@ func TestMainMenu_SettingsEscReturns(t *testing.T) {
 	}
 }
 
-func TestMainMenu_SettingsKeyBReturns(t *testing.T) {
+func TestMainMenu_SettingsKeyBDoesNotExit(t *testing.T) {
 	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
 	m.SetSize(80, 30)
 	m.EnterSettings()
@@ -1322,22 +1322,38 @@ func TestMainMenu_SettingsKeyBReturns(t *testing.T) {
 	newModel, _ := m.Update(msg)
 	mm := newModel.(*tui.MainMenuModel)
 
-	if mm.InSettingsMode() {
-		t.Error("B in settings should return to main menu")
+	if !mm.InSettingsMode() {
+		t.Error("B in settings should not exit settings mode")
 	}
 }
 
-func TestMainMenu_SettingsKeyACycles(t *testing.T) {
+func TestMainMenu_SettingsLeftArrowCyclesPrevious(t *testing.T) {
 	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
 	m.SetSize(80, 30)
 	m.EnterSettings()
 
-	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}}
+	// Left = previous: animated → none
+	msg := tea.KeyMsg{Type: tea.KeyLeft}
+	newModel, _ := m.Update(msg)
+	mm := newModel.(*tui.MainMenuModel)
+
+	if mm.GhostDisplay() != "none" {
+		t.Errorf("expected none after pressing left arrow from animated, got %s", mm.GhostDisplay())
+	}
+}
+
+func TestMainMenu_SettingsRightArrowCyclesNext(t *testing.T) {
+	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
+	m.SetSize(80, 30)
+	m.EnterSettings()
+
+	// Right = next: animated → static
+	msg := tea.KeyMsg{Type: tea.KeyRight}
 	newModel, _ := m.Update(msg)
 	mm := newModel.(*tui.MainMenuModel)
 
 	if mm.GhostDisplay() != "static" {
-		t.Errorf("expected static after pressing A, got %s", mm.GhostDisplay())
+		t.Errorf("expected static after pressing right arrow from animated, got %s", mm.GhostDisplay())
 	}
 }
 
@@ -1436,12 +1452,12 @@ func TestMainMenu_SettingsDoesNotQuit(t *testing.T) {
 	m.SetSize(80, 30)
 	m.EnterSettings()
 
-	// Pressing A (cycle) should not produce a quit command
-	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}}
+	// Pressing left arrow (cycle) should not produce a quit command
+	msg := tea.KeyMsg{Type: tea.KeyLeft}
 	_, cmd := m.Update(msg)
 
 	if cmd != nil {
-		t.Error("pressing A in settings should not produce a quit command")
+		t.Error("pressing left arrow in settings should not produce a quit command")
 	}
 }
 
@@ -1468,8 +1484,11 @@ func TestMainMenu_SettingsHelpRow(t *testing.T) {
 	if !strings.Contains(view, "cycle") {
 		t.Error("settings help row should mention 'cycle'")
 	}
-	if !strings.Contains(view, "back") {
-		t.Error("settings help row should mention 'back'")
+	if !strings.Contains(view, "close") {
+		t.Error("settings help row should mention 'close'")
+	}
+	if strings.Contains(view, "back") {
+		t.Error("settings help row should not mention 'back'")
 	}
 }
 
