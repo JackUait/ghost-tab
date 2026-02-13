@@ -121,7 +121,7 @@ main() {
     echo "Release $tag?"
     echo "  - Create annotated tag $tag"
     echo "  - Push to origin"
-    echo "  - Create GitHub release with auto-generated notes"
+    echo "  - Create GitHub release with release notes"
     echo "  - Update Homebrew formula"
     echo ""
     read -rp "Proceed? [y/N] " confirm
@@ -140,7 +140,11 @@ main() {
 
   # Create GitHub release
   echo "Creating GitHub release..."
-  gh release create "$tag" --generate-notes
+  local prev_tag
+  prev_tag="$(git describe --tags --abbrev=0 "${tag}^" 2>/dev/null || echo "")"
+  local notes
+  notes="$(bash "$script_dir/generate-release-notes.sh" "$prev_tag" "$tag")"
+  gh release create "$tag" --notes "$notes"
 
   # Download tarball and compute SHA256
   echo "Computing SHA256..."

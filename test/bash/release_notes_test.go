@@ -2,6 +2,7 @@ package bash_test
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -271,4 +272,15 @@ func TestGenerateReleaseNotes_filters_merge_commits(t *testing.T) {
 	assertContains(t, out, "## Features")
 	assertContains(t, out, "Add dashboard")
 	assertNotContains(t, out, "Merge pull request")
+}
+
+func TestReleaseScript_uses_generate_release_notes(t *testing.T) {
+	root := projectRoot(t)
+	releaseScript, err := os.ReadFile(filepath.Join(root, "scripts", "release.sh"))
+	if err != nil {
+		t.Fatalf("failed to read release.sh: %v", err)
+	}
+	content := string(releaseScript)
+	assertContains(t, content, "generate-release-notes.sh")
+	assertNotContains(t, content, "--generate-notes")
 }
