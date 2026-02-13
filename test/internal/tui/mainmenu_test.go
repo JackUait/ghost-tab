@@ -2914,3 +2914,43 @@ func TestMainMenu_View_FeedbackMessage(t *testing.T) {
 		t.Error("View should show 'Deleted' feedback")
 	}
 }
+
+func TestMainMenu_NumberKeyInstantSelect(t *testing.T) {
+	projects := testProjects()
+	m := tui.NewMainMenu(projects, testAITools(), "claude", "animated")
+
+	// Press '2' — should instantly select "my-app" and quit
+	newModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}})
+	if cmd == nil {
+		t.Fatal("Number key should return quit command")
+	}
+	mm := newModel.(*tui.MainMenuModel)
+	result := mm.Result()
+	if result == nil {
+		t.Fatal("Number key should produce a result")
+	}
+	if result.Action != "select-project" {
+		t.Errorf("Expected action 'select-project', got %q", result.Action)
+	}
+	if result.Name != "my-app" {
+		t.Errorf("Expected name 'my-app', got %q", result.Name)
+	}
+	if result.Path != "/Users/jack/my-app" {
+		t.Errorf("Expected path '/Users/jack/my-app', got %q", result.Path)
+	}
+}
+
+func TestMainMenu_NumberKeyOutOfRange(t *testing.T) {
+	projects := testProjects() // 3 projects
+	m := tui.NewMainMenu(projects, testAITools(), "claude", "animated")
+
+	// Press '9' — out of range, should do nothing (no quit, no result)
+	newModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'9'}})
+	if cmd != nil {
+		t.Error("Out-of-range number key should not return quit command")
+	}
+	mm := newModel.(*tui.MainMenuModel)
+	if mm.Result() != nil {
+		t.Error("Out-of-range number key should not produce a result")
+	}
+}

@@ -708,8 +708,12 @@ func (m *MainMenuModel) handleRune(r rune) (tea.Model, tea.Cmd) {
 		return m, nil
 	case '1', '2', '3', '4', '5', '6', '7', '8', '9':
 		n := int(r - '0')
+		if n > len(m.projects) {
+			return m, nil
+		}
 		m.JumpTo(n)
-		return m, nil
+		m.selectCurrent()
+		return m, tea.Quit
 	}
 	return m, nil
 }
