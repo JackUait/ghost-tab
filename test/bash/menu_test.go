@@ -971,7 +971,7 @@ select_project_interactive %q
 	assertNotContains(t, string(data), "tab_title=full")
 }
 
-func TestMenu_passes_sound_enabled_flag_when_sound_enabled(t *testing.T) {
+func TestMenu_passes_sound_name_flag_when_sound_has_name(t *testing.T) {
 	dir := t.TempDir()
 	argsFile := filepath.Join(dir, "captured_args")
 	binDir := mockCommand(t, dir, "ghost-tab-tui", fmt.Sprintf(`
@@ -991,8 +991,8 @@ error() { echo "ERROR: $*" >&2; }
 AI_TOOLS_AVAILABLE=("claude")
 SELECTED_AI_TOOL="claude"
 _update_version=""
-# Mock is_sound_enabled to return true
-is_sound_enabled() { echo "true"; }
+# Mock get_sound_name to return a sound name
+get_sound_name() { echo "Bottle"; }
 select_project_interactive %q || true
 `, filepath.Join(root, "lib/tui.sh"),
 		filepath.Join(root, "lib/menu-tui.sh"),
@@ -1004,7 +1004,162 @@ select_project_interactive %q || true
 	if err != nil {
 		t.Fatalf("args file not found: %v", err)
 	}
-	assertContains(t, string(data), "--sound-enabled")
+	assertContains(t, string(data), "--sound-name Bottle")
+	assertNotContains(t, string(data), "--sound-enabled")
+}
+
+func TestMenu_omits_sound_name_flag_when_sound_disabled(t *testing.T) {
+	dir := t.TempDir()
+	argsFile := filepath.Join(dir, "captured_args")
+	binDir := mockCommand(t, dir, "ghost-tab-tui", fmt.Sprintf(`
+echo "$*" > %q
+echo '{"action":"quit"}'
+`, argsFile))
+	projectsFile := writeTempFile(t, dir, "projects", "test:/tmp/test\n")
+	root := projectRoot(t)
+	env := buildEnv(t, []string{binDir},
+		"XDG_CONFIG_HOME="+filepath.Join(dir, "config"),
+	)
+
+	script := fmt.Sprintf(`
+source %q 2>/dev/null || true
+source %q
+error() { echo "ERROR: $*" >&2; }
+AI_TOOLS_AVAILABLE=("claude")
+SELECTED_AI_TOOL="claude"
+_update_version=""
+# Mock get_sound_name to return empty (disabled)
+get_sound_name() { echo ""; }
+select_project_interactive %q || true
+`, filepath.Join(root, "lib/tui.sh"),
+		filepath.Join(root, "lib/menu-tui.sh"),
+		projectsFile)
+
+	_, _ = runBashSnippet(t, script, env)
+
+	data, err := os.ReadFile(argsFile)
+	if err != nil {
+		t.Fatalf("args file not found: %v", err)
+	}
+	assertNotContains(t, string(data), "--sound-name")
+	assertNotContains(t, string(data), "--sound-enabled")
+}
+
+func TestMenu_calls_apply_sound_notification_when_sound_name_present(t *testing.T) {
+	dir := t.TempDir()
+	applyLog := filepath.Join(dir, "apply_log")
+	binDir := mockCommand(t, dir, "ghost-tab-tui",
+		`echo '{"action":"select-project","name":"proj1","path":"/tmp/p1","ai_tool":"claude","sound_name":"Glass"}'`)
+	projectsFile := writeTempFile(t, dir, "projects", "proj1:/tmp/p1\n")
+	root := projectRoot(t)
+	env := buildEnv(t, []string{binDir},
+		"XDG_CONFIG_HOME="+filepath.Join(dir, "config"),
+		"HOME="+dir,
+	)
+
+	script := fmt.Sprintf(`
+source %q 2>/dev/null || true
+source %q
+error() { echo "ERROR: $*" >&2; }
+AI_TOOLS_AVAILABLE=("claude")
+SELECTED_AI_TOOL="claude"
+_update_version=""
+# Mock apply_sound_notification to log the call
+apply_sound_notification() { echo "$1|$2|$3|$4" > %q; }
+select_project_interactive %q
+`, filepath.Join(root, "lib/tui.sh"),
+		filepath.Join(root, "lib/menu-tui.sh"),
+		applyLog,
+		projectsFile)
+
+	_, code := runBashSnippet(t, script, env)
+	assertExitCode(t, code, 0)
+
+	data, err := os.ReadFile(applyLog)
+	if err != nil {
+		t.Fatalf("apply_log not created — apply_sound_notification was not called: %v", err)
+	}
+	logged := strings.TrimSpace(string(data))
+	// Should have: tool|config_dir|claude_settings|sound_name
+	assertContains(t, logged, "claude")
+	assertContains(t, logged, "Glass")
+}
+
+func TestMenu_calls_apply_sound_notification_with_empty_for_off(t *testing.T) {
+	dir := t.TempDir()
+	applyLog := filepath.Join(dir, "apply_log")
+	// sound_name is "" (empty string) meaning user selected Off
+	binDir := mockCommand(t, dir, "ghost-tab-tui",
+		`echo '{"action":"select-project","name":"proj1","path":"/tmp/p1","ai_tool":"claude","sound_name":""}'`)
+	projectsFile := writeTempFile(t, dir, "projects", "proj1:/tmp/p1\n")
+	root := projectRoot(t)
+	env := buildEnv(t, []string{binDir},
+		"XDG_CONFIG_HOME="+filepath.Join(dir, "config"),
+		"HOME="+dir,
+	)
+
+	script := fmt.Sprintf(`
+source %q 2>/dev/null || true
+source %q
+error() { echo "ERROR: $*" >&2; }
+AI_TOOLS_AVAILABLE=("claude")
+SELECTED_AI_TOOL="claude"
+_update_version=""
+# Mock apply_sound_notification to log the call
+apply_sound_notification() { echo "CALLED:$1|$2|$3|$4" > %q; }
+select_project_interactive %q
+`, filepath.Join(root, "lib/tui.sh"),
+		filepath.Join(root, "lib/menu-tui.sh"),
+		applyLog,
+		projectsFile)
+
+	_, code := runBashSnippet(t, script, env)
+	assertExitCode(t, code, 0)
+
+	data, err := os.ReadFile(applyLog)
+	if err != nil {
+		t.Fatalf("apply_log not created — apply_sound_notification was not called: %v", err)
+	}
+	logged := strings.TrimSpace(string(data))
+	// Should be called with empty sound name (4th arg empty)
+	assertContains(t, logged, "CALLED:claude")
+}
+
+func TestMenu_does_not_call_apply_when_sound_name_absent(t *testing.T) {
+	dir := t.TempDir()
+	applyLog := filepath.Join(dir, "apply_log")
+	// No sound_name key in JSON at all
+	binDir := mockCommand(t, dir, "ghost-tab-tui",
+		`echo '{"action":"select-project","name":"proj1","path":"/tmp/p1","ai_tool":"claude"}'`)
+	projectsFile := writeTempFile(t, dir, "projects", "proj1:/tmp/p1\n")
+	root := projectRoot(t)
+	env := buildEnv(t, []string{binDir},
+		"XDG_CONFIG_HOME="+filepath.Join(dir, "config"),
+		"HOME="+dir,
+	)
+
+	script := fmt.Sprintf(`
+source %q 2>/dev/null || true
+source %q
+error() { echo "ERROR: $*" >&2; }
+AI_TOOLS_AVAILABLE=("claude")
+SELECTED_AI_TOOL="claude"
+_update_version=""
+# Mock apply_sound_notification to log the call
+apply_sound_notification() { echo "CALLED" > %q; }
+select_project_interactive %q
+`, filepath.Join(root, "lib/tui.sh"),
+		filepath.Join(root, "lib/menu-tui.sh"),
+		applyLog,
+		projectsFile)
+
+	_, code := runBashSnippet(t, script, env)
+	assertExitCode(t, code, 0)
+
+	// apply_sound_notification should NOT have been called
+	if _, err := os.Stat(applyLog); err == nil {
+		t.Error("apply_sound_notification should NOT be called when sound_name key is absent from JSON")
+	}
 }
 
 // ---------- ai-tools.sh validate_ai_tool tests (TestAITools_*) ----------

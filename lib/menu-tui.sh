@@ -31,10 +31,10 @@ select_project_interactive() {
   fi
 
   # Read sound notification state
-  local sound_enabled="false"
+  local sound_name=""
   local gt_config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/ghost-tab"
-  if type is_sound_enabled &>/dev/null; then
-    sound_enabled="$(is_sound_enabled "${SELECTED_AI_TOOL:-claude}" "$gt_config_dir")"
+  if type get_sound_name &>/dev/null; then
+    sound_name="$(get_sound_name "${SELECTED_AI_TOOL:-claude}" "$gt_config_dir")"
   fi
 
   # Build AI tools comma-separated list
@@ -49,8 +49,8 @@ select_project_interactive() {
   cmd_args+=("--ai-tool-file" "$ai_tool_file")
   cmd_args+=("--ghost-display" "$ghost_display")
   cmd_args+=("--tab-title" "$tab_title")
-  if [[ "$sound_enabled" == "true" ]]; then
-    cmd_args+=("--sound-enabled")
+  if [[ -n "$sound_name" ]]; then
+    cmd_args+=("--sound-name" "$sound_name")
   fi
   if [ -n "${_update_version:-}" ]; then
     cmd_args+=("--update-version" "$_update_version")
@@ -108,13 +108,15 @@ select_project_interactive() {
     fi
   fi
 
-  # Handle sound toggle
-  local sound_enabled_new
-  sound_enabled_new=$(echo "$result" | jq -r '.sound_enabled // ""' 2>/dev/null)
-  if [[ -n "$sound_enabled_new" && "$sound_enabled_new" != "null" ]]; then
-    if type toggle_sound_notification &>/dev/null; then
+  # Handle sound name change
+  local sound_name_changed
+  sound_name_changed=$(echo "$result" | jq 'has("sound_name")' 2>/dev/null)
+  if [[ "$sound_name_changed" == "true" ]]; then
+    if type apply_sound_notification &>/dev/null; then
       local claude_settings="$HOME/.claude/settings.json"
-      toggle_sound_notification "${SELECTED_AI_TOOL:-claude}" "$gt_config_dir" "$claude_settings"
+      local new_sound_name
+      new_sound_name=$(echo "$result" | jq -r '.sound_name // empty' 2>/dev/null)
+      apply_sound_notification "${SELECTED_AI_TOOL:-claude}" "$gt_config_dir" "$claude_settings" "${new_sound_name:-}"
     fi
   fi
 
