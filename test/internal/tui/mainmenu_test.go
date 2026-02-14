@@ -3619,3 +3619,57 @@ func TestMainMenu_CalculateLayoutWithWorktrees(t *testing.T) {
 			layout1.MenuHeight, layout2.MenuHeight)
 	}
 }
+
+func TestMainMenu_WorktreeFullFlow(t *testing.T) {
+	// Setup: project with worktrees
+	projects := []models.Project{
+		{
+			Name: "myproject",
+			Path: "/home/user/myproject",
+			Worktrees: []models.Worktree{
+				{Path: "/home/user/wt/feat", Branch: "feature/new-ui"},
+			},
+		},
+		{Name: "other", Path: "/home/user/other"},
+	}
+	m := tui.NewMainMenu(projects, []string{"claude"}, "claude", "animated")
+	m.SetSize(100, 40)
+
+	// Verify initial state: 2 projects + 4 actions = 6
+	if m.TotalItems() != 6 {
+		t.Fatalf("initial total: expected 6, got %d", m.TotalItems())
+	}
+
+	// Press 'w' to expand project 0 (which has 1 worktree)
+	wKey := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'w'}}
+	m.Update(wKey)
+	if m.TotalItems() != 7 { // 2 projects + 1 worktree + 4 actions
+		t.Fatalf("after expand: expected 7, got %d", m.TotalItems())
+	}
+
+	// Move down to worktree
+	downKey := tea.KeyMsg{Type: tea.KeyDown}
+	m.Update(downKey)
+	if m.SelectedItem() != 1 {
+		t.Fatalf("after down: expected 1, got %d", m.SelectedItem())
+	}
+
+	// Press Enter to select worktree
+	enterKey := tea.KeyMsg{Type: tea.KeyEnter}
+	newModel, _ := m.Update(enterKey)
+	mm := newModel.(*tui.MainMenuModel)
+
+	result := mm.Result()
+	if result == nil {
+		t.Fatal("expected result after Enter")
+	}
+	if result.Path != "/home/user/wt/feat" {
+		t.Errorf("path: got %q, want %q", result.Path, "/home/user/wt/feat")
+	}
+	if result.Name != "myproject" {
+		t.Errorf("name: got %q, want %q", result.Name, "myproject")
+	}
+	if result.Action != "select-project" {
+		t.Errorf("action: got %q, want %q", result.Action, "select-project")
+	}
+}
