@@ -43,6 +43,31 @@ func TestLoading_get_loading_art_contains_ghost_characters(t *testing.T) {
 	}
 }
 
+func TestLoading_get_loading_art_meets_minimum_size(t *testing.T) {
+	for i := 0; i < 10; i++ {
+		t.Run(fmt.Sprintf("art_%d", i), func(t *testing.T) {
+			out, code := runBashFunc(t, "lib/loading.sh", "get_loading_art",
+				[]string{fmt.Sprintf("%d", i)}, nil)
+			assertExitCode(t, code, 0)
+
+			lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
+			if len(lines) < 6 {
+				t.Errorf("art %d has %d lines, want >= 6", i, len(lines))
+			}
+
+			maxWidth := 0
+			for _, line := range lines {
+				if len(line) > maxWidth {
+					maxWidth = len(line)
+				}
+			}
+			if maxWidth < 70 {
+				t.Errorf("art %d max width is %d, want >= 70", i, maxWidth)
+			}
+		})
+	}
+}
+
 func TestLoading_get_loading_art_invalid_index_returns_empty(t *testing.T) {
 	out, code := runBashFunc(t, "lib/loading.sh", "get_loading_art", []string{"99"}, nil)
 	assertExitCode(t, code, 0)
