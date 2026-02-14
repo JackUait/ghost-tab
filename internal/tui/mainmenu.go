@@ -1684,12 +1684,24 @@ func (m *MainMenuModel) renderMenuBox() string {
 	lines = append(lines, separator)
 
 	// Help row
+	hasWorktrees := false
+	for _, p := range m.projects {
+		if len(p.Worktrees) > 0 {
+			hasWorktrees = true
+			break
+		}
+	}
+
 	var helpText string
 	if len(m.aiTools) > 1 {
-		helpText = "\u2191\u2193 navigate \u2190\u2192 AI tool S settings \u23ce select"
+		helpText = "\u2191\u2193 navigate \u2190\u2192 AI tool S settings"
 	} else {
-		helpText = "\u2191\u2193 navigate S settings \u23ce select"
+		helpText = "\u2191\u2193 navigate S settings"
 	}
+	if hasWorktrees {
+		helpText += " w worktrees"
+	}
+	helpText += " \u23ce select"
 	helpContent := helpStyle.Render(helpText)
 	helpPadding := menuInnerWidth - lipgloss.Width(helpContent) - 1 // -1 for leading space
 	if helpPadding < 0 {

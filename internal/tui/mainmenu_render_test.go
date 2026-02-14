@@ -300,6 +300,27 @@ func TestMenuBox_NoIndicatorWithoutWorktrees(t *testing.T) {
 	}
 }
 
+func TestMenuBox_HelpTextIncludesWorktreeKey(t *testing.T) {
+	projects := []models.Project{
+		{
+			Name: "proj",
+			Path: "/tmp/proj",
+			Worktrees: []models.Worktree{
+				{Path: "/tmp/wt", Branch: "feature"},
+			},
+		},
+	}
+	m := NewMainMenu(projects, []string{"claude", "codex"}, "claude", "animated")
+	m.width = 100
+	m.height = 40
+	box := m.renderMenuBox()
+	raw := stripAnsi(box)
+
+	if !strings.Contains(raw, "w worktrees") && !strings.Contains(raw, "W worktrees") {
+		t.Errorf("expected help text to mention 'w worktrees', got:\n%s", raw)
+	}
+}
+
 // stripAnsi removes ANSI escape sequences from a string.
 func stripAnsi(s string) string {
 	var result strings.Builder
