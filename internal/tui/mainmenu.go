@@ -1502,7 +1502,7 @@ func (m *MainMenuModel) renderMenuBox() string {
 	// Project items
 	numProjects := len(m.projects)
 	for i, proj := range m.projects {
-		selected := m.selectedItem == i
+		selected := m.selectedItem == m.projectToFlatIndex(i)
 		num := fmt.Sprintf("%d", i+1)
 
 		var nameLine string
@@ -1510,17 +1510,38 @@ func (m *MainMenuModel) renderMenuBox() string {
 
 		shortPath := TruncateMiddle(shortenHomePath(proj.Path), menuInnerWidth-7)
 
+		// Worktree count indicator
+		var wtIndicator string
+		if len(proj.Worktrees) > 0 {
+			wtCount := len(proj.Worktrees)
+			wtWord := "worktrees"
+			if wtCount == 1 {
+				wtWord = "worktree"
+			}
+			wtIndicator = fmt.Sprintf("%d %s", wtCount, wtWord)
+		}
+
 		if selected {
 			marker := primaryBoldStyle.Render("\u258e")
 			truncName := TruncateMiddle(proj.Name, menuInnerWidth-7-len(num))
 			nameText := primaryBoldStyle.Render(num + "  " + truncName)
 			// "  ▎ 1  name" -> 2 spaces + marker + space + num + 2 spaces + name
 			nameContent := "  " + marker + " " + nameText
-			namePadding := menuInnerWidth - lipgloss.Width(nameContent)
-			if namePadding < 0 {
-				namePadding = 0
+
+			if wtIndicator != "" {
+				wtStyled := dimStyle.Render(wtIndicator)
+				gap := menuInnerWidth - lipgloss.Width(nameContent) - lipgloss.Width(wtStyled)
+				if gap < 1 {
+					gap = 1
+				}
+				nameLine = leftBorder + nameContent + strings.Repeat(" ", gap) + wtStyled + rightBorder
+			} else {
+				namePadding := menuInnerWidth - lipgloss.Width(nameContent)
+				if namePadding < 0 {
+					namePadding = 0
+				}
+				nameLine = leftBorder + nameContent + strings.Repeat(" ", namePadding) + rightBorder
 			}
-			nameLine = leftBorder + nameContent + strings.Repeat(" ", namePadding) + rightBorder
 
 			pathContent := "       " + primaryStyle.Render(shortPath)
 			pathPadding := menuInnerWidth - lipgloss.Width(pathContent)
@@ -1533,11 +1554,21 @@ func (m *MainMenuModel) renderMenuBox() string {
 			truncName := TruncateMiddle(proj.Name, menuInnerWidth-6-len(num))
 			nameText := textStyle.Render(truncName)
 			nameContent := "    " + numText + "  " + nameText
-			namePadding := menuInnerWidth - lipgloss.Width(nameContent)
-			if namePadding < 0 {
-				namePadding = 0
+
+			if wtIndicator != "" {
+				wtStyled := dimStyle.Render(wtIndicator)
+				gap := menuInnerWidth - lipgloss.Width(nameContent) - lipgloss.Width(wtStyled)
+				if gap < 1 {
+					gap = 1
+				}
+				nameLine = leftBorder + nameContent + strings.Repeat(" ", gap) + wtStyled + rightBorder
+			} else {
+				namePadding := menuInnerWidth - lipgloss.Width(nameContent)
+				if namePadding < 0 {
+					namePadding = 0
+				}
+				nameLine = leftBorder + nameContent + strings.Repeat(" ", namePadding) + rightBorder
 			}
-			nameLine = leftBorder + nameContent + strings.Repeat(" ", namePadding) + rightBorder
 
 			pathContent := "       " + dimStyle.Render(shortPath)
 			pathPadding := menuInnerWidth - lipgloss.Width(pathContent)
@@ -1549,6 +1580,36 @@ func (m *MainMenuModel) renderMenuBox() string {
 
 		lines = append(lines, nameLine)
 		lines = append(lines, pathLine)
+
+		// Expanded worktree entries
+		if m.expandedWorktrees[i] {
+			for j, wt := range proj.Worktrees {
+				wtFlatIdx := m.projectToFlatIndex(i) + 1 + j
+				wtSelected := m.selectedItem == wtFlatIdx
+				var wtLine string
+				branchDisplay := TruncateMiddle(wt.Branch, menuInnerWidth-10)
+
+				if wtSelected {
+					marker := primaryBoldStyle.Render("\u258e")
+					branchText := primaryBoldStyle.Render(branchDisplay)
+					content := "    " + marker + "   " + branchText
+					padding := menuInnerWidth - lipgloss.Width(content)
+					if padding < 0 {
+						padding = 0
+					}
+					wtLine = leftBorder + content + strings.Repeat(" ", padding) + rightBorder
+				} else {
+					branchText := dimStyle.Render(branchDisplay)
+					content := "         " + branchText
+					padding := menuInnerWidth - lipgloss.Width(content)
+					if padding < 0 {
+						padding = 0
+					}
+					wtLine = leftBorder + content + strings.Repeat(" ", padding) + rightBorder
+				}
+				lines = append(lines, wtLine)
+			}
+		}
 	}
 
 	// Separator between projects and actions (only if there are projects)
@@ -1558,7 +1619,7 @@ func (m *MainMenuModel) renderMenuBox() string {
 
 	// Action items
 	for i, action := range actionLabels {
-		actionIdx := numProjects + i
+		actionIdx := numProjects + m.expandedWorktreeCount() + i
 		selected := m.selectedItem == actionIdx
 
 		var actionLine string

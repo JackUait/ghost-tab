@@ -237,6 +237,69 @@ func TestSoundNameForResult_ChangedReturnsValue(t *testing.T) {
 	}
 }
 
+func TestMenuBox_WorktreeCountIndicator(t *testing.T) {
+	projects := []models.Project{
+		{
+			Name: "ghost-tab",
+			Path: "/tmp/ghost-tab",
+			Worktrees: []models.Worktree{
+				{Path: "/tmp/wt1", Branch: "feature/auth"},
+				{Path: "/tmp/wt2", Branch: "fix/bug"},
+			},
+		},
+	}
+	m := NewMainMenu(projects, []string{"claude"}, "claude", "animated")
+	m.width = 100
+	m.height = 40
+	box := m.renderMenuBox()
+	raw := stripAnsi(box)
+
+	if !strings.Contains(raw, "2 worktrees") {
+		t.Errorf("expected '2 worktrees' indicator in menu, got:\n%s", raw)
+	}
+}
+
+func TestMenuBox_ExpandedWorktreeEntries(t *testing.T) {
+	projects := []models.Project{
+		{
+			Name: "ghost-tab",
+			Path: "/tmp/ghost-tab",
+			Worktrees: []models.Worktree{
+				{Path: "/tmp/wt1", Branch: "feature/auth"},
+				{Path: "/tmp/wt2", Branch: "fix/bug"},
+			},
+		},
+	}
+	m := NewMainMenu(projects, []string{"claude"}, "claude", "animated")
+	m.width = 100
+	m.height = 40
+	m.expandedWorktrees = map[int]bool{0: true}
+	box := m.renderMenuBox()
+	raw := stripAnsi(box)
+
+	if !strings.Contains(raw, "feature/auth") {
+		t.Errorf("expected 'feature/auth' in expanded menu, got:\n%s", raw)
+	}
+	if !strings.Contains(raw, "fix/bug") {
+		t.Errorf("expected 'fix/bug' in expanded menu, got:\n%s", raw)
+	}
+}
+
+func TestMenuBox_NoIndicatorWithoutWorktrees(t *testing.T) {
+	projects := []models.Project{
+		{Name: "simple", Path: "/tmp/simple"},
+	}
+	m := NewMainMenu(projects, []string{"claude"}, "claude", "animated")
+	m.width = 100
+	m.height = 40
+	box := m.renderMenuBox()
+	raw := stripAnsi(box)
+
+	if strings.Contains(raw, "worktree") {
+		t.Errorf("expected no worktree indicator for project without worktrees, got:\n%s", raw)
+	}
+}
+
 // stripAnsi removes ANSI escape sequences from a string.
 func stripAnsi(s string) string {
 	var result strings.Builder
