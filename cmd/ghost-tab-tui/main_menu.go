@@ -58,6 +58,8 @@ func runMainMenu(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load projects: %w", err)
 	}
 
+	models.PopulateWorktrees(projects)
+
 	aiTools := strings.Split(mainMenuAITools, ",")
 	for i := range aiTools {
 		aiTools[i] = strings.TrimSpace(aiTools[i])

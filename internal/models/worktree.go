@@ -49,6 +49,14 @@ func ParseWorktreeListPorcelain(output string) []Worktree {
 	return all[1:]
 }
 
+// PopulateWorktrees runs DetectWorktrees for each project and attaches
+// the results to the Worktrees field.
+func PopulateWorktrees(projects []Project) {
+	for i := range projects {
+		projects[i].Worktrees = DetectWorktrees(projects[i].Path)
+	}
+}
+
 // DetectWorktrees runs `git worktree list --porcelain` for the given path
 // and returns non-main worktrees. Returns nil on any error.
 func DetectWorktrees(projectPath string) []Worktree {

@@ -79,3 +79,17 @@ func TestParseWorktreeListPorcelain_DetachedHead(t *testing.T) {
 		t.Errorf("detached branch: got %q, want %q", worktrees[0].Branch, "(detached)")
 	}
 }
+
+func TestLoadProjectsWithWorktrees_NonGitDir(t *testing.T) {
+	// A temp dir that's not a git repo should produce 0 worktrees
+	tmpDir := t.TempDir()
+	projects := []models.Project{
+		{Name: "no-git", Path: tmpDir},
+	}
+
+	models.PopulateWorktrees(projects)
+
+	if len(projects[0].Worktrees) != 0 {
+		t.Errorf("expected 0 worktrees for non-git dir, got %d", len(projects[0].Worktrees))
+	}
+}
