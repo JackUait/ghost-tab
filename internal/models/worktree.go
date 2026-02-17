@@ -66,3 +66,68 @@ func DetectWorktrees(projectPath string) []Worktree {
 	}
 	return ParseWorktreeListPorcelain(string(out))
 }
+
+// ParseBranchList parses the output of `git branch -a --format='%(refname:short)'`
+// and returns a deduplicated list. When a branch exists both locally and as
+// origin/<name>, only the local name is kept. HEAD refs are removed.
+func ParseBranchList(output string) []string {
+	if output == "" {
+		return nil
+	}
+
+	localSet := make(map[string]bool)
+	var remoteOnly []string
+
+	for _, line := range strings.Split(strings.TrimRight(output, "\n"), "\n") {
+		branch := strings.TrimSpace(line)
+		if branch == "" {
+			continue
+		}
+		if branch == "origin/HEAD" || strings.HasPrefix(branch, "origin/HEAD ") {
+			continue
+		}
+		if strings.HasPrefix(branch, "origin/") {
+			localName := strings.TrimPrefix(branch, "origin/")
+			if !localSet[localName] {
+				remoteOnly = append(remoteOnly, branch)
+			}
+		} else {
+			localSet[branch] = true
+		}
+	}
+
+	var result []string
+	for _, line := range strings.Split(strings.TrimRight(output, "\n"), "\n") {
+		branch := strings.TrimSpace(line)
+		if localSet[branch] {
+			result = append(result, branch)
+			delete(localSet, branch)
+		}
+	}
+	for _, remote := range remoteOnly {
+		localName := strings.TrimPrefix(remote, "origin/")
+		found := false
+		for _, r := range result {
+			if r == localName {
+				found = true
+				break
+			}
+		}
+		if !found {
+			result = append(result, remote)
+		}
+	}
+
+	return result
+}
+
+// ListBranches runs `git branch -a --format='%(refname:short)'` and returns
+// a deduplicated branch list. Returns nil on error.
+func ListBranches(projectPath string) []string {
+	cmd := exec.Command("git", "-C", projectPath, "branch", "-a", "--format=%(refname:short)")
+	out, err := cmd.Output()
+	if err != nil {
+		return nil
+	}
+	return ParseBranchList(string(out))
+}
