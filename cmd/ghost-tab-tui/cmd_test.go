@@ -31,6 +31,7 @@ func TestRootCmd_SubcommandRegistered(t *testing.T) {
 		"settings-menu",
 		"main-menu",
 		"multi-select-ai-tool",
+		"select-branch",
 	}
 
 	for _, name := range subcommands {
@@ -269,6 +270,58 @@ func TestRunMainMenu_MalformedProjectsFile(t *testing.T) {
 	// LoadProjects should succeed (returns empty slice for comments-only file)
 	// Any error here comes from TUITeaOptions, not from loading
 	_ = err
+}
+
+func TestSelectBranchCmd_HasProjectPathFlag(t *testing.T) {
+	cmd, _, _ := rootCmd.Find([]string{"select-branch"})
+	flag := cmd.Flags().Lookup("project-path")
+	if flag == nil {
+		t.Fatal("Expected --project-path flag on select-branch")
+	}
+}
+
+func TestSelectBranchCmd_ProjectPathFlagRequired(t *testing.T) {
+	cmd, _, _ := rootCmd.Find([]string{"select-branch"})
+	flag := cmd.Flags().Lookup("project-path")
+	if flag == nil {
+		t.Fatal("Expected --project-path flag on select-branch")
+	}
+	annotations := flag.Annotations
+	if annotations == nil {
+		t.Fatal("Expected required annotation on --project-path")
+	}
+	required, ok := annotations[cobra.BashCompOneRequiredFlag]
+	if !ok || len(required) == 0 || required[0] != "true" {
+		t.Error("Expected --project-path to be marked as required")
+	}
+}
+
+func TestRunSelectBranch_NonGitDir(t *testing.T) {
+	// A non-git directory should yield no branches, outputting {"selected":false}
+	tmpDir := t.TempDir()
+
+	rootCmd.SetArgs([]string{"select-branch", "--project-path", tmpDir})
+
+	old := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	err := rootCmd.Execute()
+
+	w.Close()
+	os.Stdout = old
+
+	if err != nil {
+		t.Fatalf("Expected no error for non-git dir, got: %v", err)
+	}
+
+	var buf bytes.Buffer
+	io.Copy(&buf, r)
+	output := buf.String()
+
+	if !strings.Contains(output, `"selected":false`) {
+		t.Errorf("Expected {\"selected\":false} for non-git dir, got: %s", output)
+	}
 }
 
 func TestSelectProjectCmd_ProjectsFileFlagRequired(t *testing.T) {
