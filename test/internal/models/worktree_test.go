@@ -196,3 +196,42 @@ func TestFilterAvailableBranches(t *testing.T) {
 		})
 	}
 }
+
+func TestParseMainBranch(t *testing.T) {
+	tests := []struct {
+		name   string
+		output string
+		want   string
+	}{
+		{
+			name:   "main branch",
+			output: "worktree /Users/jack/ghost-tab\nHEAD abc123\nbranch refs/heads/main\n\n",
+			want:   "main",
+		},
+		{
+			name:   "master branch",
+			output: "worktree /Users/jack/project\nHEAD abc123\nbranch refs/heads/master\n\n",
+			want:   "master",
+		},
+		{
+			name: "with additional worktrees returns first",
+			output: "worktree /Users/jack/ghost-tab\nHEAD abc\nbranch refs/heads/main\n\n" +
+				"worktree /wt/feature\nHEAD def\nbranch refs/heads/feature\n\n",
+			want: "main",
+		},
+		{
+			name:   "empty output",
+			output: "",
+			want:   "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := models.ParseMainBranch(tt.output)
+			if got != tt.want {
+				t.Errorf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}

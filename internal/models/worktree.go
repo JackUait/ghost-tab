@@ -151,3 +151,22 @@ func FilterAvailableBranches(branches []string, worktrees []Worktree, mainBranch
 	}
 	return result
 }
+
+// ParseMainBranch extracts the branch name of the main worktree (first entry)
+// from `git worktree list --porcelain` output. Returns "" if not found.
+func ParseMainBranch(output string) string {
+	if output == "" {
+		return ""
+	}
+	blocks := strings.Split(strings.TrimRight(output, "\n"), "\n\n")
+	if len(blocks) == 0 {
+		return ""
+	}
+	for _, line := range strings.Split(blocks[0], "\n") {
+		if strings.HasPrefix(line, "branch ") {
+			ref := strings.TrimPrefix(line, "branch ")
+			return strings.TrimPrefix(ref, "refs/heads/")
+		}
+	}
+	return ""
+}
