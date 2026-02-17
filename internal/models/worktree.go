@@ -131,3 +131,23 @@ func ListBranches(projectPath string) []string {
 	}
 	return ParseBranchList(string(out))
 }
+
+// FilterAvailableBranches removes branches that already have worktrees and
+// the main branch. Returns nil if no branches remain.
+func FilterAvailableBranches(branches []string, worktrees []Worktree, mainBranch string) []string {
+	taken := make(map[string]bool)
+	if mainBranch != "" {
+		taken[mainBranch] = true
+	}
+	for _, wt := range worktrees {
+		taken[wt.Branch] = true
+	}
+
+	var result []string
+	for _, b := range branches {
+		if !taken[b] {
+			result = append(result, b)
+		}
+	}
+	return result
+}

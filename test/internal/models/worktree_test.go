@@ -141,3 +141,58 @@ func TestParseBranchList(t *testing.T) {
 		})
 	}
 }
+
+func TestFilterAvailableBranches(t *testing.T) {
+	tests := []struct {
+		name       string
+		branches   []string
+		worktrees  []models.Worktree
+		mainBranch string
+		want       []string
+	}{
+		{
+			name:     "filters out branches with existing worktrees",
+			branches: []string{"main", "feature/auth", "fix/cleanup", "develop"},
+			worktrees: []models.Worktree{
+				{Path: "/wt/auth", Branch: "feature/auth"},
+			},
+			mainBranch: "main",
+			want:       []string{"fix/cleanup", "develop"},
+		},
+		{
+			name:       "filters out main branch",
+			branches:   []string{"main", "feature/new"},
+			worktrees:  nil,
+			mainBranch: "main",
+			want:       []string{"feature/new"},
+		},
+		{
+			name:       "all branches taken returns nil",
+			branches:   []string{"main"},
+			worktrees:  nil,
+			mainBranch: "main",
+			want:       nil,
+		},
+		{
+			name:       "no worktrees no main returns all",
+			branches:   []string{"feature/a", "feature/b"},
+			worktrees:  nil,
+			mainBranch: "",
+			want:       []string{"feature/a", "feature/b"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := models.FilterAvailableBranches(tt.branches, tt.worktrees, tt.mainBranch)
+			if len(got) != len(tt.want) {
+				t.Fatalf("got %d branches %v, want %d %v", len(got), got, len(tt.want), tt.want)
+			}
+			for i := range got {
+				if got[i] != tt.want[i] {
+					t.Errorf("branch[%d]: got %q, want %q", i, got[i], tt.want[i])
+				}
+			}
+		})
+	}
+}
