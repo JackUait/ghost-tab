@@ -202,14 +202,14 @@ func (m *MainMenuModel) ToggleWorktrees(projectIdx int) {
 	}
 
 	if m.expandedWorktrees[projectIdx] {
-		// Collapsing: if selection is on one of this project's worktrees, snap to project
+		// Collapsing: if selection is on one of this project's worktrees or add-worktree, snap to project
 		flatIdx := m.projectToFlatIndex(projectIdx)
-		wtCount := len(m.projects[projectIdx].Worktrees)
-		if m.selectedItem > flatIdx && m.selectedItem <= flatIdx+wtCount {
+		removedCount := len(m.projects[projectIdx].Worktrees) + 1 // worktrees + add-worktree
+		if m.selectedItem > flatIdx && m.selectedItem <= flatIdx+removedCount {
 			m.selectedItem = flatIdx
-		} else if m.selectedItem > flatIdx+wtCount {
+		} else if m.selectedItem > flatIdx+removedCount {
 			// Adjust selection for removed items
-			m.selectedItem -= wtCount
+			m.selectedItem -= removedCount
 		}
 		delete(m.expandedWorktrees, projectIdx)
 	} else {
@@ -217,32 +217,33 @@ func (m *MainMenuModel) ToggleWorktrees(projectIdx int) {
 	}
 }
 
-// expandedWorktreeCount returns the total number of visible worktree entries.
+// expandedWorktreeCount returns the total number of visible worktree entries
+// (worktrees + one add-worktree item per expanded project).
 func (m *MainMenuModel) expandedWorktreeCount() int {
 	count := 0
 	for idx := range m.expandedWorktrees {
 		if idx < len(m.projects) {
-			count += len(m.projects[idx].Worktrees)
+			count += len(m.projects[idx].Worktrees) + 1 // +1 for add-worktree item
 		}
 	}
 	return count
 }
 
 // projectToFlatIndex converts a project index to its flat item index,
-// accounting for expanded worktrees above it.
+// accounting for expanded worktrees and add-worktree items above it.
 func (m *MainMenuModel) projectToFlatIndex(projectIdx int) int {
 	flat := 0
 	for i := 0; i < projectIdx; i++ {
 		flat++ // the project itself
 		if m.expandedWorktrees[i] {
-			flat += len(m.projects[i].Worktrees)
+			flat += len(m.projects[i].Worktrees) + 1 // +1 for add-worktree item
 		}
 	}
 	return flat
 }
 
 // ResolveItem maps a flat selectedItem index to what it represents.
-// Returns: itemType ("project", "worktree", or "action"), projectIdx, worktreeIdx.
+// Returns: itemType ("project", "worktree", "add-worktree", or "action"), projectIdx, worktreeIdx.
 // For "action", projectIdx is the action offset (0=add, 1=delete, etc).
 func (m *MainMenuModel) ResolveItem(flatIdx int) (itemType string, projectIdx int, worktreeIdx int) {
 	pos := 0
@@ -258,6 +259,11 @@ func (m *MainMenuModel) ResolveItem(flatIdx int) (itemType string, projectIdx in
 				}
 				pos++
 			}
+			// Add-worktree item comes after all worktrees
+			if flatIdx == pos {
+				return "add-worktree", i, -1
+			}
+			pos++
 		}
 	}
 	// Must be an action
@@ -673,11 +679,20 @@ func (m *MainMenuModel) CalculateLayout(width, height int) MenuLayout {
 	if numProjects > 0 {
 		numSeparators = 1
 	}
-	// Projects = 2 rows each, worktrees = 2 rows each (branch + path), actions = 1 row each
+	// Projects = 2 rows each, worktrees = 2 rows each (branch + path),
+	// add-worktree = 1 row each, actions = 1 row each
 	projectRows := numProjects * 2
-	worktreeRows := m.expandedWorktreeCount() * 2
+	expandedProjectCount := 0
+	for idx := range m.expandedWorktrees {
+		if idx < len(m.projects) {
+			expandedProjectCount++
+		}
+	}
+	wtEntryCount := m.expandedWorktreeCount() - expandedProjectCount // actual worktrees only
+	worktreeRows := wtEntryCount * 2                                 // worktrees are 2 rows each
+	addWorktreeRows := expandedProjectCount                          // add-worktree is 1 row each
 	actionRows := len(actionNames)
-	menuHeight := 7 + projectRows + worktreeRows + actionRows + numSeparators
+	menuHeight := 7 + projectRows + worktreeRows + addWorktreeRows + actionRows + numSeparators
 	menuWidth := 48
 
 	ghostPosition := "hidden"
@@ -724,7 +739,7 @@ func (m *MainMenuModel) MapRowToItem(clickY int) int {
 		currentRow += 2
 		flatIdx++
 
-		// Expanded worktrees (2 rows each: branch + path)
+		// Expanded worktrees (2 rows each: branch + path) + add-worktree (1 row)
 		if m.expandedWorktrees[i] {
 			for range proj.Worktrees {
 				if clickY == currentRow || clickY == currentRow+1 {
@@ -733,6 +748,12 @@ func (m *MainMenuModel) MapRowToItem(clickY int) int {
 				currentRow += 2
 				flatIdx++
 			}
+			// Add-worktree item (1 row)
+			if clickY == currentRow {
+				return flatIdx
+			}
+			currentRow++
+			flatIdx++
 		}
 	}
 
@@ -791,6 +812,16 @@ func (m *MainMenuModel) selectCurrent() {
 			Action:       "select-project",
 			Name:         m.projects[projectIdx].Name,
 			Path:         m.projects[projectIdx].Worktrees[worktreeIdx].Path,
+			AITool:       m.CurrentAITool(),
+			GhostDisplay: m.ghostDisplayForResult(),
+			TabTitle:     m.tabTitleForResult(),
+			SoundName:    m.soundNameForResult(),
+		}
+	case "add-worktree":
+		m.result = &MainMenuResult{
+			Action:       "add-worktree",
+			Name:         m.projects[projectIdx].Name,
+			Path:         m.projects[projectIdx].Path,
 			AITool:       m.CurrentAITool(),
 			GhostDisplay: m.ghostDisplayForResult(),
 			TabTitle:     m.tabTitleForResult(),
@@ -1631,20 +1662,16 @@ func (m *MainMenuModel) renderMenuBox() string {
 		lines = append(lines, nameLine)
 		lines = append(lines, pathLine)
 
-		// Expanded worktree entries (2 rows each: branch + path)
+		// Expanded worktree entries (2 rows each: branch + path) + add-worktree (1 row)
 		if m.expandedWorktrees[i] {
+			// All worktrees use ├─ connector (add-worktree follows as last item)
+			connector := "\u251c\u2500"
 			for j, wt := range proj.Worktrees {
 				wtFlatIdx := m.projectToFlatIndex(i) + 1 + j
 				wtSelected := m.selectedItem == wtFlatIdx
-				isLast := j == len(proj.Worktrees)-1
 				var wtBranchLine, wtPathLine string
 				branchDisplay := TruncateMiddle(wt.Branch, menuInnerWidth-11)
 				shortWtPath := TruncateMiddle(shortenHomePath(wt.Path), menuInnerWidth-11)
-
-				connector := "\u251c\u2500"
-				if isLast {
-					connector = "\u2514\u2500"
-				}
 
 				if wtSelected {
 					marker := primaryBoldStyle.Render("\u258e")
@@ -1683,6 +1710,33 @@ func (m *MainMenuModel) renderMenuBox() string {
 				lines = append(lines, wtBranchLine)
 				lines = append(lines, wtPathLine)
 			}
+
+			// Add-worktree item (1 row, └─ connector)
+			addWtFlatIdx := m.projectToFlatIndex(i) + 1 + len(proj.Worktrees)
+			addWtSelected := m.selectedItem == addWtFlatIdx
+			addConnector := "\u2514\u2500"
+			var addWtLine string
+			if addWtSelected {
+				marker := primaryBoldStyle.Render("\u258e")
+				connStyled := primaryBoldStyle.Render(addConnector)
+				addLabel := primaryBoldStyle.Render("+ Add worktree")
+				content := "  " + marker + "    " + connStyled + " " + addLabel
+				padding := menuInnerWidth - lipgloss.Width(content)
+				if padding < 0 {
+					padding = 0
+				}
+				addWtLine = leftBorder + content + strings.Repeat(" ", padding) + rightBorder
+			} else {
+				connStyled := dimStyle.Render(addConnector)
+				addLabel := dimStyle.Render("+ Add worktree")
+				content := "       " + connStyled + " " + addLabel
+				padding := menuInnerWidth - lipgloss.Width(content)
+				if padding < 0 {
+					padding = 0
+				}
+				addWtLine = leftBorder + content + strings.Repeat(" ", padding) + rightBorder
+			}
+			lines = append(lines, addWtLine)
 		}
 	}
 
