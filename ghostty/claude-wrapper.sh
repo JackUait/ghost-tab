@@ -142,6 +142,10 @@ elif [ -z "$1" ]; then
         plain-terminal)
           exec "$SHELL"
           ;;
+        add-worktree)
+          # Loop back to menu — worktrees refresh on reload
+          continue
+          ;;
         *)
           # settings or unknown — loop back to menu
           continue
