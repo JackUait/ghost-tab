@@ -3488,28 +3488,29 @@ func TestMainMenu_ToggleNoWorktrees(t *testing.T) {
 	}
 }
 
-func TestMainMenu_WKeyTogglesWorktrees(t *testing.T) {
+func TestMainMenu_WKeyTogglesAllWorktrees(t *testing.T) {
 	projects := testProjectsWithWorktrees()
 	m := tui.NewMainMenu(projects, testAITools(), "claude", "animated")
 	m.SetSize(100, 40)
 
-	// Select first project (has worktrees)
-	if m.SelectedItem() != 0 {
-		t.Fatalf("expected item 0, got %d", m.SelectedItem())
-	}
-
-	// Press 'w' to expand
+	// Press 'w' — should expand ALL projects with worktrees (0 and 2)
 	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'w'}}
 	m.Update(msg)
 
 	if !m.IsExpanded(0) {
 		t.Error("expected project 0 to be expanded after 'w'")
 	}
+	if !m.IsExpanded(2) {
+		t.Error("expected project 2 to be expanded after 'w'")
+	}
 
-	// Press 'w' again to collapse
+	// Press 'w' again — should collapse all
 	m.Update(msg)
 	if m.IsExpanded(0) {
 		t.Error("expected project 0 to be collapsed after second 'w'")
+	}
+	if m.IsExpanded(2) {
+		t.Error("expected project 2 to be collapsed after second 'w'")
 	}
 }
 
@@ -3561,10 +3562,10 @@ func TestMainMenu_MapRowToItemWithWorktrees(t *testing.T) {
 	// 2: separator
 	// 3: empty
 	// 4-5: project 0 (name + path) -> item 0
-	// 6: worktree 0 -> item 1
-	// 7: worktree 1 -> item 2
-	// 8-9: project 1 (name + path) -> item 3
-	// 10-11: project 2 (name + path) -> item 4
+	// 6-7: worktree 0 (branch + path) -> item 1
+	// 8-9: worktree 1 (branch + path) -> item 2
+	// 10-11: project 1 (name + path) -> item 3
+	// 12-13: project 2 (name + path) -> item 4
 
 	// Project 0
 	if m.MapRowToItem(4) != 0 {
@@ -3574,17 +3575,23 @@ func TestMainMenu_MapRowToItemWithWorktrees(t *testing.T) {
 		t.Errorf("row 5: expected item 0, got %d", m.MapRowToItem(5))
 	}
 
-	// Worktree entries (1 row each)
+	// Worktree entries (2 rows each: branch + path)
 	if m.MapRowToItem(6) != 1 {
 		t.Errorf("row 6: expected item 1 (wt0), got %d", m.MapRowToItem(6))
 	}
-	if m.MapRowToItem(7) != 2 {
-		t.Errorf("row 7: expected item 2 (wt1), got %d", m.MapRowToItem(7))
+	if m.MapRowToItem(7) != 1 {
+		t.Errorf("row 7: expected item 1 (wt0 path row), got %d", m.MapRowToItem(7))
+	}
+	if m.MapRowToItem(8) != 2 {
+		t.Errorf("row 8: expected item 2 (wt1), got %d", m.MapRowToItem(8))
+	}
+	if m.MapRowToItem(9) != 2 {
+		t.Errorf("row 9: expected item 2 (wt1 path row), got %d", m.MapRowToItem(9))
 	}
 
 	// Project 1
-	if m.MapRowToItem(8) != 3 {
-		t.Errorf("row 8: expected item 3 (proj1), got %d", m.MapRowToItem(8))
+	if m.MapRowToItem(10) != 3 {
+		t.Errorf("row 10: expected item 3 (proj1), got %d", m.MapRowToItem(10))
 	}
 }
 
@@ -3607,8 +3614,8 @@ func TestMainMenu_CalculateLayoutWithWorktrees(t *testing.T) {
 	m.ToggleWorktrees(0)
 	layout2 := m.CalculateLayout(100, 40)
 
-	// Expanded: 3 projects * 2 rows + 2 worktrees * 1 row + 4 actions * 1 row + 7 + 1 = 20
-	expectedExpanded := 7 + (3 * 2) + 2 + 4 + 1
+	// Expanded: 3 projects * 2 rows + 2 worktrees * 2 rows + 4 actions * 1 row + 7 + 1 = 22
+	expectedExpanded := 7 + (3 * 2) + (2 * 2) + 4 + 1
 	if layout2.MenuHeight != expectedExpanded {
 		t.Errorf("expanded height: got %d, want %d", layout2.MenuHeight, expectedExpanded)
 	}

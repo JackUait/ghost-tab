@@ -285,6 +285,80 @@ func TestMenuBox_ExpandedWorktreeEntries(t *testing.T) {
 	}
 }
 
+func TestMenuBox_WorktreeTreeConnectors(t *testing.T) {
+	projects := []models.Project{
+		{
+			Name: "proj",
+			Path: "/tmp/proj",
+			Worktrees: []models.Worktree{
+				{Path: "/tmp/wt1", Branch: "feature/auth"},
+				{Path: "/tmp/wt2", Branch: "fix/bug"},
+			},
+		},
+	}
+	m := NewMainMenu(projects, []string{"claude"}, "claude", "animated")
+	m.width = 100
+	m.height = 40
+	m.expandedWorktrees = map[int]bool{0: true}
+	box := m.renderMenuBox()
+	raw := stripAnsi(box)
+
+	// Non-last worktree should use ├─ connector
+	if !strings.Contains(raw, "├─ feature/auth") {
+		t.Errorf("expected '├─ feature/auth' for non-last worktree, got:\n%s", raw)
+	}
+	// Last worktree should use └─ connector
+	if !strings.Contains(raw, "└─ fix/bug") {
+		t.Errorf("expected '└─ fix/bug' for last worktree, got:\n%s", raw)
+	}
+}
+
+func TestMenuBox_SingleWorktreeUsesEndConnector(t *testing.T) {
+	projects := []models.Project{
+		{
+			Name: "proj",
+			Path: "/tmp/proj",
+			Worktrees: []models.Worktree{
+				{Path: "/tmp/wt1", Branch: "only-branch"},
+			},
+		},
+	}
+	m := NewMainMenu(projects, []string{"claude"}, "claude", "animated")
+	m.width = 100
+	m.height = 40
+	m.expandedWorktrees = map[int]bool{0: true}
+	box := m.renderMenuBox()
+	raw := stripAnsi(box)
+
+	// Single worktree is also the last, should use └─
+	if !strings.Contains(raw, "└─ only-branch") {
+		t.Errorf("expected '└─ only-branch' for single worktree, got:\n%s", raw)
+	}
+}
+
+func TestMenuBox_WorktreeShowsPath(t *testing.T) {
+	projects := []models.Project{
+		{
+			Name: "proj",
+			Path: "/tmp/proj",
+			Worktrees: []models.Worktree{
+				{Path: "/home/jack/wt/feature-auth", Branch: "feature/auth"},
+			},
+		},
+	}
+	m := NewMainMenu(projects, []string{"claude"}, "claude", "animated")
+	m.width = 100
+	m.height = 40
+	m.expandedWorktrees = map[int]bool{0: true}
+	box := m.renderMenuBox()
+	raw := stripAnsi(box)
+
+	// Worktree entry should show the shortened path on a second line
+	if !strings.Contains(raw, "wt/feature-auth") {
+		t.Errorf("expected worktree path in expanded menu, got:\n%s", raw)
+	}
+}
+
 func TestMenuBox_NoIndicatorWithoutWorktrees(t *testing.T) {
 	projects := []models.Project{
 		{Name: "simple", Path: "/tmp/simple"},

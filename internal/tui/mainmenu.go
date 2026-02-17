@@ -265,6 +265,41 @@ func (m *MainMenuModel) ResolveItem(flatIdx int) (itemType string, projectIdx in
 	return "action", actionIdx, -1
 }
 
+// ToggleAllWorktrees expands all projects with worktrees if any are collapsed,
+// or collapses all if every one is already expanded.
+func (m *MainMenuModel) ToggleAllWorktrees() {
+	// Check if all projects with worktrees are already expanded
+	allExpanded := true
+	for i, proj := range m.projects {
+		if len(proj.Worktrees) > 0 && !m.expandedWorktrees[i] {
+			allExpanded = false
+			break
+		}
+	}
+
+	if allExpanded {
+		// Collapse all — reset selection to avoid pointing at a removed worktree row
+		oldTotal := m.TotalItems()
+		m.expandedWorktrees = make(map[int]bool)
+		// Clamp selection: resolve to nearest valid item
+		newTotal := m.TotalItems()
+		if m.selectedItem >= newTotal {
+			m.selectedItem = newTotal - 1
+			if m.selectedItem < 0 {
+				m.selectedItem = 0
+			}
+		}
+		_ = oldTotal // suppress unused
+	} else {
+		// Expand all projects that have worktrees
+		for i, proj := range m.projects {
+			if len(proj.Worktrees) > 0 {
+				m.expandedWorktrees[i] = true
+			}
+		}
+	}
+}
+
 // IsExpanded returns whether the given project index is expanded.
 func (m *MainMenuModel) IsExpanded(projectIdx int) bool {
 	return m.expandedWorktrees[projectIdx]
@@ -638,9 +673,9 @@ func (m *MainMenuModel) CalculateLayout(width, height int) MenuLayout {
 	if numProjects > 0 {
 		numSeparators = 1
 	}
-	// Projects = 2 rows each, worktrees = 1 row each, actions = 1 row each
+	// Projects = 2 rows each, worktrees = 2 rows each (branch + path), actions = 1 row each
 	projectRows := numProjects * 2
-	worktreeRows := m.expandedWorktreeCount()
+	worktreeRows := m.expandedWorktreeCount() * 2
 	actionRows := len(actionNames)
 	menuHeight := 7 + projectRows + worktreeRows + actionRows + numSeparators
 	menuWidth := 48
@@ -689,13 +724,13 @@ func (m *MainMenuModel) MapRowToItem(clickY int) int {
 		currentRow += 2
 		flatIdx++
 
-		// Expanded worktrees (1 row each)
+		// Expanded worktrees (2 rows each: branch + path)
 		if m.expandedWorktrees[i] {
 			for range proj.Worktrees {
-				if clickY == currentRow {
+				if clickY == currentRow || clickY == currentRow+1 {
 					return flatIdx
 				}
-				currentRow++
+				currentRow += 2
 				flatIdx++
 			}
 		}
@@ -954,13 +989,7 @@ func (m *MainMenuModel) handleRune(r rune) (tea.Model, tea.Cmd) {
 		m.setActionResult("plain-terminal")
 		return m, tea.Quit
 	case 'w', 'W':
-		itemType, projectIdx, _ := m.ResolveItem(m.selectedItem)
-		if itemType == "project" {
-			m.ToggleWorktrees(projectIdx)
-		} else if itemType == "worktree" {
-			// If on a worktree, toggle its parent project
-			m.ToggleWorktrees(projectIdx)
-		}
+		m.ToggleAllWorktrees()
 		return m, nil
 	case 's', 'S':
 		m.settingsMode = true
@@ -1602,33 +1631,57 @@ func (m *MainMenuModel) renderMenuBox() string {
 		lines = append(lines, nameLine)
 		lines = append(lines, pathLine)
 
-		// Expanded worktree entries
+		// Expanded worktree entries (2 rows each: branch + path)
 		if m.expandedWorktrees[i] {
 			for j, wt := range proj.Worktrees {
 				wtFlatIdx := m.projectToFlatIndex(i) + 1 + j
 				wtSelected := m.selectedItem == wtFlatIdx
-				var wtLine string
-				branchDisplay := TruncateMiddle(wt.Branch, menuInnerWidth-10)
+				isLast := j == len(proj.Worktrees)-1
+				var wtBranchLine, wtPathLine string
+				branchDisplay := TruncateMiddle(wt.Branch, menuInnerWidth-11)
+				shortWtPath := TruncateMiddle(shortenHomePath(wt.Path), menuInnerWidth-11)
+
+				connector := "\u251c\u2500"
+				if isLast {
+					connector = "\u2514\u2500"
+				}
 
 				if wtSelected {
 					marker := primaryBoldStyle.Render("\u258e")
+					connStyled := primaryBoldStyle.Render(connector)
 					branchText := primaryBoldStyle.Render(branchDisplay)
-					content := "    " + marker + "   " + branchText
+					content := "  " + marker + "    " + connStyled + " " + branchText
 					padding := menuInnerWidth - lipgloss.Width(content)
 					if padding < 0 {
 						padding = 0
 					}
-					wtLine = leftBorder + content + strings.Repeat(" ", padding) + rightBorder
+					wtBranchLine = leftBorder + content + strings.Repeat(" ", padding) + rightBorder
+
+					pathContent := "          " + primaryStyle.Render(shortWtPath)
+					pathPadding := menuInnerWidth - lipgloss.Width(pathContent)
+					if pathPadding < 0 {
+						pathPadding = 0
+					}
+					wtPathLine = leftBorder + pathContent + strings.Repeat(" ", pathPadding) + rightBorder
 				} else {
-					branchText := dimStyle.Render(branchDisplay)
-					content := "         " + branchText
+					connStyled := dimStyle.Render(connector)
+					branchText := primaryStyle.Render(branchDisplay)
+					content := "       " + connStyled + " " + branchText
 					padding := menuInnerWidth - lipgloss.Width(content)
 					if padding < 0 {
 						padding = 0
 					}
-					wtLine = leftBorder + content + strings.Repeat(" ", padding) + rightBorder
+					wtBranchLine = leftBorder + content + strings.Repeat(" ", padding) + rightBorder
+
+					pathContent := "          " + dimStyle.Render(shortWtPath)
+					pathPadding := menuInnerWidth - lipgloss.Width(pathContent)
+					if pathPadding < 0 {
+						pathPadding = 0
+					}
+					wtPathLine = leftBorder + pathContent + strings.Repeat(" ", pathPadding) + rightBorder
 				}
-				lines = append(lines, wtLine)
+				lines = append(lines, wtBranchLine)
+				lines = append(lines, wtPathLine)
 			}
 		}
 	}
