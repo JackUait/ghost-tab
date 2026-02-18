@@ -28,7 +28,8 @@ func init() {
 }
 
 func runSelectBranch(cmd *cobra.Command, args []string) error {
-	tui.ApplyTheme(tui.ThemeForTool(aiToolFlag))
+	theme := tui.ThemeForTool(aiToolFlag)
+	tui.ApplyTheme(theme)
 
 	// Get main branch name from worktree porcelain output
 	wtCmd := exec.Command("git", "-C", projectPathFlag, "worktree", "list", "--porcelain")
@@ -56,7 +57,7 @@ func runSelectBranch(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	model := tui.NewBranchPicker(available)
+	model := tui.NewBranchPicker(available, theme, projectPathFlag)
 
 	ttyOpts, cleanup, err := util.TUITeaOptions()
 	if err != nil {

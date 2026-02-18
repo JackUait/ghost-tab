@@ -180,6 +180,27 @@ func TestFilterAvailableBranches(t *testing.T) {
 			mainBranch: "",
 			want:       []string{"feature/a", "feature/b"},
 		},
+		{
+			name:       "filters out master even when main branch is different",
+			branches:   []string{"develop", "master", "feature/x"},
+			worktrees:  nil,
+			mainBranch: "develop",
+			want:       []string{"feature/x"},
+		},
+		{
+			name:       "filters out main even when main branch is different",
+			branches:   []string{"develop", "main", "feature/x"},
+			worktrees:  nil,
+			mainBranch: "develop",
+			want:       []string{"feature/x"},
+		},
+		{
+			name:       "filters out origin/main and origin/master",
+			branches:   []string{"origin/main", "origin/master", "origin/feature/y"},
+			worktrees:  nil,
+			mainBranch: "",
+			want:       []string{"origin/feature/y"},
+		},
 	}
 
 	for _, tt := range tests {

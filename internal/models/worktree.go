@@ -142,6 +142,11 @@ func FilterAvailableBranches(branches []string, worktrees []Worktree, mainBranch
 	for _, wt := range worktrees {
 		taken[wt.Branch] = true
 	}
+	// Always exclude default branch names
+	taken["main"] = true
+	taken["master"] = true
+	taken["origin/main"] = true
+	taken["origin/master"] = true
 
 	var result []string
 	for _, b := range branches {
@@ -150,6 +155,19 @@ func FilterAvailableBranches(branches []string, worktrees []Worktree, mainBranch
 		}
 	}
 	return result
+}
+
+// DeleteBranch deletes a git branch. Local branches are force-deleted with
+// `git branch -D`. Remote branches (origin/ prefix) are deleted with
+// `git push origin --delete`.
+func DeleteBranch(projectPath, branch string) error {
+	if strings.HasPrefix(branch, "origin/") {
+		name := strings.TrimPrefix(branch, "origin/")
+		cmd := exec.Command("git", "-C", projectPath, "push", "origin", "--delete", name)
+		return cmd.Run()
+	}
+	cmd := exec.Command("git", "-C", projectPath, "branch", "-D", branch)
+	return cmd.Run()
 }
 
 // ParseMainBranch extracts the branch name of the main worktree (first entry)
