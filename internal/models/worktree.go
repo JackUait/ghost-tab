@@ -66,3 +66,125 @@ func DetectWorktrees(projectPath string) []Worktree {
 	}
 	return ParseWorktreeListPorcelain(string(out))
 }
+
+// ParseBranchList parses the output of `git branch -a --format='%(refname:short)'`
+// and returns a deduplicated list. When a branch exists both locally and as
+// origin/<name>, only the local name is kept. HEAD refs are removed.
+func ParseBranchList(output string) []string {
+	if output == "" {
+		return nil
+	}
+
+	localSet := make(map[string]bool)
+	var remoteOnly []string
+
+	for _, line := range strings.Split(strings.TrimRight(output, "\n"), "\n") {
+		branch := strings.TrimSpace(line)
+		if branch == "" {
+			continue
+		}
+		if branch == "origin/HEAD" || strings.HasPrefix(branch, "origin/HEAD ") {
+			continue
+		}
+		if strings.HasPrefix(branch, "origin/") {
+			localName := strings.TrimPrefix(branch, "origin/")
+			if !localSet[localName] {
+				remoteOnly = append(remoteOnly, branch)
+			}
+		} else {
+			localSet[branch] = true
+		}
+	}
+
+	var result []string
+	for _, line := range strings.Split(strings.TrimRight(output, "\n"), "\n") {
+		branch := strings.TrimSpace(line)
+		if localSet[branch] {
+			result = append(result, branch)
+			delete(localSet, branch)
+		}
+	}
+	for _, remote := range remoteOnly {
+		localName := strings.TrimPrefix(remote, "origin/")
+		found := false
+		for _, r := range result {
+			if r == localName {
+				found = true
+				break
+			}
+		}
+		if !found {
+			result = append(result, remote)
+		}
+	}
+
+	return result
+}
+
+// ListBranches runs `git branch -a --format='%(refname:short)'` and returns
+// a deduplicated branch list. Returns nil on error.
+func ListBranches(projectPath string) []string {
+	cmd := exec.Command("git", "-C", projectPath, "branch", "-a", "--format=%(refname:short)")
+	out, err := cmd.Output()
+	if err != nil {
+		return nil
+	}
+	return ParseBranchList(string(out))
+}
+
+// FilterAvailableBranches removes branches that already have worktrees and
+// the main branch. Returns nil if no branches remain.
+func FilterAvailableBranches(branches []string, worktrees []Worktree, mainBranch string) []string {
+	taken := make(map[string]bool)
+	if mainBranch != "" {
+		taken[mainBranch] = true
+	}
+	for _, wt := range worktrees {
+		taken[wt.Branch] = true
+	}
+	// Always exclude default branch names
+	taken["main"] = true
+	taken["master"] = true
+	taken["origin/main"] = true
+	taken["origin/master"] = true
+
+	var result []string
+	for _, b := range branches {
+		if !taken[b] {
+			result = append(result, b)
+		}
+	}
+	return result
+}
+
+// DeleteBranch deletes a git branch. Local branches are force-deleted with
+// `git branch -D`. Remote branches (origin/ prefix) are deleted with
+// `git push origin --delete`.
+func DeleteBranch(projectPath, branch string) error {
+	if strings.HasPrefix(branch, "origin/") {
+		name := strings.TrimPrefix(branch, "origin/")
+		cmd := exec.Command("git", "-C", projectPath, "push", "origin", "--delete", name)
+		return cmd.Run()
+	}
+	cmd := exec.Command("git", "-C", projectPath, "branch", "-D", branch)
+	return cmd.Run()
+}
+
+// ParseMainBranch extracts the branch name of the main worktree (first entry)
+// from `git worktree list --porcelain` output. Returns "" if not found.
+func ParseMainBranch(output string) string {
+	if output == "" {
+		return ""
+	}
+	blocks := strings.Split(strings.TrimRight(output, "\n"), "\n\n")
+	if len(blocks) == 0 {
+		return ""
+	}
+	for _, line := range strings.Split(blocks[0], "\n") {
+		if strings.HasPrefix(line, "branch ") {
+			ref := strings.TrimPrefix(line, "branch ")
+			return strings.TrimPrefix(ref, "refs/heads/")
+		}
+	}
+	return ""
+}

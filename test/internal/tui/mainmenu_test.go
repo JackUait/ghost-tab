@@ -3407,22 +3407,22 @@ func TestMainMenu_TotalItemsWithExpanded(t *testing.T) {
 		t.Errorf("unexpanded: expected 7, got %d", m.TotalItems())
 	}
 
-	// Expand first project (2 worktrees): 3 + 2 + 4 = 9
+	// Expand first project (2 worktrees + 1 add-worktree): 3 + 3 + 4 = 10
+	m.ToggleWorktrees(0)
+	if m.TotalItems() != 10 {
+		t.Errorf("expanded first: expected 10, got %d", m.TotalItems())
+	}
+
+	// Expand third project too (1 worktree + 1 add): 3 + 3 + 2 + 4 = 12
+	m.ToggleWorktrees(2)
+	if m.TotalItems() != 12 {
+		t.Errorf("expanded first+third: expected 12, got %d", m.TotalItems())
+	}
+
+	// Collapse first project: 3 + 2 + 4 = 9
 	m.ToggleWorktrees(0)
 	if m.TotalItems() != 9 {
-		t.Errorf("expanded first: expected 9, got %d", m.TotalItems())
-	}
-
-	// Expand third project too (1 worktree): 3 + 2 + 1 + 4 = 10
-	m.ToggleWorktrees(2)
-	if m.TotalItems() != 10 {
-		t.Errorf("expanded first+third: expected 10, got %d", m.TotalItems())
-	}
-
-	// Collapse first project: 3 + 1 + 4 = 8
-	m.ToggleWorktrees(0)
-	if m.TotalItems() != 8 {
-		t.Errorf("collapsed first, third expanded: expected 8, got %d", m.TotalItems())
+		t.Errorf("collapsed first, third expanded: expected 9, got %d", m.TotalItems())
 	}
 }
 
@@ -3614,8 +3614,8 @@ func TestMainMenu_CalculateLayoutWithWorktrees(t *testing.T) {
 	m.ToggleWorktrees(0)
 	layout2 := m.CalculateLayout(100, 40)
 
-	// Expanded: 3 projects * 2 rows + 2 worktrees * 2 rows + 4 actions * 1 row + 7 + 1 = 22
-	expectedExpanded := 7 + (3 * 2) + (2 * 2) + 4 + 1
+	// Expanded: 3 projects * 2 rows + 2 worktrees * 2 rows + 1 add-worktree * 1 row + 4 actions * 1 row + 7 + 1 = 23
+	expectedExpanded := 7 + (3 * 2) + (2 * 2) + 1 + 4 + 1
 	if layout2.MenuHeight != expectedExpanded {
 		t.Errorf("expanded height: got %d, want %d", layout2.MenuHeight, expectedExpanded)
 	}
@@ -3650,8 +3650,8 @@ func TestMainMenu_WorktreeFullFlow(t *testing.T) {
 	// Press 'w' to expand project 0 (which has 1 worktree)
 	wKey := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'w'}}
 	m.Update(wKey)
-	if m.TotalItems() != 7 { // 2 projects + 1 worktree + 4 actions
-		t.Fatalf("after expand: expected 7, got %d", m.TotalItems())
+	if m.TotalItems() != 8 { // 2 projects + 1 worktree + 1 add-worktree + 4 actions
+		t.Fatalf("after expand: expected 8, got %d", m.TotalItems())
 	}
 
 	// Move down to worktree
@@ -3678,5 +3678,121 @@ func TestMainMenu_WorktreeFullFlow(t *testing.T) {
 	}
 	if result.Action != "select-project" {
 		t.Errorf("action: got %q, want %q", result.Action, "select-project")
+	}
+}
+
+func TestMainMenu_TotalItemsWithAddWorktree(t *testing.T) {
+	projects := testProjectsWithWorktrees()
+	m := tui.NewMainMenu(projects, testAITools(), "claude", "animated")
+
+	// Collapsed: 3 projects + 4 actions = 7
+	if m.TotalItems() != 7 {
+		t.Errorf("collapsed: expected 7, got %d", m.TotalItems())
+	}
+
+	// Expand first project (2 worktrees + 1 add-worktree): 3 + 3 + 4 = 10
+	m.ToggleWorktrees(0)
+	if m.TotalItems() != 10 {
+		t.Errorf("expanded first: expected 10, got %d", m.TotalItems())
+	}
+
+	// Expand third project too (1 worktree + 1 add): 3 + 3 + 2 + 4 = 12
+	m.ToggleWorktrees(2)
+	if m.TotalItems() != 12 {
+		t.Errorf("expanded first+third: expected 12, got %d", m.TotalItems())
+	}
+}
+
+func TestMainMenu_ResolveAddWorktreeItem(t *testing.T) {
+	projects := testProjectsWithWorktrees()
+	m := tui.NewMainMenu(projects, testAITools(), "claude", "animated")
+
+	// Expand first project: [P0, WT0, WT1, +Add, P1, P2, ...]
+	m.ToggleWorktrees(0)
+
+	itemType, projectIdx, _ := m.ResolveItem(3)
+	if itemType != "add-worktree" {
+		t.Errorf("item 3 type: got %q, want %q", itemType, "add-worktree")
+	}
+	if projectIdx != 0 {
+		t.Errorf("item 3 projectIdx: got %d, want 0", projectIdx)
+	}
+}
+
+func TestMainMenu_SelectAddWorktree(t *testing.T) {
+	projects := testProjectsWithWorktrees()
+	m := tui.NewMainMenu(projects, testAITools(), "claude", "animated")
+	m.SetSize(100, 40)
+
+	m.ToggleWorktrees(0)
+	m.MoveDown() // 1: WT0
+	m.MoveDown() // 2: WT1
+	m.MoveDown() // 3: +Add
+
+	itemType, _, _ := m.ResolveItem(m.SelectedItem())
+	if itemType != "add-worktree" {
+		t.Fatalf("expected add-worktree, got %q at index %d", itemType, m.SelectedItem())
+	}
+
+	m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+
+	result := m.Result()
+	if result == nil {
+		t.Fatal("result should not be nil after Enter on add-worktree")
+	}
+	if result.Action != "add-worktree" {
+		t.Errorf("action: got %q, want %q", result.Action, "add-worktree")
+	}
+	if result.Name != "ghost-tab" {
+		t.Errorf("name: got %q, want %q", result.Name, "ghost-tab")
+	}
+	if result.Path != "/Users/jack/ghost-tab" {
+		t.Errorf("path: got %q, want %q", result.Path, "/Users/jack/ghost-tab")
+	}
+}
+
+func TestMainMenu_CollapseWithAddWorktreeAdjustsSelection(t *testing.T) {
+	projects := testProjectsWithWorktrees()
+	m := tui.NewMainMenu(projects, testAITools(), "claude", "animated")
+
+	m.ToggleWorktrees(0)
+	// [P0(0), WT0(1), WT1(2), +Add(3), P1(4), ...]
+	m.MoveDown() // 1
+	m.MoveDown() // 2
+	m.MoveDown() // 3: on +Add
+
+	m.ToggleWorktrees(0)
+	if m.SelectedItem() != 0 {
+		t.Errorf("after collapse from +Add: expected 0, got %d", m.SelectedItem())
+	}
+}
+
+func TestMainMenu_MapRowToItemWithAddWorktree(t *testing.T) {
+	projects := testProjectsWithWorktrees()
+	m := tui.NewMainMenu(projects, testAITools(), "claude", "animated")
+	m.SetSize(100, 40)
+
+	m.ToggleWorktrees(0)
+	// Layout: P0(rows 4-5), WT0(rows 6-7), WT1(rows 8-9), +Add(row 10), P1(rows 11-12)
+	if got := m.MapRowToItem(10); got != 3 {
+		t.Errorf("+Add row 10: got flat %d, want 3", got)
+	}
+	if got := m.MapRowToItem(11); got != 4 {
+		t.Errorf("P1 row 11: got flat %d, want 4", got)
+	}
+}
+
+func TestMainMenu_CalculateLayoutWithAddWorktree(t *testing.T) {
+	projects := testProjectsWithWorktrees()
+	m := tui.NewMainMenu(projects, testAITools(), "claude", "animated")
+
+	m.ToggleWorktrees(0)
+	m.ToggleWorktrees(2)
+
+	layout := m.CalculateLayout(100, 60)
+	// 7 (chrome) + 3*2 (projects) + 3*2 (worktrees) + 2*1 (add-worktree) + 4 (actions) + 1 (separator)
+	// = 7 + 6 + 6 + 2 + 4 + 1 = 26
+	if layout.MenuHeight != 26 {
+		t.Errorf("menu height: got %d, want 26", layout.MenuHeight)
 	}
 }

@@ -2,6 +2,28 @@
 # TUI wrapper for main menu
 # Uses ghost-tab-tui main-menu subcommand
 
+# Compute the target path for a new worktree.
+# Args: project_path project_name branch worktree_base
+# Outputs the computed path to stdout.
+compute_worktree_path() {
+  local project_path="$1"
+  local project_name="$2"
+  local branch="$3"
+  local worktree_base="$4"
+
+  # Sanitize branch name: strip origin/ prefix, replace / with -
+  local sanitized="${branch#origin/}"
+  sanitized="${sanitized//\//-}"
+
+  if [[ -n "$worktree_base" ]]; then
+    echo "${worktree_base}/${project_name}--${sanitized}"
+  else
+    local parent_dir
+    parent_dir="$(dirname "$project_path")"
+    echo "${parent_dir}/${project_name}--${sanitized}"
+  fi
+}
+
 # Interactive project selection using ghost-tab-tui main-menu
 # Returns 0 if an actionable item was selected, 1 if quit/cancelled
 # Sets: _selected_project_name, _selected_project_path, _selected_project_action, _selected_ai_tool
@@ -110,6 +132,54 @@ select_project_interactive() {
       ;;
     quit)
       return 1
+      ;;
+    add-worktree)
+      local wt_project_name wt_project_path
+      wt_project_name=$(echo "$result" | jq -r '.name' 2>/dev/null)
+      wt_project_path=$(echo "$result" | jq -r '.path' 2>/dev/null)
+
+      if [[ -z "$wt_project_path" || "$wt_project_path" == "null" ]]; then
+        error "TUI returned invalid project path for worktree"
+        _selected_project_action="add-worktree"
+        return 0
+      fi
+
+      # Launch branch picker
+      local branch_result
+      if ! branch_result=$(ghost-tab-tui select-branch --project-path "$wt_project_path" --ai-tool "${SELECTED_AI_TOOL:-claude}" 2>/dev/null); then
+        _selected_project_action="add-worktree"
+        return 0
+      fi
+
+      local branch_selected
+      branch_selected=$(echo "$branch_result" | jq -r '.selected' 2>/dev/null)
+      if [[ "$branch_selected" != "true" ]]; then
+        _selected_project_action="add-worktree"
+        return 0
+      fi
+
+      local branch
+      branch=$(echo "$branch_result" | jq -r '.branch' 2>/dev/null)
+
+      # Read worktree base from settings
+      local worktree_base=""
+      if [ -f "$settings_file" ]; then
+        worktree_base=$(grep '^worktree_base=' "$settings_file" 2>/dev/null | cut -d= -f2)
+      fi
+
+      # Compute worktree path
+      local wt_path
+      wt_path=$(compute_worktree_path "$wt_project_path" "$wt_project_name" "$branch" "$worktree_base")
+
+      # Create worktree
+      if git -C "$wt_project_path" worktree add "$wt_path" "$branch" 2>/dev/null; then
+        success "Created worktree at $wt_path"
+      else
+        error "Failed to create worktree for branch '$branch'"
+      fi
+
+      _selected_project_action="add-worktree"
+      return 0
       ;;
     *)
       # Other actions (plain-terminal, settings)

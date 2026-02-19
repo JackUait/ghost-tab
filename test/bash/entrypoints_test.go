@@ -385,6 +385,176 @@ echo "done"
 }
 
 // ============================================================
+// TestGhostTab_TerminalFlag_* — --terminal flag tests
+// ============================================================
+
+func TestGhostTab_TerminalFlag_recognized_and_skips_full_setup(t *testing.T) {
+	root := projectRoot(t)
+	dir := t.TempDir()
+	configDir := filepath.Join(dir, "config", "ghost-tab")
+	os.MkdirAll(configDir, 0755)
+
+	// Mock ghost-tab-tui to simulate terminal selection
+	binDir := mockCommand(t, dir, "ghost-tab-tui", `
+if [ "$1" = "select-terminal" ]; then
+  echo '{"terminal":"kitty","selected":true}'
+else
+  echo '{"selected":false}'
+fi
+`)
+	// Mock brew to avoid real installations
+	mockCommand(t, dir, "brew", `echo "mock brew"`)
+
+	scriptContent := fmt.Sprintf(`#!/bin/bash
+export XDG_CONFIG_HOME=%q
+export PATH=%q:$PATH
+source %q
+source %q
+source %q
+source %q
+source %q
+
+case "${1:-}" in
+  --terminal)
+    echo "TERMINAL_FLAG_DETECTED"
+    ;;
+  *)
+    echo "FULL_SETUP"
+    ;;
+esac
+`, filepath.Join(dir, "config"),
+		binDir,
+		filepath.Join(root, "lib/tui.sh"),
+		filepath.Join(root, "lib/install.sh"),
+		filepath.Join(root, "lib/terminal-select-tui.sh"),
+		filepath.Join(root, "lib/terminals/registry.sh"),
+		filepath.Join(root, "lib/terminals/adapter.sh"))
+
+	scriptPath := writeTempFile(t, dir, "test-flag.sh", scriptContent)
+	os.Chmod(scriptPath, 0755)
+
+	env := buildEnv(t, []string{binDir})
+	out, code := runBashSnippet(t, fmt.Sprintf("bash %q --terminal", scriptPath), env)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "TERMINAL_FLAG_DETECTED")
+	assertNotContains(t, out, "FULL_SETUP")
+}
+
+func TestGhostTab_TerminalFlag_no_flag_runs_full_setup(t *testing.T) {
+	root := projectRoot(t)
+	dir := t.TempDir()
+
+	scriptContent := fmt.Sprintf(`#!/bin/bash
+source %q
+
+case "${1:-}" in
+  --terminal)
+    echo "TERMINAL_FLAG_DETECTED"
+    ;;
+  *)
+    echo "FULL_SETUP"
+    ;;
+esac
+`, filepath.Join(root, "lib/tui.sh"))
+
+	scriptPath := writeTempFile(t, dir, "test-no-flag.sh", scriptContent)
+	os.Chmod(scriptPath, 0755)
+
+	out, code := runBashSnippet(t, fmt.Sprintf("bash %q", scriptPath), nil)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "FULL_SETUP")
+	assertNotContains(t, out, "TERMINAL_FLAG_DETECTED")
+}
+
+func TestGhostTab_TerminalFlag_unknown_flag_shows_usage(t *testing.T) {
+	root := projectRoot(t)
+	dir := t.TempDir()
+
+	scriptContent := fmt.Sprintf(`#!/bin/bash
+source %q
+
+case "${1:-}" in
+  --terminal)
+    echo "TERMINAL_SETUP"
+    ;;
+  --*)
+    error "Unknown flag: $1"
+    echo "Usage: ghost-tab [--terminal]"
+    exit 1
+    ;;
+esac
+`, filepath.Join(root, "lib/tui.sh"))
+
+	scriptPath := writeTempFile(t, dir, "test-unknown-flag.sh", scriptContent)
+	os.Chmod(scriptPath, 0755)
+
+	out, code := runBashSnippet(t, fmt.Sprintf("bash %q --bogus", scriptPath), nil)
+	assertExitCode(t, code, 1)
+	assertContains(t, out, "Unknown flag")
+	assertContains(t, out, "Usage:")
+}
+
+func TestGhostTab_TerminalFlag_saves_preference_and_configures(t *testing.T) {
+	root := projectRoot(t)
+	dir := t.TempDir()
+	configDir := filepath.Join(dir, "config", "ghost-tab")
+	os.MkdirAll(configDir, 0755)
+
+	// Mock ghost-tab-tui to return kitty
+	binDir := mockCommand(t, dir, "ghost-tab-tui", `
+if [ "$1" = "select-terminal" ]; then
+  echo '{"terminal":"kitty","selected":true}'
+fi
+`)
+	// Mock brew
+	mockCommand(t, dir, "brew", `echo "mock brew"`)
+
+	script := fmt.Sprintf(`
+export HOME=%q
+export XDG_CONFIG_HOME=%q
+export PATH=%q:$PATH
+source %q
+source %q
+source %q
+source %q
+source %q
+
+SHARE_DIR=%q
+
+# Simulate the terminal-only setup flow
+if select_terminal_interactive; then
+  SELECTED_TERMINAL="$_selected_terminal"
+  TERMINAL_PREF_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/ghost-tab"
+  mkdir -p "$TERMINAL_PREF_DIR"
+  save_terminal_preference "$SELECTED_TERMINAL" "$TERMINAL_PREF_DIR/terminal"
+  echo "SAVED:$SELECTED_TERMINAL"
+fi
+`, dir, filepath.Join(dir, "config"),
+		binDir,
+		filepath.Join(root, "lib/tui.sh"),
+		filepath.Join(root, "lib/install.sh"),
+		filepath.Join(root, "lib/terminal-select-tui.sh"),
+		filepath.Join(root, "lib/terminals/registry.sh"),
+		filepath.Join(root, "lib/terminals/adapter.sh"),
+		root)
+
+	env := buildEnv(t, []string{binDir})
+	out, code := runBashSnippet(t, script, env)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "SAVED:kitty")
+
+	// Verify preference file was written
+	prefFile := filepath.Join(configDir, "terminal")
+	content, err := os.ReadFile(prefFile)
+	if err != nil {
+		t.Fatalf("failed to read terminal preference: %v", err)
+	}
+	if strings.TrimSpace(string(content)) != "kitty" {
+		t.Errorf("expected preference %q, got %q", "kitty", strings.TrimSpace(string(content)))
+	}
+}
+
+// ============================================================
 // TestClaudeWrapper_* — migrated from test/claude-wrapper.bats (7 tests)
 // ============================================================
 

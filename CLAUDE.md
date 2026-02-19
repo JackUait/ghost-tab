@@ -61,7 +61,7 @@ Run full verification:
 
 ```bash
 # Run shellcheck on all modified scripts
-find lib bin ghostty -name '*.sh' -exec shellcheck {} +
+find lib bin -name '*.sh' -exec shellcheck {} + && shellcheck wrapper.sh
 
 # Run full test suite
 ./run-tests.sh
@@ -113,7 +113,7 @@ Scroll up to "IMMEDIATE COMPLETION CHECKLIST" and verify ALL items before declar
 
 ## Project Overview
 
-Ghost Tab is a Ghostty + tmux wrapper that launches a four-pane dev session with AI coding tools (Claude Code, Codex CLI, Copilot CLI, OpenCode), lazygit, broot, and a spare terminal. It handles complete process cleanup when windows close (no zombie processes).
+Ghost Tab is a terminal + tmux wrapper that launches a four-pane dev session with AI coding tools (Claude Code, Codex CLI, Copilot CLI, OpenCode), lazygit, broot, and a spare terminal. It supports multiple terminal emulators (Ghostty, iTerm2, WezTerm, kitty) and handles complete process cleanup when windows close (no zombie processes).
 
 **Key Features:**
 - Interactive project selector with TUI
@@ -130,7 +130,7 @@ Ghost Tab is a Ghostty + tmux wrapper that launches a four-pane dev session with
 go test ./test/bash/... -run TestFoo    # Run specific test group
 go test ./test/bash/... -run "test_name" # Filter by name
 go test ./... -v -count=1              # Verbose with no caching
-shellcheck lib/*.sh bin/ghost-tab ghostty/*.sh  # Lint all scripts
+shellcheck lib/*.sh lib/terminals/*.sh bin/ghost-tab wrapper.sh  # Lint all scripts
 ./bin/ghost-tab                         # Run main installer/setup
 make release                            # Create a new release
 ```
@@ -167,7 +167,7 @@ Ghost Tab uses a **hybrid architecture** combining Go for interactive TUI and ba
 
 **Layer 1: Go TUI Binary (`ghost-tab-tui`)**
 - Interactive terminal UI components built with Bubbletea
-- Project selector, AI tool selector, settings menu, input forms
+- Project selector, AI tool selector, terminal selector, settings menu, input forms
 - Outputs structured JSON for bash consumption
 - Binary: `~/.local/bin/ghost-tab-tui`
 - Source: `cmd/ghost-tab-tui/`, `internal/tui/`, `internal/models/`, `internal/util/`
@@ -176,7 +176,7 @@ Ghost Tab uses a **hybrid architecture** combining Go for interactive TUI and ba
 
 **Entry Points:**
 - `bin/ghost-tab` - Main installer script, sources all modules
-- `ghostty/claude-wrapper.sh` - Runtime wrapper launched by Ghostty
+- `wrapper.sh` - Terminal-agnostic runtime wrapper
 
 **Module System:**
 All reusable functionality lives in `lib/` as sourced shell scripts:
@@ -190,9 +190,15 @@ All reusable functionality lives in `lib/` as sourced shell scripts:
 - **project-actions-tui.sh**: Interactive project input wrapper (Go TUI)
 - **menu-tui.sh**: Project selection wrapper (Go TUI)
 - **settings-menu-tui.sh**: Settings menu wrapper (Go TUI)
+- **terminal-select-tui.sh**: Interactive terminal selection wrapper (Go TUI)
+- **terminals/registry.sh**: Terminal list, display names, preference management
+- **terminals/adapter.sh**: Dynamic terminal adapter loader
+- **terminals/ghostty.sh**: Ghostty terminal adapter
+- **terminals/kitty.sh**: kitty terminal adapter
+- **terminals/wezterm.sh**: WezTerm terminal adapter
+- **terminals/iterm2.sh**: iTerm2 terminal adapter (PlistBuddy)
 - **tmux-session.sh**: tmux session creation and pane setup
 - **process.sh**: Process tree management and cleanup
-- **ghostty-config.sh**: Ghostty config file operations
 - **statusline.sh**: Status line generation logic
 - **statusline-setup.sh**: Claude Code status line installation
 - **notification-setup.sh**: Sound notification setup
@@ -203,6 +209,7 @@ All reusable functionality lives in `lib/` as sourced shell scripts:
 **Data Files:**
 - `~/.config/ghost-tab/projects` - Project list (name:path format)
 - `~/.config/ghost-tab/ai-tool` - Default AI tool preference
+- `~/.config/ghost-tab/terminal` - Selected terminal preference
 - `~/.config/ghost-tab/*-features.json` - AI tool feature flags
 - `~/.claude/settings.json` - Claude Code settings
 - `~/.codex/config.toml` - Codex CLI config
@@ -210,8 +217,8 @@ All reusable functionality lives in `lib/` as sourced shell scripts:
 
 **Process Hierarchy:**
 ```
-Ghostty window
-└─ claude-wrapper.sh (shell command)
+Terminal window (Ghostty/iTerm2/WezTerm/kitty)
+└─ wrapper.sh (shell command)
    └─ tmux session
       ├─ AI tool (Claude Code/Codex/etc)
       ├─ lazygit

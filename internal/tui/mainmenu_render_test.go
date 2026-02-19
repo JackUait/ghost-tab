@@ -303,13 +303,16 @@ func TestMenuBox_WorktreeTreeConnectors(t *testing.T) {
 	box := m.renderMenuBox()
 	raw := stripAnsi(box)
 
-	// Non-last worktree should use ├─ connector
+	// All worktrees use ├─ connector (add-worktree follows)
 	if !strings.Contains(raw, "├─ feature/auth") {
-		t.Errorf("expected '├─ feature/auth' for non-last worktree, got:\n%s", raw)
+		t.Errorf("expected '├─ feature/auth' for worktree, got:\n%s", raw)
 	}
-	// Last worktree should use └─ connector
-	if !strings.Contains(raw, "└─ fix/bug") {
-		t.Errorf("expected '└─ fix/bug' for last worktree, got:\n%s", raw)
+	if !strings.Contains(raw, "├─ fix/bug") {
+		t.Errorf("expected '├─ fix/bug' for worktree, got:\n%s", raw)
+	}
+	// Add-worktree item uses └─ connector as last item
+	if !strings.Contains(raw, "└─ + Add worktree") {
+		t.Errorf("expected '└─ + Add worktree' as last item, got:\n%s", raw)
 	}
 }
 
@@ -330,9 +333,13 @@ func TestMenuBox_SingleWorktreeUsesEndConnector(t *testing.T) {
 	box := m.renderMenuBox()
 	raw := stripAnsi(box)
 
-	// Single worktree is also the last, should use └─
-	if !strings.Contains(raw, "└─ only-branch") {
-		t.Errorf("expected '└─ only-branch' for single worktree, got:\n%s", raw)
+	// Single worktree uses ├─ (add-worktree follows as └─)
+	if !strings.Contains(raw, "├─ only-branch") {
+		t.Errorf("expected '├─ only-branch' for single worktree, got:\n%s", raw)
+	}
+	// Add-worktree item uses └─ connector as last item
+	if !strings.Contains(raw, "└─ + Add worktree") {
+		t.Errorf("expected '└─ + Add worktree' as last item, got:\n%s", raw)
 	}
 }
 

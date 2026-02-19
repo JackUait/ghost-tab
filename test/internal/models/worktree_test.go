@@ -93,3 +93,166 @@ func TestLoadProjectsWithWorktrees_NonGitDir(t *testing.T) {
 		t.Errorf("expected 0 worktrees for non-git dir, got %d", len(projects[0].Worktrees))
 	}
 }
+
+func TestParseBranchList(t *testing.T) {
+	tests := []struct {
+		name   string
+		output string
+		want   []string
+	}{
+		{
+			name:   "local and remote branches",
+			output: "  main\n  feature/auth\n  origin/main\n  origin/feature/auth\n  origin/fix/cleanup\n",
+			want:   []string{"main", "feature/auth", "origin/fix/cleanup"},
+		},
+		{
+			name:   "deduplicates local+remote same branch",
+			output: "  main\n  origin/main\n",
+			want:   []string{"main"},
+		},
+		{
+			name:   "strips HEAD pointer",
+			output: "  main\n  origin/HEAD\n  origin/main\n",
+			want:   []string{"main"},
+		},
+		{
+			name:   "empty output",
+			output: "",
+			want:   nil,
+		},
+		{
+			name:   "remote-only branch kept with origin/ prefix",
+			output: "  origin/feature/new\n",
+			want:   []string{"origin/feature/new"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := models.ParseBranchList(tt.output)
+			if len(got) != len(tt.want) {
+				t.Fatalf("got %d branches %v, want %d %v", len(got), got, len(tt.want), tt.want)
+			}
+			for i := range got {
+				if got[i] != tt.want[i] {
+					t.Errorf("branch[%d]: got %q, want %q", i, got[i], tt.want[i])
+				}
+			}
+		})
+	}
+}
+
+func TestFilterAvailableBranches(t *testing.T) {
+	tests := []struct {
+		name       string
+		branches   []string
+		worktrees  []models.Worktree
+		mainBranch string
+		want       []string
+	}{
+		{
+			name:     "filters out branches with existing worktrees",
+			branches: []string{"main", "feature/auth", "fix/cleanup", "develop"},
+			worktrees: []models.Worktree{
+				{Path: "/wt/auth", Branch: "feature/auth"},
+			},
+			mainBranch: "main",
+			want:       []string{"fix/cleanup", "develop"},
+		},
+		{
+			name:       "filters out main branch",
+			branches:   []string{"main", "feature/new"},
+			worktrees:  nil,
+			mainBranch: "main",
+			want:       []string{"feature/new"},
+		},
+		{
+			name:       "all branches taken returns nil",
+			branches:   []string{"main"},
+			worktrees:  nil,
+			mainBranch: "main",
+			want:       nil,
+		},
+		{
+			name:       "no worktrees no main returns all",
+			branches:   []string{"feature/a", "feature/b"},
+			worktrees:  nil,
+			mainBranch: "",
+			want:       []string{"feature/a", "feature/b"},
+		},
+		{
+			name:       "filters out master even when main branch is different",
+			branches:   []string{"develop", "master", "feature/x"},
+			worktrees:  nil,
+			mainBranch: "develop",
+			want:       []string{"feature/x"},
+		},
+		{
+			name:       "filters out main even when main branch is different",
+			branches:   []string{"develop", "main", "feature/x"},
+			worktrees:  nil,
+			mainBranch: "develop",
+			want:       []string{"feature/x"},
+		},
+		{
+			name:       "filters out origin/main and origin/master",
+			branches:   []string{"origin/main", "origin/master", "origin/feature/y"},
+			worktrees:  nil,
+			mainBranch: "",
+			want:       []string{"origin/feature/y"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := models.FilterAvailableBranches(tt.branches, tt.worktrees, tt.mainBranch)
+			if len(got) != len(tt.want) {
+				t.Fatalf("got %d branches %v, want %d %v", len(got), got, len(tt.want), tt.want)
+			}
+			for i := range got {
+				if got[i] != tt.want[i] {
+					t.Errorf("branch[%d]: got %q, want %q", i, got[i], tt.want[i])
+				}
+			}
+		})
+	}
+}
+
+func TestParseMainBranch(t *testing.T) {
+	tests := []struct {
+		name   string
+		output string
+		want   string
+	}{
+		{
+			name:   "main branch",
+			output: "worktree /Users/jack/ghost-tab\nHEAD abc123\nbranch refs/heads/main\n\n",
+			want:   "main",
+		},
+		{
+			name:   "master branch",
+			output: "worktree /Users/jack/project\nHEAD abc123\nbranch refs/heads/master\n\n",
+			want:   "master",
+		},
+		{
+			name: "with additional worktrees returns first",
+			output: "worktree /Users/jack/ghost-tab\nHEAD abc\nbranch refs/heads/main\n\n" +
+				"worktree /wt/feature\nHEAD def\nbranch refs/heads/feature\n\n",
+			want: "main",
+		},
+		{
+			name:   "empty output",
+			output: "",
+			want:   "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := models.ParseMainBranch(tt.output)
+			if got != tt.want {
+				t.Errorf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}

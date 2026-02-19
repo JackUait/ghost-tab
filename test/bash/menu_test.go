@@ -1198,6 +1198,155 @@ settings_menu_interactive
 	assertContains(t, out, "invalid action")
 }
 
+func TestComputeWorktreePath_default_base(t *testing.T) {
+	root := projectRoot(t)
+	script := fmt.Sprintf(`
+source %q 2>/dev/null || true
+source %q
+compute_worktree_path "/Users/jack/code/ghost-tab" "ghost-tab" "feature/auth" ""
+`, filepath.Join(root, "lib/tui.sh"),
+		filepath.Join(root, "lib/menu-tui.sh"))
+
+	out, code := runBashSnippet(t, script, nil)
+	assertExitCode(t, code, 0)
+	expected := "/Users/jack/code/ghost-tab--feature-auth"
+	if strings.TrimSpace(out) != expected {
+		t.Errorf("got %q, want %q", strings.TrimSpace(out), expected)
+	}
+}
+
+func TestComputeWorktreePath_custom_base(t *testing.T) {
+	root := projectRoot(t)
+	script := fmt.Sprintf(`
+source %q 2>/dev/null || true
+source %q
+compute_worktree_path "/Users/jack/code/ghost-tab" "ghost-tab" "feature/auth" "/tmp/worktrees"
+`, filepath.Join(root, "lib/tui.sh"),
+		filepath.Join(root, "lib/menu-tui.sh"))
+
+	out, code := runBashSnippet(t, script, nil)
+	assertExitCode(t, code, 0)
+	expected := "/tmp/worktrees/ghost-tab--feature-auth"
+	if strings.TrimSpace(out) != expected {
+		t.Errorf("got %q, want %q", strings.TrimSpace(out), expected)
+	}
+}
+
+func TestComputeWorktreePath_sanitizes_slashes(t *testing.T) {
+	root := projectRoot(t)
+	script := fmt.Sprintf(`
+source %q 2>/dev/null || true
+source %q
+compute_worktree_path "/code/proj" "proj" "fix/deep/nested" ""
+`, filepath.Join(root, "lib/tui.sh"),
+		filepath.Join(root, "lib/menu-tui.sh"))
+
+	out, code := runBashSnippet(t, script, nil)
+	assertExitCode(t, code, 0)
+	expected := "/code/proj--fix-deep-nested"
+	if strings.TrimSpace(out) != expected {
+		t.Errorf("got %q, want %q", strings.TrimSpace(out), expected)
+	}
+}
+
+func TestComputeWorktreePath_strips_origin_prefix(t *testing.T) {
+	root := projectRoot(t)
+	script := fmt.Sprintf(`
+source %q 2>/dev/null || true
+source %q
+compute_worktree_path "/code/proj" "proj" "origin/feature/new" ""
+`, filepath.Join(root, "lib/tui.sh"),
+		filepath.Join(root, "lib/menu-tui.sh"))
+
+	out, code := runBashSnippet(t, script, nil)
+	assertExitCode(t, code, 0)
+	expected := "/code/proj--feature-new"
+	if strings.TrimSpace(out) != expected {
+		t.Errorf("got %q, want %q", strings.TrimSpace(out), expected)
+	}
+}
+
+func TestMenu_handles_add_worktree_action(t *testing.T) {
+	dir := t.TempDir()
+	// Mock ghost-tab-tui: first call returns add-worktree, second call (select-branch) returns selected branch
+	callCount := filepath.Join(dir, "call_count")
+	binDir := mockCommand(t, dir, "ghost-tab-tui", fmt.Sprintf(`
+count_file=%q
+if [ ! -f "$count_file" ]; then
+  echo "1" > "$count_file"
+  echo '{"action":"add-worktree","name":"proj1","path":"/tmp/p1","ai_tool":"claude"}'
+else
+  echo '{"branch":"feature/test","selected":true}'
+fi
+`, callCount))
+
+	// Mock git to succeed
+	mockCommand(t, dir, "git", `echo "worktree created"`)
+
+	projectsFile := writeTempFile(t, dir, "projects", "proj1:/tmp/p1\n")
+	root := projectRoot(t)
+	env := buildEnv(t, []string{binDir},
+		"XDG_CONFIG_HOME="+filepath.Join(dir, "config"),
+	)
+
+	script := fmt.Sprintf(`
+source %q 2>/dev/null || true
+source %q
+error() { echo "ERROR: $*" >&2; }
+success() { echo "SUCCESS: $*"; }
+AI_TOOLS_AVAILABLE=("claude")
+SELECTED_AI_TOOL="claude"
+_update_version=""
+select_project_interactive %q
+echo "action=$_selected_project_action"
+`, filepath.Join(root, "lib/tui.sh"),
+		filepath.Join(root, "lib/menu-tui.sh"),
+		projectsFile)
+
+	out, code := runBashSnippet(t, script, env)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "action=add-worktree")
+	assertContains(t, out, "SUCCESS: Created worktree")
+}
+
+func TestMenu_handles_add_worktree_branch_cancel(t *testing.T) {
+	dir := t.TempDir()
+	callCount := filepath.Join(dir, "call_count")
+	binDir := mockCommand(t, dir, "ghost-tab-tui", fmt.Sprintf(`
+count_file=%q
+if [ ! -f "$count_file" ]; then
+  echo "1" > "$count_file"
+  echo '{"action":"add-worktree","name":"proj1","path":"/tmp/p1","ai_tool":"claude"}'
+else
+  echo '{"selected":false}'
+fi
+`, callCount))
+	projectsFile := writeTempFile(t, dir, "projects", "proj1:/tmp/p1\n")
+	root := projectRoot(t)
+	env := buildEnv(t, []string{binDir},
+		"XDG_CONFIG_HOME="+filepath.Join(dir, "config"),
+	)
+
+	script := fmt.Sprintf(`
+source %q 2>/dev/null || true
+source %q
+error() { echo "ERROR: $*" >&2; }
+success() { echo "SUCCESS: $*"; }
+AI_TOOLS_AVAILABLE=("claude")
+SELECTED_AI_TOOL="claude"
+_update_version=""
+select_project_interactive %q
+echo "action=$_selected_project_action"
+`, filepath.Join(root, "lib/tui.sh"),
+		filepath.Join(root, "lib/menu-tui.sh"),
+		projectsFile)
+
+	out, code := runBashSnippet(t, script, env)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "action=add-worktree")
+	assertNotContains(t, out, "SUCCESS")
+}
+
 func TestSettingsMenu_allows_empty_action_for_quit(t *testing.T) {
 	dir := t.TempDir()
 	binDir := mockCommand(t, dir, "ghost-tab-tui", `echo '{"action":""}'`)
