@@ -35,3 +35,18 @@ save_terminal_preference() {
   mkdir -p "$(dirname "$pref_file")"
   echo "$terminal" > "$pref_file"
 }
+
+# Detect if user has a legacy Ghostty-only installation.
+# Prints "ghostty" if detected, empty otherwise.
+detect_legacy_ghostty_setup() {
+  local old_wrapper="$HOME/.config/ghostty/claude-wrapper.sh"
+  local pref_file="${XDG_CONFIG_HOME:-$HOME/.config}/ghost-tab/terminal"
+
+  if [ -f "$old_wrapper" ] || [ -L "$old_wrapper" ]; then
+    if [ ! -f "$pref_file" ]; then
+      echo "ghostty"
+      return 0
+    fi
+  fi
+  return 1
+}

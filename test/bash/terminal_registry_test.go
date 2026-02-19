@@ -92,3 +92,48 @@ func TestSaveTerminalPreference_writes_file(t *testing.T) {
 		t.Errorf("got %q, want %q", got, "kitty")
 	}
 }
+
+func TestDetectLegacyGhosttySetup_detects_old_wrapper(t *testing.T) {
+	tmpDir := t.TempDir()
+	// Create legacy wrapper file
+	writeTempFile(t, filepath.Join(tmpDir, ".config", "ghostty"), "claude-wrapper.sh", "#!/bin/bash\n")
+	// No terminal pref file exists
+	snippet := terminalRegistrySnippet(t,
+		fmt.Sprintf(`HOME=%q XDG_CONFIG_HOME=%q detect_legacy_ghostty_setup`,
+			tmpDir, filepath.Join(tmpDir, ".config")))
+	out, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+	got := strings.TrimSpace(out)
+	if got != "ghostty" {
+		t.Errorf("got %q, want %q", got, "ghostty")
+	}
+}
+
+func TestDetectLegacyGhosttySetup_skips_when_pref_exists(t *testing.T) {
+	tmpDir := t.TempDir()
+	// Create legacy wrapper file
+	writeTempFile(t, filepath.Join(tmpDir, ".config", "ghostty"), "claude-wrapper.sh", "#!/bin/bash\n")
+	// Also create a terminal pref file (already migrated)
+	writeTempFile(t, filepath.Join(tmpDir, ".config", "ghost-tab"), "terminal", "ghostty\n")
+	snippet := terminalRegistrySnippet(t,
+		fmt.Sprintf(`HOME=%q XDG_CONFIG_HOME=%q detect_legacy_ghostty_setup`,
+			tmpDir, filepath.Join(tmpDir, ".config")))
+	_, code := runBashSnippet(t, snippet, nil)
+	// Should return non-zero (not detected / already migrated)
+	if code == 0 {
+		t.Errorf("expected non-zero exit code when pref already exists, got %d", code)
+	}
+}
+
+func TestDetectLegacyGhosttySetup_skips_when_no_wrapper(t *testing.T) {
+	tmpDir := t.TempDir()
+	// No legacy wrapper, no pref
+	snippet := terminalRegistrySnippet(t,
+		fmt.Sprintf(`HOME=%q XDG_CONFIG_HOME=%q detect_legacy_ghostty_setup`,
+			tmpDir, filepath.Join(tmpDir, ".config")))
+	_, code := runBashSnippet(t, snippet, nil)
+	// Should return non-zero (nothing to detect)
+	if code == 0 {
+		t.Errorf("expected non-zero exit code when no legacy wrapper, got %d", code)
+	}
+}

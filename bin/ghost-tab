@@ -20,7 +20,9 @@ fi
 
 source "$SHARE_DIR/lib/tui.sh"
 source "$SHARE_DIR/lib/install.sh"
-source "$SHARE_DIR/lib/ghostty-config.sh"
+source "$SHARE_DIR/lib/terminal-select-tui.sh"
+source "$SHARE_DIR/lib/terminals/registry.sh"
+source "$SHARE_DIR/lib/terminals/adapter.sh"
 source "$SHARE_DIR/lib/settings-json.sh"
 source "$SHARE_DIR/lib/ai-select-tui.sh"
 source "$SHARE_DIR/lib/statusline-setup.sh"
@@ -86,7 +88,7 @@ if select_ai_tool_interactive; then
   case "$SELECTED_AI_TOOL" in
     claude)
       ensure_command "claude" "curl -fsSL https://claude.ai/install.sh | bash" \
-        "Run 'claude' to authenticate before opening Ghostty." "Claude Code"
+        "Run 'claude' to authenticate before launching Ghost Tab." "Claude Code"
       ;;
     codex)
       ensure_command "codex" "brew install --cask codex" "" "Codex CLI"
@@ -103,12 +105,39 @@ else
   exit 1
 fi
 
-# ---------- Ghostty ----------
-header "Checking Ghostty..."
-ensure_cask "ghostty" "Ghostty"
+# ---------- Terminal Selection ----------
+header "Selecting terminal..."
+echo ""
+echo -e "  Ghost Tab supports multiple terminal emulators."
+echo -e "  Select your preferred terminal:"
+echo ""
 
-# Verify supporting files exist (will fail if run via curl|bash without clone)
-if [ ! -f "$SHARE_DIR/ghostty/claude-wrapper.sh" ] || [ ! -f "$SHARE_DIR/ghostty/config" ] || [ ! -d "$SHARE_DIR/templates" ]; then
+if select_terminal_interactive; then
+  if [[ -z "$_selected_terminal" ]]; then
+    error "Internal error: TUI did not set terminal"
+    exit 1
+  fi
+  SELECTED_TERMINAL="$_selected_terminal"
+
+  # Save preference
+  TERMINAL_PREF_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/ghost-tab"
+  mkdir -p "$TERMINAL_PREF_DIR"
+  save_terminal_preference "$SELECTED_TERMINAL" "$TERMINAL_PREF_DIR/terminal"
+
+  echo ""
+  success "Selected terminal: $(get_terminal_display_name "$SELECTED_TERMINAL")"
+else
+  info "Terminal selection cancelled"
+  exit 1
+fi
+
+# ---------- Terminal Installation ----------
+header "Checking $(get_terminal_display_name "$SELECTED_TERMINAL")..."
+load_terminal_adapter "$SELECTED_TERMINAL"
+terminal_install
+
+# Verify supporting files exist
+if [ ! -f "$SHARE_DIR/wrapper.sh" ] || [ ! -d "$SHARE_DIR/templates" ]; then
   error "Supporting files not found in $SHARE_DIR"
   echo ""
   info "If you ran this via curl|bash, install via Homebrew instead:"
@@ -121,41 +150,41 @@ if [ ! -f "$SHARE_DIR/ghostty/claude-wrapper.sh" ] || [ ! -f "$SHARE_DIR/ghostty
   exit 1
 fi
 
-# ---------- Wrapper script ----------
+# ---------- Wrapper Script ----------
 header "Setting up wrapper script..."
-mkdir -p ~/.config/ghostty
-ln -sf "$SHARE_DIR/ghostty/claude-wrapper.sh" ~/.config/ghostty/claude-wrapper.sh
-success "Linked claude-wrapper.sh in ~/.config/ghostty/"
+WRAPPER_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/ghost-tab"
+mkdir -p "$WRAPPER_DIR"
+ln -sf "$SHARE_DIR/wrapper.sh" "$WRAPPER_DIR/wrapper.sh"
+success "Linked wrapper.sh in $WRAPPER_DIR/"
 
 # Symlink shared libraries (remove old copies if present)
 if [ -d "$SHARE_DIR/lib" ]; then
-  [ -d ~/.config/ghostty/lib ] && [ ! -L ~/.config/ghostty/lib ] && rm -rf ~/.config/ghostty/lib
-  ln -sfn "$SHARE_DIR/lib" ~/.config/ghostty/lib
-  success "Linked shared libraries to ~/.config/ghostty/lib/"
+  [ -d "$WRAPPER_DIR/lib" ] && [ ! -L "$WRAPPER_DIR/lib" ] && rm -rf "${WRAPPER_DIR:?}/lib"
+  ln -sfn "$SHARE_DIR/lib" "$WRAPPER_DIR/lib"
+  success "Linked shared libraries to $WRAPPER_DIR/lib/"
 fi
 
-# ---------- Ghostty config ----------
-header "Setting up Ghostty config..."
-GHOSTTY_CONFIG="$HOME/.config/ghostty/config"
-WRAPPER_LINE="command = ~/.config/ghostty/claude-wrapper.sh"
+# ---------- Terminal Config ----------
+header "Setting up $(get_terminal_display_name "$SELECTED_TERMINAL") config..."
+TERMINAL_CONFIG="$(terminal_get_config_path)"
+WRAPPER_PATH="$(terminal_get_wrapper_path)"
 
-if [ -f "$GHOSTTY_CONFIG" ]; then
-  warn "Existing Ghostty config found at $GHOSTTY_CONFIG"
+if [ -f "$TERMINAL_CONFIG" ]; then
+  warn "Existing config found at $TERMINAL_CONFIG"
   echo ""
   echo -e "  ${_BOLD}1)${_NC} Merge — add the wrapper command to your existing config"
-  echo -e "  ${_BOLD}2)${_NC} Backup & replace — save current config and use ours"
+  echo -e "  ${_BOLD}2)${_NC} Skip — don't modify the config (manual setup required)"
   echo ""
   read -rn1 -p "$(echo -e "${_BLUE}Choose (1/2):${_NC} ")" config_choice </dev/tty
   echo ""
 
   case "$config_choice" in
-    1) merge_ghostty_config "$GHOSTTY_CONFIG" "$WRAPPER_LINE" ;;
-    2) backup_replace_ghostty_config "$GHOSTTY_CONFIG" "$SHARE_DIR/ghostty/config" ;;
-    *) warn "Invalid choice, skipping config setup" ;;
+    1) terminal_setup_config "$TERMINAL_CONFIG" "$WRAPPER_PATH" ;;
+    *) info "Skipped config modification. Add the wrapper manually." ;;
   esac
 else
-  cp "$SHARE_DIR/ghostty/config" "$GHOSTTY_CONFIG"
-  success "Created Ghostty config at $GHOSTTY_CONFIG"
+  mkdir -p "$(dirname "$TERMINAL_CONFIG")"
+  terminal_setup_config "$TERMINAL_CONFIG" "$WRAPPER_PATH"
 fi
 
 # Migrate from old config location
@@ -164,6 +193,17 @@ NEW_PROJECTS_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/ghost-tab"
 if [ -d "$OLD_PROJECTS_DIR" ] && [ ! -d "$NEW_PROJECTS_DIR" ]; then
   mv "$OLD_PROJECTS_DIR" "$NEW_PROJECTS_DIR"
   info "Migrated config from vibecode-editor to ghost-tab"
+fi
+
+# Detect legacy Ghostty-only installation
+if [ -z "${SELECTED_TERMINAL:-}" ]; then
+  if [ -f "$HOME/.config/ghostty/claude-wrapper.sh" ] || [ -L "$HOME/.config/ghostty/claude-wrapper.sh" ]; then
+    TERMINAL_PREF_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/ghost-tab/terminal"
+    if [ ! -f "$TERMINAL_PREF_FILE" ]; then
+      info "Detected legacy Ghostty setup, migrating..."
+      save_terminal_preference "ghostty" "$TERMINAL_PREF_FILE"
+    fi
+  fi
 fi
 
 # ---------- Projects ----------
@@ -225,8 +265,9 @@ fi
 # ---------- Summary ----------
 header "Setup complete!"
 echo ""
-success "Wrapper script:  ~/.config/ghostty/claude-wrapper.sh (symlink)"
-success "Ghostty config:  ~/.config/ghostty/config"
+success "Wrapper script:  ~/.config/ghost-tab/wrapper.sh (symlink)"
+_terminal_pref="$(cat "${XDG_CONFIG_HOME:-$HOME/.config}/ghost-tab/terminal" 2>/dev/null)"
+success "Terminal:        $(get_terminal_display_name "$_terminal_pref")"
 _ai_default="$(cat "${XDG_CONFIG_HOME:-$HOME/.config}/ghost-tab/ai-tool" 2>/dev/null)"
 success "AI tool:         $(echo "$_ai_default" | sed 's/claude/Claude Code/;s/codex/Codex CLI/;s/copilot/Copilot CLI/;s/opencode/OpenCode/')"
 success "Projects file:   $PROJECTS_FILE"
@@ -240,7 +281,7 @@ if [ -f "${XDG_CONFIG_HOME:-$HOME/.config}/opencode/plugins/ghost-tab.ts" ]; the
   success "OpenCode plugin: ~/.config/opencode/plugins/ghost-tab.ts"
 fi
 echo ""
-info "Open a new Ghostty window to start coding."
+info "Open a new $(get_terminal_display_name "${SELECTED_TERMINAL:-$_terminal_pref}") window to start coding."
 
 } # end main
 
