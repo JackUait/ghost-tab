@@ -32,6 +32,7 @@ func TestRootCmd_SubcommandRegistered(t *testing.T) {
 		"main-menu",
 		"multi-select-ai-tool",
 		"select-branch",
+		"select-terminal",
 	}
 
 	for _, name := range subcommands {
@@ -226,6 +227,16 @@ func TestSelectAIToolCmd_Exists(t *testing.T) {
 	}
 	if cmd.Name() != "select-ai-tool" {
 		t.Errorf("Expected 'select-ai-tool', got %q", cmd.Name())
+	}
+}
+
+func TestSelectTerminalCmd_Exists(t *testing.T) {
+	cmd, _, err := rootCmd.Find([]string{"select-terminal"})
+	if err != nil {
+		t.Fatalf("Failed to find select-terminal: %v", err)
+	}
+	if cmd.Name() != "select-terminal" {
+		t.Errorf("Expected 'select-terminal', got %q", cmd.Name())
 	}
 }
 
