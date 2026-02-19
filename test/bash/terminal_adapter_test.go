@@ -25,6 +25,30 @@ func TestLoadTerminalAdapter_sources_ghostty_adapter(t *testing.T) {
 	assertContains(t, out, "loaded")
 }
 
+func TestLoadTerminalAdapter_sources_kitty_adapter(t *testing.T) {
+	snippet := terminalAdapterSnippet(t,
+		`load_terminal_adapter "kitty" && type terminal_get_config_path &>/dev/null && echo "loaded"`)
+	out, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "loaded")
+}
+
+func TestLoadTerminalAdapter_sources_wezterm_adapter(t *testing.T) {
+	snippet := terminalAdapterSnippet(t,
+		`load_terminal_adapter "wezterm" && type terminal_get_config_path &>/dev/null && echo "loaded"`)
+	out, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "loaded")
+}
+
+func TestLoadTerminalAdapter_sources_iterm2_adapter(t *testing.T) {
+	snippet := terminalAdapterSnippet(t,
+		`load_terminal_adapter "iterm2" && type terminal_get_config_path &>/dev/null && echo "loaded"`)
+	out, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "loaded")
+}
+
 func TestLoadTerminalAdapter_fails_for_unknown(t *testing.T) {
 	snippet := terminalAdapterSnippet(t,
 		`load_terminal_adapter "unknown_terminal"`)
