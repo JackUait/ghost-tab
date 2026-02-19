@@ -29,6 +29,95 @@ source "$SHARE_DIR/lib/statusline-setup.sh"
 source "$SHARE_DIR/lib/project-actions.sh"
 source "$SHARE_DIR/lib/project-actions-tui.sh"
 
+# ---------- Terminal-only setup ----------
+run_terminal_setup() {
+  local share_dir="$1"
+
+  header "Selecting terminal..."
+  echo ""
+  echo -e "  Ghost Tab supports multiple terminal emulators."
+  echo -e "  Select your preferred terminal:"
+  echo ""
+
+  if select_terminal_interactive; then
+    if [[ -z "$_selected_terminal" ]]; then
+      error "Internal error: TUI did not set terminal"
+      exit 1
+    fi
+    local selected_terminal="$_selected_terminal"
+
+    # Save preference
+    local pref_dir="${XDG_CONFIG_HOME:-$HOME/.config}/ghost-tab"
+    mkdir -p "$pref_dir"
+    save_terminal_preference "$selected_terminal" "$pref_dir/terminal"
+
+    echo ""
+    success "Selected terminal: $(get_terminal_display_name "$selected_terminal")"
+
+    # Install terminal if needed
+    header "Checking $(get_terminal_display_name "$selected_terminal")..."
+    load_terminal_adapter "$selected_terminal"
+    terminal_install
+
+    # Ensure wrapper symlink exists
+    header "Setting up wrapper script..."
+    local wrapper_dir="${XDG_CONFIG_HOME:-$HOME/.config}/ghost-tab"
+    mkdir -p "$wrapper_dir"
+    ln -sf "$share_dir/wrapper.sh" "$wrapper_dir/wrapper.sh"
+    success "Linked wrapper.sh in $wrapper_dir/"
+
+    if [ -d "$share_dir/lib" ]; then
+      [ -d "$wrapper_dir/lib" ] && [ ! -L "$wrapper_dir/lib" ] && rm -rf "${wrapper_dir:?}/lib"
+      ln -sfn "$share_dir/lib" "$wrapper_dir/lib"
+    fi
+
+    # Configure terminal
+    header "Setting up $(get_terminal_display_name "$selected_terminal") config..."
+    local terminal_config
+    terminal_config="$(terminal_get_config_path)"
+    local wrapper_path
+    wrapper_path="$(terminal_get_wrapper_path)"
+
+    if [ -f "$terminal_config" ]; then
+      warn "Existing config found at $terminal_config"
+      echo ""
+      echo -e "  ${_BOLD}1)${_NC} Merge — add the wrapper command to your existing config"
+      echo -e "  ${_BOLD}2)${_NC} Skip — don't modify the config (manual setup required)"
+      echo ""
+      read -rn1 -p "$(echo -e "${_BLUE}Choose (1/2):${_NC} ")" config_choice </dev/tty
+      echo ""
+
+      case "$config_choice" in
+        1) terminal_setup_config "$terminal_config" "$wrapper_path" ;;
+        *) info "Skipped config modification. Add the wrapper manually." ;;
+      esac
+    else
+      mkdir -p "$(dirname "$terminal_config")"
+      terminal_setup_config "$terminal_config" "$wrapper_path"
+    fi
+
+    echo ""
+    success "Terminal configured: $(get_terminal_display_name "$selected_terminal")"
+    info "Open a new $(get_terminal_display_name "$selected_terminal") window to start coding."
+  else
+    info "Terminal selection cancelled"
+    exit 1
+  fi
+}
+
+# ---------- Argument parsing ----------
+case "${1:-}" in
+  --terminal)
+    run_terminal_setup "$SHARE_DIR"
+    exit 0
+    ;;
+  --*)
+    error "Unknown flag: $1"
+    echo "Usage: ghost-tab [--terminal]"
+    exit 1
+    ;;
+esac
+
 # ---------- OS check ----------
 header "Checking platform..."
 if [ "$(uname)" != "Darwin" ]; then
