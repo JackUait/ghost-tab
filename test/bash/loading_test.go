@@ -9,70 +9,38 @@ import (
 
 // --- get_loading_art ---
 
-func TestLoading_get_loading_art_returns_nonempty_for_all_10_indices(t *testing.T) {
-	for i := 0; i < 10; i++ {
-		t.Run(fmt.Sprintf("art_%d", i), func(t *testing.T) {
-			out, code := runBashFunc(t, "lib/loading.sh", "get_loading_art",
-				[]string{fmt.Sprintf("%d", i)}, nil)
-			assertExitCode(t, code, 0)
-			if strings.TrimSpace(out) == "" {
-				t.Errorf("get_loading_art(%d) returned empty output", i)
-			}
-		})
+func TestLoading_get_loading_art_returns_nonempty(t *testing.T) {
+	out, code := runBashFunc(t, "lib/loading.sh", "get_loading_art", nil, nil)
+	assertExitCode(t, code, 0)
+	if strings.TrimSpace(out) == "" {
+		t.Error("get_loading_art() returned empty output")
 	}
 }
 
-func TestLoading_get_loading_art_contains_ghost_characters(t *testing.T) {
-	// Every art variant should contain characters that spell Ghost
-	for i := 0; i < 10; i++ {
-		t.Run(fmt.Sprintf("art_%d", i), func(t *testing.T) {
-			out, code := runBashFunc(t, "lib/loading.sh", "get_loading_art",
-				[]string{fmt.Sprintf("%d", i)}, nil)
-			assertExitCode(t, code, 0)
-			// All figlet fonts produce recognizable "host" substring somewhere
-			lower := strings.ToLower(out)
-			hasGhost := strings.Contains(lower, "host") ||
-				strings.Contains(out, "___") ||
-				strings.Contains(out, "---") ||
-				strings.Contains(out, "|||") ||
-				len(out) > 50 // All arts are multi-line and substantial
-			if !hasGhost {
-				t.Errorf("get_loading_art(%d) doesn't look like ASCII art, got:\n%s", i, out)
-			}
-		})
-	}
+func TestLoading_get_loading_art_contains_ghost_tab_box(t *testing.T) {
+	out, code := runBashFunc(t, "lib/loading.sh", "get_loading_art", nil, nil)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "+---")
+	assertContains(t, out, "Ghost")
 }
 
 func TestLoading_get_loading_art_meets_minimum_size(t *testing.T) {
-	for i := 0; i < 10; i++ {
-		t.Run(fmt.Sprintf("art_%d", i), func(t *testing.T) {
-			out, code := runBashFunc(t, "lib/loading.sh", "get_loading_art",
-				[]string{fmt.Sprintf("%d", i)}, nil)
-			assertExitCode(t, code, 0)
-
-			lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
-			if len(lines) < 6 {
-				t.Errorf("art %d has %d lines, want >= 6", i, len(lines))
-			}
-
-			maxWidth := 0
-			for _, line := range lines {
-				if len(line) > maxWidth {
-					maxWidth = len(line)
-				}
-			}
-			if maxWidth < 70 {
-				t.Errorf("art %d max width is %d, want >= 70", i, maxWidth)
-			}
-		})
-	}
-}
-
-func TestLoading_get_loading_art_invalid_index_returns_empty(t *testing.T) {
-	out, code := runBashFunc(t, "lib/loading.sh", "get_loading_art", []string{"99"}, nil)
+	out, code := runBashFunc(t, "lib/loading.sh", "get_loading_art", nil, nil)
 	assertExitCode(t, code, 0)
-	if strings.TrimSpace(out) != "" {
-		t.Errorf("expected empty for invalid index, got:\n%s", out)
+
+	lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
+	if len(lines) < 6 {
+		t.Errorf("art has %d lines, want >= 6", len(lines))
+	}
+
+	maxWidth := 0
+	for _, line := range lines {
+		if len(line) > maxWidth {
+			maxWidth = len(line)
+		}
+	}
+	if maxWidth < 70 {
+		t.Errorf("art max width is %d, want >= 70", maxWidth)
 	}
 }
 
@@ -142,7 +110,7 @@ func TestLoading_detect_term_size_returns_two_positive_numbers(t *testing.T) {
 func TestLoading_render_loading_frame_contains_ansi_color_codes(t *testing.T) {
 	root := projectRoot(t)
 	script := fmt.Sprintf(
-		`source %q/lib/loading.sh && render_loading_frame 0 0 0 80 24`,
+		`source %q/lib/loading.sh && render_loading_frame 0 0 80 24`,
 		root)
 	out, code := runBashSnippet(t, script, nil)
 	assertExitCode(t, code, 0)
@@ -153,11 +121,11 @@ func TestLoading_render_loading_frame_contains_ansi_color_codes(t *testing.T) {
 func TestLoading_render_loading_frame_contains_art_content(t *testing.T) {
 	root := projectRoot(t)
 	script := fmt.Sprintf(
-		`source %q/lib/loading.sh && render_loading_frame 0 0 0 80 24`,
+		`source %q/lib/loading.sh && render_loading_frame 0 0 80 24`,
 		root)
 	out, code := runBashSnippet(t, script, nil)
 	assertExitCode(t, code, 0)
-	// Frame 0 with art 0 (standard) should contain recognizable characters
+	// Should contain recognizable art content
 	if len(out) < 100 {
 		t.Errorf("render_loading_frame output too short (%d bytes), expected substantial output", len(out))
 	}
@@ -166,10 +134,10 @@ func TestLoading_render_loading_frame_contains_art_content(t *testing.T) {
 func TestLoading_render_loading_frame_shifts_colors_between_frames(t *testing.T) {
 	root := projectRoot(t)
 	script0 := fmt.Sprintf(
-		`source %q/lib/loading.sh && render_loading_frame 0 0 0 80 24`,
+		`source %q/lib/loading.sh && render_loading_frame 0 0 80 24`,
 		root)
 	script1 := fmt.Sprintf(
-		`source %q/lib/loading.sh && render_loading_frame 0 0 1 80 24`,
+		`source %q/lib/loading.sh && render_loading_frame 0 1 80 24`,
 		root)
 	out0, _ := runBashSnippet(t, script0, nil)
 	out1, _ := runBashSnippet(t, script1, nil)
