@@ -1,5 +1,5 @@
 #!/bin/bash
-# Loading screen with ASCII art, random color palettes, and animation.
+# Loading screen with ASCII art, tool-specific color palettes, and animation.
 
 # Print the loading screen ASCII art to stdout.
 get_loading_art() {
