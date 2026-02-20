@@ -1,9 +1,6 @@
 #!/bin/bash
 # Loading screen with ASCII art, random color palettes, and animation.
 
-# shellcheck disable=SC2034  # Removed in Task 3 with get_loading_palette
-LOADING_PALETTE_COUNT=5
-
 # Print the loading screen ASCII art to stdout.
 get_loading_art() {
   cat << 'ART'
@@ -20,17 +17,6 @@ get_loading_art() {
 |                                                                                      |
 +--------------------------------------------------------------------------------------+
 ART
-}
-
-# Get color palette by index (0-4). Prints space-separated 256-color codes.
-get_loading_palette() {
-  case "$1" in
-    0) echo "55 91 127 163 169 175 176 177" ;;   # purple aurora
-    1) echo "125 161 162 197 198 205 206 213" ;;  # hot pink
-    2) echo "17 18 24 25 31 33 39 45" ;;          # deep ocean
-    3) echo "130 166 172 208 209 214 215 220" ;;  # fire / sunset
-    4) echo "22 28 29 34 35 41 42 47" ;;          # emerald
-  esac
 }
 
 # Get color palette for a given AI tool. Prints space-separated 256-color codes.

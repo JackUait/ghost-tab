@@ -60,47 +60,6 @@ func TestLoading_get_loading_art_has_equal_line_widths(t *testing.T) {
 	}
 }
 
-// --- get_loading_palette ---
-
-func TestLoading_get_loading_palette_returns_color_codes_for_all_indices(t *testing.T) {
-	for i := 0; i < 5; i++ {
-		t.Run(fmt.Sprintf("palette_%d", i), func(t *testing.T) {
-			out, code := runBashFunc(t, "lib/loading.sh", "get_loading_palette",
-				[]string{fmt.Sprintf("%d", i)}, nil)
-			assertExitCode(t, code, 0)
-			trimmed := strings.TrimSpace(out)
-			if trimmed == "" {
-				t.Errorf("get_loading_palette(%d) returned empty output", i)
-				return
-			}
-			// Each value should be a valid 256-color code (0-255)
-			for _, part := range strings.Fields(trimmed) {
-				num, err := strconv.Atoi(part)
-				if err != nil {
-					t.Errorf("get_loading_palette(%d) non-numeric value: %q", i, part)
-				}
-				if num < 0 || num > 255 {
-					t.Errorf("get_loading_palette(%d) out of range: %d", i, num)
-				}
-			}
-		})
-	}
-}
-
-func TestLoading_get_loading_palette_has_at_least_5_colors(t *testing.T) {
-	for i := 0; i < 5; i++ {
-		t.Run(fmt.Sprintf("palette_%d", i), func(t *testing.T) {
-			out, code := runBashFunc(t, "lib/loading.sh", "get_loading_palette",
-				[]string{fmt.Sprintf("%d", i)}, nil)
-			assertExitCode(t, code, 0)
-			parts := strings.Fields(strings.TrimSpace(out))
-			if len(parts) < 5 {
-				t.Errorf("get_loading_palette(%d) has only %d colors, want >= 5", i, len(parts))
-			}
-		})
-	}
-}
-
 // --- _detect_term_size ---
 
 func TestLoading_detect_term_size_returns_two_positive_numbers(t *testing.T) {
