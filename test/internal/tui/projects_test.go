@@ -190,3 +190,34 @@ func TestProjectSelector_NumberKeyZeroIgnored(t *testing.T) {
 		t.Error("Zero key should not select anything")
 	}
 }
+
+func TestProjectSelector_EmptyList(t *testing.T) {
+	// Selected() is nil initially on empty list
+	m := tui.NewProjectSelector(nil)
+	if m.Selected() != nil {
+		t.Error("Selected should be nil initially on empty list")
+	}
+
+	// Enter on empty list should not panic and should not select anything
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	result := updated.(tui.ProjectSelectorModel)
+	if result.Selected() != nil {
+		t.Error("Enter on empty list should not select anything")
+	}
+
+	// Esc on empty list should return quit command, Selected still nil
+	m2 := tui.NewProjectSelector(nil)
+	updated2, cmd2 := m2.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	if cmd2 == nil {
+		t.Error("Esc should return quit command even on empty list")
+	}
+	result2 := updated2.(tui.ProjectSelectorModel)
+	if result2.Selected() != nil {
+		t.Error("Esc on empty list should not select anything")
+	}
+
+	// WindowSizeMsg then View() should not panic on empty list
+	m3 := tui.NewProjectSelector(nil)
+	updated3, _ := m3.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	_ = updated3.(tui.ProjectSelectorModel).View()
+}
