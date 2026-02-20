@@ -16,10 +16,12 @@ check_ai_tool_state() {
       # Marker exists, but verify pane still shows a prompt.
       # Between user input and first tool call, the marker persists
       # even though Claude is actively working.
-      local content last_line
+      # Check last 5 non-empty lines (not just last) because Claude Code
+      # shows status bars and permissions indicator below the prompt.
+      local content last_lines
       content=$("$tmux_cmd" capture-pane -t "$session_name:0.$pane_index" -p 2>/dev/null || true)
-      last_line=$(echo "$content" | grep -v '^$' | tail -1)
-      if echo "$last_line" | grep -qE '[>$❯]\s*$'; then
+      last_lines=$(echo "$content" | grep -v '^$' | tail -5)
+      if echo "$last_lines" | grep -qE '[>$❯]\s*$'; then
         echo "waiting"
       else
         echo "active"

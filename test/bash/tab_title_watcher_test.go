@@ -44,6 +44,35 @@ exit 0
 	}
 }
 
+func TestTabTitleWatcher_check_ai_tool_state_claude_returns_waiting_with_status_bars_below_prompt(t *testing.T) {
+	tmpDir := t.TempDir()
+	markerFile := filepath.Join(tmpDir, "marker")
+	os.WriteFile(markerFile, []byte(""), 0644)
+	// Simulate real Claude Code output: prompt followed by status bars
+	binDir := mockCommand(t, tmpDir, "tmux", `
+if [ "$1" = "capture-pane" ]; then
+  printf 'Some previous output\n\n'
+  printf '❯ \n'
+  printf '──────────────────────────────────\n'
+  printf '  proj | main | S: 0 | 26.3%% | 617M\n'
+  printf '  ⏵⏵ bypass permissions on (shift+tab to cycle)\n'
+  exit 0
+fi
+exit 0
+`)
+	env := buildEnv(t, []string{binDir})
+	tmuxPath := filepath.Join(binDir, "tmux")
+
+	snippet := tabTitleSnippet(t,
+		fmt.Sprintf(`check_ai_tool_state "claude" "dev-test-123" %q %q`, tmuxPath, markerFile))
+
+	out, code := runBashSnippet(t, snippet, env)
+	assertExitCode(t, code, 0)
+	if strings.TrimSpace(out) != "waiting" {
+		t.Errorf("expected 'waiting' (prompt above status bars), got %q", strings.TrimSpace(out))
+	}
+}
+
 func TestTabTitleWatcher_check_ai_tool_state_claude_returns_active_when_marker_exists_but_no_prompt(t *testing.T) {
 	tmpDir := t.TempDir()
 	markerFile := filepath.Join(tmpDir, "marker")
