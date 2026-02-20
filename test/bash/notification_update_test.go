@@ -33,63 +33,6 @@ func updateSnippet(t *testing.T, body string) string {
 
 // --- setup_sound_notification ---
 
-func TestNotification_setup_sound_notification_adds_Stop_hook_to_empty_settings(t *testing.T) {
-	tmpDir := t.TempDir()
-	settingsFile := writeTempFile(t, tmpDir, "settings.json", `{}`)
-
-	snippet := notificationSnippet(t,
-		fmt.Sprintf(`setup_sound_notification %q "afplay /System/Library/Sounds/Bottle.aiff &"`, settingsFile))
-
-	out, code := runBashSnippet(t, snippet, nil)
-	assertExitCode(t, code, 0)
-	assertContains(t, out, "configured")
-
-	data, err := os.ReadFile(settingsFile)
-	if err != nil {
-		t.Fatalf("failed to read settings.json: %v", err)
-	}
-	content := string(data)
-	assertContains(t, content, `"Stop"`)
-	assertNotContains(t, content, "idle_prompt")
-}
-
-func TestNotification_setup_sound_notification_reports_already_exists(t *testing.T) {
-	tmpDir := t.TempDir()
-	settingsFile := writeTempFile(t, tmpDir, "settings.json", `{
-  "hooks": {
-    "Stop": [
-      {
-        "hooks": [{"type": "command", "command": "afplay sound &"}]
-      }
-    ]
-  }
-}
-`)
-
-	snippet := notificationSnippet(t,
-		fmt.Sprintf(`setup_sound_notification %q "afplay sound &"`, settingsFile))
-
-	out, code := runBashSnippet(t, snippet, nil)
-	assertExitCode(t, code, 0)
-	assertContains(t, out, "already configured")
-}
-
-func TestNotification_setup_sound_notification_creates_file_when_missing(t *testing.T) {
-	tmpDir := t.TempDir()
-	settingsFile := filepath.Join(tmpDir, "new-settings.json")
-
-	snippet := notificationSnippet(t,
-		fmt.Sprintf(`setup_sound_notification %q "afplay sound &"`, settingsFile))
-
-	out, code := runBashSnippet(t, snippet, nil)
-	assertExitCode(t, code, 0)
-	assertContains(t, out, "configured")
-
-	if _, err := os.Stat(settingsFile); os.IsNotExist(err) {
-		t.Fatalf("expected settings file to be created at %s", settingsFile)
-	}
-}
-
 // --- is_sound_enabled ---
 
 func TestNotification_is_sound_enabled_returns_true_when_features_file_missing(t *testing.T) {
@@ -149,77 +92,6 @@ func TestNotification_is_sound_enabled_returns_false_when_sound_is_false(t *test
 }
 
 // --- remove_sound_notification ---
-
-func TestNotification_remove_sound_notification_removes_Stop_hook(t *testing.T) {
-	tmpDir := t.TempDir()
-	settingsFile := writeTempFile(t, tmpDir, "settings.json", `{
-  "hooks": {
-    "Stop": [
-      {
-        "hooks": [{"type": "command", "command": "afplay /System/Library/Sounds/Bottle.aiff &"}]
-      }
-    ]
-  }
-}
-`)
-
-	snippet := notificationSnippet(t,
-		fmt.Sprintf(`remove_sound_notification %q "afplay /System/Library/Sounds/Bottle.aiff &"`, settingsFile))
-
-	out, code := runBashSnippet(t, snippet, nil)
-	assertExitCode(t, code, 0)
-	assertContains(t, out, "removed")
-
-	data, err := os.ReadFile(settingsFile)
-	if err != nil {
-		t.Fatalf("failed to read settings.json: %v", err)
-	}
-	assertNotContains(t, string(data), "afplay")
-}
-
-func TestNotification_remove_sound_notification_noop_when_hook_not_present(t *testing.T) {
-	tmpDir := t.TempDir()
-	settingsFile := writeTempFile(t, tmpDir, "settings.json", `{}`)
-
-	snippet := notificationSnippet(t,
-		fmt.Sprintf(`remove_sound_notification %q "afplay /System/Library/Sounds/Bottle.aiff &"`, settingsFile))
-
-	out, code := runBashSnippet(t, snippet, nil)
-	assertExitCode(t, code, 0)
-	assertContains(t, out, "not_found")
-}
-
-func TestNotification_remove_sound_notification_removes_matching_keeps_others(t *testing.T) {
-	tmpDir := t.TempDir()
-	settingsFile := writeTempFile(t, tmpDir, "settings.json", `{
-  "hooks": {
-    "Stop": [
-      {
-        "hooks": [{"type": "command", "command": "afplay /System/Library/Sounds/Bottle.aiff &"}]
-      },
-      {
-        "hooks": [{"type": "command", "command": "other-command"}]
-      }
-    ]
-  }
-}
-`)
-
-	snippet := notificationSnippet(t,
-		fmt.Sprintf(`remove_sound_notification %q "afplay /System/Library/Sounds/Bottle.aiff &"`, settingsFile))
-
-	out, code := runBashSnippet(t, snippet, nil)
-	assertExitCode(t, code, 0)
-	assertContains(t, out, "removed")
-
-	data, err := os.ReadFile(settingsFile)
-	if err != nil {
-		t.Fatalf("failed to read settings.json: %v", err)
-	}
-	content := string(data)
-	assertNotContains(t, content, "afplay")
-	assertContains(t, content, "other-command")
-}
 
 // --- set_sound_feature_flag ---
 
@@ -413,10 +285,9 @@ func TestNotification_toggle_sound_notification_enables_for_claude(t *testing.T)
 	configDir := filepath.Join(tmpDir, "config")
 	os.MkdirAll(configDir, 0755)
 	writeTempFile(t, configDir, "claude-features.json", `{"sound": false}`)
-	settingsFile := writeTempFile(t, tmpDir, "settings.json", `{}`)
 
 	snippet := notificationSnippet(t,
-		fmt.Sprintf(`toggle_sound_notification "claude" %q %q`, configDir, settingsFile))
+		fmt.Sprintf(`toggle_sound_notification "claude" %q`, configDir))
 
 	out, code := runBashSnippet(t, snippet, nil)
 	assertExitCode(t, code, 0)
@@ -431,13 +302,6 @@ func TestNotification_toggle_sound_notification_enables_for_claude(t *testing.T)
 	if strings.TrimSpace(flagOut) != "True" {
 		t.Errorf("expected feature flag 'True', got %q", strings.TrimSpace(flagOut))
 	}
-
-	// Verify hook was added
-	data, err := os.ReadFile(settingsFile)
-	if err != nil {
-		t.Fatalf("failed to read settings.json: %v", err)
-	}
-	assertContains(t, string(data), "Stop")
 }
 
 func TestNotification_toggle_sound_notification_disables_for_claude(t *testing.T) {
@@ -445,19 +309,9 @@ func TestNotification_toggle_sound_notification_disables_for_claude(t *testing.T
 	configDir := filepath.Join(tmpDir, "config")
 	os.MkdirAll(configDir, 0755)
 	writeTempFile(t, configDir, "claude-features.json", `{"sound": true}`)
-	settingsFile := writeTempFile(t, tmpDir, "settings.json", `{
-  "hooks": {
-    "Stop": [
-      {
-        "hooks": [{"type": "command", "command": "afplay /System/Library/Sounds/Bottle.aiff &"}]
-      }
-    ]
-  }
-}
-`)
 
 	snippet := notificationSnippet(t,
-		fmt.Sprintf(`toggle_sound_notification "claude" %q %q`, configDir, settingsFile))
+		fmt.Sprintf(`toggle_sound_notification "claude" %q`, configDir))
 
 	out, code := runBashSnippet(t, snippet, nil)
 	assertExitCode(t, code, 0)
@@ -472,121 +326,9 @@ func TestNotification_toggle_sound_notification_disables_for_claude(t *testing.T
 	if strings.TrimSpace(flagOut) != "False" {
 		t.Errorf("expected feature flag 'False', got %q", strings.TrimSpace(flagOut))
 	}
-
-	// Verify hook was removed
-	data, err := os.ReadFile(settingsFile)
-	if err != nil {
-		t.Fatalf("failed to read settings.json: %v", err)
-	}
-	assertNotContains(t, string(data), "afplay")
 }
 
 // --- apply_sound_notification ---
-
-func TestNotification_apply_sound_notification_enables_with_custom_sound(t *testing.T) {
-	tmpDir := t.TempDir()
-	configDir := filepath.Join(tmpDir, "config")
-	os.MkdirAll(configDir, 0755)
-	writeTempFile(t, configDir, "claude-features.json", `{"sound": false}`)
-	settingsFile := writeTempFile(t, tmpDir, "settings.json", `{}`)
-
-	snippet := notificationSnippet(t,
-		fmt.Sprintf(`apply_sound_notification "claude" %q %q "Glass"`, configDir, settingsFile))
-
-	out, code := runBashSnippet(t, snippet, nil)
-	assertExitCode(t, code, 0)
-	assertContains(t, out, "enabled")
-
-	// Verify feature flag
-	featuresFile := filepath.Join(configDir, "claude-features.json")
-	verifySnippet := fmt.Sprintf(
-		`python3 -c "import json; d=json.load(open('%s')); print(d['sound'], d['sound_name'])"`, featuresFile)
-	flagOut, flagCode := runBashSnippet(t, verifySnippet, nil)
-	assertExitCode(t, flagCode, 0)
-	if strings.TrimSpace(flagOut) != "True Glass" {
-		t.Errorf("expected 'True Glass', got %q", strings.TrimSpace(flagOut))
-	}
-
-	// Verify hook uses Glass sound
-	data, err := os.ReadFile(settingsFile)
-	if err != nil {
-		t.Fatalf("failed to read settings.json: %v", err)
-	}
-	assertContains(t, string(data), "Glass.aiff")
-}
-
-func TestNotification_apply_sound_notification_disables_sound(t *testing.T) {
-	tmpDir := t.TempDir()
-	configDir := filepath.Join(tmpDir, "config")
-	os.MkdirAll(configDir, 0755)
-	writeTempFile(t, configDir, "claude-features.json", `{"sound": true, "sound_name": "Glass"}`)
-	settingsFile := writeTempFile(t, tmpDir, "settings.json", `{
-  "hooks": {
-    "Stop": [
-      {
-        "hooks": [{"type": "command", "command": "afplay /System/Library/Sounds/Glass.aiff &"}]
-      }
-    ]
-  }
-}
-`)
-
-	snippet := notificationSnippet(t,
-		fmt.Sprintf(`apply_sound_notification "claude" %q %q ""`, configDir, settingsFile))
-
-	out, code := runBashSnippet(t, snippet, nil)
-	assertExitCode(t, code, 0)
-	assertContains(t, out, "disabled")
-
-	// Verify feature flag
-	featuresFile := filepath.Join(configDir, "claude-features.json")
-	verifySnippet := fmt.Sprintf(
-		`python3 -c "import json; print(json.load(open('%s'))['sound'])"`, featuresFile)
-	flagOut, flagCode := runBashSnippet(t, verifySnippet, nil)
-	assertExitCode(t, flagCode, 0)
-	if strings.TrimSpace(flagOut) != "False" {
-		t.Errorf("expected 'False', got %q", strings.TrimSpace(flagOut))
-	}
-
-	// Verify hook was removed
-	data, err := os.ReadFile(settingsFile)
-	if err != nil {
-		t.Fatalf("failed to read settings.json: %v", err)
-	}
-	assertNotContains(t, string(data), "afplay")
-}
-
-func TestNotification_apply_sound_notification_changes_sound(t *testing.T) {
-	tmpDir := t.TempDir()
-	configDir := filepath.Join(tmpDir, "config")
-	os.MkdirAll(configDir, 0755)
-	writeTempFile(t, configDir, "claude-features.json", `{"sound": true, "sound_name": "Bottle"}`)
-	settingsFile := writeTempFile(t, tmpDir, "settings.json", `{
-  "hooks": {
-    "Stop": [
-      {
-        "hooks": [{"type": "command", "command": "afplay /System/Library/Sounds/Bottle.aiff &"}]
-      }
-    ]
-  }
-}
-`)
-
-	snippet := notificationSnippet(t,
-		fmt.Sprintf(`apply_sound_notification "claude" %q %q "Ping"`, configDir, settingsFile))
-
-	out, code := runBashSnippet(t, snippet, nil)
-	assertExitCode(t, code, 0)
-	assertContains(t, out, "enabled")
-
-	// Verify hook uses Ping sound
-	data, err := os.ReadFile(settingsFile)
-	if err != nil {
-		t.Fatalf("failed to read settings.json: %v", err)
-	}
-	assertContains(t, string(data), "Ping.aiff")
-	assertNotContains(t, string(data), "Bottle.aiff")
-}
 
 // --- toggle_sound_notification + config_dir passthrough ---
 
@@ -595,7 +337,6 @@ func TestNotification_toggle_sound_notification_enables_and_sets_notif_channel(t
 	configDir := filepath.Join(tmpDir, "config")
 	os.MkdirAll(configDir, 0755)
 	writeTempFile(t, configDir, "claude-features.json", `{"sound": false}`)
-	settingsFile := writeTempFile(t, tmpDir, "settings.json", `{}`)
 
 	claudeBody := `
 if [ "$1" = "config" ] && [ "$2" = "get" ]; then
@@ -612,7 +353,7 @@ exit 1
 	env := buildEnv(t, []string{binDir}, "CLAUDECODE=")
 
 	snippet := notificationSnippet(t,
-		fmt.Sprintf(`toggle_sound_notification "claude" %q %q`, configDir, settingsFile))
+		fmt.Sprintf(`toggle_sound_notification "claude" %q`, configDir))
 
 	out, code := runBashSnippet(t, snippet, env)
 	assertExitCode(t, code, 0)
@@ -631,16 +372,6 @@ func TestNotification_toggle_sound_notification_disables_and_restores_notif_chan
 	os.MkdirAll(configDir, 0755)
 	writeTempFile(t, configDir, "claude-features.json", `{"sound": true}`)
 	writeTempFile(t, configDir, "prev-notif-channel", "iterm2\n")
-	settingsFile := writeTempFile(t, tmpDir, "settings.json", `{
-  "hooks": {
-    "Stop": [
-      {
-        "hooks": [{"type": "command", "command": "afplay /System/Library/Sounds/Bottle.aiff &"}]
-      }
-    ]
-  }
-}
-`)
 
 	claudeBody := `
 if [ "$1" = "config" ] && [ "$2" = "set" ] && [ "$4" = "iterm2" ]; then
@@ -653,7 +384,7 @@ exit 1
 	env := buildEnv(t, []string{binDir}, "CLAUDECODE=")
 
 	snippet := notificationSnippet(t,
-		fmt.Sprintf(`toggle_sound_notification "claude" %q %q`, configDir, settingsFile))
+		fmt.Sprintf(`toggle_sound_notification "claude" %q`, configDir))
 
 	out, code := runBashSnippet(t, snippet, env)
 	assertExitCode(t, code, 0)
@@ -673,7 +404,6 @@ func TestNotification_apply_sound_notification_enables_and_sets_notif_channel(t 
 	configDir := filepath.Join(tmpDir, "config")
 	os.MkdirAll(configDir, 0755)
 	writeTempFile(t, configDir, "claude-features.json", `{"sound": false}`)
-	settingsFile := writeTempFile(t, tmpDir, "settings.json", `{}`)
 
 	claudeBody := `
 if [ "$1" = "config" ] && [ "$2" = "get" ]; then
@@ -690,7 +420,7 @@ exit 1
 	env := buildEnv(t, []string{binDir}, "CLAUDECODE=")
 
 	snippet := notificationSnippet(t,
-		fmt.Sprintf(`apply_sound_notification "claude" %q %q "Glass"`, configDir, settingsFile))
+		fmt.Sprintf(`apply_sound_notification "claude" %q "Glass"`, configDir))
 
 	out, code := runBashSnippet(t, snippet, env)
 	assertExitCode(t, code, 0)
@@ -708,16 +438,6 @@ func TestNotification_apply_sound_notification_disables_and_restores_notif_chann
 	os.MkdirAll(configDir, 0755)
 	writeTempFile(t, configDir, "claude-features.json", `{"sound": true, "sound_name": "Glass"}`)
 	writeTempFile(t, configDir, "prev-notif-channel", "iterm2\n")
-	settingsFile := writeTempFile(t, tmpDir, "settings.json", `{
-  "hooks": {
-    "Stop": [
-      {
-        "hooks": [{"type": "command", "command": "afplay /System/Library/Sounds/Glass.aiff &"}]
-      }
-    ]
-  }
-}
-`)
 
 	claudeBody := `
 if [ "$1" = "config" ] && [ "$2" = "set" ] && [ "$4" = "iterm2" ]; then
@@ -730,7 +450,7 @@ exit 1
 	env := buildEnv(t, []string{binDir}, "CLAUDECODE=")
 
 	snippet := notificationSnippet(t,
-		fmt.Sprintf(`apply_sound_notification "claude" %q %q ""`, configDir, settingsFile))
+		fmt.Sprintf(`apply_sound_notification "claude" %q ""`, configDir))
 
 	out, code := runBashSnippet(t, snippet, env)
 	assertExitCode(t, code, 0)
@@ -748,7 +468,6 @@ func TestNotification_setup_sound_notification_sets_notif_channel(t *testing.T) 
 	tmpDir := t.TempDir()
 	configDir := filepath.Join(tmpDir, "config")
 	os.MkdirAll(configDir, 0755)
-	settingsFile := writeTempFile(t, tmpDir, "settings.json", `{}`)
 
 	claudeBody := `
 if [ "$1" = "config" ] && [ "$2" = "get" ]; then
@@ -765,11 +484,10 @@ exit 1
 	env := buildEnv(t, []string{binDir}, "CLAUDECODE=")
 
 	snippet := notificationSnippet(t,
-		fmt.Sprintf(`setup_sound_notification %q "afplay /System/Library/Sounds/Bottle.aiff &" %q`, settingsFile, configDir))
+		fmt.Sprintf(`setup_sound_notification %q`, configDir))
 
-	out, code := runBashSnippet(t, snippet, env)
+	_, code := runBashSnippet(t, snippet, env)
 	assertExitCode(t, code, 0)
-	assertContains(t, out, "configured")
 
 	// Verify prev-notif-channel was saved
 	savedFile := filepath.Join(configDir, "prev-notif-channel")
@@ -785,16 +503,6 @@ func TestNotification_remove_sound_notification_restores_notif_channel(t *testin
 	configDir := filepath.Join(tmpDir, "config")
 	os.MkdirAll(configDir, 0755)
 	writeTempFile(t, configDir, "prev-notif-channel", "iterm2\n")
-	settingsFile := writeTempFile(t, tmpDir, "settings.json", `{
-  "hooks": {
-    "Stop": [
-      {
-        "hooks": [{"type": "command", "command": "afplay /System/Library/Sounds/Bottle.aiff &"}]
-      }
-    ]
-  }
-}
-`)
 
 	claudeBody := `
 if [ "$1" = "config" ] && [ "$2" = "set" ] && [ "$4" = "iterm2" ]; then
@@ -807,11 +515,10 @@ exit 1
 	env := buildEnv(t, []string{binDir}, "CLAUDECODE=")
 
 	snippet := notificationSnippet(t,
-		fmt.Sprintf(`remove_sound_notification %q "afplay /System/Library/Sounds/Bottle.aiff &" %q`, settingsFile, configDir))
+		fmt.Sprintf(`remove_sound_notification %q`, configDir))
 
-	out, code := runBashSnippet(t, snippet, env)
+	_, code := runBashSnippet(t, snippet, env)
 	assertExitCode(t, code, 0)
-	assertContains(t, out, "removed")
 
 	// Verify prev-notif-channel was cleaned up
 	savedFile := filepath.Join(configDir, "prev-notif-channel")
