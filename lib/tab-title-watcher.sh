@@ -49,10 +49,11 @@ discover_ai_pane() {
 }
 
 # Start the tab title watcher background loop.
-# Usage: start_tab_title_watcher <session_name> <ai_tool> <project_name> <tab_title_setting> <tmux_cmd> <marker_file>
+# Usage: start_tab_title_watcher <session_name> <ai_tool> <project_name> <tab_title_setting> <tmux_cmd> <marker_file> [config_dir]
 start_tab_title_watcher() {
   local session_name="$1" ai_tool="$2" project_name="$3"
   local tab_title_setting="$4" tmux_cmd="$5" marker_file="$6"
+  local config_dir="${7:-}"
 
   (
     # Find the AI tool pane (rightmost pane in the layout)
@@ -73,6 +74,9 @@ start_tab_title_watcher() {
           set_tab_title_waiting "$project_name" "$ai_tool"
         else
           set_tab_title_waiting "$project_name"
+        fi
+        if [[ -n "$config_dir" ]]; then
+          play_notification_sound "$ai_tool" "$config_dir"
         fi
         was_waiting=true
       elif [ "$state" = "active" ] && [ "$was_waiting" = true ]; then

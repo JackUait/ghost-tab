@@ -309,7 +309,7 @@ exit 0
 	}
 }
 
-func TestTabTitleWatcher_start_tab_title_watcher_takes_six_params(t *testing.T) {
+func TestTabTitleWatcher_start_tab_title_watcher_takes_seven_params(t *testing.T) {
 	root := projectRoot(t)
 	watcherPath := filepath.Join(root, "lib", "tab-title-watcher.sh")
 	data, err := os.ReadFile(watcherPath)
@@ -318,9 +318,14 @@ func TestTabTitleWatcher_start_tab_title_watcher_takes_six_params(t *testing.T) 
 	}
 	content := string(data)
 
-	// start_tab_title_watcher should NOT have a pane_index parameter
-	if strings.Contains(content, "pane_index=\"${7") {
-		t.Error("start_tab_title_watcher should not accept a 7th pane_index parameter; pane discovery should be dynamic")
+	// start_tab_title_watcher should accept config_dir as 7th parameter
+	if !strings.Contains(content, `config_dir="${7`) {
+		t.Error("start_tab_title_watcher should accept a config_dir parameter (7th argument) for sound notifications")
+	}
+
+	// It should call play_notification_sound on waiting transition
+	if !strings.Contains(content, "play_notification_sound") {
+		t.Error("start_tab_title_watcher should call play_notification_sound when state transitions to waiting")
 	}
 
 	// It should use discover_ai_pane for dynamic discovery
