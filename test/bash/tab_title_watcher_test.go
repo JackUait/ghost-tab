@@ -412,6 +412,83 @@ func TestTabTitleWatcher_ghostty_wrapper_disables_tmux_set_titles(t *testing.T) 
 	}
 }
 
+// --- wrapper.sh: GHOST_TAB_MARKER_FILE passed to tmux via -e ---
+
+func TestTabTitleWatcher_wrapper_passes_marker_file_to_tmux(t *testing.T) {
+	root := projectRoot(t)
+	wrapperPath := filepath.Join(root, "wrapper.sh")
+	data, err := os.ReadFile(wrapperPath)
+	if err != nil {
+		t.Fatalf("failed to read wrapper.sh: %v", err)
+	}
+	content := string(data)
+
+	// The tmux new-session command must pass GHOST_TAB_MARKER_FILE via -e flag
+	// so that hooks inside tmux panes can access the marker file path
+	if !strings.Contains(content, `-e "GHOST_TAB_MARKER_FILE=$GHOST_TAB_MARKER_FILE"`) {
+		t.Error("wrapper.sh must pass GHOST_TAB_MARKER_FILE to tmux new-session via -e flag")
+	}
+
+	// Verify the variable is defined BEFORE the tmux new-session command
+	lines := strings.Split(content, "\n")
+	definitionLine := -1
+	tmuxNewSessionLine := -1
+	for i, line := range lines {
+		if strings.Contains(line, `GHOST_TAB_MARKER_FILE="/tmp/ghost-tab-waiting-`) && !strings.HasPrefix(strings.TrimSpace(line), "#") {
+			definitionLine = i
+		}
+		if strings.Contains(line, "new-session") && strings.Contains(line, "GHOST_TAB_MARKER_FILE") {
+			tmuxNewSessionLine = i
+		}
+	}
+	if definitionLine == -1 {
+		t.Fatal("wrapper.sh must define GHOST_TAB_MARKER_FILE variable")
+	}
+	if tmuxNewSessionLine == -1 {
+		t.Fatal("wrapper.sh must use GHOST_TAB_MARKER_FILE in tmux new-session command")
+	}
+	if definitionLine >= tmuxNewSessionLine {
+		t.Errorf("GHOST_TAB_MARKER_FILE must be defined (line %d) before tmux new-session (line %d)", definitionLine+1, tmuxNewSessionLine+1)
+	}
+}
+
+func TestTabTitleWatcher_ghostty_wrapper_passes_marker_file_to_tmux(t *testing.T) {
+	root := projectRoot(t)
+	wrapperPath := filepath.Join(root, "ghostty", "claude-wrapper.sh")
+	data, err := os.ReadFile(wrapperPath)
+	if err != nil {
+		t.Fatalf("failed to read ghostty/claude-wrapper.sh: %v", err)
+	}
+	content := string(data)
+
+	// The tmux new-session command must pass GHOST_TAB_MARKER_FILE via -e flag
+	if !strings.Contains(content, `-e "GHOST_TAB_MARKER_FILE=$GHOST_TAB_MARKER_FILE"`) {
+		t.Error("ghostty/claude-wrapper.sh must pass GHOST_TAB_MARKER_FILE to tmux new-session via -e flag")
+	}
+
+	// Verify the variable is defined BEFORE the tmux new-session command
+	lines := strings.Split(content, "\n")
+	definitionLine := -1
+	tmuxNewSessionLine := -1
+	for i, line := range lines {
+		if strings.Contains(line, `GHOST_TAB_MARKER_FILE="/tmp/ghost-tab-waiting-`) && !strings.HasPrefix(strings.TrimSpace(line), "#") {
+			definitionLine = i
+		}
+		if strings.Contains(line, "new-session") && strings.Contains(line, "GHOST_TAB_MARKER_FILE") {
+			tmuxNewSessionLine = i
+		}
+	}
+	if definitionLine == -1 {
+		t.Fatal("ghostty/claude-wrapper.sh must define GHOST_TAB_MARKER_FILE variable")
+	}
+	if tmuxNewSessionLine == -1 {
+		t.Fatal("ghostty/claude-wrapper.sh must use GHOST_TAB_MARKER_FILE in tmux new-session command")
+	}
+	if definitionLine >= tmuxNewSessionLine {
+		t.Errorf("GHOST_TAB_MARKER_FILE must be defined (line %d) before tmux new-session (line %d)", definitionLine+1, tmuxNewSessionLine+1)
+	}
+}
+
 // --- play_notification_sound ---
 
 // soundWatcherSnippet sources tui.sh, settings-json.sh, notification-setup.sh,
@@ -537,4 +614,118 @@ func TestTabTitleWatcher_ghostty_wrapper_passes_config_dir_to_watcher(t *testing
 		}
 	}
 	t.Error("start_tab_title_watcher call not found in ghostty/claude-wrapper.sh")
+}
+
+// --- Full marker lifecycle ---
+
+func TestTabTitleWatcher_check_ai_tool_state_claude_full_marker_lifecycle(t *testing.T) {
+	// Tests the complete lifecycle:
+	// 1. Initially no marker → "active"
+	// 2. Stop hook touches marker → "waiting"
+	// 3. UserPromptSubmit hook removes marker → "active"
+	// 4. Stop hook touches marker again → "waiting"
+	// 5. PreToolUse hook removes marker → "active"
+
+	tmpDir := t.TempDir()
+	markerFile := filepath.Join(tmpDir, "marker")
+
+	snippet := tabTitleSnippet(t, fmt.Sprintf(`check_ai_tool_state "claude" "" "" %q`, markerFile))
+
+	// Step 1: No marker → active
+	out, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+	if strings.TrimSpace(out) != "active" {
+		t.Errorf("step 1: expected 'active' (no marker initially), got %q", strings.TrimSpace(out))
+	}
+
+	// Step 2: Simulate Stop hook (touch marker) → waiting
+	if err := os.WriteFile(markerFile, []byte(""), 0644); err != nil {
+		t.Fatalf("step 2: failed to create marker file: %v", err)
+	}
+	out, code = runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+	if strings.TrimSpace(out) != "waiting" {
+		t.Errorf("step 2: expected 'waiting' (Stop hook created marker), got %q", strings.TrimSpace(out))
+	}
+
+	// Step 3: Simulate UserPromptSubmit hook (rm -f marker) → active
+	if err := os.Remove(markerFile); err != nil {
+		t.Fatalf("step 3: failed to remove marker file: %v", err)
+	}
+	out, code = runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+	if strings.TrimSpace(out) != "active" {
+		t.Errorf("step 3: expected 'active' (UserPromptSubmit removed marker), got %q", strings.TrimSpace(out))
+	}
+
+	// Step 4: Simulate Stop hook again (touch marker) → waiting
+	if err := os.WriteFile(markerFile, []byte(""), 0644); err != nil {
+		t.Fatalf("step 4: failed to create marker file: %v", err)
+	}
+	out, code = runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+	if strings.TrimSpace(out) != "waiting" {
+		t.Errorf("step 4: expected 'waiting' (Stop hook created marker again), got %q", strings.TrimSpace(out))
+	}
+
+	// Step 5: Simulate PreToolUse hook (rm -f marker) → active
+	if err := os.Remove(markerFile); err != nil {
+		t.Fatalf("step 5: failed to remove marker file: %v", err)
+	}
+	out, code = runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+	if strings.TrimSpace(out) != "active" {
+		t.Errorf("step 5: expected 'active' (PreToolUse removed marker), got %q", strings.TrimSpace(out))
+	}
+}
+
+func TestTabTitleWatcher_hook_commands_manage_marker_file_correctly(t *testing.T) {
+	// Verifies the actual hook commands (from settings-json.sh) work correctly:
+	// 1. Stop command creates marker file
+	// 2. UserPromptSubmit command removes it
+	// 3. PreToolUse command removes it
+	// 4. All commands exit 0 even when file doesn't exist
+
+	tmpDir := t.TempDir()
+	markerFile := filepath.Join(tmpDir, "marker")
+
+	stopCmd := fmt.Sprintf(`GHOST_TAB_MARKER_FILE=%q; if [ -n "$GHOST_TAB_MARKER_FILE" ]; then touch "$GHOST_TAB_MARKER_FILE"; fi`, markerFile)
+	clearCmd := fmt.Sprintf(`GHOST_TAB_MARKER_FILE=%q; if [ -n "$GHOST_TAB_MARKER_FILE" ]; then rm -f "$GHOST_TAB_MARKER_FILE"; fi`, markerFile)
+
+	// Step 1: Stop command creates marker file
+	_, code := runBashSnippet(t, stopCmd, nil)
+	assertExitCode(t, code, 0)
+	if _, err := os.Stat(markerFile); os.IsNotExist(err) {
+		t.Error("step 1: Stop hook should create marker file")
+	}
+
+	// Step 2: UserPromptSubmit command removes marker file
+	_, code = runBashSnippet(t, clearCmd, nil)
+	assertExitCode(t, code, 0)
+	if _, err := os.Stat(markerFile); !os.IsNotExist(err) {
+		t.Error("step 2: UserPromptSubmit hook should remove marker file")
+	}
+
+	// Step 3: Stop command creates marker again
+	_, code = runBashSnippet(t, stopCmd, nil)
+	assertExitCode(t, code, 0)
+	if _, err := os.Stat(markerFile); os.IsNotExist(err) {
+		t.Error("step 3: Stop hook should create marker file again")
+	}
+
+	// Step 4: PreToolUse command removes marker (same clear_cmd)
+	_, code = runBashSnippet(t, clearCmd, nil)
+	assertExitCode(t, code, 0)
+	if _, err := os.Stat(markerFile); !os.IsNotExist(err) {
+		t.Error("step 4: PreToolUse hook should remove marker file")
+	}
+
+	// Step 5: Clear command succeeds even when file already gone
+	_, code = runBashSnippet(t, clearCmd, nil)
+	assertExitCode(t, code, 0)
+
+	// Step 6: Clear command is a noop when GHOST_TAB_MARKER_FILE is empty
+	noopCmd := `GHOST_TAB_MARKER_FILE=""; if [ -n "$GHOST_TAB_MARKER_FILE" ]; then rm -f "$GHOST_TAB_MARKER_FILE"; fi`
+	_, code = runBashSnippet(t, noopCmd, nil)
+	assertExitCode(t, code, 0)
 }
