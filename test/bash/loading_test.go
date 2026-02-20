@@ -21,7 +21,7 @@ func TestLoading_get_loading_art_contains_ghost_tab_box(t *testing.T) {
 	out, code := runBashFunc(t, "lib/loading.sh", "get_loading_art", nil, nil)
 	assertExitCode(t, code, 0)
 	assertContains(t, out, "+---")
-	assertContains(t, out, "____")
+	assertContains(t, out, "d8888b")
 }
 
 func TestLoading_get_loading_art_meets_minimum_size(t *testing.T) {
@@ -29,8 +29,8 @@ func TestLoading_get_loading_art_meets_minimum_size(t *testing.T) {
 	assertExitCode(t, code, 0)
 
 	lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
-	if len(lines) < 6 {
-		t.Errorf("art has %d lines, want >= 6", len(lines))
+	if len(lines) < 10 {
+		t.Errorf("art has %d lines, want >= 10", len(lines))
 	}
 
 	maxWidth := 0
@@ -39,8 +39,24 @@ func TestLoading_get_loading_art_meets_minimum_size(t *testing.T) {
 			maxWidth = len(line)
 		}
 	}
-	if maxWidth < 70 {
-		t.Errorf("art max width is %d, want >= 70", maxWidth)
+	if maxWidth < 85 {
+		t.Errorf("art max width is %d, want >= 85", maxWidth)
+	}
+}
+
+func TestLoading_get_loading_art_has_equal_line_widths(t *testing.T) {
+	out, code := runBashFunc(t, "lib/loading.sh", "get_loading_art", nil, nil)
+	assertExitCode(t, code, 0)
+
+	lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
+	if len(lines) == 0 {
+		t.Fatal("no lines")
+	}
+	expected := len(lines[0])
+	for i, line := range lines {
+		if len(line) != expected {
+			t.Errorf("line %d has %d chars, want %d (same as line 0)", i, len(line), expected)
+		}
 	}
 }
 
@@ -139,10 +155,10 @@ func TestLoading_render_loading_frame_centers_art_on_large_terminal(t *testing.T
 		root)
 	out, code := runBashSnippet(t, script, nil)
 	assertExitCode(t, code, 0)
-	// Art is 8 lines tall, 72 chars wide
-	// Center: row=(50-8)/2=21, col=(200-72)/2=64
-	// First line cursor position should be \033[21;64H
-	assertContains(t, out, "\033[21;64H")
+	// Art is 12 lines tall, 88 chars wide
+	// Center: row=(50-12)/2=19, col=(200-88)/2=56
+	// First line cursor position should be \033[19;56H
+	assertContains(t, out, "\033[19;56H")
 }
 
 func TestLoading_render_loading_frame_shifts_colors_between_frames(t *testing.T) {
