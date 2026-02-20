@@ -389,6 +389,138 @@ func TestSettingsJson_remove_waiting_indicator_hooks_returns_not_found_when_abse
 	assertContains(t, strings.TrimSpace(out), "not_found")
 }
 
+// --- PreToolUse hook behavior ---
+
+func TestSettingsJson_PreToolUse_hook_creates_marker_for_AskUserQuestion(t *testing.T) {
+	tmpDir := t.TempDir()
+	settingsFile := filepath.Join(tmpDir, "settings.json")
+
+	// Generate hooks
+	snippet := settingsJsonSnippet(t,
+		fmt.Sprintf(`add_waiting_indicator_hooks %q`, settingsFile))
+	_, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+
+	// Parse PreToolUse hook command
+	data, err := os.ReadFile(settingsFile)
+	if err != nil {
+		t.Fatalf("failed to read settings.json: %v", err)
+	}
+
+	type hookEntry struct {
+		Type    string `json:"type"`
+		Command string `json:"command"`
+	}
+	type hookGroup struct {
+		Hooks []hookEntry `json:"hooks"`
+	}
+	var settings struct {
+		Hooks map[string][]hookGroup `json:"hooks"`
+	}
+	if err := json.Unmarshal(data, &settings); err != nil {
+		t.Fatalf("failed to parse settings.json: %v", err)
+	}
+
+	// Find the PreToolUse hook command
+	var preToolCmd string
+	for _, group := range settings.Hooks["PreToolUse"] {
+		for _, h := range group.Hooks {
+			if strings.Contains(h.Command, "GHOST_TAB_MARKER_FILE") {
+				preToolCmd = h.Command
+			}
+		}
+	}
+	if preToolCmd == "" {
+		t.Fatal("no GHOST_TAB_MARKER_FILE PreToolUse hook found")
+	}
+
+	markerFile := filepath.Join(tmpDir, "test-marker")
+
+	// Write hook command to a script file to avoid Go %q double-quote expansion issues
+	hookScript := filepath.Join(tmpDir, "hook.sh")
+	if err := os.WriteFile(hookScript, []byte("#!/bin/bash\n"+preToolCmd+"\n"), 0755); err != nil {
+		t.Fatalf("failed to write hook script: %v", err)
+	}
+
+	// Pipe AskUserQuestion JSON to the hook command — marker should be CREATED
+	bashScript := fmt.Sprintf(
+		`export GHOST_TAB_MARKER_FILE=%q; echo '{"tool_name":"AskUserQuestion"}' | %q`,
+		markerFile, hookScript,
+	)
+	_, exitCode := runBashSnippet(t, bashScript, nil)
+	assertExitCode(t, exitCode, 0)
+
+	if _, err := os.Stat(markerFile); os.IsNotExist(err) {
+		t.Error("marker file should exist after AskUserQuestion PreToolUse, but it does not")
+	}
+}
+
+func TestSettingsJson_PreToolUse_hook_clears_marker_for_other_tools(t *testing.T) {
+	tmpDir := t.TempDir()
+	settingsFile := filepath.Join(tmpDir, "settings.json")
+
+	// Generate hooks
+	snippet := settingsJsonSnippet(t,
+		fmt.Sprintf(`add_waiting_indicator_hooks %q`, settingsFile))
+	_, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+
+	// Parse PreToolUse hook command
+	data, err := os.ReadFile(settingsFile)
+	if err != nil {
+		t.Fatalf("failed to read settings.json: %v", err)
+	}
+
+	type hookEntry struct {
+		Type    string `json:"type"`
+		Command string `json:"command"`
+	}
+	type hookGroup struct {
+		Hooks []hookEntry `json:"hooks"`
+	}
+	var settings struct {
+		Hooks map[string][]hookGroup `json:"hooks"`
+	}
+	if err := json.Unmarshal(data, &settings); err != nil {
+		t.Fatalf("failed to parse settings.json: %v", err)
+	}
+
+	var preToolCmd string
+	for _, group := range settings.Hooks["PreToolUse"] {
+		for _, h := range group.Hooks {
+			if strings.Contains(h.Command, "GHOST_TAB_MARKER_FILE") {
+				preToolCmd = h.Command
+			}
+		}
+	}
+	if preToolCmd == "" {
+		t.Fatal("no GHOST_TAB_MARKER_FILE PreToolUse hook found")
+	}
+
+	markerFile := filepath.Join(tmpDir, "test-marker")
+
+	// Write hook command to a script file to avoid Go %q double-quote expansion issues
+	hookScript := filepath.Join(tmpDir, "hook.sh")
+	if err := os.WriteFile(hookScript, []byte("#!/bin/bash\n"+preToolCmd+"\n"), 0755); err != nil {
+		t.Fatalf("failed to write hook script: %v", err)
+	}
+
+	// Create marker, then pipe Bash tool JSON — marker should be REMOVED
+	if err := os.WriteFile(markerFile, []byte(""), 0644); err != nil {
+		t.Fatalf("failed to create marker: %v", err)
+	}
+	bashScript := fmt.Sprintf(
+		`export GHOST_TAB_MARKER_FILE=%q; echo '{"tool_name":"Bash"}' | %q`,
+		markerFile, hookScript,
+	)
+	_, exitCode := runBashSnippet(t, bashScript, nil)
+	assertExitCode(t, exitCode, 0)
+
+	if _, err := os.Stat(markerFile); !os.IsNotExist(err) {
+		t.Error("marker file should have been removed for Bash tool, but it still exists")
+	}
+}
+
 func TestSettingsJson_merge_claude_settings_skips_when_already_configured(t *testing.T) {
 	tmpDir := t.TempDir()
 	settingsFile := writeTempFile(t, tmpDir, "settings.json", `{

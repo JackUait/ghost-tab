@@ -49,6 +49,7 @@ hooks = settings.setdefault("hooks", {})
 
 stop_cmd = 'if [ -n "$GHOST_TAB_MARKER_FILE" ]; then touch "$GHOST_TAB_MARKER_FILE"; fi'
 clear_cmd = 'if [ -n "$GHOST_TAB_MARKER_FILE" ]; then rm -f "$GHOST_TAB_MARKER_FILE"; fi'
+pre_tool_cmd = '_gt_in=$(cat); if [ -n "$GHOST_TAB_MARKER_FILE" ]; then if [[ "$_gt_in" == *AskUserQuestion* ]]; then touch "$GHOST_TAB_MARKER_FILE"; else rm -f "$GHOST_TAB_MARKER_FILE"; fi; fi'
 
 # Check if already installed
 stop_list = hooks.get("Stop", [])
@@ -67,9 +68,9 @@ hooks.setdefault("Stop", []).append({
     "hooks": [{"type": "command", "command": stop_cmd}]
 })
 
-# Add PreToolUse hook
+# Add PreToolUse hook (conditional: AskUserQuestion creates marker, others clear it)
 hooks.setdefault("PreToolUse", []).append({
-    "hooks": [{"type": "command", "command": clear_cmd}]
+    "hooks": [{"type": "command", "command": pre_tool_cmd}]
 })
 
 # Add UserPromptSubmit hook (clears marker when user answers)
