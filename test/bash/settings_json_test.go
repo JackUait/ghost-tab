@@ -62,7 +62,7 @@ func TestSettingsJson_merge_claude_settings_adds_status_line_to_existing(t *test
 
 // --- add_waiting_indicator_hooks ---
 
-func TestSettingsJson_add_waiting_indicator_hooks_creates_file_with_Stop_and_PreToolUse(t *testing.T) {
+func TestSettingsJson_add_waiting_indicator_hooks_creates_file_with_Stop_PreToolUse_and_UserPromptSubmit(t *testing.T) {
 	tmpDir := t.TempDir()
 	settingsFile := filepath.Join(tmpDir, "settings.json")
 
@@ -80,6 +80,7 @@ func TestSettingsJson_add_waiting_indicator_hooks_creates_file_with_Stop_and_Pre
 	content := string(data)
 	assertContains(t, content, `"Stop"`)
 	assertContains(t, content, `"PreToolUse"`)
+	assertContains(t, content, `"UserPromptSubmit"`)
 	assertContains(t, content, "GHOST_TAB_MARKER_FILE")
 }
 
@@ -141,18 +142,23 @@ func TestSettingsJson_add_waiting_indicator_hooks_reports_exists_when_duplicate(
 
 // --- remove_waiting_indicator_hooks ---
 
-func TestSettingsJson_remove_waiting_indicator_hooks_removes_both_hooks(t *testing.T) {
+func TestSettingsJson_remove_waiting_indicator_hooks_removes_all_three_hooks(t *testing.T) {
 	tmpDir := t.TempDir()
 	settingsFile := writeTempFile(t, tmpDir, "settings.json", `{
   "hooks": {
     "Stop": [
       {
-        "hooks": [{"type": "command", "command": "[ -n \"$GHOST_TAB_MARKER_FILE\" ] && touch \"$GHOST_TAB_MARKER_FILE\""}]
+        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then touch \"$GHOST_TAB_MARKER_FILE\"; fi"}]
       }
     ],
     "PreToolUse": [
       {
-        "hooks": [{"type": "command", "command": "[ -n \"$GHOST_TAB_MARKER_FILE\" ] && rm -f \"$GHOST_TAB_MARKER_FILE\""}]
+        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then rm -f \"$GHOST_TAB_MARKER_FILE\"; fi"}]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then rm -f \"$GHOST_TAB_MARKER_FILE\"; fi"}]
       }
     ]
   }

@@ -47,8 +47,8 @@ else:
 
 hooks = settings.setdefault("hooks", {})
 
-stop_cmd = '[ -n "$GHOST_TAB_MARKER_FILE" ] && touch "$GHOST_TAB_MARKER_FILE"'
-clear_cmd = '[ -n "$GHOST_TAB_MARKER_FILE" ] && rm -f "$GHOST_TAB_MARKER_FILE"'
+stop_cmd = 'if [ -n "$GHOST_TAB_MARKER_FILE" ]; then touch "$GHOST_TAB_MARKER_FILE"; fi'
+clear_cmd = 'if [ -n "$GHOST_TAB_MARKER_FILE" ]; then rm -f "$GHOST_TAB_MARKER_FILE"; fi'
 
 # Check if already installed
 stop_list = hooks.get("Stop", [])
@@ -69,6 +69,11 @@ hooks.setdefault("Stop", []).append({
 
 # Add PreToolUse hook
 hooks.setdefault("PreToolUse", []).append({
+    "hooks": [{"type": "command", "command": clear_cmd}]
+})
+
+# Add UserPromptSubmit hook (clears marker when user answers)
+hooks.setdefault("UserPromptSubmit", []).append({
     "hooks": [{"type": "command", "command": clear_cmd}]
 })
 
@@ -104,7 +109,7 @@ except (json.JSONDecodeError, ValueError, FileNotFoundError):
 hooks = settings.get("hooks", {})
 found = False
 
-for event in ["Stop", "PreToolUse"]:
+for event in ["Stop", "PreToolUse", "UserPromptSubmit"]:
     event_list = hooks.get(event, [])
     new_list = [
         entry for entry in event_list

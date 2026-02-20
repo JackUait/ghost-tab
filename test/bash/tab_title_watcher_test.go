@@ -44,99 +44,9 @@ exit 0
 	}
 }
 
-func TestTabTitleWatcher_check_ai_tool_state_claude_returns_waiting_with_status_bars_below_prompt(t *testing.T) {
-	tmpDir := t.TempDir()
-	markerFile := filepath.Join(tmpDir, "marker")
-	os.WriteFile(markerFile, []byte(""), 0644)
-	// Simulate real Claude Code output: prompt followed by status bars
-	binDir := mockCommand(t, tmpDir, "tmux", `
-if [ "$1" = "capture-pane" ]; then
-  printf 'Some previous output\n\n'
-  printf '❯ \n'
-  printf '──────────────────────────────────\n'
-  printf '  proj | main | S: 0 | 26.3%% | 617M\n'
-  printf '  ⏵⏵ bypass permissions on (shift+tab to cycle)\n'
-  exit 0
-fi
-exit 0
-`)
-	env := buildEnv(t, []string{binDir})
-	tmuxPath := filepath.Join(binDir, "tmux")
-
-	snippet := tabTitleSnippet(t,
-		fmt.Sprintf(`check_ai_tool_state "claude" "dev-test-123" %q %q`, tmuxPath, markerFile))
-
-	out, code := runBashSnippet(t, snippet, env)
-	assertExitCode(t, code, 0)
-	if strings.TrimSpace(out) != "waiting" {
-		t.Errorf("expected 'waiting' (prompt above status bars), got %q", strings.TrimSpace(out))
-	}
-}
-
-func TestTabTitleWatcher_check_ai_tool_state_claude_returns_waiting_when_user_typed_text_in_prompt(t *testing.T) {
-	tmpDir := t.TempDir()
-	markerFile := filepath.Join(tmpDir, "marker")
-	os.WriteFile(markerFile, []byte(""), 0644)
-	// Simulate Claude Code pane where user typed text but hasn't pressed Enter.
-	// Prompt line is "❯ commit and push that too" — not ending with ❯\s*$.
-	binDir := mockCommand(t, tmpDir, "tmux", `
-if [ "$1" = "capture-pane" ]; then
-  printf 'Some previous output\n\n'
-  printf '❯ commit and push that too\n'
-  printf '──────────────────────────────────\n'
-  printf '  blok | feat/table | S: 0 | U: 1 | A: 0 | 19.2%% | 497M\n'
-  printf '  ⏵⏵ bypass permissions on (shift+tab to cycle)\n'
-  exit 0
-fi
-exit 0
-`)
-	env := buildEnv(t, []string{binDir})
-	tmuxPath := filepath.Join(binDir, "tmux")
-
-	snippet := tabTitleSnippet(t,
-		fmt.Sprintf(`check_ai_tool_state "claude" "dev-test-123" %q %q`, tmuxPath, markerFile))
-
-	out, code := runBashSnippet(t, snippet, env)
-	assertExitCode(t, code, 0)
-	if strings.TrimSpace(out) != "waiting" {
-		t.Errorf("expected 'waiting' (user typed in prompt), got %q", strings.TrimSpace(out))
-	}
-}
-
-func TestTabTitleWatcher_check_ai_tool_state_claude_returns_active_after_user_submits_and_claude_is_processing(t *testing.T) {
-	tmpDir := t.TempDir()
-	markerFile := filepath.Join(tmpDir, "marker")
-	os.WriteFile(markerFile, []byte(""), 0644)
-	// Simulate: user submitted "do something", Claude is now processing.
-	// The old prompt line is still visible but Claude's output appears
-	// between the prompt and the status bar separator.
-	binDir := mockCommand(t, tmpDir, "tmux", `
-if [ "$1" = "capture-pane" ]; then
-  printf 'Some previous output\n\n'
-  printf '❯ do something\n'
-  printf '\n'
-  printf '  ● Reading file.ts\n'
-  printf '──────────────────────────────────\n'
-  printf '  proj | main | S: 0 | 26.3%% | 617M\n'
-  printf '  ⏵⏵ bypass permissions on (shift+tab to cycle)\n'
-  exit 0
-fi
-exit 0
-`)
-	env := buildEnv(t, []string{binDir})
-	tmuxPath := filepath.Join(binDir, "tmux")
-
-	snippet := tabTitleSnippet(t,
-		fmt.Sprintf(`check_ai_tool_state "claude" "dev-test-123" %q %q`, tmuxPath, markerFile))
-
-	out, code := runBashSnippet(t, snippet, env)
-	assertExitCode(t, code, 0)
-	if strings.TrimSpace(out) != "active" {
-		t.Errorf("expected 'active' (user submitted, Claude processing), got %q", strings.TrimSpace(out))
-	}
-}
-
-func TestTabTitleWatcher_check_ai_tool_state_claude_returns_active_when_marker_exists_but_no_prompt(t *testing.T) {
+func TestTabTitleWatcher_check_ai_tool_state_claude_marker_only_no_pane_check(t *testing.T) {
+	// Claude detection is marker-only. Even without a prompt in the pane,
+	// marker existing means Stop hook fired → Claude is waiting.
 	tmpDir := t.TempDir()
 	markerFile := filepath.Join(tmpDir, "marker")
 	os.WriteFile(markerFile, []byte(""), 0644)
@@ -155,8 +65,23 @@ exit 0
 
 	out, code := runBashSnippet(t, snippet, env)
 	assertExitCode(t, code, 0)
+	if strings.TrimSpace(out) != "waiting" {
+		t.Errorf("expected 'waiting' (marker exists = Claude idle), got %q", strings.TrimSpace(out))
+	}
+}
+
+func TestTabTitleWatcher_check_ai_tool_state_claude_returns_active_when_marker_absent_after_user_submits(t *testing.T) {
+	tmpDir := t.TempDir()
+	// No marker file — simulates UserPromptSubmit hook having removed it
+	markerFile := filepath.Join(tmpDir, "marker")
+
+	snippet := tabTitleSnippet(t,
+		fmt.Sprintf(`check_ai_tool_state "claude" "" "" %q`, markerFile))
+
+	out, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
 	if strings.TrimSpace(out) != "active" {
-		t.Errorf("expected 'active', got %q", strings.TrimSpace(out))
+		t.Errorf("expected 'active' (marker removed by UserPromptSubmit), got %q", strings.TrimSpace(out))
 	}
 }
 

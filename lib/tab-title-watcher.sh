@@ -12,26 +12,12 @@ check_ai_tool_state() {
   local pane_index="${5:-3}"
 
   if [ "$ai_tool" = "claude" ]; then
+    # Claude uses marker-file-only detection.
+    # Stop hook creates the marker (Claude finished, waiting for input).
+    # UserPromptSubmit hook removes it (user answered).
+    # PreToolUse hook also removes it (Claude is calling tools).
     if [ -f "$marker_file" ]; then
-      # Marker exists, but verify the prompt is the last conversation line.
-      # Between user input and first tool call, the marker persists
-      # even though Claude is actively working.
-      # Find the status-bar separator (─── line) and check the last
-      # non-empty line above it. When waiting, that's the prompt.
-      # When working, Claude's output sits between prompt and separator.
-      local content last_conv_line sep_line_num
-      content=$("$tmux_cmd" capture-pane -t "$session_name:0.$pane_index" -p 2>/dev/null || true)
-      sep_line_num=$(echo "$content" | grep -n '^─' | tail -1 | cut -d: -f1)
-      if [ -n "$sep_line_num" ]; then
-        last_conv_line=$(echo "$content" | head -$((sep_line_num - 1)) | grep -v '^$' | tail -1)
-      else
-        last_conv_line=$(echo "$content" | grep -v '^$' | tail -1)
-      fi
-      if echo "$last_conv_line" | grep -qE '^[❯>]'; then
-        echo "waiting"
-      else
-        echo "active"
-      fi
+      echo "waiting"
     else
       echo "active"
     fi
