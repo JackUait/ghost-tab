@@ -131,6 +131,20 @@ func TestLoading_render_loading_frame_contains_art_content(t *testing.T) {
 	}
 }
 
+func TestLoading_render_loading_frame_centers_art_on_large_terminal(t *testing.T) {
+	root := projectRoot(t)
+	// Large terminal: 200 cols, 50 rows
+	script := fmt.Sprintf(
+		`source %q/lib/loading.sh && render_loading_frame 0 0 200 50`,
+		root)
+	out, code := runBashSnippet(t, script, nil)
+	assertExitCode(t, code, 0)
+	// Art is 8 lines tall, 72 chars wide
+	// Center: row=(50-8)/2=21, col=(200-72)/2=64
+	// First line cursor position should be \033[21;64H
+	assertContains(t, out, "\033[21;64H")
+}
+
 func TestLoading_render_loading_frame_shifts_colors_between_frames(t *testing.T) {
 	root := projectRoot(t)
 	script0 := fmt.Sprintf(

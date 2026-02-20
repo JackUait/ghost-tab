@@ -131,8 +131,17 @@ show_loading_screen() {
     trap 'printf "\033[?25h\033[0m"; exit 0' TERM INT HUP
     local frame=1
     local -a prev_sym_positions=()
+    local prev_rows="$rows" prev_cols="$cols"
 
     while true; do
+      # Re-detect terminal size each frame (handles late window resizes)
+      read -r rows cols <<< "$(_detect_term_size)"
+      if (( rows != prev_rows || cols != prev_cols )); then
+        printf '\033[2J'  # Clear screen on resize to avoid ghost artifacts
+        prev_rows="$rows" prev_cols="$cols"
+        prev_sym_positions=()
+      fi
+
       # Redraw art with shifted colors
       render_loading_frame "$pal_idx" "$frame" "$cols" "$rows"
 
