@@ -693,7 +693,7 @@ func (m *MainMenuModel) CalculateLayout(width, height int) MenuLayout {
 	addWorktreeRows := expandedProjectCount                          // add-worktree is 1 row each
 	actionRows := len(actionNames)
 	menuHeight := 7 + projectRows + worktreeRows + addWorktreeRows + actionRows + numSeparators
-	menuWidth := 48
+	menuWidth := 58
 
 	ghostPosition := "hidden"
 	// Side layout: width >= 48 + 3 + 28 + 3 = 82
@@ -1499,7 +1499,7 @@ func (m *MainMenuModel) renderSettingsBox() string {
 	return strings.Join(lines, "\n")
 }
 
-const menuInnerWidth = 46
+const menuInnerWidth = 56
 
 // TruncateMiddle truncates s in the middle with "…" if it exceeds maxWidth.
 func TruncateMiddle(s string, maxWidth int) string {

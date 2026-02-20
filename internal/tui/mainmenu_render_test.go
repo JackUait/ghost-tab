@@ -402,6 +402,40 @@ func TestMenuBox_HelpTextIncludesWorktreeKey(t *testing.T) {
 	}
 }
 
+func TestMenuBox_HelpTextFitsWithinBorders(t *testing.T) {
+	// With multiple AI tools + worktrees, the help text is at its longest:
+	// "↑↓ navigate ←→ AI tool S settings w worktrees ⏎ select"
+	// This must fit within the container borders (all lines same width).
+	projects := []models.Project{
+		{
+			Name: "proj",
+			Path: "/tmp/proj",
+			Worktrees: []models.Worktree{
+				{Path: "/tmp/wt", Branch: "feature"},
+			},
+		},
+	}
+	m := NewMainMenu(projects, []string{"claude", "codex"}, "claude", "animated")
+	m.width = 100
+	m.height = 40
+	box := m.renderMenuBox()
+	raw := stripAnsi(box)
+	lines := strings.Split(raw, "\n")
+
+	if len(lines) < 3 {
+		t.Fatal("renderMenuBox produced fewer than 3 lines")
+	}
+
+	// The top border defines the expected width of every row
+	borderWidth := len([]rune(lines[0]))
+	for i, line := range lines {
+		lineWidth := len([]rune(line))
+		if lineWidth != borderWidth {
+			t.Errorf("line %d width %d != border width %d: %q", i, lineWidth, borderWidth, line)
+		}
+	}
+}
+
 // stripAnsi removes ANSI escape sequences from a string.
 func stripAnsi(s string) string {
 	var result strings.Builder

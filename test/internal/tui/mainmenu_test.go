@@ -222,16 +222,16 @@ func TestMainMenu_LayoutCalculation(t *testing.T) {
 	projects := testProjects()
 	m := tui.NewMainMenu(projects, testAITools(), "claude", "animated")
 
-	// Side layout: width >= 82 (48 + 3 + 28 + 3)
+	// Side layout: width >= 92 (58 + 3 + 28 + 3)
 	layout := m.CalculateLayout(100, 40)
 	if layout.GhostPosition != "side" {
 		t.Errorf("Side layout at 100x40: expected 'side', got %q", layout.GhostPosition)
 	}
-	if layout.MenuWidth != 48 {
-		t.Errorf("MenuWidth: expected 48, got %d", layout.MenuWidth)
+	if layout.MenuWidth != 58 {
+		t.Errorf("MenuWidth: expected 58, got %d", layout.MenuWidth)
 	}
 
-	// Above layout: width < 82 but height sufficient
+	// Above layout: width < 92 but height sufficient
 	// MenuHeight = 7 + (3*2) + 4 + 1 = 18 (3 projects, 4 actions, 1 separator)
 	// Need height >= 18 + 15 + 2 = 35
 	layout = m.CalculateLayout(60, 45)
@@ -246,15 +246,15 @@ func TestMainMenu_LayoutCalculation(t *testing.T) {
 	}
 
 	// Exact boundary for side layout
-	layout = m.CalculateLayout(82, 40)
+	layout = m.CalculateLayout(92, 40)
 	if layout.GhostPosition != "side" {
-		t.Errorf("Exact side boundary 82x40: expected 'side', got %q", layout.GhostPosition)
+		t.Errorf("Exact side boundary 92x40: expected 'side', got %q", layout.GhostPosition)
 	}
 
 	// Just below side boundary
-	layout = m.CalculateLayout(81, 45)
+	layout = m.CalculateLayout(91, 45)
 	if layout.GhostPosition != "above" {
-		t.Errorf("Below side boundary 81x45: expected 'above', got %q", layout.GhostPosition)
+		t.Errorf("Below side boundary 91x45: expected 'above', got %q", layout.GhostPosition)
 	}
 }
 
@@ -2097,8 +2097,8 @@ func TestMainMenu_SideLayoutVisualCentering(t *testing.T) {
 	// screen as a unit. The ghost should NOT be right-padded, so the left
 	// and right margins of the visible content are approximately equal.
 	//
-	// Visible content = 48 (menu) + 3 (spacer) + ~28 (ghost) = ~79
-	// For width=120: expected left margin ≈ (120 - 79) / 2 ≈ 20
+	// Visible content = 58 (menu) + 3 (spacer) + ~28 (ghost) = ~89
+	// For width=120: expected left margin ≈ (120 - 89) / 2 ≈ 15
 	projects := []models.Project{{Name: "test", Path: "/test"}}
 	m := tui.NewMainMenu(projects, []string{"claude"}, "claude", "static")
 	width := 120
@@ -2110,10 +2110,10 @@ func TestMainMenu_SideLayoutVisualCentering(t *testing.T) {
 		if strings.Contains(line, "\u250c") { // ┌ (top border)
 			trimmedLeft := strings.TrimLeft(line, " ")
 			leftMargin := len(line) - len(trimmedLeft)
-			// Without ghost padding, content is ~79 chars wide
-			// Left margin should be roughly (120 - 79) / 2 ≈ 20
-			if leftMargin < 16 {
-				t.Errorf("visible content not horizontally centered: left margin %d too small (expected >= 16 for width %d)", leftMargin, width)
+			// Without ghost padding, content is ~89 chars wide
+			// Left margin should be roughly (120 - 89) / 2 ≈ 15
+			if leftMargin < 11 {
+				t.Errorf("visible content not horizontally centered: left margin %d too small (expected >= 11 for width %d)", leftMargin, width)
 			}
 			break
 		}
@@ -2223,8 +2223,8 @@ func TestMainMenu_ViewTruncatesLongPath(t *testing.T) {
 			if !strings.Contains(trimmed, "\u2026") {
 				t.Error("long path should be truncated with ellipsis")
 			}
-			if lipgloss.Width(trimmed) > 48 {
-				t.Errorf("path line content should not exceed box width 48, got %d: %q", lipgloss.Width(trimmed), trimmed)
+			if lipgloss.Width(trimmed) > 58 {
+				t.Errorf("path line content should not exceed box width 58, got %d: %q", lipgloss.Width(trimmed), trimmed)
 			}
 		}
 	}
@@ -2248,8 +2248,8 @@ func TestMainMenu_ViewTruncatesLongName(t *testing.T) {
 			if !strings.Contains(trimmed, "\u2026") {
 				t.Error("long name should be truncated with ellipsis")
 			}
-			if lipgloss.Width(trimmed) > 48 {
-				t.Errorf("name line content should not exceed box width 48, got %d: %q", lipgloss.Width(trimmed), trimmed)
+			if lipgloss.Width(trimmed) > 58 {
+				t.Errorf("name line content should not exceed box width 58, got %d: %q", lipgloss.Width(trimmed), trimmed)
 			}
 		}
 	}
