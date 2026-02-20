@@ -172,7 +172,7 @@ toggle_sound_notification() {
     set_sound_feature_flag "$tool" "$config_dir" false
     case "$tool" in
       claude)
-        remove_sound_notification "$settings_path" "$sound_command"
+        remove_sound_notification "$settings_path" "$sound_command" "$config_dir"
         ;;
     esac
     success "Sound notifications disabled"
@@ -181,7 +181,7 @@ toggle_sound_notification() {
     set_sound_feature_flag "$tool" "$config_dir" true
     case "$tool" in
       claude)
-        setup_sound_notification "$settings_path" "$sound_command"
+        setup_sound_notification "$settings_path" "$sound_command" "$config_dir"
         ;;
     esac
     success "Sound notifications enabled"
@@ -200,7 +200,7 @@ apply_sound_notification() {
     # Remove any existing afplay hook
     case "$tool" in
       claude)
-        remove_sound_notification "$settings_path" "afplay /System/Library/Sounds/"
+        remove_sound_notification "$settings_path" "afplay /System/Library/Sounds/" "$config_dir"
         ;;
     esac
     success "Sound notifications disabled"
@@ -212,8 +212,8 @@ apply_sound_notification() {
     case "$tool" in
       claude)
         # Remove old hook first (any afplay sound), then add new one
-        remove_sound_notification "$settings_path" "afplay /System/Library/Sounds/"
-        setup_sound_notification "$settings_path" "$sound_command"
+        remove_sound_notification "$settings_path" "afplay /System/Library/Sounds/" "$config_dir"
+        setup_sound_notification "$settings_path" "$sound_command" "$config_dir"
         ;;
     esac
     success "Sound notifications enabled"

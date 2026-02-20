@@ -588,6 +588,160 @@ func TestNotification_apply_sound_notification_changes_sound(t *testing.T) {
 	assertNotContains(t, string(data), "Bottle.aiff")
 }
 
+// --- toggle_sound_notification + config_dir passthrough ---
+
+func TestNotification_toggle_sound_notification_enables_and_sets_notif_channel(t *testing.T) {
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, "config")
+	os.MkdirAll(configDir, 0755)
+	writeTempFile(t, configDir, "claude-features.json", `{"sound": false}`)
+	settingsFile := writeTempFile(t, tmpDir, "settings.json", `{}`)
+
+	claudeBody := `
+if [ "$1" = "config" ] && [ "$2" = "get" ]; then
+  echo ""
+  exit 0
+fi
+if [ "$1" = "config" ] && [ "$2" = "set" ] && [ "$4" = "terminal_bell" ]; then
+  exit 0
+fi
+echo "unexpected args: $*" >&2
+exit 1
+`
+	binDir := mockCommand(t, tmpDir, "claude", claudeBody)
+	env := buildEnv(t, []string{binDir}, "CLAUDECODE=")
+
+	snippet := notificationSnippet(t,
+		fmt.Sprintf(`toggle_sound_notification "claude" %q %q`, configDir, settingsFile))
+
+	out, code := runBashSnippet(t, snippet, env)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "enabled")
+
+	// Verify prev-notif-channel was saved
+	savedFile := filepath.Join(configDir, "prev-notif-channel")
+	if _, err := os.Stat(savedFile); os.IsNotExist(err) {
+		t.Errorf("expected prev-notif-channel to be created on enable")
+	}
+}
+
+func TestNotification_toggle_sound_notification_disables_and_restores_notif_channel(t *testing.T) {
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, "config")
+	os.MkdirAll(configDir, 0755)
+	writeTempFile(t, configDir, "claude-features.json", `{"sound": true}`)
+	writeTempFile(t, configDir, "prev-notif-channel", "iterm2\n")
+	settingsFile := writeTempFile(t, tmpDir, "settings.json", `{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [{"type": "command", "command": "afplay /System/Library/Sounds/Bottle.aiff &"}]
+      }
+    ]
+  }
+}
+`)
+
+	claudeBody := `
+if [ "$1" = "config" ] && [ "$2" = "set" ] && [ "$4" = "iterm2" ]; then
+  exit 0
+fi
+echo "unexpected args: $*" >&2
+exit 1
+`
+	binDir := mockCommand(t, tmpDir, "claude", claudeBody)
+	env := buildEnv(t, []string{binDir}, "CLAUDECODE=")
+
+	snippet := notificationSnippet(t,
+		fmt.Sprintf(`toggle_sound_notification "claude" %q %q`, configDir, settingsFile))
+
+	out, code := runBashSnippet(t, snippet, env)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "disabled")
+
+	// Verify prev-notif-channel was cleaned up
+	savedFile := filepath.Join(configDir, "prev-notif-channel")
+	if _, err := os.Stat(savedFile); !os.IsNotExist(err) {
+		t.Errorf("prev-notif-channel should be removed after disable")
+	}
+}
+
+// --- apply_sound_notification + config_dir passthrough ---
+
+func TestNotification_apply_sound_notification_enables_and_sets_notif_channel(t *testing.T) {
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, "config")
+	os.MkdirAll(configDir, 0755)
+	writeTempFile(t, configDir, "claude-features.json", `{"sound": false}`)
+	settingsFile := writeTempFile(t, tmpDir, "settings.json", `{}`)
+
+	claudeBody := `
+if [ "$1" = "config" ] && [ "$2" = "get" ]; then
+  echo ""
+  exit 0
+fi
+if [ "$1" = "config" ] && [ "$2" = "set" ] && [ "$4" = "terminal_bell" ]; then
+  exit 0
+fi
+echo "unexpected args: $*" >&2
+exit 1
+`
+	binDir := mockCommand(t, tmpDir, "claude", claudeBody)
+	env := buildEnv(t, []string{binDir}, "CLAUDECODE=")
+
+	snippet := notificationSnippet(t,
+		fmt.Sprintf(`apply_sound_notification "claude" %q %q "Glass"`, configDir, settingsFile))
+
+	out, code := runBashSnippet(t, snippet, env)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "enabled")
+
+	savedFile := filepath.Join(configDir, "prev-notif-channel")
+	if _, err := os.Stat(savedFile); os.IsNotExist(err) {
+		t.Errorf("expected prev-notif-channel to be created on enable")
+	}
+}
+
+func TestNotification_apply_sound_notification_disables_and_restores_notif_channel(t *testing.T) {
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, "config")
+	os.MkdirAll(configDir, 0755)
+	writeTempFile(t, configDir, "claude-features.json", `{"sound": true, "sound_name": "Glass"}`)
+	writeTempFile(t, configDir, "prev-notif-channel", "iterm2\n")
+	settingsFile := writeTempFile(t, tmpDir, "settings.json", `{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [{"type": "command", "command": "afplay /System/Library/Sounds/Glass.aiff &"}]
+      }
+    ]
+  }
+}
+`)
+
+	claudeBody := `
+if [ "$1" = "config" ] && [ "$2" = "set" ] && [ "$4" = "iterm2" ]; then
+  exit 0
+fi
+echo "unexpected args: $*" >&2
+exit 1
+`
+	binDir := mockCommand(t, tmpDir, "claude", claudeBody)
+	env := buildEnv(t, []string{binDir}, "CLAUDECODE=")
+
+	snippet := notificationSnippet(t,
+		fmt.Sprintf(`apply_sound_notification "claude" %q %q ""`, configDir, settingsFile))
+
+	out, code := runBashSnippet(t, snippet, env)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "disabled")
+
+	savedFile := filepath.Join(configDir, "prev-notif-channel")
+	if _, err := os.Stat(savedFile); !os.IsNotExist(err) {
+		t.Errorf("prev-notif-channel should be removed after disable")
+	}
+}
+
 // --- setup_sound_notification + config_dir wiring ---
 
 func TestNotification_setup_sound_notification_sets_notif_channel(t *testing.T) {
