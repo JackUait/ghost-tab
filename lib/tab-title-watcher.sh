@@ -13,15 +13,21 @@ check_ai_tool_state() {
 
   if [ "$ai_tool" = "claude" ]; then
     if [ -f "$marker_file" ]; then
-      # Marker exists, but verify pane still shows a prompt.
+      # Marker exists, but verify the prompt is the last conversation line.
       # Between user input and first tool call, the marker persists
       # even though Claude is actively working.
-      # Check last 5 non-empty lines (not just last) because Claude Code
-      # shows status bars and permissions indicator below the prompt.
-      local content last_lines
+      # Find the status-bar separator (─── line) and check the last
+      # non-empty line above it. When waiting, that's the prompt.
+      # When working, Claude's output sits between prompt and separator.
+      local content last_conv_line sep_line_num
       content=$("$tmux_cmd" capture-pane -t "$session_name:0.$pane_index" -p 2>/dev/null || true)
-      last_lines=$(echo "$content" | grep -v '^$' | tail -5)
-      if echo "$last_lines" | grep -qE '^[❯>]'; then
+      sep_line_num=$(echo "$content" | grep -n '^─' | tail -1 | cut -d: -f1)
+      if [ -n "$sep_line_num" ]; then
+        last_conv_line=$(echo "$content" | head -$((sep_line_num - 1)) | grep -v '^$' | tail -1)
+      else
+        last_conv_line=$(echo "$content" | grep -v '^$' | tail -1)
+      fi
+      if echo "$last_conv_line" | grep -qE '^[❯>]'; then
         echo "waiting"
       else
         echo "active"
