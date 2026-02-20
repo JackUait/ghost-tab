@@ -161,6 +161,46 @@ func TestLoading_render_loading_frame_centers_art_on_large_terminal(t *testing.T
 	assertContains(t, out, "\033[19;56H")
 }
 
+// --- get_tool_palette ---
+
+func TestGetToolPalette_returns_claude_palette(t *testing.T) {
+	out, code := runBashFunc(t, "lib/loading.sh", "get_tool_palette", []string{"claude"}, nil)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "130 166 172 208 209 214 215 220")
+}
+
+func TestGetToolPalette_returns_codex_palette(t *testing.T) {
+	out, code := runBashFunc(t, "lib/loading.sh", "get_tool_palette", []string{"codex"}, nil)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "22 28 29 34 35 41 42 47")
+}
+
+func TestGetToolPalette_returns_copilot_palette(t *testing.T) {
+	out, code := runBashFunc(t, "lib/loading.sh", "get_tool_palette", []string{"copilot"}, nil)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "17 18 24 25 31 33 39 45")
+}
+
+func TestGetToolPalette_returns_opencode_palette(t *testing.T) {
+	out, code := runBashFunc(t, "lib/loading.sh", "get_tool_palette", []string{"opencode"}, nil)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "55 91 127 163 169 175 176 177")
+}
+
+func TestGetToolPalette_defaults_to_claude_for_unknown(t *testing.T) {
+	out, code := runBashFunc(t, "lib/loading.sh", "get_tool_palette", []string{"unknown"}, nil)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "130 166 172 208 209 214 215 220")
+}
+
+func TestGetToolPalette_defaults_to_claude_for_empty(t *testing.T) {
+	out, code := runBashFunc(t, "lib/loading.sh", "get_tool_palette", nil, nil)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "130 166 172 208 209 214 215 220")
+}
+
+// --- render_loading_frame ---
+
 func TestLoading_render_loading_frame_shifts_colors_between_frames(t *testing.T) {
 	root := projectRoot(t)
 	script0 := fmt.Sprintf(
