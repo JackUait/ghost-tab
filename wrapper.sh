@@ -229,7 +229,7 @@ case "$SELECTED_AI_TOOL" in
 esac
 
 # Start tab title watcher before tmux (which blocks until session ends)
-start_tab_title_watcher "$SESSION_NAME" "$SELECTED_AI_TOOL" "$PROJECT_NAME" "$_tab_title_setting" "$TMUX_CMD" "$GHOST_TAB_MARKER_FILE"
+start_tab_title_watcher "$SESSION_NAME" "$SELECTED_AI_TOOL" "$PROJECT_NAME" "$_tab_title_setting" "$TMUX_CMD" "$GHOST_TAB_MARKER_FILE" "${XDG_CONFIG_HOME:-$HOME/.config}/ghost-tab"
 
 "$TMUX_CMD" new-session -s "$SESSION_NAME" -e "PATH=$PATH" -e "GHOST_TAB_BASELINE_FILE=$GHOST_TAB_BASELINE_FILE" -e "GHOST_TAB_MARKER_FILE=$GHOST_TAB_MARKER_FILE" -c "$PROJECT_DIR" \
   "$LAZYGIT_CMD; exec bash" \; \

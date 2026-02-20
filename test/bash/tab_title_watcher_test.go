@@ -481,3 +481,43 @@ func TestTabTitleWatcher_play_notification_sound_uses_default_when_features_file
 	}
 	assertContains(t, string(data), "Bottle.aiff")
 }
+
+func TestTabTitleWatcher_wrapper_passes_config_dir_to_watcher(t *testing.T) {
+	root := projectRoot(t)
+	wrapperPath := filepath.Join(root, "wrapper.sh")
+	data, err := os.ReadFile(wrapperPath)
+	if err != nil {
+		t.Fatalf("failed to read wrapper.sh: %v", err)
+	}
+	content := string(data)
+
+	for _, line := range strings.Split(content, "\n") {
+		if strings.Contains(line, "start_tab_title_watcher") && !strings.HasPrefix(strings.TrimSpace(line), "#") {
+			if !strings.Contains(line, "ghost-tab") {
+				t.Errorf("start_tab_title_watcher call should pass ghost-tab config dir, got: %s", line)
+			}
+			return
+		}
+	}
+	t.Error("start_tab_title_watcher call not found in wrapper.sh")
+}
+
+func TestTabTitleWatcher_ghostty_wrapper_passes_config_dir_to_watcher(t *testing.T) {
+	root := projectRoot(t)
+	wrapperPath := filepath.Join(root, "ghostty", "claude-wrapper.sh")
+	data, err := os.ReadFile(wrapperPath)
+	if err != nil {
+		t.Fatalf("failed to read ghostty/claude-wrapper.sh: %v", err)
+	}
+	content := string(data)
+
+	for _, line := range strings.Split(content, "\n") {
+		if strings.Contains(line, "start_tab_title_watcher") && !strings.HasPrefix(strings.TrimSpace(line), "#") {
+			if !strings.Contains(line, "ghost-tab") {
+				t.Errorf("start_tab_title_watcher call should pass ghost-tab config dir, got: %s", line)
+			}
+			return
+		}
+	}
+	t.Error("start_tab_title_watcher call not found in ghostty/claude-wrapper.sh")
+}
