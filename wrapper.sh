@@ -66,7 +66,7 @@ if [ ! -d "$_WRAPPER_DIR/lib" ]; then
   exit 1
 fi
 
-_gt_libs=(ai-tools projects process input tui update menu-tui project-actions tmux-session settings-menu-tui settings-json notification-setup)
+_gt_libs=(ai-tools projects process input tui update menu-tui project-actions tmux-session settings-menu-tui settings-json notification-setup tab-title-watcher)
 for _gt_lib in "${_gt_libs[@]}"; do
   if [ ! -f "$_WRAPPER_DIR/lib/${_gt_lib}.sh" ]; then
     printf '\033[31mError:\033[0m Missing library %s/lib/%s.sh\n' "$_WRAPPER_DIR" "$_gt_lib" >&2
@@ -184,6 +184,13 @@ else
   set_tab_title "$PROJECT_NAME"
 fi
 
+# Tab title waiting indicator
+GHOST_TAB_MARKER_FILE="/tmp/ghost-tab-waiting-$$"
+if [ "$SELECTED_AI_TOOL" = "claude" ]; then
+  _claude_settings="${HOME}/.claude/settings.json"
+  add_waiting_indicator_hooks "$_claude_settings" >/dev/null
+fi
+
 # Background watcher: switch to Claude pane once it's ready
 (
   while true; do
@@ -199,6 +206,7 @@ fi
 WATCHER_PID=$!
 
 cleanup() {
+  stop_tab_title_watcher "$GHOST_TAB_MARKER_FILE"
   cleanup_tmux_session "$SESSION_NAME" "$WATCHER_PID" "$TMUX_CMD"
   rm -f "$GHOST_TAB_BASELINE_FILE"
 }
@@ -214,7 +222,7 @@ case "$SELECTED_AI_TOOL" in
     ;;
 esac
 
-"$TMUX_CMD" new-session -s "$SESSION_NAME" -e "PATH=$PATH" -e "GHOST_TAB_BASELINE_FILE=$GHOST_TAB_BASELINE_FILE" -c "$PROJECT_DIR" \
+"$TMUX_CMD" new-session -s "$SESSION_NAME" -e "PATH=$PATH" -e "GHOST_TAB_BASELINE_FILE=$GHOST_TAB_BASELINE_FILE" -e "GHOST_TAB_MARKER_FILE=$GHOST_TAB_MARKER_FILE" -c "$PROJECT_DIR" \
   "$LAZYGIT_CMD; exec bash" \; \
   set-option status-left " ⬡ ${PROJECT_NAME} " \; \
   set-option status-left-style "fg=white,bg=colour236,bold" \; \
@@ -228,3 +236,6 @@ esac
   "trap exit TERM; while true; do $BROOT_CMD $PROJECT_DIR; done" \; \
   split-window -v -p 30 -c "$PROJECT_DIR" \; \
   select-pane -t 3
+
+# Start tab title watcher
+start_tab_title_watcher "$SESSION_NAME" "$SELECTED_AI_TOOL" "$PROJECT_NAME" "$_tab_title_setting" "$TMUX_CMD" "$GHOST_TAB_MARKER_FILE"
