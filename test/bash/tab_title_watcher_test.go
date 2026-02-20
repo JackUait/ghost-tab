@@ -351,6 +351,83 @@ func TestTabTitleWatcher_start_tab_title_watcher_takes_seven_params(t *testing.T
 	}
 }
 
+func TestTabTitleWatcher_start_tab_title_watcher_confirms_waiting_before_notify(t *testing.T) {
+	root := projectRoot(t)
+	watcherPath := filepath.Join(root, "lib", "tab-title-watcher.sh")
+	data, err := os.ReadFile(watcherPath)
+	if err != nil {
+		t.Fatalf("failed to read tab-title-watcher.sh: %v", err)
+	}
+	content := string(data)
+
+	if !strings.Contains(content, "_GHOST_TAB_CONFIRM_DELAY") {
+		t.Error("start_tab_title_watcher should use _GHOST_TAB_CONFIRM_DELAY for confirmation re-check")
+	}
+
+	if !strings.Contains(content, "# Re-check after confirmation delay") {
+		t.Error("start_tab_title_watcher should re-check AI tool state after confirmation delay to filter subagent false positives")
+	}
+}
+
+func TestTabTitleWatcher_confirm_ai_tool_waiting_returns_active_when_marker_disappears(t *testing.T) {
+	tmpDir := t.TempDir()
+	markerFile := filepath.Join(tmpDir, "marker")
+
+	os.WriteFile(markerFile, []byte(""), 0644)
+
+	go func() {
+		time.Sleep(100 * time.Millisecond)
+		os.Remove(markerFile)
+	}()
+
+	snippet := tabTitleSnippet(t,
+		fmt.Sprintf(`_GHOST_TAB_CONFIRM_DELAY=0.3; confirm_ai_tool_waiting "claude" "" "" %q ""`, markerFile))
+
+	out, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+	if strings.TrimSpace(out) != "active" {
+		t.Errorf("expected 'active' (marker disappeared during confirmation), got %q", strings.TrimSpace(out))
+	}
+}
+
+func TestTabTitleWatcher_confirm_ai_tool_waiting_returns_waiting_when_marker_persists(t *testing.T) {
+	tmpDir := t.TempDir()
+	markerFile := filepath.Join(tmpDir, "marker")
+
+	os.WriteFile(markerFile, []byte(""), 0644)
+
+	snippet := tabTitleSnippet(t,
+		fmt.Sprintf(`_GHOST_TAB_CONFIRM_DELAY=0.3; confirm_ai_tool_waiting "claude" "" "" %q ""`, markerFile))
+
+	out, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+	if strings.TrimSpace(out) != "waiting" {
+		t.Errorf("expected 'waiting' (marker persisted through confirmation), got %q", strings.TrimSpace(out))
+	}
+}
+
+func TestTabTitleWatcher_confirm_ai_tool_waiting_works_for_non_claude(t *testing.T) {
+	tmpDir := t.TempDir()
+	binDir := mockCommand(t, tmpDir, "tmux", `
+if [ "$1" = "capture-pane" ]; then
+  printf 'Some output\n❯ \n'
+  exit 0
+fi
+exit 0
+`)
+	env := buildEnv(t, []string{binDir})
+	tmuxPath := filepath.Join(binDir, "tmux")
+
+	snippet := tabTitleSnippet(t,
+		fmt.Sprintf(`_GHOST_TAB_CONFIRM_DELAY=0.3; confirm_ai_tool_waiting "codex" "dev-test-123" %q "" "3"`, tmuxPath))
+
+	out, code := runBashSnippet(t, snippet, env)
+	assertExitCode(t, code, 0)
+	if strings.TrimSpace(out) != "waiting" {
+		t.Errorf("expected 'waiting' for non-claude tool, got %q", strings.TrimSpace(out))
+	}
+}
+
 // --- stop_tab_title_watcher: cleanup ---
 
 func TestTabTitleWatcher_stop_tab_title_watcher_removes_marker_file(t *testing.T) {

@@ -3,6 +3,7 @@
 # Depends on: tui.sh (set_tab_title, set_tab_title_waiting)
 
 _TAB_TITLE_WATCHER_PID=""
+_GHOST_TAB_CONFIRM_DELAY="${_GHOST_TAB_CONFIRM_DELAY:-2}"
 
 # Check if the AI tool is waiting for user input.
 # Usage: check_ai_tool_state <ai_tool> <session_name> <tmux_cmd> <marker_file> <pane_index>
@@ -31,6 +32,19 @@ check_ai_tool_state() {
       echo "active"
     fi
   fi
+}
+
+# Confirm AI tool is actually waiting (filter transient marker appearances).
+# Sleeps for confirmation delay, then re-checks state.
+# Usage: confirm_ai_tool_waiting <ai_tool> <session_name> <tmux_cmd> <marker_file> <pane_index>
+# Outputs "waiting" or "active".
+confirm_ai_tool_waiting() {
+  local ai_tool="$1" session_name="$2" tmux_cmd="$3" marker_file="$4"
+  local pane_index="${5:-3}"
+
+  # Re-check after confirmation delay
+  sleep "$_GHOST_TAB_CONFIRM_DELAY"
+  check_ai_tool_state "$ai_tool" "$session_name" "$tmux_cmd" "$marker_file" "$pane_index"
 }
 
 # Discover the AI tool pane (rightmost pane in the tmux session).
@@ -64,15 +78,19 @@ start_tab_title_watcher() {
       state=$(check_ai_tool_state "$ai_tool" "$session_name" "$tmux_cmd" "$marker_file" "$ai_pane")
 
       if [ "$state" = "waiting" ] && [ "$was_waiting" = false ]; then
-        if [ "$tab_title_setting" = "full" ]; then
-          set_tab_title_waiting "$project_name" "$ai_tool"
-        else
-          set_tab_title_waiting "$project_name"
+        # Re-check after confirmation delay to filter subagent false positives
+        state=$(confirm_ai_tool_waiting "$ai_tool" "$session_name" "$tmux_cmd" "$marker_file" "$ai_pane")
+        if [ "$state" = "waiting" ]; then
+          if [ "$tab_title_setting" = "full" ]; then
+            set_tab_title_waiting "$project_name" "$ai_tool"
+          else
+            set_tab_title_waiting "$project_name"
+          fi
+          if [[ -n "$config_dir" ]]; then
+            play_notification_sound "$ai_tool" "$config_dir"
+          fi
+          was_waiting=true
         fi
-        if [[ -n "$config_dir" ]]; then
-          play_notification_sound "$ai_tool" "$config_dir"
-        fi
-        was_waiting=true
       elif [ "$state" = "active" ] && [ "$was_waiting" = true ]; then
         if [ "$tab_title_setting" = "full" ]; then
           set_tab_title "$project_name" "$ai_tool"
