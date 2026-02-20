@@ -52,16 +52,39 @@ clear_cmd = 'if [ -n "$GHOST_TAB_MARKER_FILE" ]; then rm -f "$GHOST_TAB_MARKER_F
 pre_tool_cmd = '_gt_in=$(cat); if [ -n "$GHOST_TAB_MARKER_FILE" ]; then if [[ "$_gt_in" == *AskUserQuestion* ]]; then touch "$GHOST_TAB_MARKER_FILE"; else rm -f "$GHOST_TAB_MARKER_FILE"; fi; fi'
 
 # Check if already installed
+marker = "GHOST_TAB_MARKER_FILE"
 stop_list = hooks.get("Stop", [])
 already_exists = any(
-    "GHOST_TAB_MARKER_FILE" in h.get("command", "")
+    marker in h.get("command", "")
     for entry in stop_list
     for h in entry.get("hooks", [])
 )
 
 if already_exists:
-    print("exists")
-    sys.exit(0)
+    # Check if PreToolUse hook has the current conditional format
+    pre_tool_list = hooks.get("PreToolUse", [])
+    is_current = any(
+        "AskUserQuestion" in h.get("command", "")
+        for entry in pre_tool_list
+        for h in entry.get("hooks", [])
+    )
+    if is_current:
+        print("exists")
+        sys.exit(0)
+    # Old format — remove ghost-tab hooks so they get re-added below
+    for event in ["Stop", "PreToolUse", "UserPromptSubmit"]:
+        event_list = hooks.get(event, [])
+        new_list = [
+            entry for entry in event_list
+            if not any(marker in h.get("command", "") for h in entry.get("hooks", []))
+        ]
+        if new_list:
+            hooks[event] = new_list
+        elif event in hooks:
+            del hooks[event]
+    action = "upgraded"
+else:
+    action = "added"
 
 # Add Stop hook
 hooks.setdefault("Stop", []).append({
@@ -82,7 +105,7 @@ with open(settings_path, "w") as f:
     json.dump(settings, f, indent=2)
     f.write("\n")
 
-print("added")
+print(action)
 PYEOF
 }
 

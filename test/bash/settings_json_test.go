@@ -117,16 +117,17 @@ func TestSettingsJson_add_waiting_indicator_hooks_adds_to_existing_settings(t *t
 
 func TestSettingsJson_add_waiting_indicator_hooks_reports_exists_when_duplicate(t *testing.T) {
 	tmpDir := t.TempDir()
+	// Use current-format hooks (PreToolUse has AskUserQuestion conditional)
 	settingsFile := writeTempFile(t, tmpDir, "settings.json", `{
   "hooks": {
     "Stop": [
       {
-        "hooks": [{"type": "command", "command": "[ -n \"$GHOST_TAB_MARKER_FILE\" ] && touch \"$GHOST_TAB_MARKER_FILE\""}]
+        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then touch \"$GHOST_TAB_MARKER_FILE\"; fi"}]
       }
     ],
     "PreToolUse": [
       {
-        "hooks": [{"type": "command", "command": "[ -n \"$GHOST_TAB_MARKER_FILE\" ] && rm -f \"$GHOST_TAB_MARKER_FILE\""}]
+        "hooks": [{"type": "command", "command": "_gt_in=$(cat); if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then if [[ \"$_gt_in\" == *AskUserQuestion* ]]; then touch \"$GHOST_TAB_MARKER_FILE\"; else rm -f \"$GHOST_TAB_MARKER_FILE\"; fi; fi"}]
       }
     ]
   }
@@ -139,6 +140,46 @@ func TestSettingsJson_add_waiting_indicator_hooks_reports_exists_when_duplicate(
 	out, code := runBashSnippet(t, snippet, nil)
 	assertExitCode(t, code, 0)
 	assertContains(t, strings.TrimSpace(out), "exists")
+}
+
+func TestSettingsJson_add_waiting_indicator_hooks_upgrades_old_format_PreToolUse(t *testing.T) {
+	tmpDir := t.TempDir()
+	// Old format: PreToolUse unconditionally clears marker (no AskUserQuestion check)
+	settingsFile := writeTempFile(t, tmpDir, "settings.json", `{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then touch \"$GHOST_TAB_MARKER_FILE\"; fi"}]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then rm -f \"$GHOST_TAB_MARKER_FILE\"; fi"}]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then rm -f \"$GHOST_TAB_MARKER_FILE\"; fi"}]
+      }
+    ]
+  }
+}
+`)
+
+	snippet := settingsJsonSnippet(t,
+		fmt.Sprintf(`add_waiting_indicator_hooks %q`, settingsFile))
+
+	out, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "upgraded")
+
+	data, err := os.ReadFile(settingsFile)
+	if err != nil {
+		t.Fatalf("failed to read settings.json: %v", err)
+	}
+	content := string(data)
+	// PreToolUse hook should now contain AskUserQuestion conditional
+	assertContains(t, content, "AskUserQuestion")
 }
 
 // --- add_waiting_indicator_hooks: safe exit code format ---
