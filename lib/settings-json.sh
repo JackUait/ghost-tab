@@ -48,8 +48,8 @@ else:
 hooks = settings.setdefault("hooks", {})
 
 stop_cmd = 'if [ -n "$GHOST_TAB_MARKER_FILE" ]; then touch "$GHOST_TAB_MARKER_FILE"; fi'
-clear_cmd = 'if [ -n "$GHOST_TAB_MARKER_FILE" ]; then rm -f "$GHOST_TAB_MARKER_FILE"; fi'
-pre_tool_cmd = '_gt_in=$(cat); if [ -n "$GHOST_TAB_MARKER_FILE" ]; then if [[ "$_gt_in" == *AskUserQuestion* ]]; then touch "$GHOST_TAB_MARKER_FILE"; else rm -f "$GHOST_TAB_MARKER_FILE"; fi; fi'
+clear_cmd = 'if [ -n "$GHOST_TAB_MARKER_FILE" ]; then rm -f "$GHOST_TAB_MARKER_FILE" "$GHOST_TAB_MARKER_FILE.ask"; fi'
+pre_tool_cmd = '_gt_in=$(cat); if [ -n "$GHOST_TAB_MARKER_FILE" ]; then if [[ "$_gt_in" == *AskUserQuestion* ]]; then touch "$GHOST_TAB_MARKER_FILE" "$GHOST_TAB_MARKER_FILE.ask"; else rm -f "$GHOST_TAB_MARKER_FILE" "$GHOST_TAB_MARKER_FILE.ask"; fi; fi'
 
 # Check if already installed
 marker = "GHOST_TAB_MARKER_FILE"
@@ -64,7 +64,7 @@ if already_exists:
     # Check if PreToolUse hook has the current conditional format
     pre_tool_list = hooks.get("PreToolUse", [])
     is_current = any(
-        "AskUserQuestion" in h.get("command", "")
+        ".ask" in h.get("command", "")
         for entry in pre_tool_list
         for h in entry.get("hooks", [])
     )
