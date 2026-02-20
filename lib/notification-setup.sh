@@ -2,6 +2,18 @@
 # Notification setup — sound hooks.
 # Depends on: tui.sh (success, warn), settings-json.sh (add_sound_notification_hook)
 
+# Play notification sound if enabled for the given AI tool.
+# Reads sound preference from features JSON and plays via afplay in background.
+# Usage: play_notification_sound <ai_tool> <config_dir>
+play_notification_sound() {
+  local ai_tool="$1" config_dir="$2"
+  local sound_name
+  sound_name="$(get_sound_name "$ai_tool" "$config_dir")"
+  if [[ -n "$sound_name" ]]; then
+    afplay "/System/Library/Sounds/${sound_name}.aiff" &
+  fi
+}
+
 # Add sound notification hook to Claude settings.
 # Usage: setup_sound_notification <settings_path> <sound_command> [config_dir]
 setup_sound_notification() {

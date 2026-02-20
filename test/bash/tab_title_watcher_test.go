@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // tabTitleSnippet sources tui.sh and tab-title-watcher.sh, then runs the provided bash code.
@@ -387,4 +388,91 @@ func TestTabTitleWatcher_ghostty_wrapper_disables_tmux_set_titles(t *testing.T) 
 	if !strings.Contains(content, "set-option set-titles off") {
 		t.Error("ghostty/claude-wrapper.sh must contain 'set-option set-titles off' in tmux new-session command to prevent tmux from overwriting tab titles")
 	}
+}
+
+// --- play_notification_sound ---
+
+// soundWatcherSnippet sources tui.sh, settings-json.sh, notification-setup.sh,
+// and tab-title-watcher.sh, then runs the provided bash code.
+func soundWatcherSnippet(t *testing.T, body string) string {
+	t.Helper()
+	root := projectRoot(t)
+	tuiPath := filepath.Join(root, "lib", "tui.sh")
+	settingsJsonPath := filepath.Join(root, "lib", "settings-json.sh")
+	notifPath := filepath.Join(root, "lib", "notification-setup.sh")
+	watcherPath := filepath.Join(root, "lib", "tab-title-watcher.sh")
+	return fmt.Sprintf("source %q && source %q && source %q && source %q && %s",
+		tuiPath, settingsJsonPath, notifPath, watcherPath, body)
+}
+
+func TestTabTitleWatcher_play_notification_sound_calls_afplay_when_enabled(t *testing.T) {
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, "config")
+	os.MkdirAll(configDir, 0755)
+	writeTempFile(t, configDir, "claude-features.json", `{"sound": true, "sound_name": "Glass"}`)
+
+	logFile := filepath.Join(tmpDir, "afplay.log")
+	binDir := mockCommand(t, tmpDir, "afplay", fmt.Sprintf(`echo "$1" >> %q`, logFile))
+	env := buildEnv(t, []string{binDir})
+
+	snippet := soundWatcherSnippet(t,
+		fmt.Sprintf(`play_notification_sound "claude" %q`, configDir))
+
+	_, code := runBashSnippet(t, snippet, env)
+	assertExitCode(t, code, 0)
+
+	// Give background process a moment to write
+	time.Sleep(200 * time.Millisecond)
+
+	data, err := os.ReadFile(logFile)
+	if err != nil {
+		t.Fatalf("expected afplay to be called, log file missing: %v", err)
+	}
+	assertContains(t, string(data), "Glass.aiff")
+}
+
+func TestTabTitleWatcher_play_notification_sound_skips_when_sound_disabled(t *testing.T) {
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, "config")
+	os.MkdirAll(configDir, 0755)
+	writeTempFile(t, configDir, "claude-features.json", `{"sound": false}`)
+
+	logFile := filepath.Join(tmpDir, "afplay.log")
+	binDir := mockCommand(t, tmpDir, "afplay", fmt.Sprintf(`echo "$1" >> %q`, logFile))
+	env := buildEnv(t, []string{binDir})
+
+	snippet := soundWatcherSnippet(t,
+		fmt.Sprintf(`play_notification_sound "claude" %q`, configDir))
+
+	_, code := runBashSnippet(t, snippet, env)
+	assertExitCode(t, code, 0)
+
+	time.Sleep(200 * time.Millisecond)
+
+	if _, err := os.Stat(logFile); !os.IsNotExist(err) {
+		t.Errorf("expected afplay NOT to be called when sound is disabled")
+	}
+}
+
+func TestTabTitleWatcher_play_notification_sound_uses_default_when_features_file_missing(t *testing.T) {
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, "nonexistent")
+
+	logFile := filepath.Join(tmpDir, "afplay.log")
+	binDir := mockCommand(t, tmpDir, "afplay", fmt.Sprintf(`echo "$1" >> %q`, logFile))
+	env := buildEnv(t, []string{binDir})
+
+	snippet := soundWatcherSnippet(t,
+		fmt.Sprintf(`play_notification_sound "claude" %q`, configDir))
+
+	_, code := runBashSnippet(t, snippet, env)
+	assertExitCode(t, code, 0)
+
+	time.Sleep(200 * time.Millisecond)
+
+	data, err := os.ReadFile(logFile)
+	if err != nil {
+		t.Fatalf("expected afplay to be called with default sound: %v", err)
+	}
+	assertContains(t, string(data), "Bottle.aiff")
 }
