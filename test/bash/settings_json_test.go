@@ -231,6 +231,168 @@ func TestSettingsJson_merge_claude_settings_adds_status_line_to_existing(t *test
 	assertContains(t, content, `"statusLine"`)
 }
 
+// --- add_waiting_indicator_hooks ---
+
+func TestSettingsJson_add_waiting_indicator_hooks_creates_file_with_Stop_and_PreToolUse(t *testing.T) {
+	tmpDir := t.TempDir()
+	settingsFile := filepath.Join(tmpDir, "settings.json")
+
+	snippet := settingsJsonSnippet(t,
+		fmt.Sprintf(`add_waiting_indicator_hooks %q`, settingsFile))
+
+	out, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "added")
+
+	data, err := os.ReadFile(settingsFile)
+	if err != nil {
+		t.Fatalf("settings.json should have been created: %v", err)
+	}
+	content := string(data)
+	assertContains(t, content, `"Stop"`)
+	assertContains(t, content, `"PreToolUse"`)
+	assertContains(t, content, "GHOST_TAB_MARKER_FILE")
+}
+
+func TestSettingsJson_add_waiting_indicator_hooks_adds_to_existing_settings(t *testing.T) {
+	tmpDir := t.TempDir()
+	settingsFile := writeTempFile(t, tmpDir, "settings.json", `{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [{"type": "command", "command": "afplay /System/Library/Sounds/Bottle.aiff &"}]
+      }
+    ]
+  }
+}
+`)
+
+	snippet := settingsJsonSnippet(t,
+		fmt.Sprintf(`add_waiting_indicator_hooks %q`, settingsFile))
+
+	out, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "added")
+
+	data, err := os.ReadFile(settingsFile)
+	if err != nil {
+		t.Fatalf("failed to read settings.json: %v", err)
+	}
+	content := string(data)
+	assertContains(t, content, "afplay")
+	assertContains(t, content, "GHOST_TAB_MARKER_FILE")
+	assertContains(t, content, `"PreToolUse"`)
+}
+
+func TestSettingsJson_add_waiting_indicator_hooks_reports_exists_when_duplicate(t *testing.T) {
+	tmpDir := t.TempDir()
+	settingsFile := writeTempFile(t, tmpDir, "settings.json", `{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [{"type": "command", "command": "[ -n \"$GHOST_TAB_MARKER_FILE\" ] && touch \"$GHOST_TAB_MARKER_FILE\""}]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [{"type": "command", "command": "[ -n \"$GHOST_TAB_MARKER_FILE\" ] && rm -f \"$GHOST_TAB_MARKER_FILE\""}]
+      }
+    ]
+  }
+}
+`)
+
+	snippet := settingsJsonSnippet(t,
+		fmt.Sprintf(`add_waiting_indicator_hooks %q`, settingsFile))
+
+	out, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+	assertContains(t, strings.TrimSpace(out), "exists")
+}
+
+// --- remove_waiting_indicator_hooks ---
+
+func TestSettingsJson_remove_waiting_indicator_hooks_removes_both_hooks(t *testing.T) {
+	tmpDir := t.TempDir()
+	settingsFile := writeTempFile(t, tmpDir, "settings.json", `{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [{"type": "command", "command": "[ -n \"$GHOST_TAB_MARKER_FILE\" ] && touch \"$GHOST_TAB_MARKER_FILE\""}]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [{"type": "command", "command": "[ -n \"$GHOST_TAB_MARKER_FILE\" ] && rm -f \"$GHOST_TAB_MARKER_FILE\""}]
+      }
+    ]
+  }
+}
+`)
+
+	snippet := settingsJsonSnippet(t,
+		fmt.Sprintf(`remove_waiting_indicator_hooks %q`, settingsFile))
+
+	out, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "removed")
+
+	data, err := os.ReadFile(settingsFile)
+	if err != nil {
+		t.Fatalf("failed to read settings.json: %v", err)
+	}
+	assertNotContains(t, string(data), "GHOST_TAB_MARKER_FILE")
+}
+
+func TestSettingsJson_remove_waiting_indicator_hooks_preserves_other_hooks(t *testing.T) {
+	tmpDir := t.TempDir()
+	settingsFile := writeTempFile(t, tmpDir, "settings.json", `{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [{"type": "command", "command": "afplay /System/Library/Sounds/Bottle.aiff &"}]
+      },
+      {
+        "hooks": [{"type": "command", "command": "[ -n \"$GHOST_TAB_MARKER_FILE\" ] && touch \"$GHOST_TAB_MARKER_FILE\""}]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [{"type": "command", "command": "[ -n \"$GHOST_TAB_MARKER_FILE\" ] && rm -f \"$GHOST_TAB_MARKER_FILE\""}]
+      }
+    ]
+  }
+}
+`)
+
+	snippet := settingsJsonSnippet(t,
+		fmt.Sprintf(`remove_waiting_indicator_hooks %q`, settingsFile))
+
+	out, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "removed")
+
+	data, err := os.ReadFile(settingsFile)
+	if err != nil {
+		t.Fatalf("failed to read settings.json: %v", err)
+	}
+	content := string(data)
+	assertContains(t, content, "afplay")
+	assertNotContains(t, content, "GHOST_TAB_MARKER_FILE")
+}
+
+func TestSettingsJson_remove_waiting_indicator_hooks_returns_not_found_when_absent(t *testing.T) {
+	tmpDir := t.TempDir()
+	settingsFile := writeTempFile(t, tmpDir, "settings.json", `{}`)
+
+	snippet := settingsJsonSnippet(t,
+		fmt.Sprintf(`remove_waiting_indicator_hooks %q`, settingsFile))
+
+	out, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+	assertContains(t, strings.TrimSpace(out), "not_found")
+}
+
 func TestSettingsJson_merge_claude_settings_skips_when_already_configured(t *testing.T) {
 	tmpDir := t.TempDir()
 	settingsFile := writeTempFile(t, tmpDir, "settings.json", `{

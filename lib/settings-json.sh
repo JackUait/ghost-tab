@@ -141,3 +141,110 @@ with open(settings_path, "w") as f:
 print("removed")
 PYEOF
 }
+
+# Add waiting indicator hooks (Stop + PreToolUse) to settings.json.
+# Uses $GHOST_TAB_MARKER_FILE env var so hooks are safe outside Ghost Tab.
+# Outputs "added" or "exists".
+add_waiting_indicator_hooks() {
+  local path="$1"
+  mkdir -p "$(dirname "$path")"
+  python3 - "$path" << 'PYEOF'
+import json, sys, os
+
+settings_path = sys.argv[1]
+
+if os.path.exists(settings_path):
+    try:
+        with open(settings_path, "r") as f:
+            settings = json.load(f)
+    except (json.JSONDecodeError, ValueError):
+        settings = {}
+else:
+    settings = {}
+
+hooks = settings.setdefault("hooks", {})
+
+stop_cmd = '[ -n "$GHOST_TAB_MARKER_FILE" ] && touch "$GHOST_TAB_MARKER_FILE"'
+clear_cmd = '[ -n "$GHOST_TAB_MARKER_FILE" ] && rm -f "$GHOST_TAB_MARKER_FILE"'
+
+# Check if already installed
+stop_list = hooks.get("Stop", [])
+already_exists = any(
+    "GHOST_TAB_MARKER_FILE" in h.get("command", "")
+    for entry in stop_list
+    for h in entry.get("hooks", [])
+)
+
+if already_exists:
+    print("exists")
+    sys.exit(0)
+
+# Add Stop hook
+hooks.setdefault("Stop", []).append({
+    "hooks": [{"type": "command", "command": stop_cmd}]
+})
+
+# Add PreToolUse hook
+hooks.setdefault("PreToolUse", []).append({
+    "hooks": [{"type": "command", "command": clear_cmd}]
+})
+
+with open(settings_path, "w") as f:
+    json.dump(settings, f, indent=2)
+    f.write("\n")
+
+print("added")
+PYEOF
+}
+
+# Remove waiting indicator hooks from settings.json.
+# Outputs "removed" or "not_found".
+remove_waiting_indicator_hooks() {
+  local path="$1"
+  if [ ! -f "$path" ]; then
+    echo "not_found"
+    return 0
+  fi
+  python3 - "$path" << 'PYEOF'
+import json, sys, os
+
+settings_path = sys.argv[1]
+marker = "GHOST_TAB_MARKER_FILE"
+
+try:
+    with open(settings_path, "r") as f:
+        settings = json.load(f)
+except (json.JSONDecodeError, ValueError, FileNotFoundError):
+    print("not_found")
+    sys.exit(0)
+
+hooks = settings.get("hooks", {})
+found = False
+
+for event in ["Stop", "PreToolUse"]:
+    event_list = hooks.get(event, [])
+    new_list = [
+        entry for entry in event_list
+        if not any(marker in h.get("command", "") for h in entry.get("hooks", []))
+    ]
+    if len(new_list) != len(event_list):
+        found = True
+        if new_list:
+            hooks[event] = new_list
+        else:
+            del hooks[event]
+
+if not found:
+    print("not_found")
+    sys.exit(0)
+
+if not hooks:
+    del settings["hooks"]
+
+with open(settings_path, "w") as f:
+    json.dump(settings, f, indent=2)
+    f.write("\n")
+
+print("removed")
+PYEOF
+}
