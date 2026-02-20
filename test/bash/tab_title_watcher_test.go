@@ -171,6 +171,34 @@ exit 0
 	}
 }
 
+// --- check_ai_tool_state: pane targeting ---
+
+func TestTabTitleWatcher_check_ai_tool_state_targets_correct_pane(t *testing.T) {
+	tmpDir := t.TempDir()
+	// Mock tmux that only returns a prompt for pane 0.3
+	binDir := mockCommand(t, tmpDir, "tmux", `
+for arg in "$@"; do
+  if [ "$arg" = "dev-test-123:0.3" ]; then
+    printf 'Some output\n❯ \n'
+    exit 0
+  fi
+done
+printf 'no prompt here\n'
+exit 0
+`)
+	env := buildEnv(t, []string{binDir})
+	tmuxPath := filepath.Join(binDir, "tmux")
+
+	snippet := tabTitleSnippet(t,
+		fmt.Sprintf(`check_ai_tool_state "codex" "dev-test-123" %q "" "3"`, tmuxPath))
+
+	out, code := runBashSnippet(t, snippet, env)
+	assertExitCode(t, code, 0)
+	if strings.TrimSpace(out) != "waiting" {
+		t.Errorf("expected 'waiting' (pane 0.3 targeted), got %q", strings.TrimSpace(out))
+	}
+}
+
 // --- stop_tab_title_watcher: cleanup ---
 
 func TestTabTitleWatcher_stop_tab_title_watcher_removes_marker_file(t *testing.T) {
