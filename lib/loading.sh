@@ -24,8 +24,8 @@ ART
 get_tool_palette() {
   case "${1:-}" in
     codex)    echo "22 28 29 34 35 41 42 47" ;;          # green
-    copilot)  echo "17 18 24 25 31 33 39 45" ;;          # blue/cyan
-    opencode) echo "55 91 127 163 169 175 176 177" ;;    # purple/magenta
+    copilot)  echo "54 56 93 99 135 141 177 183" ;;       # purple (GitHub Copilot brand)
+    opencode) echo "240 242 244 246 248 250 252 254" ;;   # gray/silver (OpenCode mascot)
     *)        echo "130 166 172 208 209 214 215 220" ;;   # orange/amber (claude default)
   esac
 }

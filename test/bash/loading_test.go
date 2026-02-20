@@ -137,13 +137,13 @@ func TestLoading_get_tool_palette_returns_codex_palette(t *testing.T) {
 func TestLoading_get_tool_palette_returns_copilot_palette(t *testing.T) {
 	out, code := runBashFunc(t, "lib/loading.sh", "get_tool_palette", []string{"copilot"}, nil)
 	assertExitCode(t, code, 0)
-	assertContains(t, out, "17 18 24 25 31 33 39 45")
+	assertContains(t, out, "54 56 93 99 135 141 177 183")
 }
 
 func TestLoading_get_tool_palette_returns_opencode_palette(t *testing.T) {
 	out, code := runBashFunc(t, "lib/loading.sh", "get_tool_palette", []string{"opencode"}, nil)
 	assertExitCode(t, code, 0)
-	assertContains(t, out, "55 91 127 163 169 175 176 177")
+	assertContains(t, out, "240 242 244 246 248 250 252 254")
 }
 
 func TestLoading_get_tool_palette_defaults_to_claude_for_unknown(t *testing.T) {
