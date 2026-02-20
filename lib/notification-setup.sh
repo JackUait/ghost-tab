@@ -18,6 +18,44 @@ setup_sound_notification() {
   fi
 }
 
+# Set Claude Code's preferredNotifChannel to terminal_bell to prevent
+# double sounds (ghost-tab hook + built-in notification).
+# Saves the previous value to <config_dir>/prev-notif-channel for restoration.
+# Usage: set_claude_notif_channel <config_dir>
+set_claude_notif_channel() {
+  local config_dir="$1"
+  if ! command -v claude &>/dev/null; then
+    return 0
+  fi
+  mkdir -p "$config_dir"
+  local prev
+  prev="$(CLAUDECODE="" claude config get preferredNotifChannel 2>/dev/null || true)"
+  echo "$prev" > "$config_dir/prev-notif-channel"
+  CLAUDECODE="" claude config set --global preferredNotifChannel terminal_bell 2>/dev/null || true
+}
+
+# Restore Claude Code's preferredNotifChannel from saved value.
+# If no saved value exists, does nothing.
+# Usage: restore_claude_notif_channel <config_dir>
+restore_claude_notif_channel() {
+  local config_dir="$1"
+  local saved_file="$config_dir/prev-notif-channel"
+  if [ ! -f "$saved_file" ]; then
+    return 0
+  fi
+  if ! command -v claude &>/dev/null; then
+    return 0
+  fi
+  local prev
+  prev="$(tr -d '[:space:]' < "$saved_file")"
+  if [[ -n "$prev" ]]; then
+    CLAUDECODE="" claude config set --global preferredNotifChannel "$prev" 2>/dev/null || true
+  else
+    CLAUDECODE="" claude config set --global preferredNotifChannel "" 2>/dev/null || true
+  fi
+  rm -f "$saved_file"
+}
+
 # Check if sound notifications are enabled for the given AI tool.
 # Usage: is_sound_enabled <tool> <config_dir>
 # Outputs "true" or "false".

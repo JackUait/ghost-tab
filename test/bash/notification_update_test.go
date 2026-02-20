@@ -588,6 +588,199 @@ func TestNotification_apply_sound_notification_changes_sound(t *testing.T) {
 	assertNotContains(t, string(data), "Bottle.aiff")
 }
 
+// --- set_claude_notif_channel ---
+
+func TestNotification_set_claude_notif_channel_saves_previous_and_sets_terminal_bell(t *testing.T) {
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, "config")
+	os.MkdirAll(configDir, 0755)
+
+	// Mock claude CLI: "config get" returns "iterm2", "config set" verifies terminal_bell
+	claudeBody := `
+if [ "$1" = "config" ] && [ "$2" = "get" ]; then
+  echo "iterm2"
+  exit 0
+fi
+if [ "$1" = "config" ] && [ "$2" = "set" ] && [ "$4" = "terminal_bell" ]; then
+  exit 0
+fi
+echo "unexpected args: $*" >&2
+exit 1
+`
+	binDir := mockCommand(t, tmpDir, "claude", claudeBody)
+	env := buildEnv(t, []string{binDir}, "CLAUDECODE=")
+
+	snippet := notificationSnippet(t,
+		fmt.Sprintf(`set_claude_notif_channel %q`, configDir))
+
+	_, code := runBashSnippet(t, snippet, env)
+	assertExitCode(t, code, 0)
+
+	// Verify prev-notif-channel file was saved with "iterm2"
+	savedFile := filepath.Join(configDir, "prev-notif-channel")
+	data, err := os.ReadFile(savedFile)
+	if err != nil {
+		t.Fatalf("expected prev-notif-channel file to exist: %v", err)
+	}
+	if strings.TrimSpace(string(data)) != "iterm2" {
+		t.Errorf("expected saved value 'iterm2', got %q", strings.TrimSpace(string(data)))
+	}
+}
+
+func TestNotification_set_claude_notif_channel_skips_when_claude_not_available(t *testing.T) {
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, "config")
+	os.MkdirAll(configDir, 0755)
+
+	// PATH=/nonexistent so claude is not found
+	env := buildEnv(t, nil, "PATH=/nonexistent", "CLAUDECODE=")
+
+	snippet := notificationSnippet(t,
+		fmt.Sprintf(`set_claude_notif_channel %q`, configDir))
+
+	_, code := runBashSnippet(t, snippet, env)
+	assertExitCode(t, code, 0)
+
+	// Verify no prev-notif-channel file was created
+	savedFile := filepath.Join(configDir, "prev-notif-channel")
+	if _, err := os.Stat(savedFile); !os.IsNotExist(err) {
+		t.Errorf("expected prev-notif-channel file NOT to exist, but it does")
+	}
+}
+
+func TestNotification_set_claude_notif_channel_handles_empty_current_value(t *testing.T) {
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, "config")
+	os.MkdirAll(configDir, 0755)
+
+	// Mock claude CLI: "config get" returns empty, "config set" succeeds
+	claudeBody := `
+if [ "$1" = "config" ] && [ "$2" = "get" ]; then
+  echo ""
+  exit 0
+fi
+if [ "$1" = "config" ] && [ "$2" = "set" ]; then
+  exit 0
+fi
+exit 0
+`
+	binDir := mockCommand(t, tmpDir, "claude", claudeBody)
+	env := buildEnv(t, []string{binDir}, "CLAUDECODE=")
+
+	snippet := notificationSnippet(t,
+		fmt.Sprintf(`set_claude_notif_channel %q`, configDir))
+
+	_, code := runBashSnippet(t, snippet, env)
+	assertExitCode(t, code, 0)
+
+	// Verify prev-notif-channel file exists with empty content
+	savedFile := filepath.Join(configDir, "prev-notif-channel")
+	data, err := os.ReadFile(savedFile)
+	if err != nil {
+		t.Fatalf("expected prev-notif-channel file to exist: %v", err)
+	}
+	// File should exist, content should be empty (just a newline from echo)
+	if strings.TrimSpace(string(data)) != "" {
+		t.Errorf("expected empty saved value, got %q", strings.TrimSpace(string(data)))
+	}
+}
+
+// --- restore_claude_notif_channel ---
+
+func TestNotification_restore_claude_notif_channel_restores_saved_value(t *testing.T) {
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, "config")
+	os.MkdirAll(configDir, 0755)
+	writeTempFile(t, configDir, "prev-notif-channel", "iterm2\n")
+
+	// Mock claude CLI: "config set" verifies restoring iterm2
+	claudeBody := `
+if [ "$1" = "config" ] && [ "$2" = "set" ] && [ "$4" = "iterm2" ]; then
+  exit 0
+fi
+echo "unexpected args: $*" >&2
+exit 1
+`
+	binDir := mockCommand(t, tmpDir, "claude", claudeBody)
+	env := buildEnv(t, []string{binDir}, "CLAUDECODE=")
+
+	snippet := notificationSnippet(t,
+		fmt.Sprintf(`restore_claude_notif_channel %q`, configDir))
+
+	_, code := runBashSnippet(t, snippet, env)
+	assertExitCode(t, code, 0)
+
+	// Verify prev-notif-channel file was removed after restore
+	savedFile := filepath.Join(configDir, "prev-notif-channel")
+	if _, err := os.Stat(savedFile); !os.IsNotExist(err) {
+		t.Errorf("expected prev-notif-channel file to be removed after restore")
+	}
+}
+
+func TestNotification_restore_claude_notif_channel_unsets_when_prev_was_empty(t *testing.T) {
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, "config")
+	os.MkdirAll(configDir, 0755)
+	writeTempFile(t, configDir, "prev-notif-channel", "\n")
+
+	// Mock claude CLI: "config set" succeeds
+	claudeBody := `
+if [ "$1" = "config" ] && [ "$2" = "set" ]; then
+  exit 0
+fi
+exit 0
+`
+	binDir := mockCommand(t, tmpDir, "claude", claudeBody)
+	env := buildEnv(t, []string{binDir}, "CLAUDECODE=")
+
+	snippet := notificationSnippet(t,
+		fmt.Sprintf(`restore_claude_notif_channel %q`, configDir))
+
+	_, code := runBashSnippet(t, snippet, env)
+	assertExitCode(t, code, 0)
+
+	// Verify prev-notif-channel file was removed
+	savedFile := filepath.Join(configDir, "prev-notif-channel")
+	if _, err := os.Stat(savedFile); !os.IsNotExist(err) {
+		t.Errorf("expected prev-notif-channel file to be removed after restore")
+	}
+}
+
+func TestNotification_restore_claude_notif_channel_noop_when_no_saved_file(t *testing.T) {
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, "config")
+	os.MkdirAll(configDir, 0755)
+	// No prev-notif-channel file created
+
+	snippet := notificationSnippet(t,
+		fmt.Sprintf(`restore_claude_notif_channel %q`, configDir))
+
+	_, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+}
+
+func TestNotification_restore_claude_notif_channel_skips_when_claude_not_available(t *testing.T) {
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, "config")
+	os.MkdirAll(configDir, 0755)
+	writeTempFile(t, configDir, "prev-notif-channel", "iterm2\n")
+
+	// PATH=/nonexistent so claude is not found
+	env := buildEnv(t, nil, "PATH=/nonexistent", "CLAUDECODE=")
+
+	snippet := notificationSnippet(t,
+		fmt.Sprintf(`restore_claude_notif_channel %q`, configDir))
+
+	_, code := runBashSnippet(t, snippet, env)
+	assertExitCode(t, code, 0)
+
+	// Verify file still exists (not removed since restore couldn't happen)
+	savedFile := filepath.Join(configDir, "prev-notif-channel")
+	if _, err := os.Stat(savedFile); os.IsNotExist(err) {
+		t.Errorf("expected prev-notif-channel file to still exist when claude not available")
+	}
+}
+
 // ==================== update.sh tests ====================
 
 // --- check_for_update: no brew ---
