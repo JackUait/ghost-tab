@@ -1,5 +1,5 @@
 #!/bin/bash
-# Loading screen with random ASCII art, color palettes, and animation.
+# Loading screen with ASCII art, random color palettes, and animation.
 
 LOADING_PALETTE_COUNT=5
 
