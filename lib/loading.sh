@@ -114,14 +114,9 @@ _detect_term_size() {
 # Sets _LOADING_SCREEN_PID for the caller to stop later.
 show_loading_screen() {
   local pal_idx=$(( RANDOM % LOADING_PALETTE_COUNT ))
-  local rows cols
-  read -r rows cols <<< "$(_detect_term_size)"
 
-  # Clear screen, hide cursor
+  # Clear screen, hide cursor (instant dark feedback)
   printf '\033[2J\033[H\033[?25l'
-
-  # Draw initial frame
-  render_loading_frame "$pal_idx" 0 "$cols" "$rows"
 
   # Symbols for floating particles
   local symbols=('·' '•' '°' '∘' '⋅' '∙')
@@ -129,12 +124,17 @@ show_loading_screen() {
   # Start animation in background
   (
     trap 'printf "\033[?25h\033[0m"; exit 0' TERM INT HUP
-    local frame=1
+
+    # Brief delay so terminal reports its final size after window opens
+    sleep 0.1
+
+    local frame=0
+    local rows cols
     local -a prev_sym_positions=()
-    local prev_rows="$rows" prev_cols="$cols"
+    local prev_rows=0 prev_cols=0
 
     while true; do
-      # Re-detect terminal size each frame (handles late window resizes)
+      # Detect terminal size each frame (handles late window resizes)
       read -r rows cols <<< "$(_detect_term_size)"
       if (( rows != prev_rows || cols != prev_cols )); then
         printf '\033[2J'  # Clear screen on resize to avoid ghost artifacts
