@@ -5,7 +5,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/jackuait/ghost-tab/internal/models"
+	"github.com/muesli/termenv"
 )
 
 func newTestMenu() *MainMenuModel {
@@ -54,6 +56,21 @@ func TestMenuBox_AIToolRightAligned(t *testing.T) {
 	}
 	if len(gap) < 5 {
 		t.Errorf("expected at least 5 chars padding for right-alignment, got %d: %q", len(gap), gap)
+	}
+}
+
+func TestMenuBox_AIToolHasTrailingSpace(t *testing.T) {
+	m := newTestMenu()
+	box := m.renderMenuBox()
+	lines := strings.Split(box, "\n")
+	if len(lines) < 2 {
+		t.Fatal("renderMenuBox produced fewer than 2 lines")
+	}
+	raw := stripAnsi(lines[1]) // title row
+	// AI tool selector should have a trailing space before the right border │
+	// e.g. "◂ Claude Code ▸ │" not "◂ Claude Code ▸│"
+	if !strings.HasSuffix(raw, "▸ │") {
+		t.Errorf("expected AI tool selector to have trailing space before border, got: %q", raw)
 	}
 }
 
@@ -433,6 +450,111 @@ func TestMenuBox_HelpTextFitsWithinBorders(t *testing.T) {
 		if lineWidth != borderWidth {
 			t.Errorf("line %d width %d != border width %d: %q", i, lineWidth, borderWidth, line)
 		}
+	}
+}
+
+func TestMenuBox_UnselectedProjectUsesNeutralColors(t *testing.T) {
+	// Force color output so lipgloss emits ANSI codes in tests.
+	prev := lipgloss.ColorProfile()
+	lipgloss.SetColorProfile(termenv.TrueColor)
+	defer lipgloss.SetColorProfile(prev)
+
+	projects := []models.Project{
+		{Name: "selected-proj", Path: "/tmp/selected"},
+		{Name: "unselected-proj", Path: "/tmp/unselected"},
+	}
+	m := NewMainMenu(projects, []string{"claude"}, "claude", "animated")
+	m.width = 100
+	m.height = 40
+	// Item 0 is selected by default, so item 1 (unselected-proj) should use neutral colors
+	box := m.renderMenuBox()
+
+	// The unselected project name should use neutral text color (252), not theme.Text (223)
+	// ANSI 256-color format: \033[38;5;COLORm
+	if !strings.Contains(box, "\x1b[38;5;252m") {
+		t.Error("expected neutral text color (252) for unselected project name")
+	}
+	// The unselected project path should use neutral dim color (245), not theme.Dim (166)
+	if !strings.Contains(box, "\x1b[38;5;245m") {
+		t.Error("expected neutral dim color (245) for unselected project path/number")
+	}
+}
+
+func TestMenuBox_SelectedProjectUsesThemeColor(t *testing.T) {
+	// Force color output so lipgloss emits ANSI codes in tests.
+	prev := lipgloss.ColorProfile()
+	lipgloss.SetColorProfile(termenv.TrueColor)
+	defer lipgloss.SetColorProfile(prev)
+
+	projects := []models.Project{
+		{Name: "selected-proj", Path: "/tmp/selected"},
+	}
+	m := NewMainMenu(projects, []string{"claude"}, "claude", "animated")
+	m.width = 100
+	m.height = 40
+	box := m.renderMenuBox()
+
+	// Selected project should use theme.Primary (209) not neutral colors
+	if !strings.Contains(box, "\x1b[38;5;209m") {
+		t.Error("expected theme primary color (209) for selected project")
+	}
+}
+
+func TestMenuBox_UnselectedActionUsesNeutralColors(t *testing.T) {
+	// Force color output so lipgloss emits ANSI codes in tests.
+	prev := lipgloss.ColorProfile()
+	lipgloss.SetColorProfile(termenv.TrueColor)
+	defer lipgloss.SetColorProfile(prev)
+
+	projects := []models.Project{
+		{Name: "proj", Path: "/tmp/proj"},
+	}
+	m := NewMainMenu(projects, []string{"claude"}, "claude", "animated")
+	m.width = 100
+	m.height = 40
+	// Select first project (item 0), so action items are unselected
+	box := m.renderMenuBox()
+
+	// Find action item lines in raw output — they should contain neutral colors
+	// Action shortcuts and labels should use 245 and 252 respectively
+	lines := strings.Split(box, "\n")
+	found245 := false
+	found252 := false
+	for _, line := range lines {
+		raw := stripAnsi(line)
+		if strings.Contains(raw, "Add new project") {
+			if strings.Contains(line, "\x1b[38;5;245m") {
+				found245 = true
+			}
+			if strings.Contains(line, "\x1b[38;5;252m") {
+				found252 = true
+			}
+		}
+	}
+	if !found245 {
+		t.Error("expected neutral dim color (245) for unselected action shortcut")
+	}
+	if !found252 {
+		t.Error("expected neutral text color (252) for unselected action label")
+	}
+}
+
+func TestMenuBox_BordersStillUseThemeDim(t *testing.T) {
+	// Force color output so lipgloss emits ANSI codes in tests.
+	prev := lipgloss.ColorProfile()
+	lipgloss.SetColorProfile(termenv.TrueColor)
+	defer lipgloss.SetColorProfile(prev)
+
+	m := newTestMenu()
+	box := m.renderMenuBox()
+	lines := strings.Split(box, "\n")
+
+	// Top border (first line) should use theme.Dim (166), not neutral gray
+	if len(lines) < 1 {
+		t.Fatal("no lines in rendered box")
+	}
+	if !strings.Contains(lines[0], "\x1b[38;5;166m") {
+		t.Error("expected theme dim color (166) for box border")
 	}
 }
 

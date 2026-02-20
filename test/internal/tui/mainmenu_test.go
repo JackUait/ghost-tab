@@ -1753,13 +1753,13 @@ func TestMainMenu_ViewUnselectedProjectUsesTextColor(t *testing.T) {
 	m.SetSize(80, 30)
 	view := m.View()
 
-	// Unselected project name "p2" should use theme.Text color (223 for claude)
-	// not theme.Bright (208). ANSI 256 color format: \x1b[38;5;223m
+	// Unselected project name "p2" should use neutral text color (252)
+	// not theme.Text (223). ANSI 256 color format: \x1b[38;5;252m
 	lines := strings.Split(view, "\n")
 	for _, line := range lines {
 		if strings.Contains(line, "p2") && !strings.Contains(line, "/p2") {
-			if !strings.Contains(line, "\x1b[38;5;223m") {
-				t.Errorf("unselected project name 'p2' should use Text color (223), line: %q", line)
+			if !strings.Contains(line, "\x1b[38;5;252m") {
+				t.Errorf("unselected project name 'p2' should use neutral text color (252), line: %q", line)
 			}
 			return
 		}
@@ -1829,12 +1829,12 @@ func TestMainMenu_ViewUnselectedActionUsesTextColor(t *testing.T) {
 	m.SetSize(80, 30)
 	view := m.View()
 
-	// Unselected action label "Delete" should use theme.Text color (223)
+	// Unselected action label "Delete" should use neutral text color (252)
 	lines := strings.Split(view, "\n")
 	for _, line := range lines {
 		if strings.Contains(line, "Delete") {
-			if !strings.Contains(line, "\x1b[38;5;223m") {
-				t.Errorf("unselected action label 'Delete' should use Text color (223), line: %q", line)
+			if !strings.Contains(line, "\x1b[38;5;252m") {
+				t.Errorf("unselected action label 'Delete' should use neutral text color (252), line: %q", line)
 			}
 			return
 		}

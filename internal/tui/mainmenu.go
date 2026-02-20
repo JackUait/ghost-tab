@@ -1528,9 +1528,10 @@ func (m *MainMenuModel) renderMenuBox() string {
 	dimStyle := lipgloss.NewStyle().Foreground(m.theme.Dim)
 	primaryStyle := lipgloss.NewStyle().Foreground(m.theme.Primary)
 	primaryBoldStyle := lipgloss.NewStyle().Foreground(m.theme.Primary).Bold(true)
-	textStyle := lipgloss.NewStyle().Foreground(m.theme.Text)
 	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("247"))
 	updateStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("220"))
+	neutralTextStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
+	neutralDimStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
 
 	hLine := strings.Repeat("\u2500", menuInnerWidth)
 	topBorder := dimStyle.Render("\u250c" + hLine + "\u2510")
@@ -1554,11 +1555,11 @@ func (m *MainMenuModel) renderMenuBox() string {
 		aiPart = " " + primaryStyle.Render(aiDisplay)
 	}
 	// Right-align AI tool chooser: "⬡ Ghost Tab" left, "◂ Claude Code ▸" right
-	aiPadding := menuInnerWidth - lipgloss.Width(title) - lipgloss.Width(aiPart) - 1 // -1 for leading space
+	aiPadding := menuInnerWidth - lipgloss.Width(title) - lipgloss.Width(aiPart) - 2 // -2 for leading + trailing space
 	if aiPadding < 1 {
 		aiPadding = 1
 	}
-	titleRow := leftBorder + " " + title + strings.Repeat(" ", aiPadding) + aiPart + rightBorder
+	titleRow := leftBorder + " " + title + strings.Repeat(" ", aiPadding) + aiPart + " " + rightBorder
 	lines = append(lines, titleRow)
 
 	// Separator after title
@@ -1631,13 +1632,13 @@ func (m *MainMenuModel) renderMenuBox() string {
 			}
 			pathLine = leftBorder + pathContent + strings.Repeat(" ", pathPadding) + rightBorder
 		} else {
-			numText := dimStyle.Render(num)
+			numText := neutralDimStyle.Render(num)
 			truncName := TruncateMiddle(proj.Name, menuInnerWidth-6-len(num))
-			nameText := textStyle.Render(truncName)
+			nameText := neutralTextStyle.Render(truncName)
 			nameContent := "    " + numText + "  " + nameText
 
 			if wtIndicator != "" {
-				wtStyled := dimStyle.Render(wtIndicator)
+				wtStyled := neutralDimStyle.Render(wtIndicator)
 				gap := menuInnerWidth - lipgloss.Width(nameContent) - lipgloss.Width(wtStyled)
 				if gap < 1 {
 					gap = 1
@@ -1651,7 +1652,7 @@ func (m *MainMenuModel) renderMenuBox() string {
 				nameLine = leftBorder + nameContent + strings.Repeat(" ", namePadding) + rightBorder
 			}
 
-			pathContent := "       " + dimStyle.Render(shortPath)
+			pathContent := "       " + neutralDimStyle.Render(shortPath)
 			pathPadding := menuInnerWidth - lipgloss.Width(pathContent)
 			if pathPadding < 0 {
 				pathPadding = 0
@@ -1691,8 +1692,8 @@ func (m *MainMenuModel) renderMenuBox() string {
 					}
 					wtPathLine = leftBorder + pathContent + strings.Repeat(" ", pathPadding) + rightBorder
 				} else {
-					connStyled := dimStyle.Render(connector)
-					branchText := primaryStyle.Render(branchDisplay)
+					connStyled := neutralDimStyle.Render(connector)
+					branchText := neutralTextStyle.Render(branchDisplay)
 					content := "       " + connStyled + " " + branchText
 					padding := menuInnerWidth - lipgloss.Width(content)
 					if padding < 0 {
@@ -1700,7 +1701,7 @@ func (m *MainMenuModel) renderMenuBox() string {
 					}
 					wtBranchLine = leftBorder + content + strings.Repeat(" ", padding) + rightBorder
 
-					pathContent := "          " + dimStyle.Render(shortWtPath)
+					pathContent := "          " + neutralDimStyle.Render(shortWtPath)
 					pathPadding := menuInnerWidth - lipgloss.Width(pathContent)
 					if pathPadding < 0 {
 						pathPadding = 0
@@ -1727,8 +1728,8 @@ func (m *MainMenuModel) renderMenuBox() string {
 				}
 				addWtLine = leftBorder + content + strings.Repeat(" ", padding) + rightBorder
 			} else {
-				connStyled := dimStyle.Render(addConnector)
-				addLabel := dimStyle.Render("+ Add worktree")
+				connStyled := neutralDimStyle.Render(addConnector)
+				addLabel := neutralDimStyle.Render("+ Add worktree")
 				content := "       " + connStyled + " " + addLabel
 				padding := menuInnerWidth - lipgloss.Width(content)
 				if padding < 0 {
@@ -1761,8 +1762,8 @@ func (m *MainMenuModel) renderMenuBox() string {
 			}
 			actionLine = leftBorder + content + strings.Repeat(" ", padding) + rightBorder
 		} else {
-			shortcutText := dimStyle.Render(action.shortcut)
-			labelText := textStyle.Render(action.label)
+			shortcutText := neutralDimStyle.Render(action.shortcut)
+			labelText := neutralTextStyle.Render(action.label)
 			content := "    " + shortcutText + "  " + labelText
 			padding := menuInnerWidth - lipgloss.Width(content)
 			if padding < 0 {
