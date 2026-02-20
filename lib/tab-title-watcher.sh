@@ -39,19 +39,34 @@ check_ai_tool_state() {
   fi
 }
 
+# Discover the AI tool pane (rightmost pane in the tmux session).
+# Usage: discover_ai_pane <session_name> <tmux_cmd>
+# Outputs the pane index of the rightmost pane.
+discover_ai_pane() {
+  local session_name="$1" tmux_cmd="$2"
+  "$tmux_cmd" list-panes -t "$session_name" -F '#{pane_index} #{pane_left}' 2>/dev/null \
+    | sort -k2 -rn | head -1 | awk '{print $1}'
+}
+
 # Start the tab title watcher background loop.
-# Usage: start_tab_title_watcher <session_name> <ai_tool> <project_name> <tab_title_setting> <tmux_cmd> <marker_file> [pane_index]
+# Usage: start_tab_title_watcher <session_name> <ai_tool> <project_name> <tab_title_setting> <tmux_cmd> <marker_file>
 start_tab_title_watcher() {
   local session_name="$1" ai_tool="$2" project_name="$3"
   local tab_title_setting="$4" tmux_cmd="$5" marker_file="$6"
-  local pane_index="${7:-3}"
 
   (
+    # Find the AI tool pane (rightmost pane in the layout)
+    local ai_pane=""
+    while [ -z "$ai_pane" ]; do
+      ai_pane=$(discover_ai_pane "$session_name" "$tmux_cmd")
+      [ -z "$ai_pane" ] && sleep 0.5
+    done
+
     local was_waiting=false
     while true; do
       sleep 1.5
       local state
-      state=$(check_ai_tool_state "$ai_tool" "$session_name" "$tmux_cmd" "$marker_file" "$pane_index")
+      state=$(check_ai_tool_state "$ai_tool" "$session_name" "$tmux_cmd" "$marker_file" "$ai_pane")
 
       if [ "$state" = "waiting" ] && [ "$was_waiting" = false ]; then
         if [ "$tab_title_setting" = "full" ]; then

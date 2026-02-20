@@ -410,3 +410,133 @@ func TestSettingsJson_merge_claude_settings_skips_when_already_configured(t *tes
 	assertExitCode(t, code, 0)
 	assertContains(t, out, "already configured")
 }
+
+// --- cleanup_waiting_indicator_hooks (wrapper.sh cleanup logic) ---
+
+// cleanupHooksSnippet builds a bash snippet that sources the required libraries
+// and runs the cleanup-time hook removal logic extracted from wrapper.sh.
+// It simulates the conditional: if claude + no other markers, remove hooks.
+// markerDir controls where the snippet looks for marker files (for test isolation).
+func cleanupHooksSnippet(t *testing.T, aiTool, settingsFile, markerDir string) string {
+	t.Helper()
+	root := projectRoot(t)
+	tuiPath := filepath.Join(root, "lib", "tui.sh")
+	settingsJsonPath := filepath.Join(root, "lib", "settings-json.sh")
+	return fmt.Sprintf(`source %q && source %q
+SELECTED_AI_TOOL=%q
+if [ "$SELECTED_AI_TOOL" = "claude" ]; then
+  if ! ls %s/ghost-tab-waiting-* &>/dev/null; then
+    remove_waiting_indicator_hooks %q
+  fi
+fi
+`, tuiPath, settingsJsonPath, aiTool, markerDir, settingsFile)
+}
+
+func TestCleanupHooksRemoval_removes_hooks_when_claude_and_no_markers(t *testing.T) {
+	tmpDir := t.TempDir()
+	markerDir := filepath.Join(tmpDir, "markers")
+	if err := os.MkdirAll(markerDir, 0755); err != nil {
+		t.Fatalf("failed to create marker dir: %v", err)
+	}
+	settingsFile := writeTempFile(t, tmpDir, "settings.json", `{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [{"type": "command", "command": "[ -n \"$GHOST_TAB_MARKER_FILE\" ] && touch \"$GHOST_TAB_MARKER_FILE\""}]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [{"type": "command", "command": "[ -n \"$GHOST_TAB_MARKER_FILE\" ] && rm -f \"$GHOST_TAB_MARKER_FILE\""}]
+      }
+    ]
+  }
+}
+`)
+
+	// No marker files exist in markerDir — hooks should be removed
+	snippet := cleanupHooksSnippet(t, "claude", settingsFile, markerDir)
+	out, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "removed")
+
+	data, err := os.ReadFile(settingsFile)
+	if err != nil {
+		t.Fatalf("failed to read settings.json: %v", err)
+	}
+	assertNotContains(t, string(data), "GHOST_TAB_MARKER_FILE")
+}
+
+func TestCleanupHooksRemoval_skips_when_other_markers_exist(t *testing.T) {
+	tmpDir := t.TempDir()
+	markerDir := filepath.Join(tmpDir, "markers")
+	if err := os.MkdirAll(markerDir, 0755); err != nil {
+		t.Fatalf("failed to create marker dir: %v", err)
+	}
+	settingsFile := writeTempFile(t, tmpDir, "settings.json", `{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [{"type": "command", "command": "[ -n \"$GHOST_TAB_MARKER_FILE\" ] && touch \"$GHOST_TAB_MARKER_FILE\""}]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [{"type": "command", "command": "[ -n \"$GHOST_TAB_MARKER_FILE\" ] && rm -f \"$GHOST_TAB_MARKER_FILE\""}]
+      }
+    ]
+  }
+}
+`)
+
+	// Create a marker file in the isolated marker dir to simulate another session
+	markerFile := filepath.Join(markerDir, "ghost-tab-waiting-99999")
+	if err := os.WriteFile(markerFile, []byte(""), 0644); err != nil {
+		t.Fatalf("failed to create marker file: %v", err)
+	}
+
+	snippet := cleanupHooksSnippet(t, "claude", settingsFile, markerDir)
+	_, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+
+	// Hooks should still be present because another marker exists
+	data, err := os.ReadFile(settingsFile)
+	if err != nil {
+		t.Fatalf("failed to read settings.json: %v", err)
+	}
+	assertContains(t, string(data), "GHOST_TAB_MARKER_FILE")
+}
+
+func TestCleanupHooksRemoval_skips_when_not_claude(t *testing.T) {
+	tmpDir := t.TempDir()
+	markerDir := filepath.Join(tmpDir, "markers")
+	if err := os.MkdirAll(markerDir, 0755); err != nil {
+		t.Fatalf("failed to create marker dir: %v", err)
+	}
+	settingsFile := writeTempFile(t, tmpDir, "settings.json", `{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [{"type": "command", "command": "[ -n \"$GHOST_TAB_MARKER_FILE\" ] && touch \"$GHOST_TAB_MARKER_FILE\""}]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [{"type": "command", "command": "[ -n \"$GHOST_TAB_MARKER_FILE\" ] && rm -f \"$GHOST_TAB_MARKER_FILE\""}]
+      }
+    ]
+  }
+}
+`)
+
+	// No marker files, but AI tool is codex — hooks should NOT be removed
+	snippet := cleanupHooksSnippet(t, "codex", settingsFile, markerDir)
+	_, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+
+	data, err := os.ReadFile(settingsFile)
+	if err != nil {
+		t.Fatalf("failed to read settings.json: %v", err)
+	}
+	assertContains(t, string(data), "GHOST_TAB_MARKER_FILE")
+}

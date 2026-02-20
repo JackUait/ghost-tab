@@ -199,6 +199,135 @@ exit 0
 	}
 }
 
+func TestTabTitleWatcher_check_ai_tool_state_targets_pane_with_base_index_1(t *testing.T) {
+	tmpDir := t.TempDir()
+	// Mock tmux that only returns a prompt for pane 0.1 (pane-base-index 1 scenario)
+	binDir := mockCommand(t, tmpDir, "tmux", `
+for arg in "$@"; do
+  if [ "$arg" = "dev-test-123:0.1" ]; then
+    printf 'Some output\n❯ \n'
+    exit 0
+  fi
+done
+printf 'no prompt here\n'
+exit 0
+`)
+	env := buildEnv(t, []string{binDir})
+	tmuxPath := filepath.Join(binDir, "tmux")
+
+	// Pass pane_index "1" — simulating pane-base-index 1
+	snippet := tabTitleSnippet(t,
+		fmt.Sprintf(`check_ai_tool_state "codex" "dev-test-123" %q "" "1"`, tmuxPath))
+
+	out, code := runBashSnippet(t, snippet, env)
+	assertExitCode(t, code, 0)
+	if strings.TrimSpace(out) != "waiting" {
+		t.Errorf("expected 'waiting' (pane 0.1 targeted), got %q", strings.TrimSpace(out))
+	}
+}
+
+// --- discover_ai_pane: dynamic pane discovery ---
+
+func TestTabTitleWatcher_discover_ai_pane_finds_rightmost_pane(t *testing.T) {
+	tmpDir := t.TempDir()
+	// Mock tmux list-panes returning 4 panes with different pane_left values
+	// Pane 3 has the largest pane_left (rightmost), should be selected
+	binDir := mockCommand(t, tmpDir, "tmux", `
+if [ "$1" = "list-panes" ]; then
+  printf '0 0\n1 0\n2 80\n3 80\n'
+  exit 0
+fi
+exit 0
+`)
+	env := buildEnv(t, []string{binDir})
+	tmuxPath := filepath.Join(binDir, "tmux")
+
+	snippet := tabTitleSnippet(t,
+		fmt.Sprintf(`discover_ai_pane "dev-session" %q`, tmuxPath))
+
+	out, code := runBashSnippet(t, snippet, env)
+	assertExitCode(t, code, 0)
+	if strings.TrimSpace(out) != "3" {
+		t.Errorf("expected rightmost pane '3', got %q", strings.TrimSpace(out))
+	}
+}
+
+func TestTabTitleWatcher_discover_ai_pane_with_base_index_1(t *testing.T) {
+	tmpDir := t.TempDir()
+	// Mock tmux list-panes with pane-base-index 1:
+	// Panes are numbered 1-4 instead of 0-3
+	// Pane 4 has the largest pane_left (rightmost)
+	binDir := mockCommand(t, tmpDir, "tmux", `
+if [ "$1" = "list-panes" ]; then
+  printf '1 0\n2 0\n3 80\n4 80\n'
+  exit 0
+fi
+exit 0
+`)
+	env := buildEnv(t, []string{binDir})
+	tmuxPath := filepath.Join(binDir, "tmux")
+
+	snippet := tabTitleSnippet(t,
+		fmt.Sprintf(`discover_ai_pane "dev-session" %q`, tmuxPath))
+
+	out, code := runBashSnippet(t, snippet, env)
+	assertExitCode(t, code, 0)
+	if strings.TrimSpace(out) != "4" {
+		t.Errorf("expected rightmost pane '4' (base-index 1), got %q", strings.TrimSpace(out))
+	}
+}
+
+func TestTabTitleWatcher_discover_ai_pane_picks_highest_index_among_tied_pane_left(t *testing.T) {
+	tmpDir := t.TempDir()
+	// When multiple panes share the same pane_left (rightmost column),
+	// we want the one with the highest pane_left. The AI pane is the
+	// top-right pane (created by split-window -h), which has the highest
+	// pane_left. sort -k2 -rn then head -1 picks the first among ties,
+	// but sort is stable so input order is preserved for ties.
+	// In real tmux, the AI pane (split-window -h first) will appear first
+	// among panes sharing the same pane_left.
+	binDir := mockCommand(t, tmpDir, "tmux", `
+if [ "$1" = "list-panes" ]; then
+  printf '0 0\n1 0\n2 80\n3 80\n'
+  exit 0
+fi
+exit 0
+`)
+	env := buildEnv(t, []string{binDir})
+	tmuxPath := filepath.Join(binDir, "tmux")
+
+	snippet := tabTitleSnippet(t,
+		fmt.Sprintf(`discover_ai_pane "dev-session" %q`, tmuxPath))
+
+	out, code := runBashSnippet(t, snippet, env)
+	assertExitCode(t, code, 0)
+	result := strings.TrimSpace(out)
+	// Should return one of the rightmost panes (pane_left=80)
+	if result != "2" && result != "3" {
+		t.Errorf("expected a rightmost pane (2 or 3), got %q", result)
+	}
+}
+
+func TestTabTitleWatcher_start_tab_title_watcher_takes_six_params(t *testing.T) {
+	root := projectRoot(t)
+	watcherPath := filepath.Join(root, "lib", "tab-title-watcher.sh")
+	data, err := os.ReadFile(watcherPath)
+	if err != nil {
+		t.Fatalf("failed to read tab-title-watcher.sh: %v", err)
+	}
+	content := string(data)
+
+	// start_tab_title_watcher should NOT have a pane_index parameter
+	if strings.Contains(content, "pane_index=\"${7") {
+		t.Error("start_tab_title_watcher should not accept a 7th pane_index parameter; pane discovery should be dynamic")
+	}
+
+	// It should use discover_ai_pane for dynamic discovery
+	if !strings.Contains(content, "discover_ai_pane") {
+		t.Error("start_tab_title_watcher should use discover_ai_pane for dynamic pane discovery")
+	}
+}
+
 // --- stop_tab_title_watcher: cleanup ---
 
 func TestTabTitleWatcher_stop_tab_title_watcher_removes_marker_file(t *testing.T) {
@@ -226,4 +355,36 @@ func TestTabTitleWatcher_stop_tab_title_watcher_succeeds_when_marker_absent(t *t
 
 	_, code := runBashSnippet(t, snippet, nil)
 	assertExitCode(t, code, 0)
+}
+
+// --- wrapper.sh: tmux set-titles off ---
+
+func TestTabTitleWatcher_wrapper_disables_tmux_set_titles(t *testing.T) {
+	root := projectRoot(t)
+	wrapperPath := filepath.Join(root, "wrapper.sh")
+	data, err := os.ReadFile(wrapperPath)
+	if err != nil {
+		t.Fatalf("failed to read wrapper.sh: %v", err)
+	}
+	content := string(data)
+
+	// The tmux new-session command block must include set-titles off
+	// to prevent user's global set-titles on from overwriting Ghost Tab's tab title
+	if !strings.Contains(content, "set-option set-titles off") {
+		t.Error("wrapper.sh must contain 'set-option set-titles off' in tmux new-session command to prevent tmux from overwriting tab titles")
+	}
+}
+
+func TestTabTitleWatcher_ghostty_wrapper_disables_tmux_set_titles(t *testing.T) {
+	root := projectRoot(t)
+	wrapperPath := filepath.Join(root, "ghostty", "claude-wrapper.sh")
+	data, err := os.ReadFile(wrapperPath)
+	if err != nil {
+		t.Fatalf("failed to read ghostty/claude-wrapper.sh: %v", err)
+	}
+	content := string(data)
+
+	if !strings.Contains(content, "set-option set-titles off") {
+		t.Error("ghostty/claude-wrapper.sh must contain 'set-option set-titles off' in tmux new-session command to prevent tmux from overwriting tab titles")
+	}
 }

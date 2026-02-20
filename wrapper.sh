@@ -207,6 +207,12 @@ WATCHER_PID=$!
 
 cleanup() {
   stop_tab_title_watcher "$GHOST_TAB_MARKER_FILE"
+  # Remove waiting indicator hooks if no other Ghost Tab sessions are running
+  if [ "$SELECTED_AI_TOOL" = "claude" ]; then
+    if ! ls /tmp/ghost-tab-waiting-* &>/dev/null; then
+      remove_waiting_indicator_hooks "${HOME}/.claude/settings.json" >/dev/null 2>&1 || true
+    fi
+  fi
   cleanup_tmux_session "$SESSION_NAME" "$WATCHER_PID" "$TMUX_CMD"
   rm -f "$GHOST_TAB_BASELINE_FILE"
 }
@@ -231,6 +237,7 @@ start_tab_title_watcher "$SESSION_NAME" "$SELECTED_AI_TOOL" "$PROJECT_NAME" "$_t
   set-option status-left-style "fg=white,bg=colour236,bold" \; \
   set-option status-style "bg=colour235" \; \
   set-option status-right "" \; \
+  set-option set-titles off \; \
   set-option exit-unattached on \; \
   split-window -h -p 50 -c "$PROJECT_DIR" \
   "$AI_LAUNCH_CMD; exec bash" \; \
