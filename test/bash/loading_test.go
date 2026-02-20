@@ -126,7 +126,7 @@ func TestLoading_detect_term_size_returns_two_positive_numbers(t *testing.T) {
 func TestLoading_render_loading_frame_contains_ansi_color_codes(t *testing.T) {
 	root := projectRoot(t)
 	script := fmt.Sprintf(
-		`source %q/lib/loading.sh && render_loading_frame 0 0 80 24`,
+		`source %q/lib/loading.sh && render_loading_frame claude 0 80 24`,
 		root)
 	out, code := runBashSnippet(t, script, nil)
 	assertExitCode(t, code, 0)
@@ -137,7 +137,7 @@ func TestLoading_render_loading_frame_contains_ansi_color_codes(t *testing.T) {
 func TestLoading_render_loading_frame_contains_art_content(t *testing.T) {
 	root := projectRoot(t)
 	script := fmt.Sprintf(
-		`source %q/lib/loading.sh && render_loading_frame 0 0 80 24`,
+		`source %q/lib/loading.sh && render_loading_frame claude 0 80 24`,
 		root)
 	out, code := runBashSnippet(t, script, nil)
 	assertExitCode(t, code, 0)
@@ -151,7 +151,7 @@ func TestLoading_render_loading_frame_centers_art_on_large_terminal(t *testing.T
 	root := projectRoot(t)
 	// Large terminal: 200 cols, 50 rows
 	script := fmt.Sprintf(
-		`source %q/lib/loading.sh && render_loading_frame 0 0 200 50`,
+		`source %q/lib/loading.sh && render_loading_frame claude 0 200 50`,
 		root)
 	out, code := runBashSnippet(t, script, nil)
 	assertExitCode(t, code, 0)
@@ -199,13 +199,25 @@ func TestLoading_get_tool_palette_defaults_to_claude_for_empty(t *testing.T) {
 	assertContains(t, out, "130 166 172 208 209 214 215 220")
 }
 
+func TestLoading_render_loading_frame_uses_tool_palette(t *testing.T) {
+	root := projectRoot(t)
+	// Codex palette starts with color 22
+	script := fmt.Sprintf(
+		`source %q/lib/loading.sh && render_loading_frame codex 0 90 24`,
+		root)
+	out, code := runBashSnippet(t, script, nil)
+	assertExitCode(t, code, 0)
+	// Should contain ANSI color code from green palette
+	assertContains(t, out, "38;5;22m")
+}
+
 func TestLoading_render_loading_frame_shifts_colors_between_frames(t *testing.T) {
 	root := projectRoot(t)
 	script0 := fmt.Sprintf(
-		`source %q/lib/loading.sh && render_loading_frame 0 0 80 24`,
+		`source %q/lib/loading.sh && render_loading_frame claude 0 80 24`,
 		root)
 	script1 := fmt.Sprintf(
-		`source %q/lib/loading.sh && render_loading_frame 0 1 80 24`,
+		`source %q/lib/loading.sh && render_loading_frame claude 1 80 24`,
 		root)
 	out0, _ := runBashSnippet(t, script0, nil)
 	out1, _ := runBashSnippet(t, script1, nil)

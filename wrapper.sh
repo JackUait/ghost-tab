@@ -6,7 +6,8 @@ _wrapper_dir_early="$(cd "$(dirname "$0")" && pwd)"
 if [ -z "$1" ] && [ -f "$_wrapper_dir_early/lib/loading.sh" ]; then
   # shellcheck disable=SC1091  # Dynamic path
   source "$_wrapper_dir_early/lib/loading.sh"
-  show_loading_screen
+  _ai_tool="$(cat "${XDG_CONFIG_HOME:-$HOME/.config}/ghost-tab/ai-tool" 2>/dev/null | tr -d '[:space:]')"
+  show_loading_screen "${_ai_tool:-}"
 fi
 
 # Self-healing: Check if ghost-tab-tui exists, rebuild if missing

@@ -1,6 +1,7 @@
 #!/bin/bash
 # Loading screen with ASCII art, random color palettes, and animation.
 
+# shellcheck disable=SC2034  # Removed in Task 3 with get_loading_palette
 LOADING_PALETTE_COUNT=5
 
 # Print the loading screen ASCII art to stdout.
@@ -44,9 +45,9 @@ get_tool_palette() {
 }
 
 # Render a single frame of the loading screen.
-# Args: palette_index frame_number term_cols term_rows
+# Args: tool_name frame_number term_cols term_rows
 render_loading_frame() {
-  local pal_idx="$1" frame="$2"
+  local tool="$1" frame="$2"
   local cols="${3:-80}" rows="${4:-24}"
 
   # Get art lines into array
@@ -59,7 +60,7 @@ render_loading_frame() {
 
   # Get palette
   local -a palette
-  read -ra palette <<< "$(get_loading_palette "$pal_idx")"
+  read -ra palette <<< "$(get_tool_palette "$tool")"
   local pal_len=${#palette[@]}
 
   # Calculate art dimensions
@@ -126,10 +127,11 @@ _detect_term_size() {
   echo "24 80"
 }
 
-# Show animated loading screen with random colors.
+# Show animated loading screen with tool-specific colors.
+# Args: [tool_name] — defaults to claude if omitted.
 # Sets _LOADING_SCREEN_PID for the caller to stop later.
 show_loading_screen() {
-  local pal_idx=$(( RANDOM % LOADING_PALETTE_COUNT ))
+  local tool="${1:-claude}"
 
   # Clear screen, hide cursor (instant dark feedback)
   printf '\033[2J\033[H\033[?25l'
@@ -159,7 +161,7 @@ show_loading_screen() {
       fi
 
       # Redraw art with shifted colors
-      render_loading_frame "$pal_idx" "$frame" "$cols" "$rows"
+      render_loading_frame "$tool" "$frame" "$cols" "$rows"
 
       # Clear previous floating symbols
       for pos in "${prev_sym_positions[@]}"; do
@@ -171,7 +173,7 @@ show_loading_screen() {
 
       # Draw new floating symbols
       local -a palette
-      read -ra palette <<< "$(get_loading_palette "$pal_idx")"
+      read -ra palette <<< "$(get_tool_palette "$tool")"
       local pal_len=${#palette[@]}
       local _s
       for _s in 0 1 2; do
