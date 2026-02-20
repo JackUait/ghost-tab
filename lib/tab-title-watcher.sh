@@ -21,7 +21,7 @@ check_ai_tool_state() {
       local content last_lines
       content=$("$tmux_cmd" capture-pane -t "$session_name:0.$pane_index" -p 2>/dev/null || true)
       last_lines=$(echo "$content" | grep -v '^$' | tail -5)
-      if echo "$last_lines" | grep -qE '[>$❯]\s*$'; then
+      if echo "$last_lines" | grep -qE '^[❯>]'; then
         echo "waiting"
       else
         echo "active"
