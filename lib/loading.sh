@@ -1,50 +1,11 @@
 #!/bin/bash
 # Loading screen with random ASCII art, color palettes, and animation.
 
-LOADING_ART_COUNT=10
 LOADING_PALETTE_COUNT=5
 
-# Get ASCII art by index (0-9). Prints to stdout.
+# Print the loading screen ASCII art to stdout.
 get_loading_art() {
-  case "$1" in
-    0) cat << 'ART'
-  ________  __                         __         ________         __
- /  _____/ |  |__    ____    _______  /  |_       \__    __\ _____  |  |__
-/   \  ___ |  |  \  /  _ \  /  ___/ _\   __\        |  |   /  _  \ |  |  \
-\    \_\  \|   Y  \(  <_> ) \___ \   |  |           |  |  (  <_> )|   Y  \
- \______  /|___|  / \____/ /____  >  |__|           |__|   \_____/ |___|  /
-        \/      \/              \/                                      \/
-ART
-    ;;
-    1) cat << 'ART'
-  ####    ##  ##    ####    ####   ######       ######    ###    #####
- ##  ##   ##  ##   ##  ##  ##       ##            ##     ## ##   ##  ##
- ##       ##  ##   ##  ##   ####    ##            ##    ##   ##  #####
- ## ###   ######   ##  ##      ##   ##            ##    #######  ##  ##
- ##  ##   ##  ##   ##  ##  ##  ##   ##            ##    ##   ##  ##  ##
-  ####    ##  ##    ####    ####    ##            ####   ##   ##  #####
-ART
-    ;;
-    2) cat << 'ART'
-  .oooooo.    oooo                                 o8o      ooooooooo            oooo
- d8P'  'Y8b   '888                                 '"'      888   '88.           '888
-888            888 .oo.    .ooooo.   .oooo.o .o888oo        888    888  .oooo.    888oooo.
-888     ooo    888P'Y88b  d88' '88b d88(  '8   888          888   .88' P  )88b   d88' '88b
-888     '88b   888   888  888   888  '"Y88b.   888          888ooo8P'  .oP'888   888   888
- '88.    88P   888   888  888   888 o.  )88b   888  .       888       d8(  888   888   888
-  'Y8bood8P'  o888o o888o 'Y8bod8P' 8''888P'   '888'       o888o      'Y888''8o  'Y8bod8P'
-ART
-    ;;
-    3) cat << 'ART'
-  ========   ==  ==    ====     ====   ========      ========   =====   ======
-  ||         ||  ||   ||  ||   ||        ||            ||      ||   ||  ||   ||
-  ||   ===   ||==||   ||  ||   =====     ||            ||      =======  ||===|
-  ||    ||   ||  ||   ||  ||      ||     ||            ||      ||   ||  ||   ||
-  ||    ||   ||  ||   ||  ||   || ||     ||            ||      ||   ||  ||   ||
-  ========   ==  ==    ====    ====      ==            ==      ==   ==  ======
-ART
-    ;;
-    4) cat << 'ART'
+  cat << 'ART'
 +----------------------------------------------------------------------+
 |    ____   _                   _     _____         _                  |
 |   / ___| | |__    ___   ___  | |_  |_   _|  __ _ | |__              |
@@ -53,57 +14,6 @@ ART
 |   \____| |_| |_| \___/ |___/  \__|   |_|   \__,_||_.__/             |
 +----------------------------------------------------------------------+
 ART
-    ;;
-    5) cat << 'ART'
-  @@@@@@@   @@@  @@@   @@@@@@    @@@@@@   @@@@@@@     @@@@@@@   @@@@@@   @@@@@@@
- @@@@@@@@   @@@  @@@  @@@@@@@@  @@@@@@@   @@@@@@@     @@@@@@@  @@@@@@@@  @@@@@@@@
- @@!        @@!  @@@  @@!  @@@  !@@         @@!         @@!    @@!  @@@  @@!  @@@
- !@! !@!@@  !@!  @!@  !@!  @!@  !@@!!      !@!         !@!    !@!  @!@  !@   @!@
- @!@ !@!@!  @!@!@!@!  @!@  !@!   !@!!!     @!!         @!!    @!@!@!@!  @!@!@!@
- !@!!@!!    !!!@!!!!  !@!  !!!  !:!         !!!         !!!    !!!@!!!!  !!@!!!
-  !:::!     !!:  !!!  !!:  !!!  ::!:!       !!:         !!:    !!:  !!!  !!:  !!!
-   ::!:     :!:  !:!   :!:!:!    :!:!       :!:         :!:    :!:  !:!  :!:  !:!
-ART
-    ;;
-    6) cat << 'ART'
-  .|'''',    '||                            ||      .|''''|,              ||
-  ||    ||    ||                            ||      ||    ||              ||
-  ||          ||''||,  .|''|,  (''''  ''||''        ||    ||  '''|.   '|.|'|,
-  || .|.|     ||  ||  ||  ||   `''))   ||           ||    || .|..||    ||  ||
-  ||    ||    ||  ||  ||..||   ,,.|'   ||           ||  | ||  ||        ||  ||
-  `|....|    .||. ||.  '|...   '||..   `|..'        `|..|'|   `|..'  .||. ||.
-ART
-    ;;
-    7) cat << 'ART'
-  .:::::::.  ::    ::   .::::.   .:::::.  :::::::      :::::::   .:::.    ::::::.
- :::         ::    ::  ::    ::  ::         ::            ::     ::   ::   ::    ::
- ::   ::::   :::::::   ::    ::  '::::::    ::            ::     :::::::   ::::::'
- ::     ::   ::    ::  ::    ::       ::    ::            ::     ::   ::   ::    ::
- '::    ::   ::    ::  ::    ::  ::   ::    ::            ::     ::   ::   ::    ::
-  '::::::    ::    ::   '::::'   ':::::'    ::            ::     ::   ::   ::::::'
-ART
-    ;;
-    8) cat << 'ART'
-    ****      **    **    ****     ****   ******       ******     ***     *****
-   **  **     **    **   **  **   **        **           **      ** **    **  **
-  **          ********  **    ** ***        **           **     **   **   *****
-  **  ****    **    **  **    **    ***     **           **    *********  **  **
-   **   **    **    **   **  **  **  **     **           **    **     **  **  **
-    *****     **    **    ****    ****      **           **    **     **  *****
-ART
-    ;;
-    9) cat << 'ART'
-  ,ggg,         gg                                   gg     ,ggggggg,        gg
- dP""Y8a        88                            ,d     88    dP""""""88       ,88
- Yb, `88        88                            88     88    Yb,_    88       d8'
-  `"  88        88,dPPYba,    ,adPPYba,  ,adPPYba, MM88MMM  `""    88  ,adPPYb,88
-      88        88P'    "8a  a8"     "8a I8[    ""   88            ,88 a8"    `Y88
-      I8        88       88  8b       d8  `"Y8ba,    88          ,88"  8b       88
-     ,d8,     , 88       88  "8a,   ,a8" aa    ]8I   88,       ,88"   "8a,   ,d88
-    ,d88b,   ,d 88       88   `"YbbdP"'  `"YbbdP"'   "Y888   ,dP"      `"YbbdPY8
-ART
-    ;;
-  esac
 }
 
 # Get color palette by index (0-4). Prints space-separated 256-color codes.
@@ -118,14 +28,14 @@ get_loading_palette() {
 }
 
 # Render a single frame of the loading screen.
-# Args: art_index palette_index frame_number term_cols term_rows
+# Args: palette_index frame_number term_cols term_rows
 render_loading_frame() {
-  local art_idx="$1" pal_idx="$2" frame="$3"
-  local cols="${4:-80}" rows="${5:-24}"
+  local pal_idx="$1" frame="$2"
+  local cols="${3:-80}" rows="${4:-24}"
 
   # Get art lines into array
   local art
-  art="$(get_loading_art "$art_idx")"
+  art="$(get_loading_art)"
   local -a lines=()
   while IFS= read -r line; do
     lines+=("$line")
@@ -200,10 +110,9 @@ _detect_term_size() {
   echo "24 80"
 }
 
-# Show animated loading screen with random art and colors.
+# Show animated loading screen with random colors.
 # Sets _LOADING_SCREEN_PID for the caller to stop later.
 show_loading_screen() {
-  local art_idx=$(( RANDOM % LOADING_ART_COUNT ))
   local pal_idx=$(( RANDOM % LOADING_PALETTE_COUNT ))
   local rows cols
   read -r rows cols <<< "$(_detect_term_size)"
@@ -212,7 +121,7 @@ show_loading_screen() {
   printf '\033[2J\033[H\033[?25l'
 
   # Draw initial frame
-  render_loading_frame "$art_idx" "$pal_idx" 0 "$cols" "$rows"
+  render_loading_frame "$pal_idx" 0 "$cols" "$rows"
 
   # Symbols for floating particles
   local symbols=('·' '•' '°' '∘' '⋅' '∙')
@@ -225,7 +134,7 @@ show_loading_screen() {
 
     while true; do
       # Redraw art with shifted colors
-      render_loading_frame "$art_idx" "$pal_idx" "$frame" "$cols" "$rows"
+      render_loading_frame "$pal_idx" "$frame" "$cols" "$rows"
 
       # Clear previous floating symbols
       for pos in "${prev_sym_positions[@]}"; do

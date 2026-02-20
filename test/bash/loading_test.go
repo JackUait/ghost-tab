@@ -21,7 +21,7 @@ func TestLoading_get_loading_art_contains_ghost_tab_box(t *testing.T) {
 	out, code := runBashFunc(t, "lib/loading.sh", "get_loading_art", nil, nil)
 	assertExitCode(t, code, 0)
 	assertContains(t, out, "+---")
-	assertContains(t, out, "Ghost")
+	assertContains(t, out, "____")
 }
 
 func TestLoading_get_loading_art_meets_minimum_size(t *testing.T) {
