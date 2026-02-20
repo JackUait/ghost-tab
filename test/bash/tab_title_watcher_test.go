@@ -457,6 +457,43 @@ func TestTabTitleWatcher_stop_tab_title_watcher_succeeds_when_marker_absent(t *t
 	assertExitCode(t, code, 0)
 }
 
+func TestTabTitleWatcher_stop_tab_title_watcher_removes_ask_marker(t *testing.T) {
+	tmpDir := t.TempDir()
+	markerFile := filepath.Join(tmpDir, "marker")
+	askMarkerFile := markerFile + ".ask"
+	os.WriteFile(markerFile, []byte(""), 0644)
+	os.WriteFile(askMarkerFile, []byte(""), 0644)
+
+	snippet := tabTitleSnippet(t,
+		fmt.Sprintf(`_TAB_TITLE_WATCHER_PID=""; stop_tab_title_watcher %q`, markerFile))
+
+	_, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+
+	if _, err := os.Stat(markerFile); !os.IsNotExist(err) {
+		t.Error("regular marker file should be removed")
+	}
+	if _, err := os.Stat(askMarkerFile); !os.IsNotExist(err) {
+		t.Error("ask marker file (.ask) should also be removed by stop_tab_title_watcher")
+	}
+}
+
+// --- watcher loop: .ask marker skips confirmation ---
+
+func TestTabTitleWatcher_watcher_skips_confirmation_when_ask_marker_exists(t *testing.T) {
+	root := projectRoot(t)
+	watcherPath := filepath.Join(root, "lib", "tab-title-watcher.sh")
+	data, err := os.ReadFile(watcherPath)
+	if err != nil {
+		t.Fatalf("failed to read tab-title-watcher.sh: %v", err)
+	}
+	content := string(data)
+
+	if !strings.Contains(content, ".ask") {
+		t.Error("start_tab_title_watcher should check for .ask marker file to skip confirmation delay for AskUserQuestion events")
+	}
+}
+
 // --- wrapper.sh: tmux set-titles off ---
 
 func TestTabTitleWatcher_wrapper_disables_tmux_set_titles(t *testing.T) {

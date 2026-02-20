@@ -78,8 +78,11 @@ start_tab_title_watcher() {
       state=$(check_ai_tool_state "$ai_tool" "$session_name" "$tmux_cmd" "$marker_file" "$ai_pane")
 
       if [ "$state" = "waiting" ] && [ "$was_waiting" = false ]; then
-        # Re-check after confirmation delay to filter subagent false positives
-        state=$(confirm_ai_tool_waiting "$ai_tool" "$session_name" "$tmux_cmd" "$marker_file" "$ai_pane")
+        # Skip confirmation delay if this is an AskUserQuestion event (.ask marker present)
+        if [ ! -f "${marker_file}.ask" ]; then
+          # Re-check after confirmation delay to filter subagent false positives
+          state=$(confirm_ai_tool_waiting "$ai_tool" "$session_name" "$tmux_cmd" "$marker_file" "$ai_pane")
+        fi
         if [ "$state" = "waiting" ]; then
           if [ "$tab_title_setting" = "full" ]; then
             set_tab_title_waiting "$project_name" "$ai_tool"
@@ -112,6 +115,6 @@ stop_tab_title_watcher() {
     kill "$_TAB_TITLE_WATCHER_PID" 2>/dev/null || true
   fi
   if [ -n "$marker_file" ]; then
-    rm -f "$marker_file"
+    rm -f "$marker_file" "${marker_file}.ask"
   fi
 }
