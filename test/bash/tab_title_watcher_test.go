@@ -19,18 +19,51 @@ func tabTitleSnippet(t *testing.T, body string) string {
 
 // --- check_ai_tool_state: Claude with marker file ---
 
-func TestTabTitleWatcher_check_ai_tool_state_claude_returns_waiting_when_marker_exists(t *testing.T) {
+func TestTabTitleWatcher_check_ai_tool_state_claude_returns_waiting_when_marker_exists_and_prompt_visible(t *testing.T) {
 	tmpDir := t.TempDir()
 	markerFile := filepath.Join(tmpDir, "marker")
 	os.WriteFile(markerFile, []byte(""), 0644)
+	binDir := mockCommand(t, tmpDir, "tmux", `
+if [ "$1" = "capture-pane" ]; then
+  printf 'Some output\n> \n'
+  exit 0
+fi
+exit 0
+`)
+	env := buildEnv(t, []string{binDir})
+	tmuxPath := filepath.Join(binDir, "tmux")
 
 	snippet := tabTitleSnippet(t,
-		fmt.Sprintf(`check_ai_tool_state "claude" "" "" %q`, markerFile))
+		fmt.Sprintf(`check_ai_tool_state "claude" "dev-test-123" %q %q`, tmuxPath, markerFile))
 
-	out, code := runBashSnippet(t, snippet, nil)
+	out, code := runBashSnippet(t, snippet, env)
 	assertExitCode(t, code, 0)
 	if strings.TrimSpace(out) != "waiting" {
 		t.Errorf("expected 'waiting', got %q", strings.TrimSpace(out))
+	}
+}
+
+func TestTabTitleWatcher_check_ai_tool_state_claude_returns_active_when_marker_exists_but_no_prompt(t *testing.T) {
+	tmpDir := t.TempDir()
+	markerFile := filepath.Join(tmpDir, "marker")
+	os.WriteFile(markerFile, []byte(""), 0644)
+	binDir := mockCommand(t, tmpDir, "tmux", `
+if [ "$1" = "capture-pane" ]; then
+  printf 'Processing request...\nGenerating code\n'
+  exit 0
+fi
+exit 0
+`)
+	env := buildEnv(t, []string{binDir})
+	tmuxPath := filepath.Join(binDir, "tmux")
+
+	snippet := tabTitleSnippet(t,
+		fmt.Sprintf(`check_ai_tool_state "claude" "dev-test-123" %q %q`, tmuxPath, markerFile))
+
+	out, code := runBashSnippet(t, snippet, env)
+	assertExitCode(t, code, 0)
+	if strings.TrimSpace(out) != "active" {
+		t.Errorf("expected 'active', got %q", strings.TrimSpace(out))
 	}
 }
 

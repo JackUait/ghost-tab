@@ -12,7 +12,17 @@ check_ai_tool_state() {
 
   if [ "$ai_tool" = "claude" ]; then
     if [ -f "$marker_file" ]; then
-      echo "waiting"
+      # Marker exists, but verify pane still shows a prompt.
+      # Between user input and first tool call, the marker persists
+      # even though Claude is actively working.
+      local content last_line
+      content=$("$tmux_cmd" capture-pane -t "$session_name:0.1" -p 2>/dev/null || true)
+      last_line=$(echo "$content" | grep -v '^$' | tail -1)
+      if echo "$last_line" | grep -qE '[>$❯]\s*$'; then
+        echo "waiting"
+      else
+        echo "active"
+      fi
     else
       echo "active"
     fi
