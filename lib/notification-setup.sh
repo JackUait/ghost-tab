@@ -34,7 +34,7 @@ set_claude_notif_channel() {
   local prev
   prev="$(CLAUDECODE="" claude config get preferredNotifChannel 2>/dev/null || true)"
   echo "$prev" > "$config_dir/prev-notif-channel"
-  CLAUDECODE="" claude config set --global preferredNotifChannel terminal_bell 2>/dev/null || true
+  CLAUDECODE="" claude config set preferredNotifChannel terminal_bell 2>/dev/null || true
 }
 
 # Restore Claude Code's preferredNotifChannel from saved value.
@@ -52,9 +52,9 @@ restore_claude_notif_channel() {
   local prev
   prev="$(tr -d '[:space:]' < "$saved_file")"
   if [[ -n "$prev" ]]; then
-    CLAUDECODE="" claude config set --global preferredNotifChannel "$prev" 2>/dev/null || true
+    CLAUDECODE="" claude config set preferredNotifChannel "$prev" 2>/dev/null || true
   else
-    CLAUDECODE="" claude config set --global preferredNotifChannel "" 2>/dev/null || true
+    CLAUDECODE="" claude config set preferredNotifChannel "" 2>/dev/null || true
   fi
   rm -f "$saved_file"
 }
