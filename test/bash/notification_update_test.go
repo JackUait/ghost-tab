@@ -588,6 +588,84 @@ func TestNotification_apply_sound_notification_changes_sound(t *testing.T) {
 	assertNotContains(t, string(data), "Bottle.aiff")
 }
 
+// --- setup_sound_notification + config_dir wiring ---
+
+func TestNotification_setup_sound_notification_sets_notif_channel(t *testing.T) {
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, "config")
+	os.MkdirAll(configDir, 0755)
+	settingsFile := writeTempFile(t, tmpDir, "settings.json", `{}`)
+
+	claudeBody := `
+if [ "$1" = "config" ] && [ "$2" = "get" ]; then
+  echo ""
+  exit 0
+fi
+if [ "$1" = "config" ] && [ "$2" = "set" ] && [ "$4" = "terminal_bell" ]; then
+  exit 0
+fi
+echo "unexpected args: $*" >&2
+exit 1
+`
+	binDir := mockCommand(t, tmpDir, "claude", claudeBody)
+	env := buildEnv(t, []string{binDir}, "CLAUDECODE=")
+
+	snippet := notificationSnippet(t,
+		fmt.Sprintf(`setup_sound_notification %q "afplay /System/Library/Sounds/Bottle.aiff &" %q`, settingsFile, configDir))
+
+	out, code := runBashSnippet(t, snippet, env)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "configured")
+
+	// Verify prev-notif-channel was saved
+	savedFile := filepath.Join(configDir, "prev-notif-channel")
+	if _, err := os.Stat(savedFile); os.IsNotExist(err) {
+		t.Errorf("expected prev-notif-channel to be created")
+	}
+}
+
+// --- remove_sound_notification + config_dir wiring ---
+
+func TestNotification_remove_sound_notification_restores_notif_channel(t *testing.T) {
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, "config")
+	os.MkdirAll(configDir, 0755)
+	writeTempFile(t, configDir, "prev-notif-channel", "iterm2\n")
+	settingsFile := writeTempFile(t, tmpDir, "settings.json", `{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [{"type": "command", "command": "afplay /System/Library/Sounds/Bottle.aiff &"}]
+      }
+    ]
+  }
+}
+`)
+
+	claudeBody := `
+if [ "$1" = "config" ] && [ "$2" = "set" ] && [ "$4" = "iterm2" ]; then
+  exit 0
+fi
+echo "unexpected args: $*" >&2
+exit 1
+`
+	binDir := mockCommand(t, tmpDir, "claude", claudeBody)
+	env := buildEnv(t, []string{binDir}, "CLAUDECODE=")
+
+	snippet := notificationSnippet(t,
+		fmt.Sprintf(`remove_sound_notification %q "afplay /System/Library/Sounds/Bottle.aiff &" %q`, settingsFile, configDir))
+
+	out, code := runBashSnippet(t, snippet, env)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "removed")
+
+	// Verify prev-notif-channel was cleaned up
+	savedFile := filepath.Join(configDir, "prev-notif-channel")
+	if _, err := os.Stat(savedFile); !os.IsNotExist(err) {
+		t.Errorf("prev-notif-channel should be removed after restore")
+	}
+}
+
 // --- set_claude_notif_channel ---
 
 func TestNotification_set_claude_notif_channel_saves_previous_and_sets_terminal_bell(t *testing.T) {

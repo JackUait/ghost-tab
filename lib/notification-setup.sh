@@ -3,9 +3,9 @@
 # Depends on: tui.sh (success, warn), settings-json.sh (add_sound_notification_hook)
 
 # Add sound notification hook to Claude settings.
-# Usage: setup_sound_notification <settings_path> <sound_command>
+# Usage: setup_sound_notification <settings_path> <sound_command> [config_dir]
 setup_sound_notification() {
-  local settings_path="$1" sound_command="$2"
+  local settings_path="$1" sound_command="$2" config_dir="${3:-}"
   local result
   result="$(add_sound_notification_hook "$settings_path" "$sound_command")"
   if [ "$result" = "added" ]; then
@@ -15,6 +15,9 @@ setup_sound_notification() {
   else
     warn "Failed to configure sound notification"
     return 1
+  fi
+  if [[ -n "$config_dir" ]]; then
+    set_claude_notif_channel "$config_dir"
   fi
 }
 
@@ -144,12 +147,15 @@ with open(path, 'w') as f:
 }
 
 # Remove sound notification hook from Claude settings.
-# Usage: remove_sound_notification <settings_path> <sound_command>
+# Usage: remove_sound_notification <settings_path> <sound_command> [config_dir]
 remove_sound_notification() {
-  local settings_path="$1" sound_command="$2"
+  local settings_path="$1" sound_command="$2" config_dir="${3:-}"
   local result
   result="$(remove_sound_notification_hook "$settings_path" "$sound_command")"
   echo "$result"
+  if [[ -n "$config_dir" ]]; then
+    restore_claude_notif_channel "$config_dir"
+  fi
 }
 
 # Toggle sound notification for the given AI tool.
