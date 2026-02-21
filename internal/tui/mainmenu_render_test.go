@@ -584,12 +584,8 @@ func TestMenuBox_ContentRowsHavePadding(t *testing.T) {
 		if len(inner) < 4 {
 			continue
 		}
-		// Content rows must have at least 2 spaces of padding on each side
-		leftPad := inner[:2]
+		// Content rows must have at least 2 spaces of right padding
 		rightPad := inner[len(inner)-2:]
-		if leftPad != "  " {
-			t.Errorf("line %d missing 2-char left padding: %q", i, line)
-		}
 		if rightPad != "  " {
 			t.Errorf("line %d missing 2-char right padding: %q", i, line)
 		}

@@ -334,7 +334,7 @@ func (m BranchPickerModel) renderSelectBox() string {
 	topBorder := dimStyle.Render("\u250c" + hLine + "\u2510")
 	separator := dimStyle.Render("\u251c" + hLine + "\u2524")
 	bottomBorder := dimStyle.Render("\u2514" + hLine + "\u2518")
-	leftBorder := dimStyle.Render("\u2502") + strings.Repeat(" ", menuPadding)
+	leftBorder := dimStyle.Render("\u2502")
 	rightBorder := strings.Repeat(" ", menuPadding) + dimStyle.Render("\u2502")
 
 	emptyRow := leftBorder + strings.Repeat(" ", menuContentWidth) + rightBorder
@@ -459,7 +459,7 @@ func (m BranchPickerModel) renderDeleteBox() string {
 	topBorder := dimStyle.Render("\u250c" + hLine + "\u2510")
 	separator := dimStyle.Render("\u251c" + hLine + "\u2524")
 	bottomBorder := dimStyle.Render("\u2514" + hLine + "\u2518")
-	leftBorder := dimStyle.Render("\u2502") + strings.Repeat(" ", menuPadding)
+	leftBorder := dimStyle.Render("\u2502")
 	rightBorder := strings.Repeat(" ", menuPadding) + dimStyle.Render("\u2502")
 	emptyRow := leftBorder + strings.Repeat(" ", menuContentWidth) + rightBorder
 

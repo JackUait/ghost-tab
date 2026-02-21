@@ -1421,7 +1421,7 @@ func (m *MainMenuModel) renderSettingsBox() string {
 	topBorder := dimStyle.Render("\u250c" + hLine + "\u2510")
 	separator := dimStyle.Render("\u251c" + hLine + "\u2524")
 	bottomBorder := dimStyle.Render("\u2514" + hLine + "\u2518")
-	leftBorder := dimStyle.Render("\u2502") + strings.Repeat(" ", menuPadding)
+	leftBorder := dimStyle.Render("\u2502")
 	rightBorder := strings.Repeat(" ", menuPadding) + dimStyle.Render("\u2502")
 
 	var lines []string
@@ -1501,7 +1501,7 @@ func (m *MainMenuModel) renderSettingsBox() string {
 
 const menuInnerWidth = 56
 const menuPadding = 2
-const menuContentWidth = menuInnerWidth - 2*menuPadding // 52
+const menuContentWidth = menuInnerWidth - menuPadding // 54 (right-side padding only)
 
 // TruncateMiddle truncates s in the middle with "…" if it exceeds maxWidth.
 func TruncateMiddle(s string, maxWidth int) string {
@@ -1539,7 +1539,7 @@ func (m *MainMenuModel) renderMenuBox() string {
 	topBorder := dimStyle.Render("\u250c" + hLine + "\u2510")
 	separator := dimStyle.Render("\u251c" + hLine + "\u2524")
 	bottomBorder := dimStyle.Render("\u2514" + hLine + "\u2518")
-	leftBorder := dimStyle.Render("\u2502") + strings.Repeat(" ", menuPadding)
+	leftBorder := dimStyle.Render("\u2502")
 	rightBorder := strings.Repeat(" ", menuPadding) + dimStyle.Render("\u2502")
 
 	var lines []string
@@ -1841,7 +1841,7 @@ func (m *MainMenuModel) renderInputBox() string {
 	topBorder := dimStyle.Render("\u250c" + hLine + "\u2510")
 	separator := dimStyle.Render("\u251c" + hLine + "\u2524")
 	bottomBorder := dimStyle.Render("\u2514" + hLine + "\u2518")
-	leftBorder := dimStyle.Render("\u2502") + strings.Repeat(" ", menuPadding)
+	leftBorder := dimStyle.Render("\u2502")
 	rightBorder := strings.Repeat(" ", menuPadding) + dimStyle.Render("\u2502")
 	emptyRow := leftBorder + strings.Repeat(" ", menuContentWidth) + rightBorder
 
@@ -1939,7 +1939,7 @@ func (m *MainMenuModel) renderDeleteBox() string {
 	topBorder := dimStyle.Render("\u250c" + hLine + "\u2510")
 	separator := dimStyle.Render("\u251c" + hLine + "\u2524")
 	bottomBorder := dimStyle.Render("\u2514" + hLine + "\u2518")
-	leftBorder := dimStyle.Render("\u2502") + strings.Repeat(" ", menuPadding)
+	leftBorder := dimStyle.Render("\u2502")
 	rightBorder := strings.Repeat(" ", menuPadding) + dimStyle.Render("\u2502")
 	emptyRow := leftBorder + strings.Repeat(" ", menuContentWidth) + rightBorder
 
