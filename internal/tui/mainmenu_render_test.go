@@ -67,10 +67,17 @@ func TestMenuBox_AIToolHasTrailingSpace(t *testing.T) {
 		t.Fatal("renderMenuBox produced fewer than 2 lines")
 	}
 	raw := stripAnsi(lines[1]) // title row
-	// AI tool selector should have a trailing space before the right border │
-	// e.g. "◂ Claude Code ▸ │" not "◂ Claude Code ▸│"
-	if !strings.HasSuffix(raw, "▸ │") {
-		t.Errorf("expected AI tool selector to have trailing space before border, got: %q", raw)
+	// AI tool selector should have whitespace between last ▸ and trailing │
+	// After padding, the trailing is "▸   │" (3 spaces: 1 content + 2 padding)
+	// Check there's whitespace between last ▸ and trailing │
+	lastArrow := strings.LastIndex(raw, "▸")
+	borderChar := strings.LastIndex(raw, "│")
+	if lastArrow < 0 || borderChar < 0 || borderChar <= lastArrow {
+		t.Errorf("expected AI tool selector with ▸ and trailing border, got: %q", raw)
+	}
+	trailing := raw[lastArrow+len("▸") : borderChar]
+	if len(strings.TrimSpace(trailing)) != 0 || len(trailing) < 1 {
+		t.Errorf("expected only whitespace between ▸ and border, got: %q", trailing)
 	}
 }
 
@@ -83,8 +90,8 @@ func TestMenuBox_HelpTextPresent(t *testing.T) {
 	if !strings.Contains(raw, "navigate") {
 		t.Error("help text missing 'navigate'")
 	}
-	if !strings.Contains(raw, "AI tool") {
-		t.Error("help text missing 'AI tool' (expected when multiple AI tools available)")
+	if !strings.Contains(raw, "AI") {
+		t.Error("help text missing 'AI' hint (expected when multiple AI tools available)")
 	}
 	if !strings.Contains(raw, "select") {
 		t.Error("help text missing 'select'")
@@ -555,6 +562,37 @@ func TestMenuBox_BordersStillUseThemeDim(t *testing.T) {
 	}
 	if !strings.Contains(lines[0], "\x1b[38;5;166m") {
 		t.Error("expected theme dim color (166) for box border")
+	}
+}
+
+func TestMenuBox_ContentRowsHavePadding(t *testing.T) {
+	m := newTestMenu()
+	box := m.renderMenuBox()
+	raw := stripAnsi(box)
+	lines := strings.Split(raw, "\n")
+
+	for i, line := range lines {
+		if len(line) == 0 {
+			continue
+		}
+		// Skip border-only rows (top/bottom border, separators)
+		if !strings.HasPrefix(line, "│") || !strings.HasSuffix(line, "│") {
+			continue
+		}
+		// Extract content between the border characters
+		inner := line[len("│") : len(line)-len("│")]
+		if len(inner) < 4 {
+			continue
+		}
+		// Content rows must have at least 2 spaces of padding on each side
+		leftPad := inner[:2]
+		rightPad := inner[len(inner)-2:]
+		if leftPad != "  " {
+			t.Errorf("line %d missing 2-char left padding: %q", i, line)
+		}
+		if rightPad != "  " {
+			t.Errorf("line %d missing 2-char right padding: %q", i, line)
+		}
 	}
 }
 

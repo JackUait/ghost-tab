@@ -789,8 +789,8 @@ func TestMainMenu_ViewHelpRow(t *testing.T) {
 	if !strings.Contains(view, "navigate") {
 		t.Error("help row should mention navigate")
 	}
-	if !strings.Contains(view, "AI tool") {
-		t.Error("help row should mention AI tool when multiple available")
+	if !strings.Contains(view, "AI") {
+		t.Error("help row should mention AI when multiple available")
 	}
 }
 

@@ -334,10 +334,10 @@ func (m BranchPickerModel) renderSelectBox() string {
 	topBorder := dimStyle.Render("\u250c" + hLine + "\u2510")
 	separator := dimStyle.Render("\u251c" + hLine + "\u2524")
 	bottomBorder := dimStyle.Render("\u2514" + hLine + "\u2518")
-	leftBorder := dimStyle.Render("\u2502")
-	rightBorder := dimStyle.Render("\u2502")
+	leftBorder := dimStyle.Render("\u2502") + strings.Repeat(" ", menuPadding)
+	rightBorder := strings.Repeat(" ", menuPadding) + dimStyle.Render("\u2502")
 
-	emptyRow := leftBorder + strings.Repeat(" ", menuInnerWidth) + rightBorder
+	emptyRow := leftBorder + strings.Repeat(" ", menuContentWidth) + rightBorder
 
 	var lines []string
 
@@ -346,7 +346,7 @@ func (m BranchPickerModel) renderSelectBox() string {
 
 	// Title row
 	title := primaryBoldStyle.Render("\u2b21  Select Branch")
-	titlePadding := menuInnerWidth - lipgloss.Width(title) - 1
+	titlePadding := menuContentWidth - lipgloss.Width(title) - 1
 	if titlePadding < 0 {
 		titlePadding = 0
 	}
@@ -367,7 +367,7 @@ func (m BranchPickerModel) renderSelectBox() string {
 	} else {
 		filterContent = "  " + dimStyle.Render("/ to filter")
 	}
-	filterPadding := menuInnerWidth - lipgloss.Width(filterContent)
+	filterPadding := menuContentWidth - lipgloss.Width(filterContent)
 	if filterPadding < 0 {
 		filterPadding = 0
 	}
@@ -380,7 +380,7 @@ func (m BranchPickerModel) renderSelectBox() string {
 	visible := m.visibleItemCount()
 	if len(m.filtered) == 0 {
 		noItems := "  " + dimStyle.Render("No matching branches")
-		noItemsPadding := menuInnerWidth - lipgloss.Width(noItems)
+		noItemsPadding := menuContentWidth - lipgloss.Width(noItems)
 		if noItemsPadding < 0 {
 			noItemsPadding = 0
 		}
@@ -394,14 +394,14 @@ func (m BranchPickerModel) renderSelectBox() string {
 			branch := m.filtered[i]
 			selected := i == m.cursor
 
-			truncBranch := TruncateMiddle(branch, menuInnerWidth-7)
+			truncBranch := TruncateMiddle(branch, menuContentWidth-7)
 
 			var row string
 			if selected {
 				marker := primaryBoldStyle.Render("\u258e")
 				branchText := primaryBoldStyle.Render(truncBranch)
 				content := "  " + marker + " " + branchText
-				padding := menuInnerWidth - lipgloss.Width(content)
+				padding := menuContentWidth - lipgloss.Width(content)
 				if padding < 0 {
 					padding = 0
 				}
@@ -409,7 +409,7 @@ func (m BranchPickerModel) renderSelectBox() string {
 			} else {
 				branchText := primaryStyle.Render(truncBranch)
 				content := "    " + branchText
-				padding := menuInnerWidth - lipgloss.Width(content)
+				padding := menuContentWidth - lipgloss.Width(content)
 				if padding < 0 {
 					padding = 0
 				}
@@ -437,7 +437,7 @@ func (m BranchPickerModel) renderSelectBox() string {
 		helpText := "\u2191/k up \u00b7 \u2193/j down \u00b7 enter select \u00b7 / filter \u00b7 d delete \u00b7 esc back"
 		helpContent = helpStyle.Render(helpText)
 	}
-	helpPadding := menuInnerWidth - lipgloss.Width(helpContent) - 1
+	helpPadding := menuContentWidth - lipgloss.Width(helpContent) - 1
 	if helpPadding < 0 {
 		helpPadding = 0
 	}
@@ -459,9 +459,9 @@ func (m BranchPickerModel) renderDeleteBox() string {
 	topBorder := dimStyle.Render("\u250c" + hLine + "\u2510")
 	separator := dimStyle.Render("\u251c" + hLine + "\u2524")
 	bottomBorder := dimStyle.Render("\u2514" + hLine + "\u2518")
-	leftBorder := dimStyle.Render("\u2502")
-	rightBorder := dimStyle.Render("\u2502")
-	emptyRow := leftBorder + strings.Repeat(" ", menuInnerWidth) + rightBorder
+	leftBorder := dimStyle.Render("\u2502") + strings.Repeat(" ", menuPadding)
+	rightBorder := strings.Repeat(" ", menuPadding) + dimStyle.Render("\u2502")
+	emptyRow := leftBorder + strings.Repeat(" ", menuContentWidth) + rightBorder
 
 	var lines []string
 
@@ -470,7 +470,7 @@ func (m BranchPickerModel) renderDeleteBox() string {
 	// Title row with "· Delete" suffix
 	title := primaryBoldStyle.Render("\u2b21  Select Branch")
 	titleContent := title + " " + dimStyle.Render("\u00b7 Delete")
-	titlePadding := menuInnerWidth - lipgloss.Width(titleContent) - 1
+	titlePadding := menuContentWidth - lipgloss.Width(titleContent) - 1
 	if titlePadding < 0 {
 		titlePadding = 0
 	}
@@ -487,13 +487,13 @@ func (m BranchPickerModel) renderDeleteBox() string {
 	for i := m.deleteOffset; i < end; i++ {
 		branch := m.allBranches[i]
 		selected := m.deleteSelected == i
-		truncBranch := TruncateMiddle(branch, menuInnerWidth-6)
+		truncBranch := TruncateMiddle(branch, menuContentWidth-6)
 
 		var row string
 		if selected {
 			nameText := deleteHighlight.Render(" " + truncBranch + " ")
 			content := "  " + nameText
-			padding := menuInnerWidth - lipgloss.Width(content)
+			padding := menuContentWidth - lipgloss.Width(content)
 			if padding < 0 {
 				padding = 0
 			}
@@ -501,7 +501,7 @@ func (m BranchPickerModel) renderDeleteBox() string {
 		} else {
 			nameText := dimStyle.Render(truncBranch)
 			content := "    " + nameText
-			padding := menuInnerWidth - lipgloss.Width(content)
+			padding := menuContentWidth - lipgloss.Width(content)
 			if padding < 0 {
 				padding = 0
 			}
@@ -516,7 +516,7 @@ func (m BranchPickerModel) renderDeleteBox() string {
 	// Help row
 	helpText := "\u2191\u2193 navigate  \u23ce delete  Q cancel"
 	helpContent := helpStyle.Render(helpText)
-	helpPadding := menuInnerWidth - lipgloss.Width(helpContent) - 1
+	helpPadding := menuContentWidth - lipgloss.Width(helpContent) - 1
 	if helpPadding < 0 {
 		helpPadding = 0
 	}
