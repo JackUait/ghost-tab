@@ -45,19 +45,6 @@ marker_age() {
   echo $(( now - mtime ))
 }
 
-# Confirm AI tool is actually waiting (filter transient marker appearances).
-# Sleeps for confirmation delay, then re-checks state.
-# Usage: confirm_ai_tool_waiting <ai_tool> <session_name> <tmux_cmd> <marker_file> <pane_index>
-# Outputs "waiting" or "active".
-confirm_ai_tool_waiting() {
-  local ai_tool="$1" session_name="$2" tmux_cmd="$3" marker_file="$4"
-  local pane_index="${5:-3}"
-
-  # Re-check after confirmation delay
-  sleep "$_GHOST_TAB_CONFIRM_DELAY"
-  check_ai_tool_state "$ai_tool" "$session_name" "$tmux_cmd" "$marker_file" "$pane_index"
-}
-
 # Discover the AI tool pane (rightmost pane in the tmux session).
 # Usage: discover_ai_pane <session_name> <tmux_cmd>
 # Outputs the pane index of the rightmost pane.
@@ -84,17 +71,13 @@ start_tab_title_watcher() {
 
     local was_waiting=false
     while true; do
-      sleep 1.5
+      sleep 0.5
       local state
       state=$(check_ai_tool_state "$ai_tool" "$session_name" "$tmux_cmd" "$marker_file" "$ai_pane")
 
       if [ "$state" = "waiting" ] && [ "$was_waiting" = false ]; then
-        # Skip confirmation delay if this is an AskUserQuestion event (.ask marker present)
-        if [ ! -f "${marker_file}.ask" ]; then
-          # Re-check after confirmation delay to filter subagent false positives
-          state=$(confirm_ai_tool_waiting "$ai_tool" "$session_name" "$tmux_cmd" "$marker_file" "$ai_pane")
-        fi
-        if [ "$state" = "waiting" ]; then
+        # AskUserQuestion: instant notification (.ask marker present)
+        if [ -f "${marker_file}.ask" ]; then
           if [ "$tab_title_setting" = "full" ]; then
             set_tab_title_waiting "$project_name" "$ai_tool"
           else
@@ -104,6 +87,21 @@ start_tab_title_watcher() {
             play_notification_sound "$ai_tool" "$config_dir"
           fi
           was_waiting=true
+        else
+          # Regular stop: check marker age to filter subagent false positives
+          local age
+          age=$(marker_age "$marker_file") || continue
+          if [ "$age" -ge "$_GHOST_TAB_NOTIFY_AFTER" ]; then
+            if [ "$tab_title_setting" = "full" ]; then
+              set_tab_title_waiting "$project_name" "$ai_tool"
+            else
+              set_tab_title_waiting "$project_name"
+            fi
+            if [[ -n "$config_dir" ]]; then
+              play_notification_sound "$ai_tool" "$config_dir"
+            fi
+            was_waiting=true
+          fi
         fi
       elif [ "$state" = "active" ] && [ "$was_waiting" = true ]; then
         if [ "$tab_title_setting" = "full" ]; then
