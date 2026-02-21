@@ -678,9 +678,9 @@ func TestTabTitleWatcher_ghostty_wrapper_passes_config_dir_to_watcher(t *testing
 func TestTabTitleWatcher_check_ai_tool_state_claude_full_marker_lifecycle(t *testing.T) {
 	// Tests the complete lifecycle:
 	// 1. Initially no marker → "active"
-	// 2. Stop hook touches marker → "waiting"
+	// 2. Notification hook touches marker → "waiting"
 	// 3. UserPromptSubmit hook removes marker → "active"
-	// 4. Stop hook touches marker again → "waiting"
+	// 4. Notification hook touches marker again → "waiting"
 	// 5. PreToolUse hook removes marker → "active"
 
 	tmpDir := t.TempDir()
@@ -695,14 +695,14 @@ func TestTabTitleWatcher_check_ai_tool_state_claude_full_marker_lifecycle(t *tes
 		t.Errorf("step 1: expected 'active' (no marker initially), got %q", strings.TrimSpace(out))
 	}
 
-	// Step 2: Simulate Stop hook (touch marker) → waiting
+	// Step 2: Simulate Notification hook (touch marker) → waiting
 	if err := os.WriteFile(markerFile, []byte(""), 0644); err != nil {
 		t.Fatalf("step 2: failed to create marker file: %v", err)
 	}
 	out, code = runBashSnippet(t, snippet, nil)
 	assertExitCode(t, code, 0)
 	if strings.TrimSpace(out) != "waiting" {
-		t.Errorf("step 2: expected 'waiting' (Stop hook created marker), got %q", strings.TrimSpace(out))
+		t.Errorf("step 2: expected 'waiting' (Notification hook created marker), got %q", strings.TrimSpace(out))
 	}
 
 	// Step 3: Simulate UserPromptSubmit hook (rm -f marker) → active
@@ -715,14 +715,14 @@ func TestTabTitleWatcher_check_ai_tool_state_claude_full_marker_lifecycle(t *tes
 		t.Errorf("step 3: expected 'active' (UserPromptSubmit removed marker), got %q", strings.TrimSpace(out))
 	}
 
-	// Step 4: Simulate Stop hook again (touch marker) → waiting
+	// Step 4: Simulate Notification hook again (touch marker) → waiting
 	if err := os.WriteFile(markerFile, []byte(""), 0644); err != nil {
 		t.Fatalf("step 4: failed to create marker file: %v", err)
 	}
 	out, code = runBashSnippet(t, snippet, nil)
 	assertExitCode(t, code, 0)
 	if strings.TrimSpace(out) != "waiting" {
-		t.Errorf("step 4: expected 'waiting' (Stop hook created marker again), got %q", strings.TrimSpace(out))
+		t.Errorf("step 4: expected 'waiting' (Notification hook created marker again), got %q", strings.TrimSpace(out))
 	}
 
 	// Step 5: Simulate PreToolUse hook (rm -f marker) → active
@@ -738,7 +738,7 @@ func TestTabTitleWatcher_check_ai_tool_state_claude_full_marker_lifecycle(t *tes
 
 func TestTabTitleWatcher_hook_commands_manage_marker_file_correctly(t *testing.T) {
 	// Verifies the actual hook commands (from settings-json.sh) work correctly:
-	// 1. Stop command creates marker file
+	// 1. Notification command creates marker file
 	// 2. UserPromptSubmit command removes it
 	// 3. PreToolUse command removes it
 	// 4. All commands exit 0 even when file doesn't exist
@@ -749,11 +749,11 @@ func TestTabTitleWatcher_hook_commands_manage_marker_file_correctly(t *testing.T
 	stopCmd := fmt.Sprintf(`GHOST_TAB_MARKER_FILE=%q; if [ -n "$GHOST_TAB_MARKER_FILE" ]; then touch "$GHOST_TAB_MARKER_FILE"; fi`, markerFile)
 	clearCmd := fmt.Sprintf(`GHOST_TAB_MARKER_FILE=%q; if [ -n "$GHOST_TAB_MARKER_FILE" ]; then rm -f "$GHOST_TAB_MARKER_FILE"; fi`, markerFile)
 
-	// Step 1: Stop command creates marker file
+	// Step 1: Notification command creates marker file
 	_, code := runBashSnippet(t, stopCmd, nil)
 	assertExitCode(t, code, 0)
 	if _, err := os.Stat(markerFile); os.IsNotExist(err) {
-		t.Error("step 1: Stop hook should create marker file")
+		t.Error("step 1: Notification hook should create marker file")
 	}
 
 	// Step 2: UserPromptSubmit command removes marker file
@@ -763,11 +763,11 @@ func TestTabTitleWatcher_hook_commands_manage_marker_file_correctly(t *testing.T
 		t.Error("step 2: UserPromptSubmit hook should remove marker file")
 	}
 
-	// Step 3: Stop command creates marker again
+	// Step 3: Notification command creates marker again
 	_, code = runBashSnippet(t, stopCmd, nil)
 	assertExitCode(t, code, 0)
 	if _, err := os.Stat(markerFile); os.IsNotExist(err) {
-		t.Error("step 3: Stop hook should create marker file again")
+		t.Error("step 3: Notification hook should create marker file again")
 	}
 
 	// Step 4: PreToolUse command removes marker (same clear_cmd)
