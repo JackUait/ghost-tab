@@ -99,6 +99,39 @@ func TestTabTitleWatcher_check_ai_tool_state_claude_returns_active_when_marker_a
 	}
 }
 
+// --- marker_age: file age in seconds ---
+
+func TestTabTitleWatcher_marker_age_returns_age_in_seconds(t *testing.T) {
+	tmpDir := t.TempDir()
+	markerFile := filepath.Join(tmpDir, "marker")
+	os.WriteFile(markerFile, []byte(""), 0644)
+
+	// File was just created, age should be 0 or 1
+	snippet := tabTitleSnippet(t,
+		fmt.Sprintf(`marker_age %q`, markerFile))
+
+	out, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+	age := strings.TrimSpace(out)
+	if age != "0" && age != "1" {
+		t.Errorf("expected marker age 0 or 1 for just-created file, got %q", age)
+	}
+}
+
+func TestTabTitleWatcher_marker_age_fails_for_nonexistent_file(t *testing.T) {
+	tmpDir := t.TempDir()
+	markerFile := filepath.Join(tmpDir, "no-such-marker")
+
+	snippet := tabTitleSnippet(t,
+		fmt.Sprintf(`marker_age %q; echo "exit=$?"`, markerFile))
+
+	out, code := runBashSnippet(t, snippet, nil)
+	// The function itself returns 1, but bash snippet may still exit 0
+	// because we captured the exit code with echo
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "exit=1")
+}
+
 // --- check_ai_tool_state: non-Claude with mock tmux ---
 
 func TestTabTitleWatcher_check_ai_tool_state_codex_returns_waiting_when_prompt_detected(t *testing.T) {

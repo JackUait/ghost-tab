@@ -3,7 +3,7 @@
 # Depends on: tui.sh (set_tab_title, set_tab_title_waiting)
 
 _TAB_TITLE_WATCHER_PID=""
-_GHOST_TAB_CONFIRM_DELAY="${_GHOST_TAB_CONFIRM_DELAY:-2}"
+_GHOST_TAB_NOTIFY_AFTER="${_GHOST_TAB_NOTIFY_AFTER:-1}"
 
 # Check if the AI tool is waiting for user input.
 # Usage: check_ai_tool_state <ai_tool> <session_name> <tmux_cmd> <marker_file> <pane_index>
@@ -32,6 +32,17 @@ check_ai_tool_state() {
       echo "active"
     fi
   fi
+}
+
+# Return the age of a marker file in seconds (mtime vs now).
+# Usage: marker_age <file>
+# Outputs age in seconds. Returns 1 if file doesn't exist.
+marker_age() {
+  local file="$1"
+  local mtime now
+  mtime=$(stat -f %m "$file" 2>/dev/null) || return 1
+  now=$(date +%s)
+  echo $(( now - mtime ))
 }
 
 # Confirm AI tool is actually waiting (filter transient marker appearances).
