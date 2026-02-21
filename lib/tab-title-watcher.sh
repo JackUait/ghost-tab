@@ -3,7 +3,6 @@
 # Depends on: tui.sh (set_tab_title, set_tab_title_waiting)
 
 _TAB_TITLE_WATCHER_PID=""
-_GHOST_TAB_NOTIFY_AFTER="${_GHOST_TAB_NOTIFY_AFTER:-1}"
 
 # Check if the AI tool is waiting for user input.
 # Usage: check_ai_tool_state <ai_tool> <session_name> <tmux_cmd> <marker_file> <pane_index>
@@ -14,7 +13,7 @@ check_ai_tool_state() {
 
   if [ "$ai_tool" = "claude" ]; then
     # Claude uses marker-file-only detection.
-    # Stop hook creates the marker (Claude finished, waiting for input).
+    # Notification hook creates the marker (Claude waiting for input).
     # UserPromptSubmit hook removes it (user answered).
     # PreToolUse hook also removes it (Claude is calling tools).
     if [ -f "$marker_file" ]; then
@@ -32,17 +31,6 @@ check_ai_tool_state() {
       echo "active"
     fi
   fi
-}
-
-# Return the age of a marker file in seconds (mtime vs now).
-# Usage: marker_age <file>
-# Outputs age in seconds. Returns 1 if file doesn't exist.
-marker_age() {
-  local file="$1"
-  local mtime now
-  mtime=$(stat -f %m "$file" 2>/dev/null) || return 1
-  now=$(date +%s)
-  echo $(( now - mtime ))
 }
 
 # Discover the AI tool pane (rightmost pane in the tmux session).
@@ -76,33 +64,15 @@ start_tab_title_watcher() {
       state=$(check_ai_tool_state "$ai_tool" "$session_name" "$tmux_cmd" "$marker_file" "$ai_pane")
 
       if [ "$state" = "waiting" ] && [ "$was_waiting" = false ]; then
-        # AskUserQuestion: instant notification (.ask marker present)
-        if [ -f "${marker_file}.ask" ]; then
-          if [ "$tab_title_setting" = "full" ]; then
-            set_tab_title_waiting "$project_name" "$ai_tool"
-          else
-            set_tab_title_waiting "$project_name"
-          fi
-          if [[ -n "$config_dir" ]]; then
-            play_notification_sound "$ai_tool" "$config_dir"
-          fi
-          was_waiting=true
+        if [ "$tab_title_setting" = "full" ]; then
+          set_tab_title_waiting "$project_name" "$ai_tool"
         else
-          # Regular stop: check marker age to filter subagent false positives
-          local age
-          age=$(marker_age "$marker_file") || continue
-          if [ "$age" -ge "$_GHOST_TAB_NOTIFY_AFTER" ]; then
-            if [ "$tab_title_setting" = "full" ]; then
-              set_tab_title_waiting "$project_name" "$ai_tool"
-            else
-              set_tab_title_waiting "$project_name"
-            fi
-            if [[ -n "$config_dir" ]]; then
-              play_notification_sound "$ai_tool" "$config_dir"
-            fi
-            was_waiting=true
-          fi
+          set_tab_title_waiting "$project_name"
         fi
+        if [[ -n "$config_dir" ]]; then
+          play_notification_sound "$ai_tool" "$config_dir"
+        fi
+        was_waiting=true
       elif [ "$state" = "active" ] && [ "$was_waiting" = true ]; then
         if [ "$tab_title_setting" = "full" ]; then
           set_tab_title "$project_name" "$ai_tool"
@@ -124,6 +94,6 @@ stop_tab_title_watcher() {
     kill "$_TAB_TITLE_WATCHER_PID" 2>/dev/null || true
   fi
   if [ -n "$marker_file" ]; then
-    rm -f "$marker_file" "${marker_file}.ask"
+    rm -f "$marker_file"
   fi
 }

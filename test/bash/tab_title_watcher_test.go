@@ -99,39 +99,6 @@ func TestTabTitleWatcher_check_ai_tool_state_claude_returns_active_when_marker_a
 	}
 }
 
-// --- marker_age: file age in seconds ---
-
-func TestTabTitleWatcher_marker_age_returns_age_in_seconds(t *testing.T) {
-	tmpDir := t.TempDir()
-	markerFile := filepath.Join(tmpDir, "marker")
-	os.WriteFile(markerFile, []byte(""), 0644)
-
-	// File was just created, age should be 0 or 1
-	snippet := tabTitleSnippet(t,
-		fmt.Sprintf(`marker_age %q`, markerFile))
-
-	out, code := runBashSnippet(t, snippet, nil)
-	assertExitCode(t, code, 0)
-	age := strings.TrimSpace(out)
-	if age != "0" && age != "1" {
-		t.Errorf("expected marker age 0 or 1 for just-created file, got %q", age)
-	}
-}
-
-func TestTabTitleWatcher_marker_age_fails_for_nonexistent_file(t *testing.T) {
-	tmpDir := t.TempDir()
-	markerFile := filepath.Join(tmpDir, "no-such-marker")
-
-	snippet := tabTitleSnippet(t,
-		fmt.Sprintf(`marker_age %q; echo "exit=$?"`, markerFile))
-
-	out, code := runBashSnippet(t, snippet, nil)
-	// The function itself returns 1, but bash snippet may still exit 0
-	// because we captured the exit code with echo
-	assertExitCode(t, code, 0)
-	assertContains(t, out, "exit=1")
-}
-
 // --- check_ai_tool_state: non-Claude with mock tmux ---
 
 func TestTabTitleWatcher_check_ai_tool_state_codex_returns_waiting_when_prompt_detected(t *testing.T) {
@@ -384,7 +351,7 @@ func TestTabTitleWatcher_start_tab_title_watcher_takes_seven_params(t *testing.T
 	}
 }
 
-func TestTabTitleWatcher_watcher_uses_marker_age_instead_of_confirm_delay(t *testing.T) {
+func TestTabTitleWatcher_watcher_uses_notification_hook_no_delay(t *testing.T) {
 	root := projectRoot(t)
 	watcherPath := filepath.Join(root, "lib", "tab-title-watcher.sh")
 	data, err := os.ReadFile(watcherPath)
@@ -393,27 +360,51 @@ func TestTabTitleWatcher_watcher_uses_marker_age_instead_of_confirm_delay(t *tes
 	}
 	content := string(data)
 
-	// Should use _GHOST_TAB_NOTIFY_AFTER (not _GHOST_TAB_CONFIRM_DELAY)
-	if !strings.Contains(content, "_GHOST_TAB_NOTIFY_AFTER") {
-		t.Error("watcher should use _GHOST_TAB_NOTIFY_AFTER for age-based notification threshold")
-	}
-	if strings.Contains(content, "_GHOST_TAB_CONFIRM_DELAY") {
-		t.Error("watcher should NOT use _GHOST_TAB_CONFIRM_DELAY (replaced by marker_age approach)")
+	// Should NOT use _GHOST_TAB_NOTIFY_AFTER (delay removed)
+	if strings.Contains(content, "_GHOST_TAB_NOTIFY_AFTER") {
+		t.Error("watcher should NOT use _GHOST_TAB_NOTIFY_AFTER (Notification hook eliminates need for delay)")
 	}
 
-	// Should use marker_age in the watcher loop
-	if !strings.Contains(content, "marker_age") {
-		t.Error("watcher loop should call marker_age to check marker file age")
+	// Should NOT contain marker_age function (delay removed)
+	if strings.Contains(content, "marker_age") {
+		t.Error("watcher should NOT contain marker_age (Notification hook eliminates need for age-based filtering)")
 	}
 
-	// Should NOT contain confirm_ai_tool_waiting function
-	if strings.Contains(content, "confirm_ai_tool_waiting") {
-		t.Error("confirm_ai_tool_waiting should be removed (replaced by inline marker_age check)")
+	// Should NOT reference .ask marker (removed)
+	if strings.Contains(content, ".ask") {
+		t.Error("watcher should NOT reference .ask marker (removed in Notification hook migration)")
 	}
 
-	// Should poll at 0.5s (not 1.5s)
+	// Should still poll at 0.5s
 	if !strings.Contains(content, "sleep 0.5") {
-		t.Error("watcher loop should poll every 0.5 seconds (was 1.5)")
+		t.Error("watcher loop should poll every 0.5 seconds")
+	}
+
+	// Should still use play_notification_sound
+	if !strings.Contains(content, "play_notification_sound") {
+		t.Error("watcher should call play_notification_sound when state transitions to waiting")
+	}
+
+	// Should still use discover_ai_pane
+	if !strings.Contains(content, "discover_ai_pane") {
+		t.Error("watcher should use discover_ai_pane for dynamic pane discovery")
+	}
+}
+
+func TestTabTitleWatcher_check_ai_tool_state_claude_comment_references_notification_hook(t *testing.T) {
+	root := projectRoot(t)
+	watcherPath := filepath.Join(root, "lib", "tab-title-watcher.sh")
+	data, err := os.ReadFile(watcherPath)
+	if err != nil {
+		t.Fatalf("failed to read tab-title-watcher.sh: %v", err)
+	}
+	content := string(data)
+
+	if strings.Contains(content, "Stop hook creates") {
+		t.Error("check_ai_tool_state comment should reference Notification hook, not Stop hook")
+	}
+	if !strings.Contains(content, "Notification hook") {
+		t.Error("check_ai_tool_state comment should mention Notification hook")
 	}
 }
 
@@ -444,43 +435,6 @@ func TestTabTitleWatcher_stop_tab_title_watcher_succeeds_when_marker_absent(t *t
 
 	_, code := runBashSnippet(t, snippet, nil)
 	assertExitCode(t, code, 0)
-}
-
-func TestTabTitleWatcher_stop_tab_title_watcher_removes_ask_marker(t *testing.T) {
-	tmpDir := t.TempDir()
-	markerFile := filepath.Join(tmpDir, "marker")
-	askMarkerFile := markerFile + ".ask"
-	os.WriteFile(markerFile, []byte(""), 0644)
-	os.WriteFile(askMarkerFile, []byte(""), 0644)
-
-	snippet := tabTitleSnippet(t,
-		fmt.Sprintf(`_TAB_TITLE_WATCHER_PID=""; stop_tab_title_watcher %q`, markerFile))
-
-	_, code := runBashSnippet(t, snippet, nil)
-	assertExitCode(t, code, 0)
-
-	if _, err := os.Stat(markerFile); !os.IsNotExist(err) {
-		t.Error("regular marker file should be removed")
-	}
-	if _, err := os.Stat(askMarkerFile); !os.IsNotExist(err) {
-		t.Error("ask marker file (.ask) should also be removed by stop_tab_title_watcher")
-	}
-}
-
-// --- watcher loop: .ask marker skips confirmation ---
-
-func TestTabTitleWatcher_watcher_skips_confirmation_when_ask_marker_exists(t *testing.T) {
-	root := projectRoot(t)
-	watcherPath := filepath.Join(root, "lib", "tab-title-watcher.sh")
-	data, err := os.ReadFile(watcherPath)
-	if err != nil {
-		t.Fatalf("failed to read tab-title-watcher.sh: %v", err)
-	}
-	content := string(data)
-
-	if !strings.Contains(content, ".ask") {
-		t.Error("start_tab_title_watcher should check for .ask marker file to skip confirmation delay for AskUserQuestion events")
-	}
 }
 
 // --- wrapper.sh: tmux set-titles off ---
