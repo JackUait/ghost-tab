@@ -25,9 +25,9 @@ CSEOF
   fi
 }
 
-# Add waiting indicator hooks (Stop + PreToolUse) to settings.json.
+# Add waiting indicator hooks (Notification + PreToolUse) to settings.json.
 # Uses $GHOST_TAB_MARKER_FILE env var so hooks are safe outside Ghost Tab.
-# Outputs "added" or "exists".
+# Outputs "added", "upgraded", or "exists".
 add_waiting_indicator_hooks() {
   local path="$1"
   mkdir -p "$(dirname "$path")"
@@ -47,32 +47,34 @@ else:
 
 hooks = settings.setdefault("hooks", {})
 
-stop_cmd = 'if [ -n "$GHOST_TAB_MARKER_FILE" ]; then touch "$GHOST_TAB_MARKER_FILE"; fi'
-clear_cmd = 'if [ -n "$GHOST_TAB_MARKER_FILE" ]; then rm -f "$GHOST_TAB_MARKER_FILE" "$GHOST_TAB_MARKER_FILE.ask"; fi'
-pre_tool_cmd = '_gt_in=$(cat); if [ -n "$GHOST_TAB_MARKER_FILE" ]; then if [[ "$_gt_in" == *AskUserQuestion* ]]; then touch "$GHOST_TAB_MARKER_FILE" "$GHOST_TAB_MARKER_FILE.ask"; else rm -f "$GHOST_TAB_MARKER_FILE" "$GHOST_TAB_MARKER_FILE.ask"; fi; fi'
+notif_cmd = 'if [ -n "$GHOST_TAB_MARKER_FILE" ]; then touch "$GHOST_TAB_MARKER_FILE"; fi'
+clear_cmd = 'if [ -n "$GHOST_TAB_MARKER_FILE" ]; then rm -f "$GHOST_TAB_MARKER_FILE"; fi'
+pre_tool_cmd = '_gt_in=$(cat); if [ -n "$GHOST_TAB_MARKER_FILE" ]; then if [[ "$_gt_in" == *AskUserQuestion* ]]; then touch "$GHOST_TAB_MARKER_FILE"; else rm -f "$GHOST_TAB_MARKER_FILE"; fi; fi'
 
-# Check if already installed
+# Check if already installed (check both old Stop and new Notification locations)
 marker = "GHOST_TAB_MARKER_FILE"
+
+notif_list = hooks.get("Notification", [])
+notif_exists = any(
+    marker in h.get("command", "")
+    for entry in notif_list
+    for h in entry.get("hooks", [])
+)
+
 stop_list = hooks.get("Stop", [])
-already_exists = any(
+stop_exists = any(
     marker in h.get("command", "")
     for entry in stop_list
     for h in entry.get("hooks", [])
 )
 
-if already_exists:
-    # Check if PreToolUse hook has the current conditional format
-    pre_tool_list = hooks.get("PreToolUse", [])
-    is_current = any(
-        ".ask" in h.get("command", "")
-        for entry in pre_tool_list
-        for h in entry.get("hooks", [])
-    )
-    if is_current:
-        print("exists")
-        sys.exit(0)
-    # Old format — remove ghost-tab hooks so they get re-added below
-    for event in ["Stop", "PreToolUse", "UserPromptSubmit"]:
+if notif_exists:
+    # Current Notification format already installed
+    print("exists")
+    sys.exit(0)
+elif stop_exists:
+    # Old format (Stop-based) — remove ghost-tab hooks so they get re-added below
+    for event in ["Stop", "Notification", "PreToolUse", "UserPromptSubmit"]:
         event_list = hooks.get(event, [])
         new_list = [
             entry for entry in event_list
@@ -86,9 +88,9 @@ if already_exists:
 else:
     action = "added"
 
-# Add Stop hook
-hooks.setdefault("Stop", []).append({
-    "hooks": [{"type": "command", "command": stop_cmd}]
+# Add Notification hook
+hooks.setdefault("Notification", []).append({
+    "hooks": [{"type": "command", "command": notif_cmd}]
 })
 
 # Add PreToolUse hook (conditional: AskUserQuestion creates marker, others clear it)
@@ -133,7 +135,7 @@ except (json.JSONDecodeError, ValueError, FileNotFoundError):
 hooks = settings.get("hooks", {})
 found = False
 
-for event in ["Stop", "PreToolUse", "UserPromptSubmit"]:
+for event in ["Stop", "Notification", "PreToolUse", "UserPromptSubmit"]:
     event_list = hooks.get(event, [])
     new_list = [
         entry for entry in event_list
