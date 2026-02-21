@@ -1557,11 +1557,11 @@ func (m *MainMenuModel) renderMenuBox() string {
 		aiPart = " " + primaryStyle.Render(aiDisplay)
 	}
 	// Right-align AI tool chooser: "⬡ Ghost Tab" left, "◂ Claude Code ▸" right
-	aiPadding := menuContentWidth - lipgloss.Width(title) - lipgloss.Width(aiPart) - 2 // -2 for leading + trailing space
+	aiPadding := menuContentWidth - lipgloss.Width(title) - lipgloss.Width(aiPart) - 1 // -1 for leading space
 	if aiPadding < 1 {
 		aiPadding = 1
 	}
-	titleRow := leftBorder + " " + title + strings.Repeat(" ", aiPadding) + aiPart + " " + rightBorder
+	titleRow := leftBorder + " " + title + strings.Repeat(" ", aiPadding) + aiPart + rightBorder
 	lines = append(lines, titleRow)
 
 	// Separator after title
