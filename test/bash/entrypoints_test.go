@@ -888,6 +888,21 @@ func TestWrapper_does_not_contain_inline_brew_check(t *testing.T) {
 	}
 }
 
+func TestWrapper_uses_go_tui_for_project_selection(t *testing.T) {
+	root := projectRoot(t)
+	data, err := os.ReadFile(filepath.Join(root, "wrapper.sh"))
+	if err != nil {
+		t.Fatalf("failed to read wrapper.sh: %v", err)
+	}
+	content := string(data)
+	if !strings.Contains(content, "select_project_interactive") {
+		t.Errorf("wrapper.sh should use select_project_interactive (Go TUI), not a bash draw_menu")
+	}
+	if strings.Contains(content, "draw_menu()") {
+		t.Errorf("wrapper.sh should not contain a bash draw_menu function — use ghost-tab-tui main-menu instead")
+	}
+}
+
 func TestClaudeWrapper_PlainTerminal_action_execs_shell_instead_of_exiting(t *testing.T) {
 	dir := t.TempDir()
 
