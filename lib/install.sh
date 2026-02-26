@@ -17,11 +17,16 @@ detect_arch() {
 # Get the latest release tag from a GitHub repo (e.g. "v1.2.3")
 # Uses the /releases/latest redirect — no API key required.
 get_latest_release_tag() {
-  local repo="$1"
-  curl -fsSI "https://github.com/$repo/releases/latest" 2>/dev/null \
+  local repo="$1" tag
+  tag="$(curl -fsSI "https://github.com/$repo/releases/latest" 2>/dev/null \
     | grep -i '^location:' \
     | sed 's|.*/tag/||' \
-    | tr -d '[:space:]\r'
+    | tr -d '[:space:]\r')"
+  if [[ -z "$tag" ]]; then
+    error "Failed to fetch release tag for $repo"
+    return 1
+  fi
+  echo "$tag"
 }
 
 # Download a binary from $url to $dest and make it executable.
@@ -45,7 +50,7 @@ ensure_jq() {
     return 0
   fi
   local arch jq_arch
-  arch="$(detect_arch)"
+  arch="$(detect_arch)" || return 1
   case "$arch" in
     arm64)   jq_arch="macos-arm64" ;;
     x86_64)  jq_arch="macos-amd64" ;;
@@ -63,8 +68,8 @@ ensure_tmux() {
     return 0
   fi
   local arch tag version tmp_dir url
-  arch="$(detect_arch)"
-  tag="$(get_latest_release_tag "tmux/tmux-builds")"
+  arch="$(detect_arch)" || return 1
+  tag="$(get_latest_release_tag "tmux/tmux-builds")" || return 1
   version="${tag#v}"
   tmp_dir="$(mktemp -d)"
   # shellcheck disable=SC2064
@@ -72,7 +77,7 @@ ensure_tmux() {
   url="https://github.com/tmux/tmux-builds/releases/download/${tag}/tmux-${version}-macos-${arch}.tar.gz"
   info "Downloading tmux..."
   if curl -fsSL -o "$tmp_dir/tmux.tar.gz" "$url"; then
-    tar -xzf "$tmp_dir/tmux.tar.gz" -C "$tmp_dir"
+    tar -xzf "$tmp_dir/tmux.tar.gz" -C "$tmp_dir" tmux
     mkdir -p "$HOME/.local/bin"
     mv "$tmp_dir/tmux" "$HOME/.local/bin/tmux"
     chmod +x "$HOME/.local/bin/tmux"
@@ -90,8 +95,8 @@ ensure_lazygit() {
     return 0
   fi
   local arch tag version tmp_dir url
-  arch="$(detect_arch)"
-  tag="$(get_latest_release_tag "jesseduffield/lazygit")"
+  arch="$(detect_arch)" || return 1
+  tag="$(get_latest_release_tag "jesseduffield/lazygit")" || return 1
   version="${tag#v}"
   tmp_dir="$(mktemp -d)"
   # shellcheck disable=SC2064
@@ -117,12 +122,12 @@ ensure_broot() {
     return 0
   fi
   local arch broot_arch tag version tmp_dir url
-  arch="$(detect_arch)"
+  arch="$(detect_arch)" || return 1
   case "$arch" in
     arm64)   broot_arch="aarch64-apple-darwin" ;;
     x86_64)  broot_arch="x86_64-apple-darwin" ;;
   esac
-  tag="$(get_latest_release_tag "Canop/broot")"
+  tag="$(get_latest_release_tag "Canop/broot")" || return 1
   version="${tag#v}"
   tmp_dir="$(mktemp -d)"
   # shellcheck disable=SC2064
@@ -130,7 +135,7 @@ ensure_broot() {
   url="https://github.com/Canop/broot/releases/download/${tag}/broot_${version}.zip"
   info "Downloading broot..."
   if curl -fsSL -o "$tmp_dir/broot.zip" "$url"; then
-    cd "$tmp_dir" && unzip -q broot.zip
+    unzip -q -d "$tmp_dir" "$tmp_dir/broot.zip"
     mkdir -p "$HOME/.local/bin"
     mv "$tmp_dir/build/${broot_arch}/broot" "$HOME/.local/bin/broot"
     chmod +x "$HOME/.local/bin/broot"
@@ -152,22 +157,17 @@ ensure_ghost_tab_tui() {
   fi
 
   local version arch url
-  version="$(cat "$share_dir/VERSION" 2>/dev/null | tr -d '[:space:]')"
+  version="$(tr -d '[:space:]' < "$share_dir/VERSION" 2>/dev/null)"
   if [[ -z "$version" ]]; then
     error "Cannot determine ghost-tab-tui version: VERSION file missing in $share_dir"
     return 1
   fi
 
-  arch="$(detect_arch)"
+  arch="$(detect_arch)" || return 1
   url="https://github.com/JackUait/ghost-tab/releases/download/v${version}/ghost-tab-tui-darwin-${arch}"
 
   mkdir -p "$HOME/.local/bin"
-  if install_binary "$url" "$HOME/.local/bin/ghost-tab-tui" "ghost-tab-tui"; then
-    return 0
-  else
-    error "Failed to download ghost-tab-tui v${version}"
-    return 1
-  fi
+  install_binary "$url" "$HOME/.local/bin/ghost-tab-tui" "ghost-tab-tui" || return 1
 }
 
 # Install base CLI requirements.
