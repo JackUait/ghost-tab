@@ -8,18 +8,11 @@ A **`Ghostty`** + **`tmux`** wrapper that launches a four-pane dev session with 
 
 ## Quick Start
 
-> [!NOTE]
-> **Homebrew (recommended):**
-
 ```sh
-brew install JackUait/ghost-tab/ghost-tab
-ghost-tab
+git clone https://github.com/JackUait/ghost-tab.git && cd ghost-tab && ./bin/ghost-tab
 ```
 
-That's it. Homebrew installs all dependencies. Then run `ghost-tab` to set up **`Ghostty`** and add your projects.
-
-> [!IMPORTANT]
-> **Only requirement:** **`macOS`**. Everything (**`Homebrew`**, **`Ghostty`**, **`tmux`**, **`lazygit`**, **`broot`**, **`Claude Code`**) is installed automatically.
+That's it — only requirement is **`macOS`**. Everything (**`Ghostty`**, **`tmux`**, **`lazygit`**, **`broot`**, **`Claude Code`**) is installed automatically.
 
 ---
 
@@ -76,54 +69,13 @@ That's it. Homebrew installs all dependencies. Then run `ghost-tab` to set up **
 
 ## What `ghost-tab` Does
 
-1. Installs **`Homebrew`** (if needed)
-2. Installs **`tmux`**, **`lazygit`**, and **`broot`** via **`Homebrew`**
-3. Installs **`Claude Code`** via native installer (auto-updates)
-4. Installs **`Ghostty`** via **`Homebrew`** cask (if needed)
-5. Sets up the **`Ghostty`** config (with merge/replace option if you have an existing one)
-6. Walks you through adding your **project directories**
-7. Installs **`Node.js`** LTS (if needed) and sets up **Claude Code status line** showing git info and context usage
-
-<details>
-<summary><strong>Alternative: Clone and Run</strong></summary>
-
-```sh
-git clone https://github.com/JackUait/ghost-tab.git
-cd ghost-tab
-./bin/ghost-tab
-```
-
-</details>
-
-<details>
-<summary><strong>Alternative: One-liner</strong></summary>
-
-> [!CAUTION]
-> The one-liner requires cloning the repo first. It cannot run standalone via curl pipe.
-
-```sh
-git clone https://github.com/JackUait/ghost-tab.git && cd ghost-tab && ./bin/ghost-tab
-```
-
-</details>
-
-<details>
-<summary><strong>Alternative: Manual Setup</strong></summary>
-
-If you prefer to set things up by hand:
-
-1. Copy `ghostty/claude-wrapper.sh` to `~/.config/ghostty/` and make it executable
-2. Add `command = ~/.config/ghostty/claude-wrapper.sh` to `~/.config/ghostty/config`
-3. Add your projects to `~/.config/ghost-tab/projects`, one per line in `name:path` format:
-
-```
-my-app:/path/to/my-app
-another-project:/path/to/another-project
-```
-
-Lines starting with `#` are ignored. You can also add/delete projects directly from the interactive menu.
-
-</details>
+1. Downloads **`tmux`**, **`lazygit`**, **`broot`**, and **`jq`** natively (no package manager required)
+2. Installs **`Claude Code`** via native installer (auto-updates)
+3. Prompts to install **`Ghostty`** from ghostty.org if not already installed
+4. Sets up the **`Ghostty`** config (with merge option if you have an existing one)
+5. Walks you through adding your **project directories**
+6. Installs **`Node.js`** LTS (if needed) and sets up **Claude Code status line** showing git info and context usage
+7. Auto-updates via **`git pull`** in the background — notifies on next launch
 
 ---
 
