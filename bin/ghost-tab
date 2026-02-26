@@ -11,12 +11,7 @@ export PATH="$HOME/.local/bin:$PATH"
 
 # Determine where supporting files live
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-_brew_prefix="$(brew --prefix 2>/dev/null || true)"
-if [[ -n "$_brew_prefix" && "$SCRIPT_DIR" == "$_brew_prefix/bin" ]]; then
-    SHARE_DIR="$_brew_prefix/share/ghost-tab"
-else
-    SHARE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-fi
+SHARE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 source "$SHARE_DIR/lib/tui.sh"
 source "$SHARE_DIR/lib/install.sh"
@@ -28,6 +23,7 @@ source "$SHARE_DIR/lib/ai-select-tui.sh"
 source "$SHARE_DIR/lib/statusline-setup.sh"
 source "$SHARE_DIR/lib/project-actions.sh"
 source "$SHARE_DIR/lib/project-actions-tui.sh"
+source "$SHARE_DIR/lib/update.sh"
 
 # ---------- Terminal-only setup ----------
 run_terminal_setup() {
@@ -125,23 +121,11 @@ if [ "$(uname)" != "Darwin" ]; then
   exit 1
 fi
 success "macOS detected"
-
-# ---------- Homebrew ----------
-header "Checking Homebrew..."
-if ! command -v brew &>/dev/null; then
-  info "Installing Homebrew..."
-  /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-  eval "$(/opt/homebrew/bin/brew shellenv 2>/dev/null || /usr/local/bin/brew shellenv 2>/dev/null)"
-  success "Homebrew installed"
-else
-  success "Homebrew found"
-fi
+notify_if_updated
 
 # ---------- Dependencies ----------
 header "Installing dependencies..."
-for pkg in tmux lazygit broot; do
-  ensure_brew_pkg "$pkg"
-done
+ensure_base_requirements
 
 # ---------- TUI Binary ----------
 header "Checking TUI binary..."
@@ -227,15 +211,7 @@ terminal_install
 
 # Verify supporting files exist
 if [ ! -f "$SHARE_DIR/wrapper.sh" ] || [ ! -d "$SHARE_DIR/templates" ]; then
-  error "Supporting files not found in $SHARE_DIR"
-  echo ""
-  info "If you ran this via curl|bash, install via Homebrew instead:"
-  echo "  brew tap JackUait/ghost-tab https://github.com/JackUait/ghost-tab"
-  echo "  brew install ghost-tab"
-  echo ""
-  info "Or clone the repo:"
-  echo "  git clone https://github.com/JackUait/ghost-tab.git"
-  echo "  cd ghost-tab && ./bin/ghost-tab"
+  error "Supporting files not found in $SHARE_DIR. Re-clone the repo and try again."
   exit 1
 fi
 

@@ -2,6 +2,14 @@
 # shellcheck disable=SC2059  # ANSI escape vars (_DIM, _NC, etc.) in printf format strings are intentional, not user-controlled
 export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
 
+SHARE_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/ghost-tab"
+
+# shellcheck source=/dev/null
+[ -f "$SHARE_DIR/lib/update.sh" ] && source "$SHARE_DIR/lib/update.sh"
+
+notify_if_updated
+check_for_update "$SHARE_DIR"
+
 TMUX_CMD="$(command -v tmux)"
 LAZYGIT_CMD="$(command -v lazygit)"
 BROOT_CMD="$(command -v broot)"
@@ -9,47 +17,6 @@ CLAUDE_CMD="$(command -v claude)"
 
 # Load user projects from config file if it exists
 PROJECTS_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/ghost-tab/projects"
-
-# Version update check (Homebrew only)
-UPDATE_CACHE="${XDG_CONFIG_HOME:-$HOME/.config}/ghost-tab/.update-check"
-_update_version=""
-
-check_for_update() {
-  local cache_ts now age latest
-  # Only check if brew is available (Homebrew install)
-  command -v brew &>/dev/null || return
-
-  # Read cache if it exists
-  if [ -f "$UPDATE_CACHE" ]; then
-    latest="$(sed -n '1p' "$UPDATE_CACHE")"
-    cache_ts="$(sed -n '2p' "$UPDATE_CACHE")"
-    now="$(date +%s)"
-    age=$(( now - ${cache_ts:-0} ))
-    # Use cached result if less than 24 hours old
-    if [ "$age" -lt 86400 ]; then
-      _update_version="$latest"
-      return
-    fi
-  fi
-
-  # Spawn background check (non-blocking)
-  (
-    result="$(brew outdated --verbose --formula ghost-tab 2>/dev/null)"
-    mkdir -p "$(dirname "$UPDATE_CACHE")"
-    if [ -n "$result" ]; then
-      # Extract new version: "ghost-tab (1.0.0) < 1.1.0" -> "1.1.0"
-      new_ver="$(echo "$result" | sed -n 's/.*< *//p')"
-      printf '%s\n%s\n' "$new_ver" "$(date +%s)" > "$UPDATE_CACHE.tmp"
-      mv "$UPDATE_CACHE.tmp" "$UPDATE_CACHE"
-    else
-      printf '\n%s\n' "$(date +%s)" > "$UPDATE_CACHE.tmp"
-      mv "$UPDATE_CACHE.tmp" "$UPDATE_CACHE"
-    fi
-  ) &
-  disown
-}
-
-check_for_update
 
 # Select working directory
 if [ -n "$1" ] && [ -d "$1" ]; then

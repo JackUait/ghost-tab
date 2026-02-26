@@ -848,6 +848,48 @@ func TestClaudeWrapper_SelfHealing_does_not_add_noticeable_latency_when_binary_e
 	}
 }
 
+// ============================================================
+// TestGhostTab_NativeInstall_* — Task 4: no Homebrew in main flow
+// ============================================================
+
+func TestGhostTab_does_not_reference_homebrew_in_main_flow(t *testing.T) {
+	root := projectRoot(t)
+	data, err := os.ReadFile(filepath.Join(root, "bin", "ghost-tab"))
+	if err != nil {
+		t.Fatalf("failed to read bin/ghost-tab: %v", err)
+	}
+	content := string(data)
+	if strings.Contains(content, "Homebrew/install/HEAD/install.sh") {
+		t.Errorf("bin/ghost-tab still references Homebrew installer URL")
+	}
+	if strings.Contains(content, "ensure_brew_pkg") {
+		t.Errorf("bin/ghost-tab still calls ensure_brew_pkg")
+	}
+}
+
+func TestWrapper_sources_update_lib(t *testing.T) {
+	root := projectRoot(t)
+	data, err := os.ReadFile(filepath.Join(root, "wrapper.sh"))
+	if err != nil {
+		t.Fatalf("failed to read wrapper.sh: %v", err)
+	}
+	content := string(data)
+	if !strings.Contains(content, "update.sh") {
+		t.Errorf("wrapper.sh does not source update.sh")
+	}
+}
+
+func TestWrapper_does_not_contain_inline_brew_check(t *testing.T) {
+	root := projectRoot(t)
+	data, err := os.ReadFile(filepath.Join(root, "wrapper.sh"))
+	if err != nil {
+		t.Fatalf("failed to read wrapper.sh: %v", err)
+	}
+	if strings.Contains(string(data), "brew outdated") {
+		t.Errorf("wrapper.sh still contains inline brew update check")
+	}
+}
+
 func TestClaudeWrapper_PlainTerminal_action_execs_shell_instead_of_exiting(t *testing.T) {
 	dir := t.TempDir()
 
