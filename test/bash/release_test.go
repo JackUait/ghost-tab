@@ -199,91 +199,6 @@ func TestCheckGhAuth_fails_when_not_installed(t *testing.T) {
 }
 
 // ============================================================
-// check_formula_exists tests
-// ============================================================
-
-func TestCheckFormulaExists_passes_when_file_exists(t *testing.T) {
-	dir := t.TempDir()
-	writeTempFile(t, dir, "ghost-tab.rb", "class GhostTab < Formula\nend\n")
-	formulaPath := filepath.Join(dir, "ghost-tab.rb")
-
-	snippet := releaseSnippet(t, `check_formula_exists "`+formulaPath+`"`)
-	_, code := runBashSnippet(t, snippet, nil)
-	assertExitCode(t, code, 0)
-}
-
-func TestCheckFormulaExists_fails_when_file_missing(t *testing.T) {
-	dir := t.TempDir()
-	formulaPath := filepath.Join(dir, "ghost-tab.rb")
-
-	snippet := releaseSnippet(t, `check_formula_exists "`+formulaPath+`"`)
-	out, code := runBashSnippet(t, snippet, nil)
-	assertExitCode(t, code, 1)
-	assertContains(t, out, "formula")
-}
-
-// ============================================================
-// update_formula tests
-// ============================================================
-
-func TestUpdateFormula_updates_url_and_sha256(t *testing.T) {
-	dir := t.TempDir()
-	formula := `class GhostTab < Formula
-  url "https://github.com/JackUait/ghost-tab/archive/refs/tags/v1.5.0.tar.gz"
-  sha256 "oldsha256value"
-  license "MIT"
-end
-`
-	formulaPath := writeTempFile(t, dir, "ghost-tab.rb", formula)
-
-	snippet := releaseSnippet(t, `update_formula "`+formulaPath+`" "2.0.0" "newsha256value"`)
-	out, code := runBashSnippet(t, snippet, nil)
-	assertExitCode(t, code, 0)
-	_ = out
-
-	updated, err := os.ReadFile(formulaPath)
-	if err != nil {
-		t.Fatalf("failed to read formula: %v", err)
-	}
-	content := string(updated)
-	assertContains(t, content, "v2.0.0.tar.gz")
-	assertContains(t, content, `sha256 "newsha256value"`)
-	assertNotContains(t, content, "v1.5.0")
-	assertNotContains(t, content, "oldsha256value")
-}
-
-func TestUpdateFormula_preserves_other_content(t *testing.T) {
-	dir := t.TempDir()
-	formula := `class GhostTab < Formula
-  desc "Ghostty + tmux wrapper"
-  homepage "https://github.com/JackUait/ghost-tab"
-  url "https://github.com/JackUait/ghost-tab/archive/refs/tags/v1.5.0.tar.gz"
-  sha256 "oldsha"
-  license "MIT"
-
-  depends_on "tmux"
-
-  def install
-    bin.install "bin/ghost-tab"
-  end
-end
-`
-	formulaPath := writeTempFile(t, dir, "ghost-tab.rb", formula)
-
-	snippet := releaseSnippet(t, `update_formula "`+formulaPath+`" "3.0.0" "newsha"`)
-	_, code := runBashSnippet(t, snippet, nil)
-	assertExitCode(t, code, 0)
-
-	updated, _ := os.ReadFile(formulaPath)
-	content := string(updated)
-	assertContains(t, content, `desc "Ghostty + tmux wrapper"`)
-	assertContains(t, content, `depends_on "tmux"`)
-	assertContains(t, content, `bin.install "bin/ghost-tab"`)
-	assertContains(t, content, "v3.0.0.tar.gz")
-	assertContains(t, content, `sha256 "newsha"`)
-}
-
-// ============================================================
 // main / integration tests
 // ============================================================
 
@@ -331,23 +246,65 @@ func TestRelease_main_shows_confirmation_and_aborts_on_no(t *testing.T) {
 	cmd.Dir = dir
 	cmd.Stdin = strings.NewReader("n\n")
 
-	// Mock gh as authenticated, and provide a formula path that exists
+	// Mock gh as authenticated
 	mockDir := t.TempDir()
 	binDir := mockCommand(t, mockDir, "gh", `
 if [ "$1" = "auth" ] && [ "$2" = "status" ]; then exit 0; fi
 exit 0
 `)
-	formulaDir := t.TempDir()
-	writeTempFile(t, formulaDir, "Formula/ghost-tab.rb", "class GhostTab\nend\n")
 
 	cmd.Env = buildEnv(t, []string{binDir},
 		"RELEASE_VERSION_FILE="+filepath.Join(dir, "VERSION"),
-		"RELEASE_FORMULA_PATH="+filepath.Join(formulaDir, "Formula", "ghost-tab.rb"),
 	)
 
 	out, _ := cmd.CombinedOutput()
 	assertContains(t, string(out), "Release v1.0.0")
 	assertContains(t, string(out), "Aborted")
+}
+
+// ============================================================
+// Binary build / upload tests
+// ============================================================
+
+func TestRelease_does_not_check_for_formula(t *testing.T) {
+	root := projectRoot(t)
+	data, err := os.ReadFile(filepath.Join(root, "scripts", "release.sh"))
+	if err != nil {
+		t.Fatalf("failed to read release.sh: %v", err)
+	}
+	if strings.Contains(string(data), "check_formula_exists") {
+		t.Errorf("release.sh still calls check_formula_exists")
+	}
+}
+
+func TestRelease_builds_ghost_tab_tui_binaries(t *testing.T) {
+	root := projectRoot(t)
+	data, err := os.ReadFile(filepath.Join(root, "scripts", "release.sh"))
+	if err != nil {
+		t.Fatalf("failed to read release.sh: %v", err)
+	}
+	content := string(data)
+	if !strings.Contains(content, "GOARCH=arm64") {
+		t.Errorf("release.sh does not build arm64 binary")
+	}
+	if !strings.Contains(content, "GOARCH=amd64") {
+		t.Errorf("release.sh does not build amd64 binary")
+	}
+}
+
+func TestRelease_uploads_binaries_to_gh_release(t *testing.T) {
+	root := projectRoot(t)
+	data, err := os.ReadFile(filepath.Join(root, "scripts", "release.sh"))
+	if err != nil {
+		t.Fatalf("failed to read release.sh: %v", err)
+	}
+	content := string(data)
+	if !strings.Contains(content, "ghost-tab-tui-darwin-arm64") {
+		t.Errorf("release.sh does not upload arm64 binary asset")
+	}
+	if !strings.Contains(content, "ghost-tab-tui-darwin-amd64") {
+		t.Errorf("release.sh does not upload amd64 binary asset")
+	}
 }
 
 // ============================================================

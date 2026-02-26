@@ -53,27 +53,6 @@ check_gh_auth() {
   fi
 }
 
-check_formula_exists() {
-  local formula_path="$1"
-  if [[ ! -f "$formula_path" ]]; then
-    echo "Error: Homebrew formula not found at $formula_path" >&2
-    return 1
-  fi
-}
-
-# --- Formula update function ---
-
-update_formula() {
-  local formula_path="$1"
-  local version="$2"
-  local sha="$3"
-
-  sed -i '' \
-    -e "s|archive/refs/tags/v[0-9]*\.[0-9]*\.[0-9]*\.tar\.gz|archive/refs/tags/v${version}.tar.gz|" \
-    -e "s|sha256 \"[a-zA-Z0-9]*\"|sha256 \"${sha}\"|" \
-    "$formula_path"
-}
-
 # --- Main orchestration ---
 
 main() {
@@ -81,7 +60,6 @@ main() {
   script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   local project_dir="$script_dir/.."
   local version_file="${RELEASE_VERSION_FILE:-$project_dir/VERSION}"
-  local formula_path="${RELEASE_FORMULA_PATH:-$project_dir/../homebrew-ghost-tab/Formula/ghost-tab.rb}"
   local yes_flag=false
 
   # Parse args
@@ -111,9 +89,6 @@ main() {
   check_gh_auth
   echo "  ✓ gh CLI authenticated"
 
-  check_formula_exists "$formula_path"
-  echo "  ✓ Homebrew formula found"
-
   echo ""
 
   # Confirmation
@@ -121,8 +96,7 @@ main() {
     echo "Release $tag?"
     echo "  - Create annotated tag $tag"
     echo "  - Push to origin"
-    echo "  - Create GitHub release with release notes"
-    echo "  - Update Homebrew formula"
+    echo "  - Create GitHub release with binaries attached"
     echo ""
     read -rp "Proceed? [y/N] " confirm
     if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
@@ -130,6 +104,21 @@ main() {
       exit 0
     fi
   fi
+
+  # Build ghost-tab-tui binaries
+  echo "Building ghost-tab-tui binaries..."
+  local arm64_bin amd64_bin
+  arm64_bin="$(mktemp)"
+  amd64_bin="$(mktemp)"
+  trap 'rm -f "$arm64_bin" "$amd64_bin"' EXIT
+
+  (cd "$project_dir" && GOOS=darwin GOARCH=arm64 go build -o "$arm64_bin" ./cmd/ghost-tab-tui) || {
+    echo "Error: failed to build ghost-tab-tui for arm64" >&2; exit 1
+  }
+  (cd "$project_dir" && GOOS=darwin GOARCH=amd64 go build -o "$amd64_bin" ./cmd/ghost-tab-tui) || {
+    echo "Error: failed to build ghost-tab-tui for amd64" >&2; exit 1
+  }
+  echo "  ✓ Built ghost-tab-tui for darwin/arm64 and darwin/amd64"
 
   # Tag and push
   echo ""
@@ -144,42 +133,14 @@ main() {
   prev_tag="$(git describe --tags --abbrev=0 "${tag}^" 2>/dev/null || echo "")"
   local notes
   notes="$(bash "$script_dir/generate-release-notes.sh" "$prev_tag" "$tag")"
-  gh release create "$tag" --notes "$notes"
-
-  # Download tarball and compute SHA256
-  echo "Computing SHA256..."
-  local tarball_url="https://github.com/JackUait/ghost-tab/archive/refs/tags/${tag}.tar.gz"
-  local tmp_tarball
-  tmp_tarball="$(mktemp)"
-  trap 'rm -f "$tmp_tarball"' EXIT
-
-  if ! curl -fsSL -o "$tmp_tarball" "$tarball_url"; then
-    echo "Error: Failed to download tarball from $tarball_url" >&2
-    echo "GitHub release was created. Update formula manually." >&2
-    exit 1
-  fi
-
-  local sha256
-  sha256="$(shasum -a 256 "$tmp_tarball" | awk '{print $1}')"
-  echo "  SHA256: $sha256"
-
-  # Update Homebrew formula
-  echo "Updating Homebrew formula..."
-  update_formula "$formula_path" "$version" "$sha256"
-
-  # Commit and push formula
-  echo "Committing formula update..."
-  (
-    cd "$(dirname "$formula_path")/.."
-    git add Formula/ghost-tab.rb
-    git commit -m "Bump ghost-tab to $tag"
-    git push origin main
-  )
+  gh release create "$tag" --notes "$notes" \
+    "${arm64_bin}#ghost-tab-tui-darwin-arm64" \
+    "${amd64_bin}#ghost-tab-tui-darwin-amd64"
 
   echo ""
   echo "✓ Release $tag complete!"
   echo "  GitHub: https://github.com/JackUait/ghost-tab/releases/tag/$tag"
-  echo "  Formula: updated and pushed"
+  echo "  Binaries: ghost-tab-tui-darwin-arm64, ghost-tab-tui-darwin-amd64"
 }
 
 # Only run main when executed directly (not sourced for testing)
