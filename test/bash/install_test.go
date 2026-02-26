@@ -18,316 +18,168 @@ func installSnippet(t *testing.T, body string) string {
 	return fmt.Sprintf("source %q && source %q && %s", tuiPath, installPath, body)
 }
 
-// ============================================================
-// ensure_brew_pkg tests
-// ============================================================
-
-func TestEnsureBrewPkg_reports_already_installed(t *testing.T) {
-	dir := t.TempDir()
-	// Mock brew: "brew list" succeeds => package already installed
-	binDir := mockCommand(t, dir, "brew", `
-if [ "$1" = "list" ]; then exit 0; fi
-exit 0
-`)
-	snippet := installSnippet(t, `ensure_brew_pkg "tmux"`)
-	env := buildEnv(t, []string{binDir})
-	out, code := runBashSnippet(t, snippet, env)
-	assertExitCode(t, code, 0)
-	assertContains(t, out, "already installed")
-}
-
-func TestEnsureBrewPkg_installs_missing_package(t *testing.T) {
-	dir := t.TempDir()
-	// Mock brew: "brew list" fails (not installed), "brew install" succeeds
-	binDir := mockCommand(t, dir, "brew", `
-if [ "$1" = "list" ]; then exit 1; fi
-if [ "$1" = "install" ]; then exit 0; fi
-exit 0
-`)
-	snippet := installSnippet(t, `ensure_brew_pkg "tmux"`)
-	env := buildEnv(t, []string{binDir})
-	out, code := runBashSnippet(t, snippet, env)
-	assertExitCode(t, code, 0)
-	assertContains(t, out, "installed")
-}
-
-func TestEnsureBrewPkg_warns_on_install_failure(t *testing.T) {
-	dir := t.TempDir()
-	// Mock brew: "brew list" fails, "brew install" also fails
-	binDir := mockCommand(t, dir, "brew", `
-if [ "$1" = "list" ]; then exit 1; fi
-if [ "$1" = "install" ]; then exit 1; fi
-exit 0
-`)
-	snippet := installSnippet(t, `ensure_brew_pkg "tmux"`)
-	env := buildEnv(t, []string{binDir})
-	out, code := runBashSnippet(t, snippet, env)
-	assertExitCode(t, code, 0)
-	assertContains(t, out, "Failed")
-}
-
-func TestEnsureBrewPkg_handles_brew_command_timeout(t *testing.T) {
-	dir := t.TempDir()
-	// Mock brew: "brew list" returns 124 (timeout code)
-	binDir := mockCommand(t, dir, "brew", `
-if [ "$1" = "list" ]; then exit 124; fi
-exit 0
-`)
-	snippet := installSnippet(t, `ensure_brew_pkg "tmux"`)
-	env := buildEnv(t, []string{binDir})
-	_, code := runBashSnippet(t, snippet, env)
-	assertExitCode(t, code, 0)
-}
-
-func TestEnsureBrewPkg_handles_brew_not_in_PATH(t *testing.T) {
-	dir := t.TempDir()
-	// Mock brew: always returns 127 (command not found)
-	binDir := mockCommand(t, dir, "brew", `exit 127`)
-	snippet := installSnippet(t, `ensure_brew_pkg "tmux"`)
-	env := buildEnv(t, []string{binDir})
-	out, code := runBashSnippet(t, snippet, env)
-	assertExitCode(t, code, 0)
-	assertContains(t, out, "Failed")
-}
-
-func TestEnsureBrewPkg_handles_network_failure_during_install(t *testing.T) {
-	dir := t.TempDir()
-	// Mock brew: "brew list" fails, "brew install" prints error and fails
-	binDir := mockCommand(t, dir, "brew", `
-if [ "$1" = "list" ]; then exit 1; fi
-if [ "$1" = "install" ]; then
-  echo "Error: Failed to download" >&2
-  exit 1
-fi
-exit 0
-`)
-	snippet := installSnippet(t, `ensure_brew_pkg "tmux"`)
-	env := buildEnv(t, []string{binDir})
-	out, code := runBashSnippet(t, snippet, env)
-	assertExitCode(t, code, 0)
-	assertContains(t, out, "Failed")
-}
-
-func TestEnsureBrewPkg_handles_brew_returning_unexpected_output(t *testing.T) {
-	dir := t.TempDir()
-	// Mock brew: "brew list" outputs corrupt data and returns 1
-	binDir := mockCommand(t, dir, "brew", `
-if [ "$1" = "list" ]; then
-  echo "CORRUPT_DATA_@#$%"
-  exit 1
-fi
-exit 0
-`)
-	snippet := installSnippet(t, `ensure_brew_pkg "tmux"`)
-	env := buildEnv(t, []string{binDir})
-	_, code := runBashSnippet(t, snippet, env)
-	assertExitCode(t, code, 0)
-}
-
-func TestEnsureBrewPkg_gracefully_handles_brew_not_installed(t *testing.T) {
-	dir := t.TempDir()
-	// Mock brew: prints "command not found" to stderr and returns 127
-	binDir := mockCommand(t, dir, "brew", `
-echo "bash: brew: command not found" >&2
-exit 127
-`)
-	snippet := installSnippet(t, `ensure_brew_pkg "tmux"`)
-	env := buildEnv(t, []string{binDir})
-	out, code := runBashSnippet(t, snippet, env)
-	// Should not crash; either non-zero exit or output contains "Failed"
-	if code != 0 || strings.Contains(out, "Failed") {
-		// acceptable
-	} else {
-		t.Errorf("expected non-zero exit or output containing 'Failed', got code=%d, output=%q", code, out)
+// symlinkUsrBinTools creates symlinks in binDir pointing to the named tools
+// found in /usr/bin. This lets tests build a restricted PATH that includes
+// essential tools (grep, sed, tr, …) without exposing other binaries such as
+// jq that may be installed on the host machine.
+func symlinkUsrBinTools(t *testing.T, binDir string, names ...string) {
+	t.Helper()
+	for _, name := range names {
+		src := filepath.Join("/usr/bin", name)
+		dst := filepath.Join(binDir, name)
+		if _, err := os.Lstat(dst); err == nil {
+			continue // already exists (e.g. already mocked)
+		}
+		if err := os.Symlink(src, dst); err != nil {
+			t.Fatalf("symlinkUsrBinTools: failed to symlink %s -> %s: %v", src, dst, err)
+		}
 	}
 }
 
-func TestEnsureBrewPkg_handles_brew_list_non_zero_with_empty_output(t *testing.T) {
+// ============================================================
+// detect_arch tests
+// ============================================================
+
+func TestDetectArch_returns_arm64_or_x86_64(t *testing.T) {
+	snippet := installSnippet(t, `detect_arch`)
+	out, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+	got := strings.TrimSpace(out)
+	if got != "arm64" && got != "x86_64" {
+		t.Errorf("expected arm64 or x86_64, got %q", got)
+	}
+}
+
+func TestDetectArch_returns_arm64_for_arm64(t *testing.T) {
 	dir := t.TempDir()
-	// Mock brew: "brew list" returns 1 with no output, "brew install" succeeds
-	binDir := mockCommand(t, dir, "brew", `
-if [ "$1" = "list" ]; then exit 1; fi
-if [ "$1" = "install" ]; then exit 0; fi
-exit 0
-`)
-	snippet := installSnippet(t, `ensure_brew_pkg "tmux"`)
+	binDir := mockCommand(t, dir, "uname", `echo "arm64"`)
+	snippet := installSnippet(t, `detect_arch`)
 	env := buildEnv(t, []string{binDir})
 	out, code := runBashSnippet(t, snippet, env)
 	assertExitCode(t, code, 0)
-	assertContains(t, out, "installed")
+	if strings.TrimSpace(out) != "arm64" {
+		t.Errorf("expected arm64, got %q", strings.TrimSpace(out))
+	}
 }
 
-func TestEnsureBrewPkg_handles_brew_outputting_to_stderr(t *testing.T) {
+func TestDetectArch_returns_x86_64_for_x86_64(t *testing.T) {
 	dir := t.TempDir()
-	// Mock brew: "brew list" writes to stderr but returns 0 (success)
-	binDir := mockCommand(t, dir, "brew", `
-if [ "$1" = "list" ]; then
-  echo "Warning: Something weird" >&2
+	binDir := mockCommand(t, dir, "uname", `echo "x86_64"`)
+	snippet := installSnippet(t, `detect_arch`)
+	env := buildEnv(t, []string{binDir})
+	out, code := runBashSnippet(t, snippet, env)
+	assertExitCode(t, code, 0)
+	if strings.TrimSpace(out) != "x86_64" {
+		t.Errorf("expected x86_64, got %q", strings.TrimSpace(out))
+	}
+}
+
+// ============================================================
+// install_binary tests
+// ============================================================
+
+func TestInstallBinary_downloads_and_makes_executable(t *testing.T) {
+	dir := t.TempDir()
+	dest := filepath.Join(dir, "bin", "mytool")
+	binDir := mockCommand(t, dir, "curl", fmt.Sprintf(`
+if [ "$1" = "-fsSL" ]; then
+  echo "#!/bin/bash" > "$3"
   exit 0
 fi
-exit 0
-`)
-	snippet := installSnippet(t, `ensure_brew_pkg "tmux"`)
+exit 1
+`))
+	snippet := installSnippet(t, fmt.Sprintf(`install_binary "https://example.com/mytool" %q "mytool"`, dest))
+	env := buildEnv(t, []string{binDir})
+	out, code := runBashSnippet(t, snippet, env)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "mytool installed")
+	if _, err := os.Stat(dest); os.IsNotExist(err) {
+		t.Errorf("expected %s to exist", dest)
+	}
+}
+
+func TestInstallBinary_warns_on_curl_failure(t *testing.T) {
+	dir := t.TempDir()
+	dest := filepath.Join(dir, "bin", "mytool")
+	binDir := mockCommand(t, dir, "curl", `exit 1`)
+	snippet := installSnippet(t, fmt.Sprintf(`install_binary "https://example.com/mytool" %q "mytool"`, dest))
+	env := buildEnv(t, []string{binDir})
+	out, code := runBashSnippet(t, snippet, env)
+	_ = code
+	assertContains(t, out, "Failed")
+}
+
+// ============================================================
+// ensure_jq tests
+// ============================================================
+
+func TestEnsureJq_skips_when_already_installed(t *testing.T) {
+	dir := t.TempDir()
+	binDir := mockCommand(t, dir, "jq", `echo "jq-1.7"`)
+	snippet := installSnippet(t, `ensure_jq`)
 	env := buildEnv(t, []string{binDir})
 	out, code := runBashSnippet(t, snippet, env)
 	assertExitCode(t, code, 0)
 	assertContains(t, out, "already installed")
 }
 
-// ============================================================
-// ensure_cask tests
-// ============================================================
-
-func TestEnsureCask_reports_found_when_app_exists(t *testing.T) {
+func TestEnsureJq_downloads_for_arm64(t *testing.T) {
 	dir := t.TempDir()
-	// Create a fake .app directory
-	appDir := filepath.Join(dir, "Ghostty.app")
-	if err := os.MkdirAll(appDir, 0755); err != nil {
-		t.Fatalf("failed to create fake app dir: %v", err)
-	}
+	fakeHome := filepath.Join(dir, "home")
+	os.MkdirAll(filepath.Join(fakeHome, ".local", "bin"), 0755)
 
-	// We test the check logic directly: if the directory exists, ensure_cask reports success.
-	// The real ensure_cask checks /Applications, so we use a wrapper snippet
-	// that checks if a specific directory exists (equivalent to the BATS test).
-	root := projectRoot(t)
-	tuiPath := filepath.Join(root, "lib", "tui.sh")
-	script := fmt.Sprintf(`
-source %q
-if [ -d %q ]; then
-  success "Ghostty found"
-fi
-`, tuiPath, appDir)
-
-	out, code := runBashSnippet(t, script, nil)
-	assertExitCode(t, code, 0)
-	assertContains(t, out, "found")
-}
-
-func TestEnsureCask_handles_cask_install_failure_with_network_error(t *testing.T) {
-	dir := t.TempDir()
-	// Mock brew: cask install fails with network error
-	binDir := mockCommand(t, dir, "brew", `
-if echo "$*" | grep -q -- "--cask"; then
-  echo "Error: Download failed (Connection timed out)" >&2
-  exit 1
-fi
+	curlCalls := filepath.Join(dir, "curl_calls")
+	binDir := mockCommand(t, dir, "curl", fmt.Sprintf(`
+echo "$@" >> %q
+if [ "$1" = "-fsSL" ]; then echo "binary" > "$3"; exit 0; fi
+if [ "$1" = "-fsSI" ]; then printf "location: https://github.com/jqlang/jq/releases/tag/jq-1.7.1\r\n"; exit 0; fi
 exit 0
-`)
-	snippet := installSnippet(t, `ensure_cask "nonexistent-app-xyz" "NonexistentApp"`)
-	env := buildEnv(t, []string{binDir})
+`, curlCalls))
+	mockCommand(t, dir, "uname", `echo "arm64"`)
+	snippet := installSnippet(t, `ensure_jq`)
+	// Symlink needed /usr/bin tools except jq into the mock dir so we can
+	// use a restricted PATH that does not expose the real jq binary.
+	symlinkUsrBinTools(t, binDir, "grep", "sed", "tr", "mktemp", "tar", "unzip")
+	env := buildEnv(t, nil, "HOME="+fakeHome, "PATH="+binDir+":/bin")
 	out, code := runBashSnippet(t, snippet, env)
-	// ensure_cask calls exit 1 on failure, so expect non-zero exit
-	if code == 0 {
-		t.Errorf("expected non-zero exit code for cask install failure, got 0")
-	}
-	assertContains(t, out, "installation failed")
-}
-
-// ============================================================
-// ensure_command tests
-// ============================================================
-
-func TestEnsureCommand_reports_already_installed_for_existing_command(t *testing.T) {
-	// "bash" is always available in PATH
-	snippet := installSnippet(t, `ensure_command "bash" "echo noop" "" "Bash"`)
-	out, code := runBashSnippet(t, snippet, nil)
 	assertExitCode(t, code, 0)
-	assertContains(t, out, "already installed")
+	assertContains(t, out, "jq installed")
+	calls, _ := os.ReadFile(curlCalls)
+	assertContains(t, string(calls), "macos-arm64")
 }
 
-func TestEnsureCommand_installs_missing_command(t *testing.T) {
-	// "nonexistent_cmd_xyz" is not in PATH, install command is "true" (succeeds)
-	// Note: ensure_command exits with 1 when post_msg is empty due to
-	// [ -n "$post_msg" ] && ... returning 1 under set -e. The BATS test
-	// only checks output, not exit code.
-	snippet := installSnippet(t, `ensure_command "nonexistent_cmd_xyz" "true" "" "TestTool"`)
-	out, _ := runBashSnippet(t, snippet, nil)
-	assertContains(t, out, "installed")
-}
-
-func TestEnsureCommand_shows_post_message_on_success(t *testing.T) {
-	snippet := installSnippet(t, `ensure_command "nonexistent_cmd_xyz" "true" "Run it now" "TestTool"`)
-	out, code := runBashSnippet(t, snippet, nil)
-	assertExitCode(t, code, 0)
-	assertContains(t, out, "Run it now")
-}
-
-func TestEnsureCommand_warns_on_install_failure(t *testing.T) {
-	// Install command "false" always returns 1
-	snippet := installSnippet(t, `ensure_command "nonexistent_cmd_xyz" "false" "" "TestTool"`)
-	out, code := runBashSnippet(t, snippet, nil)
-	assertExitCode(t, code, 0)
-	assertContains(t, out, "failed")
-}
-
-func TestEnsureCommand_handles_curl_404_error(t *testing.T) {
-	snippet := installSnippet(t, `ensure_command "fake_tool" "curl -sSL https://example.com/404 | bash" "" "FakeTool"`)
-	out, code := runBashSnippet(t, snippet, nil)
-	// May succeed or fail depending on network, but output should mention "failed"
-	_ = code
-	assertContains(t, out, "failed")
-}
-
-func TestEnsureCommand_handles_curl_500_error(t *testing.T) {
+func TestEnsureJq_downloads_for_x86_64(t *testing.T) {
 	dir := t.TempDir()
-	// Mock curl: returns error
-	binDir := mockCommand(t, dir, "curl", `
-echo "500 Internal Server Error" >&2
-exit 22
-`)
-	snippet := installSnippet(t, `ensure_command "fake_tool" "curl -sSL https://example.com/install | bash" "" "FakeTool"`)
-	env := buildEnv(t, []string{binDir})
+	fakeHome := filepath.Join(dir, "home")
+	os.MkdirAll(filepath.Join(fakeHome, ".local", "bin"), 0755)
+
+	curlCalls := filepath.Join(dir, "curl_calls")
+	binDir := mockCommand(t, dir, "curl", fmt.Sprintf(`
+echo "$@" >> %q
+if [ "$1" = "-fsSL" ]; then echo "binary" > "$3"; exit 0; fi
+if [ "$1" = "-fsSI" ]; then printf "location: https://github.com/jqlang/jq/releases/tag/jq-1.7.1\r\n"; exit 0; fi
+exit 0
+`, curlCalls))
+	mockCommand(t, dir, "uname", `echo "x86_64"`)
+	snippet := installSnippet(t, `ensure_jq`)
+	// Symlink needed /usr/bin tools except jq into the mock dir so we can
+	// use a restricted PATH that does not expose the real jq binary.
+	symlinkUsrBinTools(t, binDir, "grep", "sed", "tr", "mktemp", "tar", "unzip")
+	env := buildEnv(t, nil, "HOME="+fakeHome, "PATH="+binDir+":/bin")
 	out, code := runBashSnippet(t, snippet, env)
-	// May succeed or fail depending on environment
-	if code != 0 && code != 1 {
-		t.Errorf("expected exit code 0 or 1, got %d", code)
-	}
-	assertContains(t, out, "FakeTool installed")
-}
-
-func TestEnsureCommand_handles_install_command_timeout(t *testing.T) {
-	// Use a very short sleep instead of 10s to keep test fast
-	// The BATS test just checks that it doesn't crash; exit code can be anything
-	snippet := installSnippet(t, `ensure_command "slow_tool" "sleep 0.1 && true" "" "SlowTool"`)
-	_, code := runBashSnippet(t, snippet, nil)
-	// Either success or failure is acceptable
-	if code != 0 && code != 1 {
-		// Still acceptable, just not crashing
-	}
-}
-
-func TestEnsureCommand_handles_empty_install_command(t *testing.T) {
-	snippet := installSnippet(t, `ensure_command "test_cmd" "" "" "TestCmd"`)
-	out, code := runBashSnippet(t, snippet, nil)
-	if code != 0 && code != 1 {
-		t.Errorf("expected exit code 0 or 1, got %d", code)
-	}
-	assertContains(t, out, "installed")
-}
-
-func TestEnsureCommand_handles_malformed_install_command(t *testing.T) {
-	snippet := installSnippet(t, `ensure_command "test_cmd" "((invalid bash syntax" "" "TestCmd"`)
-	out, code := runBashSnippet(t, snippet, nil)
-	_ = code
-	assertContains(t, out, "failed")
-}
-
-func TestEnsureCommand_verifies_command_exists_after_install(t *testing.T) {
-	// Note: same as installs_missing_command — the BATS test only checks output.
-	snippet := installSnippet(t, `ensure_command "definitely_not_real_cmd_xyz123" "true" "" "FakeTool"`)
-	out, _ := runBashSnippet(t, snippet, nil)
-	assertContains(t, out, "installed")
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "jq installed")
+	calls, _ := os.ReadFile(curlCalls)
+	assertContains(t, string(calls), "macos-amd64")
 }
 
 // ============================================================
-// ensure_ghost_tab_tui tests
+// ensure_ghost_tab_tui tests (binary download, not build from source)
 // ============================================================
 
 func TestEnsureGhostTabTui_skips_when_binary_already_in_PATH(t *testing.T) {
 	dir := t.TempDir()
-	// Mock ghost-tab-tui already exists
 	binDir := mockCommand(t, dir, "ghost-tab-tui", `echo "I exist"`)
-
 	snippet := installSnippet(t, `ensure_ghost_tab_tui "/some/share/dir"`)
 	env := buildEnv(t, []string{binDir})
 	out, code := runBashSnippet(t, snippet, env)
@@ -335,133 +187,96 @@ func TestEnsureGhostTabTui_skips_when_binary_already_in_PATH(t *testing.T) {
 	assertContains(t, out, "ghost-tab-tui already available")
 }
 
-func TestEnsureGhostTabTui_builds_from_source_when_go_available(t *testing.T) {
+func TestEnsureGhostTabTui_downloads_binary_for_correct_arch(t *testing.T) {
 	dir := t.TempDir()
 	fakeHome := filepath.Join(dir, "home")
-	if err := os.MkdirAll(filepath.Join(fakeHome, ".local", "bin"), 0755); err != nil {
-		t.Fatalf("failed to create .local/bin: %v", err)
-	}
+	os.MkdirAll(filepath.Join(fakeHome, ".local", "bin"), 0755)
+	shareDir := t.TempDir()
+	writeTempFile(t, shareDir, "VERSION", "2.2.0")
 
-	root := projectRoot(t)
-
-	// Mock go: "go build -o <path> ./cmd/ghost-tab-tui" creates a fake binary
-	binDir := mockCommand(t, dir, "go", `
-if [ "$1" = "build" ]; then
-  touch "$3"
-  chmod +x "$3"
-  exit 0
-fi
-exit 1
-`)
-	// We need ghost-tab-tui to NOT be in PATH, but go to be in PATH.
-	// Explicitly set PATH to only include mock dir and system dirs, excluding
-	// ~/.local/bin where the real ghost-tab-tui may be installed.
-	snippet := installSnippet(t, fmt.Sprintf(`ensure_ghost_tab_tui %q`, root))
-	env := buildEnv(t, nil, "HOME="+fakeHome, "PATH="+binDir+":/usr/bin:/bin")
+	curlCalls := filepath.Join(dir, "curl_calls")
+	binDir := mockCommand(t, dir, "curl", fmt.Sprintf(`
+echo "$@" >> %q
+if [ "$1" = "-fsSL" ]; then echo "binary" > "$3"; exit 0; fi
+exit 0
+`, curlCalls))
+	unameDir := mockCommand(t, dir, "uname", `echo "arm64"`)
+	snippet := installSnippet(t, fmt.Sprintf(`ensure_ghost_tab_tui %q`, shareDir))
+	// Use explicit PATH so the real ghost-tab-tui (if installed) is not found.
+	env := buildEnv(t, nil, "HOME="+fakeHome, "PATH="+binDir+":"+unameDir+":/usr/bin:/bin")
 	out, code := runBashSnippet(t, snippet, env)
 	assertExitCode(t, code, 0)
-	assertContains(t, out, "Building ghost-tab-tui")
-	assertContains(t, out, "ghost-tab-tui built and installed")
+	assertContains(t, out, "ghost-tab-tui")
+	calls, _ := os.ReadFile(curlCalls)
+	assertContains(t, string(calls), "ghost-tab-tui-darwin-arm64")
+	assertContains(t, string(calls), "2.2.0")
 }
 
-func TestEnsureGhostTabTui_fails_when_go_not_available(t *testing.T) {
+func TestEnsureGhostTabTui_fails_when_download_fails(t *testing.T) {
 	dir := t.TempDir()
 	fakeHome := filepath.Join(dir, "home")
-	if err := os.MkdirAll(fakeHome, 0755); err != nil {
-		t.Fatalf("failed to create fakeHome: %v", err)
-	}
+	os.MkdirAll(filepath.Join(fakeHome, ".local", "bin"), 0755)
+	shareDir := t.TempDir()
+	writeTempFile(t, shareDir, "VERSION", "2.2.0")
 
-	root := projectRoot(t)
-	snippet := installSnippet(t, fmt.Sprintf(`ensure_ghost_tab_tui %q`, root))
-	// Set PATH to only /usr/bin:/bin so `go` and `ghost-tab-tui` are not found.
-	// This excludes Homebrew/user paths where go is typically installed.
-	env := buildEnv(t, nil, "HOME="+fakeHome, "PATH=/usr/bin:/bin")
+	binDir := mockCommand(t, dir, "curl", `exit 1`)
+	unameDir := mockCommand(t, dir, "uname", `echo "arm64"`)
+	snippet := installSnippet(t, fmt.Sprintf(`ensure_ghost_tab_tui %q`, shareDir))
+	env := buildEnv(t, []string{binDir, unameDir}, "HOME="+fakeHome, "PATH="+binDir+":"+unameDir+":/usr/bin:/bin")
 	out, code := runBashSnippet(t, snippet, env)
 	if code == 0 {
-		t.Errorf("expected non-zero exit code when go is not available, got 0")
+		t.Errorf("expected non-zero exit when download fails")
 	}
-	assertContains(t, out, "Go is required")
-}
-
-func TestEnsureGhostTabTui_fails_when_go_build_fails(t *testing.T) {
-	dir := t.TempDir()
-	fakeHome := filepath.Join(dir, "home")
-	if err := os.MkdirAll(filepath.Join(fakeHome, ".local", "bin"), 0755); err != nil {
-		t.Fatalf("failed to create .local/bin: %v", err)
-	}
-
-	root := projectRoot(t)
-
-	// Mock go: build fails
-	binDir := mockCommand(t, dir, "go", `
-echo "build error" >&2
-exit 1
-`)
-	snippet := installSnippet(t, fmt.Sprintf(`ensure_ghost_tab_tui %q`, root))
-	// Explicitly set PATH to exclude ~/.local/bin where real ghost-tab-tui lives
-	env := buildEnv(t, nil, "HOME="+fakeHome, "PATH="+binDir+":/usr/bin:/bin")
-	out, code := runBashSnippet(t, snippet, env)
-	if code == 0 {
-		t.Errorf("expected non-zero exit code when go build fails, got 0")
-	}
-	assertContains(t, out, "Failed to build ghost-tab-tui")
-}
-
-func TestEnsureGhostTabTui_creates_local_bin_directory_if_missing(t *testing.T) {
-	dir := t.TempDir()
-	fakeHome := filepath.Join(dir, "home")
-	// Do NOT create .local/bin — ensure_ghost_tab_tui should create it
-	if err := os.MkdirAll(fakeHome, 0755); err != nil {
-		t.Fatalf("failed to create fakeHome: %v", err)
-	}
-
-	root := projectRoot(t)
-
-	// Mock go: "go build" creates a fake binary
-	binDir := mockCommand(t, dir, "go", `
-if [ "$1" = "build" ]; then
-  # Ensure parent dir exists before touch (the function creates it)
-  mkdir -p "$(dirname "$3")"
-  touch "$3"
-  chmod +x "$3"
-  exit 0
-fi
-exit 1
-`)
-	snippet := installSnippet(t, fmt.Sprintf(`ensure_ghost_tab_tui %q`, root))
-	// Explicitly set PATH to exclude ~/.local/bin where real ghost-tab-tui lives
-	env := buildEnv(t, nil, "HOME="+fakeHome, "PATH="+binDir+":/usr/bin:/bin")
-	_, code := runBashSnippet(t, snippet, env)
-	assertExitCode(t, code, 0)
-
-	// Verify .local/bin was created
-	localBin := filepath.Join(fakeHome, ".local", "bin")
-	if _, err := os.Stat(localBin); os.IsNotExist(err) {
-		t.Errorf("expected %s to be created, but it does not exist", localBin)
-	}
+	assertContains(t, out, "Failed")
 }
 
 // ============================================================
 // ensure_base_requirements tests
 // ============================================================
 
-func TestEnsureBaseRequirements_checks_jq(t *testing.T) {
+func TestEnsureBaseRequirements_calls_all_installers(t *testing.T) {
 	root := projectRoot(t)
 	tuiPath := filepath.Join(root, "lib", "tui.sh")
 	installPath := filepath.Join(root, "lib", "install.sh")
-
-	// Source install.sh, then override ensure_command to just echo args,
-	// then call ensure_base_requirements.
 	script := fmt.Sprintf(`
 source %q
 source %q
-ensure_command() {
-  echo "Checking $1"
-}
+called=""
+ensure_jq()       { called="$called jq"; }
+ensure_tmux()     { called="$called tmux"; }
+ensure_lazygit()  { called="$called lazygit"; }
+ensure_broot()    { called="$called broot"; }
 ensure_base_requirements
+echo "$called"
 `, tuiPath, installPath)
-
 	out, code := runBashSnippet(t, script, nil)
 	assertExitCode(t, code, 0)
 	assertContains(t, out, "jq")
+	assertContains(t, out, "tmux")
+	assertContains(t, out, "lazygit")
+	assertContains(t, out, "broot")
+}
+
+// ============================================================
+// ensure_command tests (kept — still used for AI tools)
+// ============================================================
+
+func TestEnsureCommand_reports_already_installed_for_existing_command(t *testing.T) {
+	snippet := installSnippet(t, `ensure_command "bash" "echo noop" "" "Bash"`)
+	out, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "already installed")
+}
+
+func TestEnsureCommand_installs_missing_command(t *testing.T) {
+	snippet := installSnippet(t, `ensure_command "nonexistent_cmd_xyz" "true" "" "TestTool"`)
+	out, _ := runBashSnippet(t, snippet, nil)
+	assertContains(t, out, "installed")
+}
+
+func TestEnsureCommand_warns_on_install_failure(t *testing.T) {
+	snippet := installSnippet(t, `ensure_command "nonexistent_cmd_xyz" "false" "" "TestTool"`)
+	out, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "failed")
 }
