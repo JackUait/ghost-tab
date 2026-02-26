@@ -1,5 +1,5 @@
 #!/bin/bash
-# Auto-update for ghost-tab — git-based (native install) and Homebrew.
+# Git-based auto-update for ghost-tab.
 
 # Show update notification if a previous background update wrote a flag file.
 # Deletes the flag after displaying.
@@ -14,24 +14,10 @@ notify_if_updated() {
   echo "  ↑ Updated to v${version}"
 }
 
-# check_for_update [share_dir]
-#
-# With share_dir: run a background git fetch + pull in share_dir.
-#   If a new version is pulled, downloads the ghost-tab-tui binary and writes
-#   a flag file at $XDG_CONFIG_HOME/ghost-tab/updated.
-#   Does nothing if share_dir is not a git repo.
-#
-# Without share_dir: Homebrew-based check (legacy, used when installed via brew).
-#   Reads/writes UPDATE_CACHE; sets _update_version if a newer version exists.
+# Run a background git fetch + pull in share_dir.
+# If a new version is pulled, downloads the ghost-tab-tui binary and writes a flag file.
+# Args: share_dir
 check_for_update() {
-  if [ -n "${1:-}" ]; then
-    _check_for_update_git "$1"
-  else
-    _check_for_update_brew
-  fi
-}
-
-_check_for_update_git() {
   local share_dir="$1"
   local config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
   local flag="${config_home}/ghost-tab/updated"
@@ -61,47 +47,6 @@ _check_for_update_git() {
 
     mkdir -p "${config_home}/ghost-tab"
     echo "$new_version" > "$flag"
-  ) &
-  disown
-}
-
-_check_for_update_brew() {
-  local cache_ts now age latest
-  # Only check if brew is available (Homebrew install)
-  command -v brew &>/dev/null || return 0
-
-  # Read cache if it exists
-  if [ -f "$UPDATE_CACHE" ]; then
-    latest="$(sed -n '1p' "$UPDATE_CACHE")"
-    cache_ts="$(sed -n '2p' "$UPDATE_CACHE")"
-    now="$(date +%s)"
-    age=$(( now - ${cache_ts:-0} ))
-    # Use cached result if less than 24 hours old
-    if [ "$age" -lt 86400 ]; then
-      # Verify cached version is actually newer than installed
-      if [ -n "$latest" ]; then
-        installed="$(brew list --versions ghost-tab 2>/dev/null | awk '{print $2}')"
-        if [ "$latest" != "$installed" ]; then
-          _update_version="$latest"
-        fi
-      fi
-      return
-    fi
-  fi
-
-  # Spawn background check (non-blocking)
-  (
-    result="$(brew outdated --verbose --formula ghost-tab 2>/dev/null)"
-    mkdir -p "$(dirname "$UPDATE_CACHE")"
-    if [ -n "$result" ]; then
-      # Extract new version: "ghost-tab (1.0.0) < 1.1.0" -> "1.1.0"
-      new_ver="$(echo "$result" | sed -n 's/.*< *//p')"
-      printf '%s\n%s\n' "$new_ver" "$(date +%s)" > "$UPDATE_CACHE.tmp"
-      mv "$UPDATE_CACHE.tmp" "$UPDATE_CACHE"
-    else
-      printf '\n%s\n' "$(date +%s)" > "$UPDATE_CACHE.tmp"
-      mv "$UPDATE_CACHE.tmp" "$UPDATE_CACHE"
-    fi
   ) &
   disown
 }
