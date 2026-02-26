@@ -1300,3 +1300,71 @@ exit 0
 	// Should handle gracefully even with corrupt cache
 	assertExitCode(t, code, 0)
 }
+
+// ==================== lib/update.sh tests (git-based) ====================
+
+func TestUpdate_notify_if_updated_does_nothing_when_no_flag(t *testing.T) {
+	dir := t.TempDir()
+
+	snippet := updateSnippet(t, fmt.Sprintf(`
+XDG_CONFIG_HOME=%q
+notify_if_updated
+`, filepath.Join(dir, "config")))
+	out, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+	if strings.TrimSpace(out) != "" {
+		t.Errorf("expected no output when no flag file, got %q", out)
+	}
+}
+
+func TestUpdate_notify_if_updated_shows_version_and_deletes_flag(t *testing.T) {
+	dir := t.TempDir()
+	configDir := filepath.Join(dir, "config", "ghost-tab")
+	os.MkdirAll(configDir, 0755)
+	writeTempFile(t, configDir, "updated", "2.3.0")
+
+	snippet := updateSnippet(t, fmt.Sprintf(`
+XDG_CONFIG_HOME=%q
+notify_if_updated
+`, filepath.Join(dir, "config")))
+	out, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "2.3.0")
+	flagFile := filepath.Join(configDir, "updated")
+	if _, err := os.Stat(flagFile); !os.IsNotExist(err) {
+		t.Errorf("expected flag file to be deleted after notify_if_updated")
+	}
+}
+
+func TestUpdate_notify_if_updated_shows_update_message(t *testing.T) {
+	dir := t.TempDir()
+	configDir := filepath.Join(dir, "config", "ghost-tab")
+	os.MkdirAll(configDir, 0755)
+	writeTempFile(t, configDir, "updated", "2.5.0")
+
+	snippet := updateSnippet(t, fmt.Sprintf(`
+XDG_CONFIG_HOME=%q
+notify_if_updated
+`, filepath.Join(dir, "config")))
+	out, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "Updated")
+}
+
+func TestUpdate_check_for_update_does_nothing_when_not_git_repo(t *testing.T) {
+	dir := t.TempDir()
+	shareDir := t.TempDir() // not a git repo — no .git directory
+	writeTempFile(t, shareDir, "VERSION", "2.2.0")
+
+	snippet := updateSnippet(t, fmt.Sprintf(`
+check_for_update %q
+sleep 0.2
+`, shareDir))
+	env := buildEnv(t, nil, "XDG_CONFIG_HOME="+filepath.Join(dir, "config"))
+	_, code := runBashSnippet(t, snippet, env)
+	assertExitCode(t, code, 0)
+	flagFile := filepath.Join(dir, "config", "ghost-tab", "updated")
+	if _, err := os.Stat(flagFile); !os.IsNotExist(err) {
+		t.Errorf("expected no flag file when share_dir is not a git repo")
+	}
+}
