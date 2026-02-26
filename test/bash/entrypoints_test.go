@@ -47,31 +47,29 @@ func TestGhostTab_SupportingFiles_fails_when_files_missing(t *testing.T) {
 	script := fmt.Sprintf(`
 source %q
 SHARE_DIR=%q
-if [ ! -f "$SHARE_DIR/ghostty/claude-wrapper.sh" ] || [ ! -f "$SHARE_DIR/ghostty/config" ] || [ ! -d "$SHARE_DIR/templates" ]; then
-  error "Supporting files not found in $SHARE_DIR"
+if [ ! -f "$SHARE_DIR/wrapper.sh" ] || [ ! -d "$SHARE_DIR/templates" ]; then
+  error "Supporting files not found in $SHARE_DIR. Re-clone the repository."
   exit 1
 fi
 `, filepath.Join(root, "lib/tui.sh"), shareDir)
 
 	out, code := runBashSnippet(t, script, nil)
 	assertExitCode(t, code, 1)
-	assertContains(t, out, "Supporting files not found")
+	assertContains(t, out, "Re-clone")
 }
 
 func TestGhostTab_SupportingFiles_passes_when_all_present(t *testing.T) {
 	dir := t.TempDir()
 	shareDir := filepath.Join(dir, "full-share")
-	os.MkdirAll(filepath.Join(shareDir, "ghostty"), 0755)
 	os.MkdirAll(filepath.Join(shareDir, "templates"), 0755)
-	writeTempFile(t, shareDir, "ghostty/claude-wrapper.sh", "")
-	writeTempFile(t, shareDir, "ghostty/config", "")
+	writeTempFile(t, shareDir, "wrapper.sh", "")
 
 	root := projectRoot(t)
 	script := fmt.Sprintf(`
 source %q
 SHARE_DIR=%q
-if [ ! -f "$SHARE_DIR/ghostty/claude-wrapper.sh" ] || [ ! -f "$SHARE_DIR/ghostty/config" ] || [ ! -d "$SHARE_DIR/templates" ]; then
-  error "Supporting files not found in $SHARE_DIR"
+if [ ! -f "$SHARE_DIR/wrapper.sh" ] || [ ! -d "$SHARE_DIR/templates" ]; then
+  error "Supporting files not found in $SHARE_DIR. Re-clone the repository."
   exit 1
 fi
 echo "ok"
