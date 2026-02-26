@@ -11,9 +11,27 @@ terminal_get_wrapper_path() {
   echo "$HOME/.config/ghost-tab/wrapper.sh"
 }
 
-# Install Ghostty via Homebrew cask.
+# Install Ghostty: check for the app, open download page if missing.
 terminal_install() {
-  ensure_cask "ghostty" "Ghostty"
+  local app_path="${GHOSTTY_APP_PATH:-/Applications/Ghostty.app}"
+  if [ -d "$app_path" ]; then
+    success "Ghostty found"
+    return 0
+  fi
+
+  info "Ghostty not found. Opening download page..."
+  open "https://ghostty.org/download"
+  echo ""
+  echo "  Download and install Ghostty from the page that just opened."
+  echo "  Press Enter when installation is complete."
+  read -r < /dev/tty
+
+  if [ ! -d "$app_path" ]; then
+    error "Ghostty still not found at $app_path"
+    info "Install Ghostty and re-run: ghost-tab --terminal"
+    exit 1
+  fi
+  success "Ghostty installed"
 }
 
 # Write or merge the wrapper command into Ghostty config.

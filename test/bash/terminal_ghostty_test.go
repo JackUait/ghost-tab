@@ -120,3 +120,49 @@ func TestGhosttyAdapter_cleanup_config_removes_command_line(t *testing.T) {
 	assertContains(t, content, "theme = dark")
 	assertNotContains(t, content, "command =")
 }
+
+func TestGhosttyAdapter_terminal_install_skips_when_app_exists(t *testing.T) {
+	dir := t.TempDir()
+	fakeApps := filepath.Join(dir, "Applications")
+	os.MkdirAll(filepath.Join(fakeApps, "Ghostty.app"), 0755)
+
+	root := projectRoot(t)
+	tuiPath := filepath.Join(root, "lib", "tui.sh")
+	installPath := filepath.Join(root, "lib", "install.sh")
+	adapterPath := filepath.Join(root, "lib", "terminals", "ghostty.sh")
+	script := fmt.Sprintf(`
+source %q && source %q && source %q
+GHOSTTY_APP_PATH=%q
+terminal_install
+`, tuiPath, installPath, adapterPath, filepath.Join(fakeApps, "Ghostty.app"))
+
+	out, code := runBashSnippet(t, script, nil)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "Ghostty found")
+}
+
+func TestGhosttyAdapter_terminal_install_opens_download_page_when_missing(t *testing.T) {
+	dir := t.TempDir()
+	fakeApps := filepath.Join(dir, "Applications")
+	// Ghostty.app does NOT exist
+
+	openCalls := filepath.Join(dir, "open_calls")
+	binDir := mockCommand(t, dir, "open", fmt.Sprintf(`echo "$@" >> %q`, openCalls))
+
+	root := projectRoot(t)
+	tuiPath := filepath.Join(root, "lib", "tui.sh")
+	installPath := filepath.Join(root, "lib", "install.sh")
+	adapterPath := filepath.Join(root, "lib", "terminals", "ghostty.sh")
+	// Pipe empty Enter to satisfy the read, and || true to suppress exit 1 when app still not found
+	script := fmt.Sprintf(`
+source %q && source %q && source %q
+GHOSTTY_APP_PATH=%q
+terminal_install </dev/null || true
+`, tuiPath, installPath, adapterPath, filepath.Join(fakeApps, "Ghostty.app"))
+
+	env := buildEnv(t, []string{binDir})
+	_, _ = runBashSnippet(t, script, env)
+
+	calls, _ := os.ReadFile(openCalls)
+	assertContains(t, string(calls), "ghostty.org")
+}
