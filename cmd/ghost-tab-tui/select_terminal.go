@@ -11,6 +11,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var currentTerminalFlag string
+
 var selectTerminalCmd = &cobra.Command{
 	Use:   "select-terminal",
 	Short: "Interactive terminal emulator selector",
@@ -19,6 +21,7 @@ var selectTerminalCmd = &cobra.Command{
 }
 
 func init() {
+	selectTerminalCmd.Flags().StringVar(&currentTerminalFlag, "current", "", "Currently selected terminal name")
 	rootCmd.AddCommand(selectTerminalCmd)
 }
 
@@ -27,7 +30,7 @@ func runSelectTerminal(cmd *cobra.Command, args []string) error {
 
 	terminals := models.DetectTerminals()
 
-	model := tui.NewTerminalSelector(terminals)
+	model := tui.NewTerminalSelector(terminals, currentTerminalFlag)
 
 	ttyOpts, cleanup, err := util.TUITeaOptions()
 	if err != nil {
@@ -45,9 +48,16 @@ func runSelectTerminal(cmd *cobra.Command, args []string) error {
 
 	m := finalModel.(tui.TerminalSelectorModel)
 	selected := m.Selected()
+	installReq := m.InstallRequest()
 
 	var result map[string]interface{}
-	if selected != nil {
+	if installReq != "" {
+		result = map[string]interface{}{
+			"action":   "install",
+			"terminal": installReq,
+			"selected": false,
+		}
+	} else if selected != nil {
 		result = map[string]interface{}{
 			"terminal": selected.Name,
 			"selected": true,
