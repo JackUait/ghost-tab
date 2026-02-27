@@ -29,6 +29,12 @@ source "$SHARE_DIR/lib/update.sh"
 run_terminal_setup() {
   local share_dir="$1"
 
+  # Ensure TUI binary is up to date (--terminal path skips main flow checks)
+  header "Checking TUI binary..."
+  if ! ensure_ghost_tab_tui "$share_dir"; then
+    exit 1
+  fi
+
   header "Selecting terminal..."
   echo ""
   echo -e "  Ghost Tab supports multiple terminal emulators."
