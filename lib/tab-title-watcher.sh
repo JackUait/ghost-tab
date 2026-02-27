@@ -4,6 +4,18 @@
 
 _TAB_TITLE_WATCHER_PID=""
 
+# Return the age of the marker file in seconds.
+# Usage: marker_age <file>
+# Outputs the number of seconds since the file was last modified.
+# Returns 1 if the file does not exist or stat fails.
+marker_age() {
+  local file="$1"
+  local now mtime
+  now=$(date +%s)
+  mtime=$(stat -f %m "$file" 2>/dev/null) || return 1
+  echo $(( now - mtime ))
+}
+
 # Check if the AI tool is waiting for user input.
 # Usage: check_ai_tool_state <ai_tool> <session_name> <tmux_cmd> <marker_file> <pane_index>
 # Outputs "waiting" or "active".
@@ -13,7 +25,7 @@ check_ai_tool_state() {
 
   if [ "$ai_tool" = "claude" ]; then
     # Claude uses marker-file-only detection.
-    # Notification hook creates the marker (Claude waiting for input).
+    # Stop hook creates the marker (Claude stopped generating).
     # UserPromptSubmit hook removes it (user answered).
     # PreToolUse hook also removes it (Claude is calling tools).
     if [ -f "$marker_file" ]; then
@@ -64,15 +76,22 @@ start_tab_title_watcher() {
       state=$(check_ai_tool_state "$ai_tool" "$session_name" "$tmux_cmd" "$marker_file" "$ai_pane")
 
       if [ "$state" = "waiting" ] && [ "$was_waiting" = false ]; then
-        if [ "$tab_title_setting" = "full" ]; then
-          set_tab_title_waiting "$project_name" "$ai_tool"
-        else
-          set_tab_title_waiting "$project_name"
+        # Debounce: only notify if marker has existed for >= 1 second.
+        # Subagent completions create/remove markers within milliseconds,
+        # so they never reach the 1s threshold.
+        local age
+        age=$(marker_age "$marker_file") || continue
+        if [ "$age" -ge 1 ]; then
+          if [ "$tab_title_setting" = "full" ]; then
+            set_tab_title_waiting "$project_name" "$ai_tool"
+          else
+            set_tab_title_waiting "$project_name"
+          fi
+          if [[ -n "$config_dir" ]]; then
+            play_notification_sound "$ai_tool" "$config_dir"
+          fi
+          was_waiting=true
         fi
-        if [[ -n "$config_dir" ]]; then
-          play_notification_sound "$ai_tool" "$config_dir"
-        fi
-        was_waiting=true
       elif [ "$state" = "active" ] && [ "$was_waiting" = true ]; then
         if [ "$tab_title_setting" = "full" ]; then
           set_tab_title "$project_name" "$ai_tool"
