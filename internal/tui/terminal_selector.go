@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -17,6 +18,7 @@ type TerminalSelectorModel struct {
 	installRequest     string
 	installRequestCask string
 	quitting           bool
+	width              int
 }
 
 // NewTerminalSelector creates a new terminal selector.
@@ -49,6 +51,10 @@ func (m TerminalSelectorModel) InstallRequestCask() string {
 
 func (m TerminalSelectorModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		return m, nil
+
 	case tea.KeyMsg:
 		switch msg.Type {
 		case tea.KeyCtrlC, tea.KeyEscape:
@@ -122,63 +128,102 @@ func (m TerminalSelectorModel) View() string {
 		return ""
 	}
 
-	var b strings.Builder
+	borderColor := titleStyle.GetForeground()
 
-	b.WriteString(titleStyle.Render("Select Terminal"))
-	b.WriteString("\n\n")
+	boxWidth := 56
+	if m.width > 0 && m.width < boxWidth {
+		boxWidth = m.width
+	}
+
+	innerWidth := boxWidth - 4 // border + padding
+	if innerWidth < 20 {
+		innerWidth = 20
+	}
 
 	installedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("114"))
 	notInstalledStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
 	currentStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("220"))
 
+	var content strings.Builder
+
 	for i, t := range m.terminals {
-		// Cursor indicator
+		// Cursor + terminal name
+		var line string
 		if i == m.cursor {
-			b.WriteString(selectedItemStyle.Render("  ❯ "))
+			line = selectedItemStyle.Render(fmt.Sprintf(" %s %s", "\u25b8", t.DisplayName))
 		} else {
-			b.WriteString("    ")
+			line = fmt.Sprintf("   %s", t.DisplayName)
 		}
 
-		// Terminal display name
-		name := t.DisplayName
-		if i == m.cursor {
-			b.WriteString(selectedItemStyle.Render(name))
-		} else {
-			b.WriteString(name)
-		}
-
-		// Status indicators (right-aligned with padding)
-		padding := 28 - len(name)
-		if padding < 2 {
-			padding = 2
-		}
-		b.WriteString(strings.Repeat(" ", padding))
-
+		// Status right-aligned
+		var statusStr string
 		if t.Installed {
-			b.WriteString(installedStyle.Render("✓ installed"))
-			// Current marker
+			statusStr = installedStyle.Render("✓ installed")
 			if m.current != "" && t.Name == m.current {
-				b.WriteString("   ")
-				b.WriteString(currentStyle.Render("★ current"))
+				statusStr += "  " + currentStyle.Render("★ current")
 			}
 		} else {
-			b.WriteString(notInstalledStyle.Render("○ not installed"))
+			statusStr = notInstalledStyle.Render("○ not installed")
 		}
 
-		b.WriteString("\n")
+		titleVisible := lipgloss.Width(line)
+		statusVisible := lipgloss.Width(statusStr)
+		gap := innerWidth - titleVisible - statusVisible
+		if gap < 2 {
+			gap = 2
+		}
+		line += strings.Repeat(" ", gap) + statusStr
+
+		content.WriteString(line)
+		if i < len(m.terminals)-1 {
+			content.WriteString("\n")
+		}
 	}
 
-	b.WriteString("\n")
-	hint := "  ↑↓ navigate  "
+	// Hint text
+	content.WriteString("\n\n")
+	hint := " \u2191/\u2193 navigate \u2022 "
 	if m.cursor < len(m.terminals) && m.terminals[m.cursor].Installed {
-		hint += "Enter select  "
+		hint += "Enter select \u2022 "
 	} else {
-		hint += "Enter install  "
+		hint += "Enter install \u2022 "
 	}
 	hint += "Esc cancel"
-	b.WriteString(hintStyle.Render(hint))
+	content.WriteString(hintStyle.Render(hint))
 
-	return b.String()
+	// Bordered box
+	borderStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(borderColor).
+		Padding(1, 1).
+		Width(boxWidth)
+
+	box := borderStyle.Render(content.String())
+
+	// Overlay title on the top border
+	title := " Select Terminal "
+	titleRendered := lipgloss.NewStyle().
+		Foreground(borderColor).
+		Bold(true).
+		Render(title)
+
+	lines := strings.Split(box, "\n")
+	if len(lines) > 0 {
+		topRunes := []rune(lines[0])
+		titleRunes := []rune(titleRendered)
+		insertPos := 2
+
+		if len(topRunes) > insertPos+len(titleRunes) {
+			result := make([]rune, 0, len(topRunes))
+			result = append(result, topRunes[:insertPos]...)
+			result = append(result, titleRunes...)
+			result = append(result, topRunes[insertPos+len(titleRunes):]...)
+			lines[0] = string(result)
+		}
+		box = strings.Join(lines, "\n")
+	}
+
+	return box
 }
 
 // Selected returns the selected terminal, or nil if none was selected.

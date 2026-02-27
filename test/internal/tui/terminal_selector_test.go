@@ -209,8 +209,49 @@ func TestTerminalSelector_view_no_current_when_empty(t *testing.T) {
 func TestTerminalSelector_view_shows_cursor(t *testing.T) {
 	m := tui.NewTerminalSelector(testTerminals(), "")
 	view := m.View()
-	if !strings.Contains(view, "❯") {
-		t.Error("view should show cursor indicator")
+	if !strings.Contains(view, "\u25b8") {
+		t.Error("view should show cursor indicator ▸")
+	}
+}
+
+func TestTerminalSelector_view_has_bordered_box(t *testing.T) {
+	m := tui.NewTerminalSelector(testTerminals(), "ghostty")
+	view := m.View()
+	// Should have rounded border corners like the config menu
+	if !strings.Contains(view, "╭") {
+		t.Error("view should have rounded top-left border corner")
+	}
+	if !strings.Contains(view, "╰") {
+		t.Error("view should have rounded bottom-left border corner")
+	}
+}
+
+func TestTerminalSelector_view_has_title_in_border(t *testing.T) {
+	m := tui.NewTerminalSelector(testTerminals(), "ghostty")
+	view := m.View()
+	lines := strings.Split(view, "\n")
+	if len(lines) == 0 {
+		t.Fatal("view should not be empty")
+	}
+	// Title should be overlaid on the top border line
+	if !strings.Contains(lines[0], "Select Terminal") {
+		t.Error("title 'Select Terminal' should be overlaid on the top border")
+	}
+}
+
+func TestTerminalSelector_view_has_bullet_separators_in_hint(t *testing.T) {
+	m := tui.NewTerminalSelector(testTerminals(), "ghostty")
+	view := m.View()
+	if !strings.Contains(view, "\u2022") {
+		t.Error("hint bar should use bullet separators like config menu")
+	}
+}
+
+func TestTerminalSelector_handles_window_size_msg(t *testing.T) {
+	m := tui.NewTerminalSelector(testTerminals(), "")
+	_, cmd := m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	if cmd != nil {
+		t.Error("WindowSizeMsg should return nil cmd")
 	}
 }
 
