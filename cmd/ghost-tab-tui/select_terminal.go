@@ -41,14 +41,18 @@ func runSelectTerminal(cmd *cobra.Command, args []string) error {
 	opts := append([]tea.ProgramOption{tea.WithAltScreen()}, ttyOpts...)
 	p := tea.NewProgram(model, opts...)
 
-	finalModel, err := p.Run()
-	if err != nil {
-		return fmt.Errorf("failed to run TUI: %w", err)
-	}
+	finalModel, runErr := p.Run()
 
 	m := finalModel.(tui.TerminalSelectorModel)
 	selected := m.Selected()
 	installReq := m.InstallRequest()
+
+	// If the TUI errored but the user completed an action (install/select),
+	// output the result anyway — bubbletea may error during cleanup even
+	// after a successful interaction.
+	if runErr != nil && installReq == "" && selected == nil {
+		return fmt.Errorf("failed to run TUI: %w", runErr)
+	}
 
 	var result map[string]interface{}
 	if installReq != "" {

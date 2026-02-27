@@ -83,6 +83,21 @@ func TestSelectTerminalInteractive_install_action_calls_brew(t *testing.T) {
 	assertContains(t, string(data), "install --cask kitty")
 }
 
+func TestSelectTerminalInteractive_handles_install_action_with_nonzero_exit(t *testing.T) {
+	tmpDir := t.TempDir()
+	// Binary exits non-zero but still outputs valid install JSON
+	binDir := mockCommand(t, tmpDir, "ghost-tab-tui",
+		`echo '{"action":"install","terminal":"wezterm","selected":false}'; exit 1`)
+	mockCommand(t, tmpDir, "brew", `echo "==> Installing wezterm"`)
+	env := buildEnv(t, []string{binDir})
+
+	snippet := terminalSelectTuiSnippet(t,
+		`select_terminal_interactive && echo "SELECTED=$_selected_terminal"`)
+	out, code := runBashSnippet(t, snippet, env)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "SELECTED=wezterm")
+}
+
 func TestSelectTerminalInteractive_passes_current_flag(t *testing.T) {
 	tmpDir := t.TempDir()
 	logFile := filepath.Join(tmpDir, "tui.log")

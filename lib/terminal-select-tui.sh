@@ -24,7 +24,12 @@ select_terminal_interactive() {
   fi
 
   local result
-  if ! result=$(ghost-tab-tui "${args[@]}" 2>/dev/null); then
+  # Capture output regardless of exit code — bubbletea may exit non-zero
+  # during cleanup even when the user completed an action successfully.
+  result=$(ghost-tab-tui "${args[@]}" 2>/dev/null) || true
+
+  # If no output at all, the TUI failed to run
+  if [[ -z "$result" ]]; then
     return 1
   fi
 
@@ -34,7 +39,7 @@ select_terminal_interactive() {
     return 1
   fi
 
-  # Check for install action
+  # Check for install action first — takes priority over exit code
   local action
   action=$(echo "$result" | jq -r '.action // empty' 2>/dev/null)
   if [[ "$action" == "install" ]]; then
