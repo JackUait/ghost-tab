@@ -6,9 +6,9 @@ import (
 )
 
 type ConfigMenuItem struct {
-	ItemTitle string
-	ItemDesc  string
-	Action    string
+	ItemTitle   string
+	ItemDesc    string
+	Action      string
 }
 
 func (i ConfigMenuItem) Title() string       { return i.ItemTitle }
