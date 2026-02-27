@@ -54,7 +54,18 @@ func TestSelectTerminalInteractive_returns_1_when_binary_missing(t *testing.T) {
 
 func TestSelectTerminalInteractive_handles_install_action(t *testing.T) {
 	tmpDir := t.TempDir()
-	binDir := mockCommand(t, tmpDir, "ghost-tab-tui", `echo '{"action":"install","terminal":"wezterm","selected":false}'`)
+	callCount := filepath.Join(tmpDir, "call_count")
+	binDir := mockCommand(t, tmpDir, "ghost-tab-tui", fmt.Sprintf(`
+count=0
+if [ -f %q ]; then count=$(cat %q); fi
+count=$((count + 1))
+echo "$count" > %q
+if [ "$count" -eq 1 ]; then
+  echo '{"action":"install","terminal":"wezterm","cask":"wezterm","selected":false}'
+else
+  echo '{"terminal":"wezterm","selected":true}'
+fi
+`, callCount, callCount, callCount))
 	mockCommand(t, tmpDir, "brew", `echo "==> Installing wezterm"`)
 	env := buildEnv(t, []string{binDir})
 
@@ -68,7 +79,18 @@ func TestSelectTerminalInteractive_handles_install_action(t *testing.T) {
 func TestSelectTerminalInteractive_install_action_calls_brew(t *testing.T) {
 	tmpDir := t.TempDir()
 	logFile := filepath.Join(tmpDir, "brew.log")
-	binDir := mockCommand(t, tmpDir, "ghost-tab-tui", `echo '{"action":"install","terminal":"kitty","selected":false}'`)
+	callCount := filepath.Join(tmpDir, "call_count")
+	binDir := mockCommand(t, tmpDir, "ghost-tab-tui", fmt.Sprintf(`
+count=0
+if [ -f %q ]; then count=$(cat %q); fi
+count=$((count + 1))
+echo "$count" > %q
+if [ "$count" -eq 1 ]; then
+  echo '{"action":"install","terminal":"kitty","cask":"kitty","selected":false}'
+else
+  echo '{"terminal":"kitty","selected":true}'
+fi
+`, callCount, callCount, callCount))
 	mockCommand(t, tmpDir, "brew", fmt.Sprintf(`echo "$@" >> %q`, logFile))
 	env := buildEnv(t, []string{binDir})
 
@@ -85,9 +107,21 @@ func TestSelectTerminalInteractive_install_action_calls_brew(t *testing.T) {
 
 func TestSelectTerminalInteractive_handles_install_action_with_nonzero_exit(t *testing.T) {
 	tmpDir := t.TempDir()
-	// Binary exits non-zero but still outputs valid install JSON
-	binDir := mockCommand(t, tmpDir, "ghost-tab-tui",
-		`echo '{"action":"install","terminal":"wezterm","selected":false}'; exit 1`)
+	callCount := filepath.Join(tmpDir, "call_count")
+	// First call: binary exits non-zero but outputs valid install JSON
+	// Second call: binary returns normal selection
+	binDir := mockCommand(t, tmpDir, "ghost-tab-tui", fmt.Sprintf(`
+count=0
+if [ -f %q ]; then count=$(cat %q); fi
+count=$((count + 1))
+echo "$count" > %q
+if [ "$count" -eq 1 ]; then
+  echo '{"action":"install","terminal":"wezterm","cask":"wezterm","selected":false}'
+  exit 1
+else
+  echo '{"terminal":"wezterm","selected":true}'
+fi
+`, callCount, callCount, callCount))
 	mockCommand(t, tmpDir, "brew", `echo "==> Installing wezterm"`)
 	env := buildEnv(t, []string{binDir})
 
