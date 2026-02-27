@@ -308,6 +308,37 @@ func TestRelease_uploads_binaries_to_gh_release(t *testing.T) {
 	}
 }
 
+func TestRelease_builds_to_named_files_not_mktemp(t *testing.T) {
+	root := projectRoot(t)
+	data, err := os.ReadFile(filepath.Join(root, "scripts", "release.sh"))
+	if err != nil {
+		t.Fatalf("failed to read release.sh: %v", err)
+	}
+	content := string(data)
+	// go build -o must target a file named ghost-tab-tui-darwin-arm64, not a mktemp path
+	if !strings.Contains(content, `-o "$build_dir/ghost-tab-tui-darwin-arm64"`) &&
+		!strings.Contains(content, `-o "${build_dir}/ghost-tab-tui-darwin-arm64"`) {
+		t.Errorf("release.sh should build arm64 binary to a properly named file, not mktemp")
+	}
+	if !strings.Contains(content, `-o "$build_dir/ghost-tab-tui-darwin-amd64"`) &&
+		!strings.Contains(content, `-o "${build_dir}/ghost-tab-tui-darwin-amd64"`) {
+		t.Errorf("release.sh should build amd64 binary to a properly named file, not mktemp")
+	}
+}
+
+func TestRelease_trap_does_not_reference_local_variables(t *testing.T) {
+	root := projectRoot(t)
+	data, err := os.ReadFile(filepath.Join(root, "scripts", "release.sh"))
+	if err != nil {
+		t.Fatalf("failed to read release.sh: %v", err)
+	}
+	content := string(data)
+	// trap should not reference arm64_bin or amd64_bin (local to main)
+	if strings.Contains(content, `trap`) && strings.Contains(content, `"$arm64_bin"`) {
+		t.Errorf("trap references $arm64_bin which is local to main() and will be unbound at EXIT")
+	}
+}
+
 // ============================================================
 // Makefile integration test
 // ============================================================

@@ -55,6 +55,10 @@ check_gh_auth() {
 
 # --- Main orchestration ---
 
+# Script-level variable so the EXIT trap can clean up after main() returns.
+build_dir=""
+trap '[[ -n "$build_dir" ]] && rm -rf "$build_dir"' EXIT
+
 main() {
   local script_dir
   script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -105,17 +109,16 @@ main() {
     fi
   fi
 
-  # Build ghost-tab-tui binaries
+  # Build ghost-tab-tui binaries into a temp directory with correct filenames.
+  # gh release create uses the file's basename as the asset download name,
+  # so files must be named ghost-tab-tui-darwin-{arch} (not mktemp names).
   echo "Building ghost-tab-tui binaries..."
-  local arm64_bin amd64_bin
-  arm64_bin="$(mktemp)"
-  amd64_bin="$(mktemp)"
-  trap 'rm -f "$arm64_bin" "$amd64_bin"' EXIT
+  build_dir="$(mktemp -d)"
 
-  (cd "$project_dir" && GOOS=darwin GOARCH=arm64 go build -o "$arm64_bin" ./cmd/ghost-tab-tui) || {
+  (cd "$project_dir" && GOOS=darwin GOARCH=arm64 go build -o "$build_dir/ghost-tab-tui-darwin-arm64" ./cmd/ghost-tab-tui) || {
     echo "Error: failed to build ghost-tab-tui for arm64" >&2; exit 1
   }
-  (cd "$project_dir" && GOOS=darwin GOARCH=amd64 go build -o "$amd64_bin" ./cmd/ghost-tab-tui) || {
+  (cd "$project_dir" && GOOS=darwin GOARCH=amd64 go build -o "$build_dir/ghost-tab-tui-darwin-amd64" ./cmd/ghost-tab-tui) || {
     echo "Error: failed to build ghost-tab-tui for amd64" >&2; exit 1
   }
   echo "  ✓ Built ghost-tab-tui for darwin/arm64 and darwin/amd64"
@@ -134,8 +137,8 @@ main() {
   local notes
   notes="$(bash "$script_dir/generate-release-notes.sh" "$prev_tag" "$tag")"
   gh release create "$tag" --notes "$notes" \
-    "${arm64_bin}#ghost-tab-tui-darwin-arm64" \
-    "${amd64_bin}#ghost-tab-tui-darwin-amd64"
+    "$build_dir/ghost-tab-tui-darwin-arm64" \
+    "$build_dir/ghost-tab-tui-darwin-amd64"
 
   echo ""
   echo "✓ Release $tag complete!"
