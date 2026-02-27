@@ -9,10 +9,10 @@ A **`Ghostty`** + **`tmux`** wrapper that launches a four-pane dev session with 
 ## Quick Start
 
 ```sh
-git clone https://github.com/JackUait/ghost-tab.git && cd ghost-tab && ./bin/ghost-tab
+npx ghost-tab
 ```
 
-That's it — only requirement is **`macOS`**. Everything (**`Ghostty`**, **`tmux`**, **`lazygit`**, **`broot`**, **`Claude Code`**) is installed automatically.
+That's it — only requirements are **`macOS`** and **`Node.js 16+`**. Everything (**`Ghostty`**, **`tmux`**, **`lazygit`**, **`broot`**, **`Claude Code`**) is installed automatically.
 
 ---
 
@@ -75,7 +75,7 @@ That's it — only requirement is **`macOS`**. Everything (**`Ghostty`**, **`tmu
 4. Sets up the **`Ghostty`** config (with merge option if you have an existing one)
 5. Walks you through adding your **project directories**
 6. Installs **`Node.js`** LTS (if needed) and sets up **Claude Code status line** showing git info and context usage
-7. Auto-updates via **`git pull`** in the background — notifies on next launch
+7. Auto-updates automatically — just run `npx ghost-tab` again to get the latest version
 
 ---
 
