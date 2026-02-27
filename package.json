@@ -1,0 +1,42 @@
+{
+  "name": "ghost-tab",
+  "version": "2.5.3",
+  "description": "Terminal + tmux wrapper for AI coding tools (Claude Code, Codex CLI, Copilot CLI, OpenCode)",
+  "bin": {
+    "ghost-tab": "bin/npx-ghost-tab.js"
+  },
+  "files": [
+    "bin/ghost-tab",
+    "bin/npx-ghost-tab.js",
+    "lib/",
+    "templates/",
+    "ghostty/",
+    "terminals/",
+    "wrapper.sh",
+    "VERSION"
+  ],
+  "os": [
+    "darwin"
+  ],
+  "keywords": [
+    "ghost-tab",
+    "tmux",
+    "terminal",
+    "claude",
+    "codex",
+    "copilot",
+    "opencode",
+    "ai",
+    "coding"
+  ],
+  "author": "JackUait",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JackUait/ghost-tab.git"
+  },
+  "homepage": "https://github.com/JackUait/ghost-tab",
+  "engines": {
+    "node": ">=16"
+  }
+}
