@@ -397,3 +397,52 @@ func TestEnsureCommand_warns_on_install_failure(t *testing.T) {
 	assertExitCode(t, code, 0)
 	assertContains(t, out, "failed")
 }
+
+// ============================================================
+// ensure_cask tests
+// ============================================================
+
+func TestEnsureCask_skips_when_app_already_installed(t *testing.T) {
+	tmpDir := t.TempDir()
+	// Create fake /Applications/TestApp.app directory
+	appDir := filepath.Join(tmpDir, "Applications", "TestApp.app")
+	os.MkdirAll(appDir, 0755)
+
+	snippet := installSnippet(t, fmt.Sprintf(
+		`APPLICATIONS_DIR=%q ensure_cask "testapp" "TestApp"`, filepath.Join(tmpDir, "Applications")))
+	out, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "TestApp found")
+}
+
+func TestEnsureCask_installs_via_brew_when_app_missing(t *testing.T) {
+	tmpDir := t.TempDir()
+	logFile := filepath.Join(tmpDir, "brew.log")
+	binDir := mockCommand(t, tmpDir, "brew", fmt.Sprintf(`echo "$@" >> %q`, logFile))
+	env := buildEnv(t, []string{binDir})
+
+	snippet := installSnippet(t, fmt.Sprintf(
+		`APPLICATIONS_DIR=%q ensure_cask "wezterm" "WezTerm"`, filepath.Join(tmpDir, "Applications")))
+	out, code := runBashSnippet(t, snippet, env)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "WezTerm installed")
+
+	data, err := os.ReadFile(logFile)
+	if err != nil {
+		t.Fatalf("failed to read brew log: %v", err)
+	}
+	assertContains(t, string(data), "install --cask wezterm")
+}
+
+func TestEnsureCask_exits_nonzero_when_brew_fails(t *testing.T) {
+	tmpDir := t.TempDir()
+	binDir := mockCommand(t, tmpDir, "brew", `exit 1`)
+	env := buildEnv(t, []string{binDir})
+
+	snippet := installSnippet(t, fmt.Sprintf(
+		`APPLICATIONS_DIR=%q ensure_cask "badcask" "BadApp"`, filepath.Join(tmpDir, "Applications")))
+	_, code := runBashSnippet(t, snippet, env)
+	if code == 0 {
+		t.Error("expected non-zero exit when brew install fails")
+	}
+}

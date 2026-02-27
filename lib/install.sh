@@ -186,6 +186,26 @@ ensure_base_requirements() {
   ensure_broot
 }
 
+# Install a Homebrew cask if the .app isn't in /Applications.
+# Usage: ensure_cask "cask_name" "AppDisplayName"
+# Respects APPLICATIONS_DIR env var for testing (defaults to /Applications).
+ensure_cask() {
+  local cask="$1" app_name="$2"
+  local app_dir="${APPLICATIONS_DIR:-/Applications}"
+  if [ -d "${app_dir}/${app_name}.app" ]; then
+    success "$app_name found"
+  else
+    info "Installing $app_name..."
+    if brew install --cask "$cask"; then
+      success "$app_name installed"
+    else
+      error "$app_name installation failed."
+      info "Install manually or run: brew install --cask $cask"
+      return 1
+    fi
+  fi
+}
+
 # Install a command-line tool if not already on PATH.
 # Usage: ensure_command "cmd" "install_cmd" "post_msg" "display_name"
 ensure_command() {

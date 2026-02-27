@@ -69,6 +69,19 @@ func TestKittyAdapter_setup_config_replaces_existing_shell(t *testing.T) {
 	assertNotContains(t, content, "/old/path")
 }
 
+func TestKittyAdapter_install_calls_ensure_cask(t *testing.T) {
+	tmpDir := t.TempDir()
+	// Create fake app so ensure_cask finds it
+	appDir := filepath.Join(tmpDir, "Applications", "kitty.app")
+	os.MkdirAll(appDir, 0755)
+
+	snippet := kittyAdapterSnippet(t, fmt.Sprintf(
+		`APPLICATIONS_DIR=%q terminal_install`, filepath.Join(tmpDir, "Applications")))
+	out, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "kitty found")
+}
+
 func TestKittyAdapter_cleanup_config_removes_shell_line(t *testing.T) {
 	tmpDir := t.TempDir()
 	configFile := writeTempFile(t, tmpDir, "kitty.conf", "font_size 14\nshell /some/path\ntheme dark\n")
