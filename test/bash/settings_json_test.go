@@ -63,7 +63,7 @@ func TestSettingsJson_merge_claude_settings_adds_status_line_to_existing(t *test
 
 // --- add_waiting_indicator_hooks ---
 
-func TestSettingsJson_add_waiting_indicator_hooks_creates_file_with_Notification_PreToolUse_and_UserPromptSubmit(t *testing.T) {
+func TestSettingsJson_add_waiting_indicator_hooks_creates_file_with_Stop_PreToolUse_and_UserPromptSubmit(t *testing.T) {
 	tmpDir := t.TempDir()
 	settingsFile := filepath.Join(tmpDir, "settings.json")
 
@@ -79,21 +79,23 @@ func TestSettingsJson_add_waiting_indicator_hooks_creates_file_with_Notification
 		t.Fatalf("settings.json should have been created: %v", err)
 	}
 	content := string(data)
-	assertContains(t, content, `"Notification"`)
+	assertContains(t, content, `"Stop"`)
 	assertContains(t, content, `"PreToolUse"`)
 	assertContains(t, content, `"UserPromptSubmit"`)
 	assertContains(t, content, "GHOST_TAB_MARKER_FILE")
-	// Must NOT have Stop hook (replaced by Notification)
-	assertNotContains(t, content, `"Stop"`)
+	assertContains(t, content, `"AskUserQuestion"`)
+	// Must NOT have Notification hook (replaced by Stop)
+	assertNotContains(t, content, `"Notification"`)
 }
 
 func TestSettingsJson_add_waiting_indicator_hooks_adds_to_existing_settings(t *testing.T) {
 	tmpDir := t.TempDir()
-	// Existing settings has a Stop hook from another plugin (afplay sound)
+	// Existing settings has a Notification hook from another plugin (afplay sound)
 	settingsFile := writeTempFile(t, tmpDir, "settings.json", `{
   "hooks": {
-    "Stop": [
+    "Notification": [
       {
+        "matcher": "idle_prompt",
         "hooks": [{"type": "command", "command": "afplay /System/Library/Sounds/Bottle.aiff &"}]
       }
     ]
@@ -113,18 +115,54 @@ func TestSettingsJson_add_waiting_indicator_hooks_adds_to_existing_settings(t *t
 		t.Fatalf("failed to read settings.json: %v", err)
 	}
 	content := string(data)
-	// The other plugin's Stop hook should remain untouched
+	// The other plugin's Notification hook should remain untouched
 	assertContains(t, content, "afplay")
-	assertContains(t, content, `"Stop"`)
-	// Our hooks should use Notification, not Stop
 	assertContains(t, content, `"Notification"`)
+	// Our hooks should use Stop, not Notification
+	assertContains(t, content, `"Stop"`)
 	assertContains(t, content, "GHOST_TAB_MARKER_FILE")
 	assertContains(t, content, `"PreToolUse"`)
 }
 
 func TestSettingsJson_add_waiting_indicator_hooks_reports_exists_when_duplicate(t *testing.T) {
 	tmpDir := t.TempDir()
-	// Current Notification format hooks already installed
+	// Current Stop format hooks already installed
+	settingsFile := writeTempFile(t, tmpDir, "settings.json", `{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then touch \"$GHOST_TAB_MARKER_FILE\"; fi"}]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "AskUserQuestion",
+        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then touch \"$GHOST_TAB_MARKER_FILE\"; fi"}]
+      },
+      {
+        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then rm -f \"$GHOST_TAB_MARKER_FILE\"; fi"}]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then rm -f \"$GHOST_TAB_MARKER_FILE\"; fi"}]
+      }
+    ]
+  }
+}
+`)
+
+	snippet := settingsJsonSnippet(t,
+		fmt.Sprintf(`add_waiting_indicator_hooks %q`, settingsFile))
+
+	out, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+	assertContains(t, strings.TrimSpace(out), "exists")
+}
+
+func TestSettingsJson_add_waiting_indicator_hooks_upgrades_notification_format_to_stop(t *testing.T) {
+	tmpDir := t.TempDir()
+	// Old Notification format (the format being replaced)
 	settingsFile := writeTempFile(t, tmpDir, "settings.json", `{
   "hooks": {
     "Notification": [
@@ -151,38 +189,6 @@ func TestSettingsJson_add_waiting_indicator_hooks_reports_exists_when_duplicate(
 
 	out, code := runBashSnippet(t, snippet, nil)
 	assertExitCode(t, code, 0)
-	assertContains(t, strings.TrimSpace(out), "exists")
-}
-
-func TestSettingsJson_add_waiting_indicator_hooks_upgrades_old_format_PreToolUse(t *testing.T) {
-	tmpDir := t.TempDir()
-	// Old v1 format: Stop hook with simple PreToolUse (no AskUserQuestion check)
-	settingsFile := writeTempFile(t, tmpDir, "settings.json", `{
-  "hooks": {
-    "Stop": [
-      {
-        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then touch \"$GHOST_TAB_MARKER_FILE\"; fi"}]
-      }
-    ],
-    "PreToolUse": [
-      {
-        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then rm -f \"$GHOST_TAB_MARKER_FILE\"; fi"}]
-      }
-    ],
-    "UserPromptSubmit": [
-      {
-        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then rm -f \"$GHOST_TAB_MARKER_FILE\"; fi"}]
-      }
-    ]
-  }
-}
-`)
-
-	snippet := settingsJsonSnippet(t,
-		fmt.Sprintf(`add_waiting_indicator_hooks %q`, settingsFile))
-
-	out, code := runBashSnippet(t, snippet, nil)
-	assertExitCode(t, code, 0)
 	assertContains(t, out, "upgraded")
 
 	data, err := os.ReadFile(settingsFile)
@@ -190,16 +196,17 @@ func TestSettingsJson_add_waiting_indicator_hooks_upgrades_old_format_PreToolUse
 		t.Fatalf("failed to read settings.json: %v", err)
 	}
 	content := string(data)
-	// Should now use Notification instead of Stop
-	assertContains(t, content, `"Notification"`)
-	assertNotContains(t, content, `"Stop"`)
-	// PreToolUse hook should now contain AskUserQuestion conditional
-	assertContains(t, content, "AskUserQuestion")
+	// Should now use Stop instead of Notification
+	assertContains(t, content, `"Stop"`)
+	assertNotContains(t, content, `"Notification"`)
+	// PreToolUse should use matcher instead of stdin reading
+	assertContains(t, content, `"AskUserQuestion"`)
+	assertNotContains(t, content, "$(cat)")
 }
 
-func TestSettingsJson_add_waiting_indicator_hooks_upgrades_v3_stop_ask_format_to_notification(t *testing.T) {
+func TestSettingsJson_add_waiting_indicator_hooks_upgrades_v3_stop_ask_format_to_current(t *testing.T) {
 	tmpDir := t.TempDir()
-	// v3 format: Stop hook with .ask marker (the format being replaced)
+	// v3 format: Stop hook with .ask marker (old format)
 	settingsFile := writeTempFile(t, tmpDir, "settings.json", `{
   "hooks": {
     "Stop": [
@@ -233,11 +240,13 @@ func TestSettingsJson_add_waiting_indicator_hooks_upgrades_v3_stop_ask_format_to
 		t.Fatalf("failed to read settings.json: %v", err)
 	}
 	content := string(data)
-	// Should now use Notification instead of Stop
-	assertContains(t, content, `"Notification"`)
-	assertNotContains(t, content, `"Stop"`)
+	// Should still use Stop (current format)
+	assertContains(t, content, `"Stop"`)
 	// Should no longer have .ask references
 	assertNotContains(t, content, ".ask")
+	// Should use matcher instead of stdin reading
+	assertContains(t, content, `"AskUserQuestion"`)
+	assertNotContains(t, content, "$(cat)")
 }
 
 // --- add_waiting_indicator_hooks: safe exit code format ---
@@ -539,7 +548,7 @@ func TestSettingsJson_PreToolUse_hook_creates_marker_for_AskUserQuestion(t *test
 	_, code := runBashSnippet(t, snippet, nil)
 	assertExitCode(t, code, 0)
 
-	// Parse PreToolUse hook command
+	// Parse to verify structure
 	data, err := os.ReadFile(settingsFile)
 	if err != nil {
 		t.Fatalf("failed to read settings.json: %v", err)
@@ -550,7 +559,8 @@ func TestSettingsJson_PreToolUse_hook_creates_marker_for_AskUserQuestion(t *test
 		Command string `json:"command"`
 	}
 	type hookGroup struct {
-		Hooks []hookEntry `json:"hooks"`
+		Matcher string      `json:"matcher,omitempty"`
+		Hooks   []hookEntry `json:"hooks"`
 	}
 	var settings struct {
 		Hooks map[string][]hookGroup `json:"hooks"`
@@ -559,42 +569,29 @@ func TestSettingsJson_PreToolUse_hook_creates_marker_for_AskUserQuestion(t *test
 		t.Fatalf("failed to parse settings.json: %v", err)
 	}
 
-	// Find the PreToolUse hook command
-	var preToolCmd string
+	// Find the AskUserQuestion PreToolUse hook (has matcher)
+	var askCmd string
 	for _, group := range settings.Hooks["PreToolUse"] {
-		for _, h := range group.Hooks {
-			if strings.Contains(h.Command, "GHOST_TAB_MARKER_FILE") {
-				preToolCmd = h.Command
+		if group.Matcher == "AskUserQuestion" {
+			for _, h := range group.Hooks {
+				if strings.Contains(h.Command, "GHOST_TAB_MARKER_FILE") {
+					askCmd = h.Command
+				}
 			}
 		}
 	}
-	if preToolCmd == "" {
-		t.Fatal("no GHOST_TAB_MARKER_FILE PreToolUse hook found")
+	if askCmd == "" {
+		t.Fatal("no AskUserQuestion PreToolUse hook with matcher found")
 	}
 
+	// The AskUserQuestion hook should touch (create) the marker
 	markerFile := filepath.Join(tmpDir, "test-marker")
-
-	// Write hook command to a script file to avoid Go %q double-quote expansion issues
-	hookScript := filepath.Join(tmpDir, "hook.sh")
-	if err := os.WriteFile(hookScript, []byte("#!/bin/bash\n"+preToolCmd+"\n"), 0755); err != nil {
-		t.Fatalf("failed to write hook script: %v", err)
-	}
-
-	// Pipe AskUserQuestion JSON to the hook command — marker should be CREATED
-	bashScript := fmt.Sprintf(
-		`export GHOST_TAB_MARKER_FILE=%q; echo '{"tool_name":"AskUserQuestion"}' | %q`,
-		markerFile, hookScript,
-	)
+	bashScript := fmt.Sprintf(`export GHOST_TAB_MARKER_FILE=%q; %s`, markerFile, askCmd)
 	_, exitCode := runBashSnippet(t, bashScript, nil)
 	assertExitCode(t, exitCode, 0)
 
 	if _, err := os.Stat(markerFile); os.IsNotExist(err) {
 		t.Error("marker file should exist after AskUserQuestion PreToolUse, but it does not")
-	}
-	// No .ask marker should be created (Notification hook replaces .ask system)
-	askMarker := markerFile + ".ask"
-	if _, err := os.Stat(askMarker); !os.IsNotExist(err) {
-		t.Error(".ask marker file should NOT exist (Notification hook replaces .ask system), but it does")
 	}
 }
 
@@ -608,7 +605,7 @@ func TestSettingsJson_PreToolUse_hook_clears_marker_for_other_tools(t *testing.T
 	_, code := runBashSnippet(t, snippet, nil)
 	assertExitCode(t, code, 0)
 
-	// Parse PreToolUse hook command
+	// Parse to find the catch-all PreToolUse hook (no matcher)
 	data, err := os.ReadFile(settingsFile)
 	if err != nil {
 		t.Fatalf("failed to read settings.json: %v", err)
@@ -619,7 +616,8 @@ func TestSettingsJson_PreToolUse_hook_clears_marker_for_other_tools(t *testing.T
 		Command string `json:"command"`
 	}
 	type hookGroup struct {
-		Hooks []hookEntry `json:"hooks"`
+		Matcher string      `json:"matcher,omitempty"`
+		Hooks   []hookEntry `json:"hooks"`
 	}
 	var settings struct {
 		Hooks map[string][]hookGroup `json:"hooks"`
@@ -628,39 +626,32 @@ func TestSettingsJson_PreToolUse_hook_clears_marker_for_other_tools(t *testing.T
 		t.Fatalf("failed to parse settings.json: %v", err)
 	}
 
-	var preToolCmd string
+	// Find the catch-all PreToolUse hook (no matcher, has rm -f)
+	var clearCmd string
 	for _, group := range settings.Hooks["PreToolUse"] {
-		for _, h := range group.Hooks {
-			if strings.Contains(h.Command, "GHOST_TAB_MARKER_FILE") {
-				preToolCmd = h.Command
+		if group.Matcher == "" {
+			for _, h := range group.Hooks {
+				if strings.Contains(h.Command, "GHOST_TAB_MARKER_FILE") {
+					clearCmd = h.Command
+				}
 			}
 		}
 	}
-	if preToolCmd == "" {
-		t.Fatal("no GHOST_TAB_MARKER_FILE PreToolUse hook found")
+	if clearCmd == "" {
+		t.Fatal("no catch-all PreToolUse hook found (no matcher)")
 	}
 
+	// Create marker, then run the catch-all hook — marker should be REMOVED
 	markerFile := filepath.Join(tmpDir, "test-marker")
-
-	// Write hook command to a script file to avoid Go %q double-quote expansion issues
-	hookScript := filepath.Join(tmpDir, "hook.sh")
-	if err := os.WriteFile(hookScript, []byte("#!/bin/bash\n"+preToolCmd+"\n"), 0755); err != nil {
-		t.Fatalf("failed to write hook script: %v", err)
-	}
-
-	// Create marker, then pipe Bash tool JSON — marker should be REMOVED
 	if err := os.WriteFile(markerFile, []byte(""), 0644); err != nil {
 		t.Fatalf("failed to create marker: %v", err)
 	}
-	bashScript := fmt.Sprintf(
-		`export GHOST_TAB_MARKER_FILE=%q; echo '{"tool_name":"Bash"}' | %q`,
-		markerFile, hookScript,
-	)
+	bashScript := fmt.Sprintf(`export GHOST_TAB_MARKER_FILE=%q; %s`, markerFile, clearCmd)
 	_, exitCode := runBashSnippet(t, bashScript, nil)
 	assertExitCode(t, exitCode, 0)
 
 	if _, err := os.Stat(markerFile); !os.IsNotExist(err) {
-		t.Error("marker file should have been removed for Bash tool, but it still exists")
+		t.Error("marker file should have been removed by catch-all PreToolUse, but it still exists")
 	}
 }
 
@@ -726,7 +717,7 @@ func TestSettingsJson_UserPromptSubmit_hook_clears_marker(t *testing.T) {
 	}
 }
 
-func TestSettingsJson_generated_hooks_contain_no_ask_references(t *testing.T) {
+func TestSettingsJson_generated_hooks_contain_no_ask_references_or_stdin_reading(t *testing.T) {
 	tmpDir := t.TempDir()
 	settingsFile := filepath.Join(tmpDir, "settings.json")
 
@@ -741,8 +732,11 @@ func TestSettingsJson_generated_hooks_contain_no_ask_references(t *testing.T) {
 		t.Fatalf("settings.json should have been created: %v", err)
 	}
 	content := string(data)
-	// The generated hooks must not contain any .ask references
+	// No .ask references
 	assertNotContains(t, content, ".ask")
+	// No stdin reading (cat) — uses matcher instead
+	assertNotContains(t, content, "$(cat)")
+	assertNotContains(t, content, "_gt_in")
 }
 
 func TestSettingsJson_merge_claude_settings_skips_when_already_configured(t *testing.T) {
