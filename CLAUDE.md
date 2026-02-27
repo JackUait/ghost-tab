@@ -158,6 +158,8 @@ make release              # Interactive (with confirmation prompt)
 bash scripts/release.sh --yes  # Non-interactive (skip confirmation)
 ```
 
+**Gotcha:** `gh release create FILE#LABEL` uses the file's **basename** as the download name (not the label). If you build to a mktemp path, users get assets named `tmp.XXXX`. The release script builds to a temp directory with correct filenames to avoid this.
+
 **Post-release verification (MANDATORY):**
 ```bash
 # Verify binaries are downloadable (users get 404 if this fails)
