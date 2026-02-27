@@ -3,7 +3,12 @@ set -e
 
 export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# Resolve symlinks so SHARE_DIR points to the repo, not ~/.local/bin
+SELF="$0"
+if [ -L "$SELF" ]; then
+  SELF="$(readlink "$SELF")"
+fi
+SCRIPT_DIR="$(cd "$(dirname "$SELF")" && pwd)"
 SHARE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # Source the config menu dispatcher (it sources its own dependencies)
