@@ -1,0 +1,23 @@
+# Go source
+cmd/
+internal/
+go.mod
+go.sum
+
+# Tests
+test/
+run-tests.sh
+
+# Build & dev
+Makefile
+scripts/
+docs/
+specs/
+seed.spec.ts
+CLAUDE.md
+
+# Build artifacts
+bin/ghost-tab-tui
+*.test
+*.out
+ghost-tab-tui
