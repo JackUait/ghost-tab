@@ -1,0 +1,13 @@
+#!/bin/bash
+set -e
+
+export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SHARE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# Source the config menu dispatcher (it sources its own dependencies)
+# shellcheck source=lib/config-tui.sh
+source "$SHARE_DIR/lib/config-tui.sh"
+
+config_menu_interactive
