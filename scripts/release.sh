@@ -140,6 +140,15 @@ main() {
     "$build_dir/ghost-tab-tui-darwin-arm64" \
     "$build_dir/ghost-tab-tui-darwin-amd64"
 
+  # Update local binary so the developer sees changes immediately
+  echo "Updating local binary..."
+  local local_bin="$HOME/.local/bin/ghost-tab-tui"
+  if [[ -d "$(dirname "$local_bin")" ]]; then
+    (cd "$project_dir" && go build -o "$local_bin" ./cmd/ghost-tab-tui) && \
+      echo "  ✓ Updated $local_bin" || \
+      echo "  ⚠ Failed to update local binary (release still succeeded)"
+  fi
+
   echo ""
   echo "✓ Release $tag complete!"
   echo "  GitHub: https://github.com/JackUait/ghost-tab/releases/tag/$tag"
