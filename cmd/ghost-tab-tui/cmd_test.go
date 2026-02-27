@@ -40,7 +40,6 @@ func TestRootCmd_SubcommandRegistered(t *testing.T) {
 		"select-project",
 		"select-ai-tool",
 		"add-project",
-		"settings-menu",
 		"config-menu",
 		"main-menu",
 		"multi-select-ai-tool",
@@ -210,16 +209,6 @@ func TestShowLogoCmd_HasAIToolFlag(t *testing.T) {
 	flag := rootCmd.PersistentFlags().Lookup("ai-tool")
 	if flag == nil {
 		t.Fatal("Expected --ai-tool persistent flag")
-	}
-}
-
-func TestSettingsMenuCmd_Exists(t *testing.T) {
-	cmd, _, err := rootCmd.Find([]string{"settings-menu"})
-	if err != nil {
-		t.Fatalf("Failed to find settings-menu: %v", err)
-	}
-	if cmd.Name() != "settings-menu" {
-		t.Errorf("Expected 'settings-menu', got %q", cmd.Name())
 	}
 }
 

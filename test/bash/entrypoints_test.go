@@ -577,7 +577,7 @@ func createWrapperTestEnv(t *testing.T) (tmpDir, wrapperDir, binDir, shareDir st
 	libFiles := []string{
 		"tui.sh", "ai-tools.sh", "projects.sh", "process.sh", "input.sh",
 		"update.sh", "menu-tui.sh", "project-actions.sh", "project-actions-tui.sh",
-		"tmux-session.sh", "settings-menu-tui.sh",
+		"tmux-session.sh",
 	}
 	for _, f := range libFiles {
 		src := filepath.Join(root, "lib", f)
@@ -965,4 +965,37 @@ echo "SHOULD_NOT_REACH"
 	assertExitCode(t, code, 0)
 	assertContains(t, out, "SHELL_EXEC_OK")
 	assertNotContains(t, out, "SHOULD_NOT_REACH")
+}
+
+// ============================================================
+// Settings menu removal regression tests
+// ============================================================
+
+func TestSettingsMenu_go_source_files_do_not_exist(t *testing.T) {
+	root := projectRoot(t)
+	deletedFiles := []string{
+		"internal/tui/settings.go",
+		"cmd/ghost-tab-tui/settings_menu.go",
+		"test/internal/tui/settings_test.go",
+		"lib/settings-menu-tui.sh",
+	}
+	for _, f := range deletedFiles {
+		t.Run(f, func(t *testing.T) {
+			path := filepath.Join(root, f)
+			if _, err := os.Stat(path); !os.IsNotExist(err) {
+				t.Errorf("%s should not exist — settings menu was removed", f)
+			}
+		})
+	}
+}
+
+func TestWrapper_does_not_reference_settings_menu_tui(t *testing.T) {
+	root := projectRoot(t)
+	data, err := os.ReadFile(filepath.Join(root, "wrapper.sh"))
+	if err != nil {
+		t.Fatalf("failed to read wrapper.sh: %v", err)
+	}
+	if strings.Contains(string(data), "settings-menu-tui") {
+		t.Errorf("wrapper.sh still references settings-menu-tui — it should be removed")
+	}
 }
