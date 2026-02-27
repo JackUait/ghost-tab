@@ -46,6 +46,7 @@ func runSelectTerminal(cmd *cobra.Command, args []string) error {
 	m := finalModel.(tui.TerminalSelectorModel)
 	selected := m.Selected()
 	installReq := m.InstallRequest()
+	installReqCask := m.InstallRequestCask()
 
 	// If the TUI errored but the user completed an action (install/select),
 	// output the result anyway — bubbletea may error during cleanup even
@@ -59,6 +60,7 @@ func runSelectTerminal(cmd *cobra.Command, args []string) error {
 		result = map[string]interface{}{
 			"action":   "install",
 			"terminal": installReq,
+			"cask":     installReqCask,
 			"selected": false,
 		}
 	} else if selected != nil {
