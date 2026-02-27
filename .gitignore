@@ -6,3 +6,4 @@ bin/ghost-tab-tui
 *.out
 ghost-tab-tui
 .worktrees/
+.env

@@ -144,7 +144,15 @@ main() {
   # Sync version to package.json and publish to npm
   if [[ -f "$project_dir/package.json" ]] && command -v npm &>/dev/null; then
     echo "Publishing to npm..."
-    (cd "$project_dir" && npm version "$version" --no-git-tag-version --allow-same-version && npm publish) && \
+    local npm_token=""
+    if [[ -f "$project_dir/.env" ]]; then
+      npm_token="$(grep '^NPM_PUBLISH_TOKEN=' "$project_dir/.env" | cut -d= -f2- | tr -d '[:space:]' || true)"
+    fi
+    local publish_cmd="npm publish"
+    if [[ -n "$npm_token" ]]; then
+      publish_cmd="npm publish --//registry.npmjs.org/:_authToken=$npm_token"
+    fi
+    (cd "$project_dir" && npm version "$version" --no-git-tag-version --allow-same-version && $publish_cmd) && \
       echo "  ✓ Published ghost-tab@$version to npm" || \
       echo "  ⚠ npm publish failed (GitHub release still succeeded)"
   fi

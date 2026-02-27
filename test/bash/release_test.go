@@ -340,6 +340,82 @@ func TestRelease_trap_does_not_reference_local_variables(t *testing.T) {
 }
 
 // ============================================================
+// npm publish token tests
+// ============================================================
+
+func TestRelease_reads_npm_token_from_env_file(t *testing.T) {
+	dir := t.TempDir()
+	writeTempFile(t, dir, ".env", "NPM_PUBLISH_TOKEN=npm_abc123\n")
+
+	snippet := releaseSnippet(t, fmt.Sprintf(`
+		project_dir=%q
+		npm_token=""
+		if [[ -f "$project_dir/.env" ]]; then
+			npm_token="$(grep '^NPM_PUBLISH_TOKEN=' "$project_dir/.env" | cut -d= -f2- | tr -d '[:space:]' || true)"
+		fi
+		echo "$npm_token"
+	`, dir))
+	out, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+	if strings.TrimSpace(out) != "npm_abc123" {
+		t.Errorf("got %q, want %q", strings.TrimSpace(out), "npm_abc123")
+	}
+}
+
+func TestRelease_npm_token_empty_when_no_env_file(t *testing.T) {
+	dir := t.TempDir()
+	// No .env file
+
+	snippet := releaseSnippet(t, fmt.Sprintf(`
+		project_dir=%q
+		npm_token=""
+		if [[ -f "$project_dir/.env" ]]; then
+			npm_token="$(grep '^NPM_PUBLISH_TOKEN=' "$project_dir/.env" | cut -d= -f2- | tr -d '[:space:]' || true)"
+		fi
+		echo "token=$npm_token"
+	`, dir))
+	out, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+	if strings.TrimSpace(out) != "token=" {
+		t.Errorf("got %q, want %q", strings.TrimSpace(out), "token=")
+	}
+}
+
+func TestRelease_npm_token_empty_when_env_has_no_token_key(t *testing.T) {
+	dir := t.TempDir()
+	writeTempFile(t, dir, ".env", "OTHER_VAR=something\n")
+
+	snippet := releaseSnippet(t, fmt.Sprintf(`
+		project_dir=%q
+		npm_token=""
+		if [[ -f "$project_dir/.env" ]]; then
+			npm_token="$(grep '^NPM_PUBLISH_TOKEN=' "$project_dir/.env" | cut -d= -f2- | tr -d '[:space:]' || true)"
+		fi
+		echo "token=$npm_token"
+	`, dir))
+	out, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+	if strings.TrimSpace(out) != "token=" {
+		t.Errorf("got %q, want %q", strings.TrimSpace(out), "token=")
+	}
+}
+
+func TestRelease_npm_publish_uses_token_flag(t *testing.T) {
+	root := projectRoot(t)
+	data, err := os.ReadFile(filepath.Join(root, "scripts", "release.sh"))
+	if err != nil {
+		t.Fatalf("failed to read release.sh: %v", err)
+	}
+	content := string(data)
+	if !strings.Contains(content, "NPM_PUBLISH_TOKEN") {
+		t.Errorf("release.sh does not read NPM_PUBLISH_TOKEN from .env")
+	}
+	if !strings.Contains(content, "--//registry.npmjs.org/:_authToken=") {
+		t.Errorf("release.sh does not pass auth token to npm publish")
+	}
+}
+
+// ============================================================
 // Makefile integration test
 // ============================================================
 
