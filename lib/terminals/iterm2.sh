@@ -1,9 +1,9 @@
 #!/bin/bash
-# iTerm2 terminal adapter using PlistBuddy.
+# iTerm2 terminal adapter using Dynamic Profiles.
 
-# Return the path to iTerm2's preferences plist.
+# Return the path to the Ghost Tab dynamic profile.
 terminal_get_config_path() {
-  echo "$HOME/Library/Preferences/com.googlecode.iterm2.plist"
+  echo "$HOME/Library/Application Support/iTerm2/DynamicProfiles/ghost-tab.json"
 }
 
 # Return the path where the wrapper script should be.
@@ -16,34 +16,36 @@ terminal_install() {
   ensure_cask "iterm2" "iTerm"
 }
 
-# Create a "Ghost Tab" profile in iTerm2 that runs the wrapper.
-# Args: plist_path wrapper_path
+# Create a "Ghost Tab" dynamic profile for iTerm2.
+# Args: profile_path wrapper_path
 terminal_setup_config() {
-  local plist_path="$1" wrapper_path="$2"
+  local profile_path="$1" wrapper_path="$2"
 
-  local pb
-  pb="$(command -v PlistBuddy 2>/dev/null || echo "/usr/libexec/PlistBuddy")"
+  mkdir -p "$(dirname "$profile_path")"
 
-  "$pb" -c "Add ':New Bookmarks:999:Name' string 'Ghost Tab'" "$plist_path" 2>/dev/null || true
-  "$pb" -c "Set ':New Bookmarks:999:Name' 'Ghost Tab'" "$plist_path" 2>/dev/null || true
-  "$pb" -c "Add ':New Bookmarks:999:Custom Command' string 'Yes'" "$plist_path" 2>/dev/null || true
-  "$pb" -c "Set ':New Bookmarks:999:Custom Command' 'Yes'" "$plist_path" 2>/dev/null || true
-  "$pb" -c "Add ':New Bookmarks:999:Command' string '$wrapper_path'" "$plist_path" 2>/dev/null || true
-  "$pb" -c "Set ':New Bookmarks:999:Command' '$wrapper_path'" "$plist_path" 2>/dev/null || true
-  "$pb" -c "Add ':New Bookmarks:999:Guid' string 'ghost-tab-profile'" "$plist_path" 2>/dev/null || true
-  "$pb" -c "Set ':New Bookmarks:999:Guid' 'ghost-tab-profile'" "$plist_path" 2>/dev/null || true
+  cat > "$profile_path" << EOF
+{
+  "Profiles": [
+    {
+      "Name": "Ghost Tab",
+      "Guid": "ghost-tab-profile",
+      "Custom Command": "Yes",
+      "Command": "$wrapper_path"
+    }
+  ]
+}
+EOF
 
   success "Created Ghost Tab profile in iTerm2"
   info "Set 'Ghost Tab' as your default profile in iTerm2 Preferences → Profiles"
 }
 
-# Remove the Ghost Tab profile from iTerm2.
+# Remove the Ghost Tab dynamic profile from iTerm2.
 terminal_cleanup_config() {
-  local plist_path="$1"
+  local profile_path="$1"
 
-  local pb
-  pb="$(command -v PlistBuddy 2>/dev/null || echo "/usr/libexec/PlistBuddy")"
-
-  "$pb" -c "Delete ':New Bookmarks:999'" "$plist_path" 2>/dev/null || true
-  success "Removed Ghost Tab profile from iTerm2"
+  if [ -f "$profile_path" ]; then
+    rm -f "$profile_path"
+    success "Removed Ghost Tab profile from iTerm2"
+  fi
 }
