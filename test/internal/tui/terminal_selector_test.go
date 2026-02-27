@@ -232,6 +232,48 @@ func TestTerminalSelector_enter_on_only_uninstalled(t *testing.T) {
 	}
 }
 
+func TestTerminalSelector_hint_shows_install_only_on_uninstalled(t *testing.T) {
+	// Cursor on installed terminal (index 0: Ghostty) → should NOT show "i install"
+	m := tui.NewTerminalSelector(testTerminals(), "ghostty")
+	view := m.View()
+	if strings.Contains(view, "i install") {
+		t.Error("hint bar should not show 'i install' when cursor is on installed terminal")
+	}
+}
+
+func TestTerminalSelector_hint_shows_install_on_uninstalled(t *testing.T) {
+	// Cursor on uninstalled terminal (index 2: WezTerm) → should show "i install"
+	var model tea.Model = tui.NewTerminalSelector(testTerminals(), "ghostty")
+	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyDown})
+	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyDown})
+	result := model.(tui.TerminalSelectorModel)
+	view := result.View()
+	if !strings.Contains(view, "i install") {
+		t.Error("hint bar should show 'i install' when cursor is on uninstalled terminal")
+	}
+}
+
+func TestTerminalSelector_hint_hides_enter_on_uninstalled(t *testing.T) {
+	// Cursor on uninstalled terminal → should NOT show "Enter select"
+	var model tea.Model = tui.NewTerminalSelector(testTerminals(), "ghostty")
+	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyDown})
+	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyDown})
+	result := model.(tui.TerminalSelectorModel)
+	view := result.View()
+	if strings.Contains(view, "Enter select") {
+		t.Error("hint bar should not show 'Enter select' when cursor is on uninstalled terminal")
+	}
+}
+
+func TestTerminalSelector_hint_shows_enter_on_installed(t *testing.T) {
+	// Cursor on installed terminal → should show "Enter select"
+	m := tui.NewTerminalSelector(testTerminals(), "ghostty")
+	view := m.View()
+	if !strings.Contains(view, "Enter select") {
+		t.Error("hint bar should show 'Enter select' when cursor is on installed terminal")
+	}
+}
+
 func TestTerminalSelector_select_second_installed(t *testing.T) {
 	var model tea.Model = tui.NewTerminalSelector(testTerminals(), "ghostty")
 	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyDown})

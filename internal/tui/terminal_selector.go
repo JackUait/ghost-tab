@@ -155,7 +155,14 @@ func (m TerminalSelectorModel) View() string {
 	}
 
 	b.WriteString("\n")
-	b.WriteString(hintStyle.Render("  ↑↓ navigate  Enter select  i install  Esc cancel"))
+	hint := "  ↑↓ navigate  "
+	if m.cursor < len(m.terminals) && m.terminals[m.cursor].Installed {
+		hint += "Enter select  "
+	} else {
+		hint += "i install  "
+	}
+	hint += "Esc cancel"
+	b.WriteString(hintStyle.Render(hint))
 
 	return b.String()
 }
