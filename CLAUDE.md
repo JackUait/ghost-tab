@@ -160,12 +160,17 @@ bash scripts/release.sh --yes  # Non-interactive (skip confirmation)
 
 **Gotcha:** `gh release create FILE#LABEL` uses the file's **basename** as the download name (not the label). If you build to a mktemp path, users get assets named `tmp.XXXX`. The release script builds to a temp directory with correct filenames to avoid this.
 
-**Post-release verification (MANDATORY):**
+**Post-release steps (MANDATORY):**
 ```bash
 # Verify binaries are downloadable (users get 404 if this fails)
 gh release view v$(cat VERSION) --json assets --jq '.assets[].name'
 # Must show: ghost-tab-tui-darwin-arm64, ghost-tab-tui-darwin-amd64
+
+# Update the LOCAL binary so the developer sees changes immediately
+go build -o ~/.local/bin/ghost-tab-tui ./cmd/ghost-tab-tui/
 ```
+
+**Gotcha:** The release script builds binaries for GitHub but does NOT update the local `~/.local/bin/ghost-tab-tui`. If you skip the local rebuild, the developer will still see the old TUI until they reinstall. Always rebuild locally after releasing.
 
 ## Architecture
 
