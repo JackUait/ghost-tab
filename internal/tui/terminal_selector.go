@@ -70,9 +70,16 @@ func (m TerminalSelectorModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 
 		case tea.KeyEnter:
-			if m.cursor < len(m.terminals) && m.terminals[m.cursor].Installed {
-				t := m.terminals[m.cursor]
-				m.selected = &t
+			if m.cursor < len(m.terminals) {
+				if m.terminals[m.cursor].Installed {
+					t := m.terminals[m.cursor]
+					m.selected = &t
+					m.quitting = true
+					return m, tea.Quit
+				}
+				// Trigger install for uninstalled terminals
+				m.installRequest = m.terminals[m.cursor].Name
+				m.installRequestCask = m.terminals[m.cursor].CaskName
 				m.quitting = true
 				return m, tea.Quit
 			}
@@ -166,7 +173,7 @@ func (m TerminalSelectorModel) View() string {
 	if m.cursor < len(m.terminals) && m.terminals[m.cursor].Installed {
 		hint += "Enter select  "
 	} else {
-		hint += "i install  "
+		hint += "Enter install  "
 	}
 	hint += "Esc cancel"
 	b.WriteString(hintStyle.Render(hint))

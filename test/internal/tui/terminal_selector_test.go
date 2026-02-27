@@ -59,6 +59,24 @@ func TestTerminalSelector_enter_does_not_select_uninstalled(t *testing.T) {
 	}
 }
 
+func TestTerminalSelector_enter_on_uninstalled_triggers_install(t *testing.T) {
+	var model tea.Model = tui.NewTerminalSelector(testTerminals(), "ghostty")
+	// Move to WezTerm (index 2, uninstalled)
+	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyDown})
+	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyDown})
+	model, cmd := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	result := model.(tui.TerminalSelectorModel)
+	if result.InstallRequest() != "wezterm" {
+		t.Errorf("expected install request for wezterm, got %q", result.InstallRequest())
+	}
+	if result.InstallRequestCask() != "wezterm" {
+		t.Errorf("expected cask name 'wezterm', got %q", result.InstallRequestCask())
+	}
+	if cmd == nil {
+		t.Error("expected quit command after install request")
+	}
+}
+
 func TestTerminalSelector_down_wraps_around(t *testing.T) {
 	var model tea.Model = tui.NewTerminalSelector(testTerminals(), "")
 	for i := 0; i < 4; i++ {
@@ -222,39 +240,45 @@ func TestTerminalSelector_init_returns_nil(t *testing.T) {
 
 func TestTerminalSelector_enter_on_only_uninstalled(t *testing.T) {
 	terminals := []models.Terminal{
-		{Name: "wezterm", DisplayName: "WezTerm", Installed: false},
+		{Name: "wezterm", DisplayName: "WezTerm", CaskName: "wezterm", Installed: false},
 	}
 	m := tui.NewTerminalSelector(terminals, "")
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	result := updated.(tui.TerminalSelectorModel)
 	if result.Selected() != nil {
 		t.Error("should not select uninstalled terminal")
 	}
+	if result.InstallRequest() != "wezterm" {
+		t.Errorf("expected install request for wezterm, got %q", result.InstallRequest())
+	}
+	if cmd == nil {
+		t.Error("expected quit command for install request")
+	}
 }
 
 func TestTerminalSelector_hint_shows_install_only_on_uninstalled(t *testing.T) {
-	// Cursor on installed terminal (index 0: Ghostty) → should NOT show "i install"
+	// Cursor on installed terminal (index 0: Ghostty) → should NOT show "Enter install"
 	m := tui.NewTerminalSelector(testTerminals(), "ghostty")
 	view := m.View()
-	if strings.Contains(view, "i install") {
-		t.Error("hint bar should not show 'i install' when cursor is on installed terminal")
+	if strings.Contains(view, "Enter install") {
+		t.Error("hint bar should not show 'Enter install' when cursor is on installed terminal")
 	}
 }
 
 func TestTerminalSelector_hint_shows_install_on_uninstalled(t *testing.T) {
-	// Cursor on uninstalled terminal (index 2: WezTerm) → should show "i install"
+	// Cursor on uninstalled terminal (index 2: WezTerm) → should show "Enter install"
 	var model tea.Model = tui.NewTerminalSelector(testTerminals(), "ghostty")
 	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyDown})
 	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyDown})
 	result := model.(tui.TerminalSelectorModel)
 	view := result.View()
-	if !strings.Contains(view, "i install") {
-		t.Error("hint bar should show 'i install' when cursor is on uninstalled terminal")
+	if !strings.Contains(view, "Enter install") {
+		t.Error("hint bar should show 'Enter install' when cursor is on uninstalled terminal")
 	}
 }
 
-func TestTerminalSelector_hint_hides_enter_on_uninstalled(t *testing.T) {
-	// Cursor on uninstalled terminal → should NOT show "Enter select"
+func TestTerminalSelector_hint_hides_select_on_uninstalled(t *testing.T) {
+	// Cursor on uninstalled terminal → should show "Enter install" not "Enter select"
 	var model tea.Model = tui.NewTerminalSelector(testTerminals(), "ghostty")
 	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyDown})
 	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyDown})
