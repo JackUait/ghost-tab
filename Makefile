@@ -1,4 +1,4 @@
-.PHONY: build install test clean lint release help
+.PHONY: build install test clean lint release sync-version help
 
 # Build the Go binary
 build:
@@ -43,6 +43,10 @@ lint:
 # Create a new release (tag, GitHub release with binaries)
 release:
 	@bash scripts/release.sh
+
+# Sync package.json version with VERSION file
+sync-version:
+	@node -e "const p=require('./package.json');const v=require('fs').readFileSync('VERSION','utf8').trim();p.version=v;require('fs').writeFileSync('package.json',JSON.stringify(p,null,2)+'\n');console.log('Synced package.json to '+v)"
 
 # Show help
 help:

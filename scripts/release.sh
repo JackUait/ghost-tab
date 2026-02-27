@@ -141,6 +141,14 @@ main() {
     "$build_dir/ghost-tab-tui-darwin-arm64" \
     "$build_dir/ghost-tab-tui-darwin-amd64"
 
+  # Sync version to package.json and publish to npm
+  if [[ -f "$project_dir/package.json" ]] && command -v npm &>/dev/null; then
+    echo "Publishing to npm..."
+    (cd "$project_dir" && npm version "$version" --no-git-tag-version --allow-same-version && npm publish) && \
+      echo "  ✓ Published ghost-tab@$version to npm" || \
+      echo "  ⚠ npm publish failed (GitHub release still succeeded)"
+  fi
+
   # Update local binary so the developer sees changes immediately
   echo "Updating local binary..."
   local local_bin="$HOME/.local/bin/ghost-tab-tui"
