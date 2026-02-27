@@ -177,14 +177,76 @@ exit 0
 // ensure_ghost_tab_tui tests (binary download, not build from source)
 // ============================================================
 
-func TestEnsureGhostTabTui_skips_when_binary_already_in_PATH(t *testing.T) {
+func TestEnsureGhostTabTui_skips_when_binary_version_matches(t *testing.T) {
 	dir := t.TempDir()
-	binDir := mockCommand(t, dir, "ghost-tab-tui", `echo "I exist"`)
-	snippet := installSnippet(t, `ensure_ghost_tab_tui "/some/share/dir"`)
+	shareDir := t.TempDir()
+	writeTempFile(t, shareDir, "VERSION", "2.4.0")
+	// Mock binary that reports matching version
+	binDir := mockCommand(t, dir, "ghost-tab-tui", `
+if [ "$1" = "--version" ]; then echo "ghost-tab-tui version 2.4.0"; exit 0; fi
+echo "I exist"
+`)
+	snippet := installSnippet(t, fmt.Sprintf(`ensure_ghost_tab_tui %q`, shareDir))
 	env := buildEnv(t, []string{binDir})
 	out, code := runBashSnippet(t, snippet, env)
 	assertExitCode(t, code, 0)
-	assertContains(t, out, "ghost-tab-tui already available")
+	assertContains(t, out, "ghost-tab-tui is up to date")
+}
+
+func TestEnsureGhostTabTui_updates_when_version_mismatch(t *testing.T) {
+	dir := t.TempDir()
+	fakeHome := filepath.Join(dir, "home")
+	os.MkdirAll(filepath.Join(fakeHome, ".local", "bin"), 0755)
+	shareDir := t.TempDir()
+	writeTempFile(t, shareDir, "VERSION", "2.5.0")
+
+	curlCalls := filepath.Join(dir, "curl_calls")
+	// Mock binary that reports old version
+	binDir := mockCommand(t, dir, "ghost-tab-tui", `
+if [ "$1" = "--version" ]; then echo "ghost-tab-tui version 2.4.0"; exit 0; fi
+echo "I exist"
+`)
+	mockCommand(t, dir, "curl", fmt.Sprintf(`
+echo "$@" >> %q
+if [ "$1" = "-fsSL" ]; then echo "binary" > "$3"; exit 0; fi
+exit 0
+`, curlCalls))
+	mockCommand(t, dir, "uname", `echo "arm64"`)
+	snippet := installSnippet(t, fmt.Sprintf(`ensure_ghost_tab_tui %q`, shareDir))
+	env := buildEnv(t, nil, "HOME="+fakeHome, "PATH="+binDir+":/usr/bin:/bin")
+	out, code := runBashSnippet(t, snippet, env)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "Updating ghost-tab-tui")
+	calls, _ := os.ReadFile(curlCalls)
+	assertContains(t, string(calls), "2.5.0")
+}
+
+func TestEnsureGhostTabTui_updates_when_no_version_flag(t *testing.T) {
+	dir := t.TempDir()
+	fakeHome := filepath.Join(dir, "home")
+	os.MkdirAll(filepath.Join(fakeHome, ".local", "bin"), 0755)
+	shareDir := t.TempDir()
+	writeTempFile(t, shareDir, "VERSION", "2.5.0")
+
+	curlCalls := filepath.Join(dir, "curl_calls")
+	// Mock old binary that doesn't support --version (exits non-zero)
+	binDir := mockCommand(t, dir, "ghost-tab-tui", `
+if [ "$1" = "--version" ]; then echo "Error: unknown flag: --version" >&2; exit 1; fi
+echo "I exist"
+`)
+	mockCommand(t, dir, "curl", fmt.Sprintf(`
+echo "$@" >> %q
+if [ "$1" = "-fsSL" ]; then echo "binary" > "$3"; exit 0; fi
+exit 0
+`, curlCalls))
+	mockCommand(t, dir, "uname", `echo "arm64"`)
+	snippet := installSnippet(t, fmt.Sprintf(`ensure_ghost_tab_tui %q`, shareDir))
+	env := buildEnv(t, nil, "HOME="+fakeHome, "PATH="+binDir+":/usr/bin:/bin")
+	out, code := runBashSnippet(t, snippet, env)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "Updating ghost-tab-tui")
+	calls, _ := os.ReadFile(curlCalls)
+	assertContains(t, string(calls), "2.5.0")
 }
 
 func TestEnsureGhostTabTui_downloads_binary_for_correct_arch(t *testing.T) {

@@ -115,10 +115,11 @@ main() {
   echo "Building ghost-tab-tui binaries..."
   build_dir="$(mktemp -d)"
 
-  (cd "$project_dir" && GOOS=darwin GOARCH=arm64 go build -o "$build_dir/ghost-tab-tui-darwin-arm64" ./cmd/ghost-tab-tui) || {
+  local ldflags="-X main.Version=$version"
+  (cd "$project_dir" && GOOS=darwin GOARCH=arm64 go build -ldflags "$ldflags" -o "$build_dir/ghost-tab-tui-darwin-arm64" ./cmd/ghost-tab-tui) || {
     echo "Error: failed to build ghost-tab-tui for arm64" >&2; exit 1
   }
-  (cd "$project_dir" && GOOS=darwin GOARCH=amd64 go build -o "$build_dir/ghost-tab-tui-darwin-amd64" ./cmd/ghost-tab-tui) || {
+  (cd "$project_dir" && GOOS=darwin GOARCH=amd64 go build -ldflags "$ldflags" -o "$build_dir/ghost-tab-tui-darwin-amd64" ./cmd/ghost-tab-tui) || {
     echo "Error: failed to build ghost-tab-tui for amd64" >&2; exit 1
   }
   echo "  ✓ Built ghost-tab-tui for darwin/arm64 and darwin/amd64"
@@ -144,7 +145,7 @@ main() {
   echo "Updating local binary..."
   local local_bin="$HOME/.local/bin/ghost-tab-tui"
   if [[ -d "$(dirname "$local_bin")" ]]; then
-    (cd "$project_dir" && go build -o "$local_bin" ./cmd/ghost-tab-tui) && \
+    (cd "$project_dir" && go build -ldflags "$ldflags" -o "$local_bin" ./cmd/ghost-tab-tui) && \
       echo "  ✓ Updated $local_bin" || \
       echo "  ⚠ Failed to update local binary (release still succeeded)"
   fi

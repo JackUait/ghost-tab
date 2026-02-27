@@ -11,6 +11,18 @@ import (
 	"github.com/spf13/cobra"
 )
 
+func TestRootCmd_HasVersion(t *testing.T) {
+	if rootCmd.Version == "" {
+		t.Fatal("Expected rootCmd.Version to be set")
+	}
+}
+
+func TestVersionVar_HasDefault(t *testing.T) {
+	if Version == "" {
+		t.Fatal("Expected Version variable to have a default value")
+	}
+}
+
 func TestRootCmd_HasAIToolFlag(t *testing.T) {
 	flag := rootCmd.PersistentFlags().Lookup("ai-tool")
 	if flag == nil {

@@ -2,6 +2,9 @@ package main
 
 import "github.com/spf13/cobra"
 
+// Version is set at build time via -ldflags "-X main.Version=X.Y.Z"
+var Version = "dev"
+
 var aiToolFlag string
 
 var rootCmd = &cobra.Command{
@@ -11,5 +14,6 @@ var rootCmd = &cobra.Command{
 }
 
 func init() {
+	rootCmd.Version = Version
 	rootCmd.PersistentFlags().StringVar(&aiToolFlag, "ai-tool", "claude", "AI tool for theming")
 }
