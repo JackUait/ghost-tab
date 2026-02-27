@@ -371,6 +371,22 @@ func TestRunSelectBranch_NonGitDir(t *testing.T) {
 	}
 }
 
+func TestConfigMenuCmd_HasTerminalNameFlag(t *testing.T) {
+	cmd, _, _ := rootCmd.Find([]string{"config-menu"})
+	flag := cmd.Flags().Lookup("terminal-name")
+	if flag == nil {
+		t.Fatal("Expected --terminal-name flag on config-menu")
+	}
+}
+
+func TestConfigMenuCmd_HasVersionFlag(t *testing.T) {
+	cmd, _, _ := rootCmd.Find([]string{"config-menu"})
+	flag := cmd.Flags().Lookup("version")
+	if flag == nil {
+		t.Fatal("Expected --version flag on config-menu")
+	}
+}
+
 func TestSelectProjectCmd_ProjectsFileFlagRequired(t *testing.T) {
 	cmd, _, _ := rootCmd.Find([]string{"select-project"})
 	flag := cmd.Flags().Lookup("projects-file")
