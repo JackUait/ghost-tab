@@ -40,7 +40,7 @@ lint:
 	@echo "Running shellcheck..."
 	find lib bin ghostty -name '*.sh' -exec shellcheck {} +
 
-# Create a new release (tag, GitHub release, Homebrew formula update)
+# Create a new release (tag, GitHub release with binaries)
 release:
 	@bash scripts/release.sh
 

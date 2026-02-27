@@ -121,7 +121,6 @@ Ghost Tab is a terminal + tmux wrapper that launches a four-pane dev session wit
 - Custom status lines showing git info and context usage
 - Sound notifications on AI idle
 - Auto-cleanup of entire process trees
-- Homebrew distribution
 
 ## Commands
 
@@ -601,7 +600,7 @@ If you catch yourself thinking ANY of these, STOP:
 
 ## Configuration
 
-**DO NOT modify** without explicit request: `run-tests.sh`, `.gitignore`, `VERSION`, Homebrew formula
+**DO NOT modify** without explicit request: `run-tests.sh`, `.gitignore`, `VERSION`
 
 ## Important Patterns
 
