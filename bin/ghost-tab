@@ -241,6 +241,11 @@ if [ -d "$SHARE_DIR/lib" ]; then
   success "Linked shared libraries to $WRAPPER_DIR/lib/"
 fi
 
+# ---------- Ghost Tab CLI Command ----------
+header "Setting up ghost-tab command..."
+ln -sf "$SHARE_DIR/bin/ghost-tab-config" "$HOME/.local/bin/ghost-tab"
+success "Created ghost-tab command at ~/.local/bin/ghost-tab"
+
 # ---------- Terminal Config ----------
 header "Setting up $(get_terminal_display_name "$SELECTED_TERMINAL") config..."
 TERMINAL_CONFIG="$(terminal_get_config_path)"
@@ -337,6 +342,7 @@ success "Terminal:        $(get_terminal_display_name "$_terminal_pref")"
 _ai_default="$(cat "${XDG_CONFIG_HOME:-$HOME/.config}/ghost-tab/ai-tool" 2>/dev/null)"
 success "AI tool:         $(echo "$_ai_default" | sed 's/claude/Claude Code/;s/codex/Codex CLI/;s/copilot/Copilot CLI/;s/opencode/OpenCode/')"
 success "Projects file:   $PROJECTS_FILE"
+success "Config command:  ghost-tab (in ~/.local/bin/)"
 if [ -f ~/.claude/statusline-wrapper.sh ]; then
   success "Status line:     ~/.claude/statusline-wrapper.sh"
 fi
@@ -347,7 +353,7 @@ if [ -f "${XDG_CONFIG_HOME:-$HOME/.config}/opencode/plugins/ghost-tab.ts" ]; the
   success "OpenCode plugin: ~/.config/opencode/plugins/ghost-tab.ts"
 fi
 echo ""
-info "Open a new $(get_terminal_display_name "${SELECTED_TERMINAL:-$_terminal_pref}") window to start coding."
+info "Run 'ghost-tab' to manage configuration, or open a new $(get_terminal_display_name "${SELECTED_TERMINAL:-$_terminal_pref}") window to start coding."
 
 } # end main
 
