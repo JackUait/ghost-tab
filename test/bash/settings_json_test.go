@@ -886,3 +886,65 @@ func TestCleanupHooksRemoval_skips_when_not_claude(t *testing.T) {
 	}
 	assertContains(t, string(data), "GHOST_TAB_MARKER_FILE")
 }
+
+func TestCleanupHooksRemoval_cleans_orphaned_markers_from_dead_pids(t *testing.T) {
+	tmpDir := t.TempDir()
+	markerDir := filepath.Join(tmpDir, "markers")
+	if err := os.MkdirAll(markerDir, 0755); err != nil {
+		t.Fatalf("failed to create marker dir: %v", err)
+	}
+	settingsFile := writeTempFile(t, tmpDir, "settings.json", `{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then touch \"$GHOST_TAB_MARKER_FILE\"; fi"}]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then rm -f \"$GHOST_TAB_MARKER_FILE\"; fi"}]
+      }
+    ]
+  }
+}
+`)
+
+	// Create a marker with a PID that definitely doesn't exist
+	orphanedMarker := filepath.Join(markerDir, "ghost-tab-waiting-99999999")
+	if err := os.WriteFile(orphanedMarker, []byte(""), 0644); err != nil {
+		t.Fatalf("failed to create orphaned marker: %v", err)
+	}
+
+	root := projectRoot(t)
+	tuiPath := filepath.Join(root, "lib", "tui.sh")
+	settingsJsonPath := filepath.Join(root, "lib", "settings-json.sh")
+	snippet := fmt.Sprintf(`source %q && source %q
+SELECTED_AI_TOOL="claude"
+# Clean up orphaned markers from dead sessions
+for marker in %s/ghost-tab-waiting-*; do
+  [ -f "$marker" ] || continue
+  pid="${marker##*-}"
+  if ! kill -0 "$pid" 2>/dev/null; then
+    rm -f "$marker"
+  fi
+done
+if ! ls %s/ghost-tab-waiting-* &>/dev/null; then
+  remove_waiting_indicator_hooks %q
+fi
+`, tuiPath, settingsJsonPath, markerDir, markerDir, settingsFile)
+
+	out, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "removed")
+
+	// Orphaned marker should have been cleaned up
+	if _, err := os.Stat(orphanedMarker); !os.IsNotExist(err) {
+		t.Error("orphaned marker should have been cleaned up")
+	}
+	// Hooks should be removed (no live markers remain)
+	data, err := os.ReadFile(settingsFile)
+	if err != nil {
+		t.Fatalf("failed to read settings.json: %v", err)
+	}
+	assertNotContains(t, string(data), "GHOST_TAB_MARKER_FILE")
+}

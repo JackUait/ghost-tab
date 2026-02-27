@@ -175,6 +175,14 @@ cleanup() {
   stop_tab_title_watcher "$GHOST_TAB_MARKER_FILE"
   # Remove waiting indicator hooks if no other Ghost Tab sessions are running
   if [ "$SELECTED_AI_TOOL" = "claude" ]; then
+    # Clean up orphaned markers from dead sessions (e.g., after SIGKILL)
+    for marker in /tmp/ghost-tab-waiting-*; do
+      [ -f "$marker" ] || continue
+      local pid="${marker##*-}"
+      if ! kill -0 "$pid" 2>/dev/null; then
+        rm -f "$marker"
+      fi
+    done
     if ! ls /tmp/ghost-tab-waiting-* &>/dev/null; then
       remove_waiting_indicator_hooks "${HOME}/.claude/settings.json" >/dev/null 2>&1 || true
     fi
