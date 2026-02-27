@@ -29,7 +29,7 @@ terminal_install() {
   if [ ! -d "$app_path" ]; then
     error "Ghostty still not found at $app_path"
     info "Install Ghostty and re-run: ghost-tab --terminal"
-    exit 1
+    return 1
   fi
   success "Ghostty installed"
 }

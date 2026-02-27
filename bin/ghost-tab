@@ -53,7 +53,10 @@ run_terminal_setup() {
     # Install terminal if needed
     header "Checking $(get_terminal_display_name "$selected_terminal")..."
     load_terminal_adapter "$selected_terminal"
-    terminal_install
+    if ! terminal_install; then
+      error "Terminal installation failed. Install manually and re-run: ghost-tab --terminal"
+      exit 1
+    fi
 
     # Ensure wrapper symlink exists
     header "Setting up wrapper script..."
@@ -207,7 +210,10 @@ fi
 # ---------- Terminal Installation ----------
 header "Checking $(get_terminal_display_name "$SELECTED_TERMINAL")..."
 load_terminal_adapter "$SELECTED_TERMINAL"
-terminal_install
+if ! terminal_install; then
+  error "Terminal installation failed. Install manually and re-run: ghost-tab --terminal"
+  exit 1
+fi
 
 # Verify supporting files exist
 if [ ! -f "$SHARE_DIR/wrapper.sh" ] || [ ! -d "$SHARE_DIR/templates" ]; then

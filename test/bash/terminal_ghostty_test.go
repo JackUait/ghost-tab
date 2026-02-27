@@ -141,6 +141,37 @@ terminal_install
 	assertContains(t, out, "Ghostty found")
 }
 
+func TestGhosttyAdapter_terminal_install_returns_1_not_exits_when_missing(t *testing.T) {
+	// Ghostty adapter should return 1 (not exit 1) when app is still
+	// missing after the download page prompt, so callers can handle
+	// the failure gracefully.
+	dir := t.TempDir()
+	fakeApps := filepath.Join(dir, "Applications")
+
+	binDir := mockCommand(t, dir, "open", `true`)
+
+	root := projectRoot(t)
+	tuiPath := filepath.Join(root, "lib", "tui.sh")
+	installPath := filepath.Join(root, "lib", "install.sh")
+	adapterPath := filepath.Join(root, "lib", "terminals", "ghostty.sh")
+	// Call terminal_install inside a function to distinguish return vs exit.
+	// If terminal_install uses exit 1, the entire subshell dies and "AFTER"
+	// is never printed. If it uses return 1, the wrapper function catches it
+	// and prints "AFTER".
+	script := fmt.Sprintf(`
+source %q && source %q && source %q
+GHOSTTY_APP_PATH=%q
+wrapper() { terminal_install </dev/null; }
+wrapper || true
+echo "AFTER"
+`, tuiPath, installPath, adapterPath, filepath.Join(fakeApps, "Ghostty.app"))
+
+	env := buildEnv(t, []string{binDir})
+	out, code := runBashSnippet(t, script, env)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "AFTER")
+}
+
 func TestGhosttyAdapter_terminal_install_opens_download_page_when_missing(t *testing.T) {
 	dir := t.TempDir()
 	fakeApps := filepath.Join(dir, "Applications")

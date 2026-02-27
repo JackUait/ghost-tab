@@ -56,6 +56,10 @@ select_terminal_interactive() {
         info "Installing $cask via Homebrew..."
         if brew install --cask "$cask"; then
           success "Installed $cask"
+          echo ""
+          # Auto-select the just-installed terminal
+          _selected_terminal="$terminal"
+          return 0
         else
           error "Failed to install $cask"
         fi
