@@ -25,7 +25,7 @@ CSEOF
   fi
 }
 
-# Add waiting indicator hooks (Notification + PreToolUse) to settings.json.
+# Add waiting indicator hooks (Stop + PreToolUse + UserPromptSubmit) to settings.json.
 # Uses $GHOST_TAB_MARKER_FILE env var so hooks are safe outside Ghost Tab.
 # Outputs "added", "upgraded", or "exists".
 add_waiting_indicator_hooks() {
@@ -47,20 +47,12 @@ else:
 
 hooks = settings.setdefault("hooks", {})
 
-notif_cmd = 'if [ -n "$GHOST_TAB_MARKER_FILE" ]; then touch "$GHOST_TAB_MARKER_FILE"; fi'
+stop_cmd = 'if [ -n "$GHOST_TAB_MARKER_FILE" ]; then touch "$GHOST_TAB_MARKER_FILE"; fi'
 clear_cmd = 'if [ -n "$GHOST_TAB_MARKER_FILE" ]; then rm -f "$GHOST_TAB_MARKER_FILE"; fi'
-pre_tool_cmd = '_gt_in=$(cat); if [ -n "$GHOST_TAB_MARKER_FILE" ]; then if [[ "$_gt_in" == *AskUserQuestion* ]]; then touch "$GHOST_TAB_MARKER_FILE"; else rm -f "$GHOST_TAB_MARKER_FILE"; fi; fi'
 
-# Check if already installed (check both old Stop and new Notification locations)
 marker = "GHOST_TAB_MARKER_FILE"
 
-notif_list = hooks.get("Notification", [])
-notif_exists = any(
-    marker in h.get("command", "")
-    for entry in notif_list
-    for h in entry.get("hooks", [])
-)
-
+# Check if current Stop-based format is already installed
 stop_list = hooks.get("Stop", [])
 stop_exists = any(
     marker in h.get("command", "")
@@ -68,12 +60,28 @@ stop_exists = any(
     for h in entry.get("hooks", [])
 )
 
-if notif_exists:
-    # Current Notification format already installed
+# Check if old Notification-based format exists (needs upgrade)
+notif_list = hooks.get("Notification", [])
+notif_exists = any(
+    marker in h.get("command", "")
+    for entry in notif_list
+    for h in entry.get("hooks", [])
+)
+
+# Check if old Stop format without matcher exists (needs upgrade)
+pre_list = hooks.get("PreToolUse", [])
+old_stop_needs_upgrade = stop_exists and not any(
+    entry.get("matcher") == "AskUserQuestion"
+    for entry in pre_list
+    if any(marker in h.get("command", "") for h in entry.get("hooks", []))
+)
+
+if stop_exists and not old_stop_needs_upgrade:
+    # Current Stop format already installed
     print("exists")
     sys.exit(0)
-elif stop_exists:
-    # Old format (Stop-based) — remove ghost-tab hooks so they get re-added below
+elif notif_exists or old_stop_needs_upgrade:
+    # Old format — remove ghost-tab hooks so they get re-added below
     for event in ["Stop", "Notification", "PreToolUse", "UserPromptSubmit"]:
         event_list = hooks.get(event, [])
         new_list = [
@@ -88,14 +96,20 @@ elif stop_exists:
 else:
     action = "added"
 
-# Add Notification hook
-hooks.setdefault("Notification", []).append({
-    "hooks": [{"type": "command", "command": notif_cmd}]
+# Add Stop hook (fires immediately when Claude stops generating)
+hooks.setdefault("Stop", []).append({
+    "hooks": [{"type": "command", "command": stop_cmd}]
 })
 
-# Add PreToolUse hook (conditional: AskUserQuestion creates marker, others clear it)
+# Add PreToolUse hook with matcher for AskUserQuestion (creates marker — user input needed)
 hooks.setdefault("PreToolUse", []).append({
-    "hooks": [{"type": "command", "command": pre_tool_cmd}]
+    "matcher": "AskUserQuestion",
+    "hooks": [{"type": "command", "command": stop_cmd}]
+})
+
+# Add PreToolUse catch-all hook (clears marker — Claude is actively working)
+hooks.setdefault("PreToolUse", []).append({
+    "hooks": [{"type": "command", "command": clear_cmd}]
 })
 
 # Add UserPromptSubmit hook (clears marker when user answers)
