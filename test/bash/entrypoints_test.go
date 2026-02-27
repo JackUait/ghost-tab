@@ -335,7 +335,7 @@ func TestGhostTab_Summary_shows_all_installed_components(t *testing.T) {
 
 	writeTempFile(t, dir, ".claude/statusline-wrapper.sh", "")
 	writeTempFile(t, dir, ".claude/settings.json",
-		`{"hooks":{"Notification":[{"matcher":"idle_prompt","hooks":[]}]}}`)
+		`{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"GHOST_TAB_MARKER_FILE"}]}]}}`)
 	writeTempFile(t, dir, ".config/ghost-tab/ai-tool", "claude")
 
 	root := projectRoot(t)
@@ -345,8 +345,8 @@ source %q
 if [ -f "$HOME/.claude/statusline-wrapper.sh" ]; then
   success "Status line:     ~/.claude/statusline-wrapper.sh"
 fi
-if grep -q "idle_prompt" "$HOME/.claude/settings.json" 2>/dev/null; then
-  success "Sound:           Notification on idle"
+if grep -q "GHOST_TAB_MARKER_FILE" "$HOME/.claude/settings.json" 2>/dev/null; then
+  success "Sound:           Waiting indicator hooks"
 fi
 `, dir, filepath.Join(root, "lib/tui.sh"))
 
@@ -368,8 +368,8 @@ source %q
 if [ -f "$HOME/.claude/statusline-wrapper.sh" ]; then
   success "Status line:     ~/.claude/statusline-wrapper.sh"
 fi
-if grep -q "idle_prompt" "$HOME/.claude/settings.json" 2>/dev/null; then
-  success "Sound:           Notification on idle"
+if grep -q "GHOST_TAB_MARKER_FILE" "$HOME/.claude/settings.json" 2>/dev/null; then
+  success "Sound:           Waiting indicator hooks"
 fi
 echo "done"
 `, dir, filepath.Join(root, "lib/tui.sh"))
