@@ -351,7 +351,7 @@ func TestTabTitleWatcher_start_tab_title_watcher_takes_seven_params(t *testing.T
 	}
 }
 
-func TestTabTitleWatcher_watcher_uses_notification_hook_no_delay(t *testing.T) {
+func TestTabTitleWatcher_watcher_uses_stop_hook_with_marker_age_debounce(t *testing.T) {
 	root := projectRoot(t)
 	watcherPath := filepath.Join(root, "lib", "tab-title-watcher.sh")
 	data, err := os.ReadFile(watcherPath)
@@ -360,19 +360,14 @@ func TestTabTitleWatcher_watcher_uses_notification_hook_no_delay(t *testing.T) {
 	}
 	content := string(data)
 
-	// Should NOT use _GHOST_TAB_NOTIFY_AFTER (delay removed)
-	if strings.Contains(content, "_GHOST_TAB_NOTIFY_AFTER") {
-		t.Error("watcher should NOT use _GHOST_TAB_NOTIFY_AFTER (Notification hook eliminates need for delay)")
-	}
-
-	// Should NOT contain marker_age function (delay removed)
-	if strings.Contains(content, "marker_age") {
-		t.Error("watcher should NOT contain marker_age (Notification hook eliminates need for age-based filtering)")
+	// Should use marker_age for debounce (Stop hook needs filtering)
+	if !strings.Contains(content, "marker_age") {
+		t.Error("watcher should contain marker_age function for debounce filtering")
 	}
 
 	// Should NOT reference .ask marker (removed)
 	if strings.Contains(content, ".ask") {
-		t.Error("watcher should NOT reference .ask marker (removed in Notification hook migration)")
+		t.Error("watcher should NOT reference .ask marker")
 	}
 
 	// Should still poll at 0.5s
@@ -391,7 +386,7 @@ func TestTabTitleWatcher_watcher_uses_notification_hook_no_delay(t *testing.T) {
 	}
 }
 
-func TestTabTitleWatcher_check_ai_tool_state_claude_comment_references_notification_hook(t *testing.T) {
+func TestTabTitleWatcher_check_ai_tool_state_claude_comment_references_stop_hook(t *testing.T) {
 	root := projectRoot(t)
 	watcherPath := filepath.Join(root, "lib", "tab-title-watcher.sh")
 	data, err := os.ReadFile(watcherPath)
@@ -400,11 +395,8 @@ func TestTabTitleWatcher_check_ai_tool_state_claude_comment_references_notificat
 	}
 	content := string(data)
 
-	if strings.Contains(content, "Stop hook creates") {
-		t.Error("check_ai_tool_state comment should reference Notification hook, not Stop hook")
-	}
-	if !strings.Contains(content, "Notification hook") {
-		t.Error("check_ai_tool_state comment should mention Notification hook")
+	if !strings.Contains(content, "Stop hook") {
+		t.Error("check_ai_tool_state comment should reference Stop hook")
 	}
 }
 
