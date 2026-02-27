@@ -127,9 +127,15 @@ function ensureTuiBinary(version) {
 
 // Synchronous HTTPS download with redirect following.
 function downloadFile(url, dest) {
-  execFileSync('curl', ['-fsSL', '-o', dest, url], {
-    stdio: ['pipe', 'pipe', 'pipe'],
-  });
+  try {
+    execFileSync('curl', ['-fsSL', '-o', dest, url], {
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+  } catch (_) {
+    process.stderr.write(`Failed to download ${url}\n`);
+    process.stderr.write('Check your network connection and that this version has been released.\n');
+    process.exit(1);
+  }
 }
 
 main();

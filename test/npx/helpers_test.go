@@ -42,31 +42,3 @@ func runLauncher(t *testing.T, env []string, args ...string) (string, string, in
 	}
 	return stdout.String(), stderr.String(), code
 }
-
-// writeTempFile creates a file with the given content in dir.
-func writeTempFile(t *testing.T, dir, name, content string) string {
-	t.Helper()
-	path := filepath.Join(dir, name)
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	return path
-}
-
-// mockCommand creates a mock executable script in dir/bin/.
-func mockCommand(t *testing.T, dir, name, body string) string {
-	t.Helper()
-	binDir := filepath.Join(dir, "bin")
-	if err := os.MkdirAll(binDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	path := filepath.Join(binDir, name)
-	script := "#!/bin/bash\n" + body
-	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	return binDir
-}

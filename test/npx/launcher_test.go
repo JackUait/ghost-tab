@@ -11,19 +11,11 @@ func TestLauncher_copies_bash_files_to_install_dir(t *testing.T) {
 	home := t.TempDir()
 	installDir := filepath.Join(home, ".local", "share", "ghost-tab")
 
-	// Create a mock ghost-tab script that just exits 0
-	mockDir := t.TempDir()
-	mockBin := mockCommand(t, mockDir, "ghost-tab", "exit 0")
-
-	// Set GHOST_TAB_INSTALL_DIR so the launcher installs there
-	// Set GHOST_TAB_SKIP_TUI_DOWNLOAD to skip the binary download
-	// Set GHOST_TAB_SKIP_EXEC to skip execing the installer (just do the copy)
 	env := append(os.Environ(),
 		"HOME="+home,
 		"GHOST_TAB_INSTALL_DIR="+installDir,
 		"GHOST_TAB_SKIP_TUI_DOWNLOAD=1",
 		"GHOST_TAB_SKIP_EXEC=1",
-		"PATH="+mockBin+":"+os.Getenv("PATH"),
 	)
 
 	_, stderr, code := runLauncher(t, env)
