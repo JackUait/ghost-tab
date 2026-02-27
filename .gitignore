@@ -5,3 +5,4 @@ bin/ghost-tab-tui
 *.test
 *.out
 ghost-tab-tui
+.worktrees/
