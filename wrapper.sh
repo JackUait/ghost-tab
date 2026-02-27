@@ -6,8 +6,8 @@ SHARE_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/ghost-tab"
 # shellcheck source=/dev/null
 [ -f "$SHARE_DIR/lib/update.sh" ] && source "$SHARE_DIR/lib/update.sh"
 
-notify_if_updated
-check_for_update "$SHARE_DIR"
+notify_if_update_available
+check_for_update "${HOME}/.local/share/ghost-tab"
 
 # Show animated loading screen immediately in interactive mode (no args)
 _wrapper_dir_early="$(cd "$(dirname "$0")" && pwd)"

@@ -130,7 +130,7 @@ if [ "$(uname)" != "Darwin" ]; then
   exit 1
 fi
 success "macOS detected"
-notify_if_updated
+notify_if_update_available
 
 # ---------- Dependencies ----------
 header "Installing dependencies..."

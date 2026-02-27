@@ -719,14 +719,16 @@ func TestNotification_restore_claude_notif_channel_skips_when_claude_not_availab
 	}
 }
 
-// ==================== lib/update.sh tests (git-based) ====================
+// ==================== lib/update.sh tests (npm-based) ====================
 
-func TestUpdate_notify_if_updated_does_nothing_when_no_flag(t *testing.T) {
+// --- notify_if_update_available ---
+
+func TestUpdate_notify_if_update_available_does_nothing_when_no_flag(t *testing.T) {
 	dir := t.TempDir()
 
 	snippet := updateSnippet(t, fmt.Sprintf(`
 XDG_CONFIG_HOME=%q
-notify_if_updated
+notify_if_update_available
 `, filepath.Join(dir, "config")))
 	out, code := runBashSnippet(t, snippet, nil)
 	assertExitCode(t, code, 0)
@@ -735,54 +737,130 @@ notify_if_updated
 	}
 }
 
-func TestUpdate_notify_if_updated_shows_version_and_deletes_flag(t *testing.T) {
+func TestUpdate_notify_if_update_available_shows_version_and_deletes_flag(t *testing.T) {
 	dir := t.TempDir()
 	configDir := filepath.Join(dir, "config", "ghost-tab")
 	os.MkdirAll(configDir, 0755)
-	writeTempFile(t, configDir, "updated", "2.3.0")
+	writeTempFile(t, configDir, "update-available", "2.7.0")
 
 	snippet := updateSnippet(t, fmt.Sprintf(`
 XDG_CONFIG_HOME=%q
-notify_if_updated
+notify_if_update_available
 `, filepath.Join(dir, "config")))
 	out, code := runBashSnippet(t, snippet, nil)
 	assertExitCode(t, code, 0)
-	assertContains(t, out, "2.3.0")
-	flagFile := filepath.Join(configDir, "updated")
+	assertContains(t, out, "2.7.0")
+	assertContains(t, out, "npx ghost-tab")
+	flagFile := filepath.Join(configDir, "update-available")
 	if _, err := os.Stat(flagFile); !os.IsNotExist(err) {
-		t.Errorf("expected flag file to be deleted after notify_if_updated")
+		t.Errorf("expected flag file to be deleted after notify_if_update_available")
 	}
 }
 
-func TestUpdate_notify_if_updated_shows_update_message(t *testing.T) {
-	dir := t.TempDir()
-	configDir := filepath.Join(dir, "config", "ghost-tab")
-	os.MkdirAll(configDir, 0755)
-	writeTempFile(t, configDir, "updated", "2.5.0")
+// --- check_for_update ---
 
+func TestUpdate_check_for_update_does_nothing_when_npm_not_available(t *testing.T) {
+	dir := t.TempDir()
+	installDir := filepath.Join(dir, "install")
+	os.MkdirAll(installDir, 0755)
+	writeTempFile(t, installDir, ".version", "2.6.0")
+
+	// Use a PATH without npm but with basic utilities
+	env := buildEnv(t, nil,
+		"PATH=/bin:/usr/bin",
+		"XDG_CONFIG_HOME="+filepath.Join(dir, "config"))
+
+	// No sleep needed — function returns immediately when npm not found
 	snippet := updateSnippet(t, fmt.Sprintf(`
-XDG_CONFIG_HOME=%q
-notify_if_updated
-`, filepath.Join(dir, "config")))
-	out, code := runBashSnippet(t, snippet, nil)
+check_for_update %q
+`, installDir))
+	_, code := runBashSnippet(t, snippet, env)
 	assertExitCode(t, code, 0)
-	assertContains(t, out, "Updated")
+	flagFile := filepath.Join(dir, "config", "ghost-tab", "update-available")
+	if _, err := os.Stat(flagFile); !os.IsNotExist(err) {
+		t.Errorf("expected no flag file when npm not available")
+	}
 }
 
-func TestUpdate_check_for_update_does_nothing_when_not_git_repo(t *testing.T) {
+func TestUpdate_check_for_update_does_nothing_when_version_file_missing(t *testing.T) {
 	dir := t.TempDir()
-	shareDir := t.TempDir() // not a git repo — no .git directory
-	writeTempFile(t, shareDir, "VERSION", "2.2.0")
+	installDir := filepath.Join(dir, "install")
+	os.MkdirAll(installDir, 0755)
+	// No .version file
 
 	snippet := updateSnippet(t, fmt.Sprintf(`
 check_for_update %q
-sleep 0.2
-`, shareDir))
+sleep 0.3
+`, installDir))
 	env := buildEnv(t, nil, "XDG_CONFIG_HOME="+filepath.Join(dir, "config"))
 	_, code := runBashSnippet(t, snippet, env)
 	assertExitCode(t, code, 0)
-	flagFile := filepath.Join(dir, "config", "ghost-tab", "updated")
+	flagFile := filepath.Join(dir, "config", "ghost-tab", "update-available")
 	if _, err := os.Stat(flagFile); !os.IsNotExist(err) {
-		t.Errorf("expected no flag file when share_dir is not a git repo")
+		t.Errorf("expected no flag file when .version missing")
+	}
+}
+
+func TestUpdate_check_for_update_writes_flag_when_newer_version_exists(t *testing.T) {
+	dir := t.TempDir()
+	installDir := filepath.Join(dir, "install")
+	os.MkdirAll(installDir, 0755)
+	writeTempFile(t, installDir, ".version", "2.6.0")
+
+	// Mock npm to return a newer version
+	npmBody := `
+if [ "$1" = "view" ] && [ "$2" = "ghost-tab" ] && [ "$3" = "version" ]; then
+  echo "2.7.0"
+  exit 0
+fi
+exit 1
+`
+	binDir := mockCommand(t, dir, "npm", npmBody)
+	env := buildEnv(t, []string{binDir},
+		"XDG_CONFIG_HOME="+filepath.Join(dir, "config"))
+
+	snippet := updateSnippet(t, fmt.Sprintf(`
+check_for_update %q
+sleep 0.3
+`, installDir))
+	_, code := runBashSnippet(t, snippet, env)
+	assertExitCode(t, code, 0)
+	flagFile := filepath.Join(dir, "config", "ghost-tab", "update-available")
+	data, err := os.ReadFile(flagFile)
+	if err != nil {
+		t.Fatalf("expected flag file to be written, got error: %v", err)
+	}
+	if strings.TrimSpace(string(data)) != "2.7.0" {
+		t.Errorf("expected flag content '2.7.0', got %q", strings.TrimSpace(string(data)))
+	}
+}
+
+func TestUpdate_check_for_update_does_nothing_when_up_to_date(t *testing.T) {
+	dir := t.TempDir()
+	installDir := filepath.Join(dir, "install")
+	os.MkdirAll(installDir, 0755)
+	writeTempFile(t, installDir, ".version", "2.6.0")
+
+	// Mock npm to return same version
+	npmBody := `
+if [ "$1" = "view" ] && [ "$2" = "ghost-tab" ] && [ "$3" = "version" ]; then
+  echo "2.6.0"
+  exit 0
+fi
+exit 1
+`
+	binDir := mockCommand(t, dir, "npm", npmBody)
+	env := buildEnv(t, []string{binDir},
+		"XDG_CONFIG_HOME="+filepath.Join(dir, "config"))
+
+	snippet := updateSnippet(t, fmt.Sprintf(`
+check_for_update %q
+sleep 0.3
+`, installDir))
+	_, code := runBashSnippet(t, snippet, env)
+	assertExitCode(t, code, 0)
+	flagFile := filepath.Join(dir, "config", "ghost-tab", "update-available")
+	if _, err := os.Stat(flagFile); !os.IsNotExist(err) {
+		t.Errorf("expected no flag file when already up to date")
 	}
 }
