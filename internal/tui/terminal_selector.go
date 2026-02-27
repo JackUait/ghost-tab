@@ -10,12 +10,13 @@ import (
 
 // TerminalSelectorModel is a Bubbletea model for selecting a terminal emulator.
 type TerminalSelectorModel struct {
-	terminals      []models.Terminal
-	current        string
-	cursor         int
-	selected       *models.Terminal
-	installRequest string
-	quitting       bool
+	terminals          []models.Terminal
+	current            string
+	cursor             int
+	selected           *models.Terminal
+	installRequest     string
+	installRequestCask string
+	quitting           bool
 }
 
 // NewTerminalSelector creates a new terminal selector.
@@ -39,6 +40,11 @@ func (m TerminalSelectorModel) Cursor() int {
 // InstallRequest returns the terminal name requested for install, or empty string.
 func (m TerminalSelectorModel) InstallRequest() string {
 	return m.installRequest
+}
+
+// InstallRequestCask returns the cask name for the install request, or empty string.
+func (m TerminalSelectorModel) InstallRequestCask() string {
+	return m.installRequestCask
 }
 
 func (m TerminalSelectorModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -91,6 +97,7 @@ func (m TerminalSelectorModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				case 'i':
 					if m.cursor < len(m.terminals) && !m.terminals[m.cursor].Installed {
 						m.installRequest = m.terminals[m.cursor].Name
+						m.installRequestCask = m.terminals[m.cursor].CaskName
 						m.quitting = true
 						return m, tea.Quit
 					}
@@ -171,4 +178,3 @@ func (m TerminalSelectorModel) View() string {
 func (m TerminalSelectorModel) Selected() *models.Terminal {
 	return m.selected
 }
-

@@ -11,10 +11,10 @@ import (
 
 func testTerminals() []models.Terminal {
 	return []models.Terminal{
-		{Name: "ghostty", DisplayName: "Ghostty", Installed: true},
-		{Name: "iterm2", DisplayName: "iTerm2", Installed: true},
-		{Name: "wezterm", DisplayName: "WezTerm", Installed: false},
-		{Name: "kitty", DisplayName: "kitty", Installed: false},
+		{Name: "ghostty", DisplayName: "Ghostty", CaskName: "ghostty", Installed: true},
+		{Name: "iterm2", DisplayName: "iTerm2", CaskName: "iterm2", Installed: true},
+		{Name: "wezterm", DisplayName: "WezTerm", CaskName: "wezterm", Installed: false},
+		{Name: "kitty", DisplayName: "kitty", CaskName: "kitty", Installed: false},
 	}
 }
 
@@ -271,6 +271,18 @@ func TestTerminalSelector_hint_shows_enter_on_installed(t *testing.T) {
 	view := m.View()
 	if !strings.Contains(view, "Enter select") {
 		t.Error("hint bar should show 'Enter select' when cursor is on installed terminal")
+	}
+}
+
+func TestTerminalSelector_install_request_includes_cask_name(t *testing.T) {
+	terminals := []models.Terminal{
+		{Name: "wezterm", DisplayName: "WezTerm", CaskName: "wezterm", Installed: false},
+	}
+	var model tea.Model = tui.NewTerminalSelector(terminals, "")
+	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'i'}})
+	result := model.(tui.TerminalSelectorModel)
+	if result.InstallRequestCask() != "wezterm" {
+		t.Errorf("expected cask name 'wezterm', got %q", result.InstallRequestCask())
 	}
 }
 
