@@ -42,6 +42,18 @@ func TestIterm2Adapter_get_wrapper_path(t *testing.T) {
 	}
 }
 
+func TestIterm2Adapter_install_calls_ensure_cask(t *testing.T) {
+	tmpDir := t.TempDir()
+	appDir := filepath.Join(tmpDir, "Applications", "iTerm.app")
+	os.MkdirAll(appDir, 0755)
+
+	snippet := iterm2AdapterSnippet(t, fmt.Sprintf(
+		`APPLICATIONS_DIR=%q terminal_install`, filepath.Join(tmpDir, "Applications")))
+	out, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "iTerm found")
+}
+
 func TestIterm2Adapter_setup_config_calls_plistbuddy(t *testing.T) {
 	tmpDir := t.TempDir()
 	wrapperPath := filepath.Join(tmpDir, "wrapper.sh")

@@ -30,6 +30,18 @@ func TestWeztermAdapter_get_config_path(t *testing.T) {
 	}
 }
 
+func TestWeztermAdapter_install_calls_ensure_cask(t *testing.T) {
+	tmpDir := t.TempDir()
+	appDir := filepath.Join(tmpDir, "Applications", "WezTerm.app")
+	os.MkdirAll(appDir, 0755)
+
+	snippet := weztermAdapterSnippet(t, fmt.Sprintf(
+		`APPLICATIONS_DIR=%q terminal_install`, filepath.Join(tmpDir, "Applications")))
+	out, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "WezTerm found")
+}
+
 func TestWeztermAdapter_setup_config_creates_new(t *testing.T) {
 	tmpDir := t.TempDir()
 	configFile := filepath.Join(tmpDir, ".wezterm.lua")
