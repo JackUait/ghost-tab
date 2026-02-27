@@ -137,7 +137,11 @@ make release                            # Create a new release
 
 ### Creating Releases
 
-**NEVER create releases manually via GitHub UI or bare `gh release create`.** The installer downloads `ghost-tab-tui` binaries from release assets — if binaries are missing, users get a 404 on install. Always use the release script.
+**EVERY release MUST include fresh `ghost-tab-tui` binaries. NO EXCEPTIONS.**
+- The installer downloads binaries from release assets — missing binaries = 404 on install
+- The developer's local binary MUST be rebuilt — stale local binary = developer sees old UI
+- **NEVER create releases manually via GitHub UI or bare `gh release create`**
+- **ALWAYS use `make release`** — it handles binaries (GitHub + local), tagging, and release creation
 
 Run `make release` to automate the full release process. Before running:
 
