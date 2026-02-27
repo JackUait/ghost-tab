@@ -137,7 +137,7 @@ ensure_broot() {
   if curl -fsSL -o "$tmp_dir/broot.zip" "$url"; then
     unzip -q -d "$tmp_dir" "$tmp_dir/broot.zip"
     mkdir -p "$HOME/.local/bin"
-    mv "$tmp_dir/build/${broot_arch}/broot" "$HOME/.local/bin/broot"
+    mv "$tmp_dir/${broot_arch}/broot" "$HOME/.local/bin/broot"
     chmod +x "$HOME/.local/bin/broot"
     success "broot installed"
   else

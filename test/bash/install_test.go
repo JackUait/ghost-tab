@@ -231,6 +231,61 @@ func TestEnsureGhostTabTui_fails_when_download_fails(t *testing.T) {
 }
 
 // ============================================================
+// ensure_broot tests
+// ============================================================
+
+func TestEnsureBroot_skips_when_already_installed(t *testing.T) {
+	dir := t.TempDir()
+	binDir := mockCommand(t, dir, "broot", `echo "broot 1.55.0"`)
+	snippet := installSnippet(t, `ensure_broot`)
+	env := buildEnv(t, []string{binDir})
+	out, code := runBashSnippet(t, snippet, env)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "already installed")
+}
+
+func TestEnsureBroot_downloads_and_installs(t *testing.T) {
+	dir := t.TempDir()
+	fakeHome := filepath.Join(dir, "home")
+	os.MkdirAll(filepath.Join(fakeHome, ".local", "bin"), 0755)
+
+	// Mock curl: fake download and fake release tag lookup
+	binDir := mockCommand(t, dir, "curl", `
+if [ "$1" = "-fsSL" ]; then
+  echo "fake-zip" > "$3"
+  exit 0
+fi
+if [ "$1" = "-fsSI" ]; then
+  printf "location: https://github.com/Canop/broot/releases/tag/v1.55.0\r\n"
+  exit 0
+fi
+exit 0
+`)
+	mockCommand(t, dir, "uname", `echo "arm64"`)
+	// Mock unzip: create the real zip structure (no build/ prefix, matching
+	// actual broot release zips)
+	mockCommand(t, dir, "unzip", `
+shift  # skip -q
+shift  # skip -d
+dest="$1"
+mkdir -p "$dest/aarch64-apple-darwin"
+echo "#!/bin/bash" > "$dest/aarch64-apple-darwin/broot"
+`)
+	symlinkUsrBinTools(t, binDir, "grep", "sed", "tr", "mktemp", "chmod", "mv", "mkdir")
+	snippet := installSnippet(t, `ensure_broot`)
+	env := buildEnv(t, nil, "HOME="+fakeHome, "PATH="+binDir+":/bin:/usr/bin")
+	out, code := runBashSnippet(t, snippet, env)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "broot installed")
+
+	// Verify the binary landed in ~/.local/bin/broot
+	brootPath := filepath.Join(fakeHome, ".local", "bin", "broot")
+	if _, err := os.Stat(brootPath); os.IsNotExist(err) {
+		t.Errorf("expected %s to exist after install", brootPath)
+	}
+}
+
+// ============================================================
 // ensure_base_requirements tests
 // ============================================================
 
