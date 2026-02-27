@@ -161,7 +161,7 @@ func TestGhostTab_GhosttyConfig_merge_option_adds_command_line(t *testing.T) {
 	script := fmt.Sprintf(`
 source %q
 source %q
-merge_ghostty_config %q "command = ~/.config/ghostty/claude-wrapper.sh"
+merge_ghostty_config %q "command = ~/.config/ghost-tab/wrapper.sh"
 `, filepath.Join(root, "lib/tui.sh"), filepath.Join(root, "lib/ghostty-config.sh"), configFile)
 
 	out, code := runBashSnippet(t, script, nil)
@@ -173,7 +173,7 @@ merge_ghostty_config %q "command = ~/.config/ghostty/claude-wrapper.sh"
 		t.Fatalf("failed to read config: %v", err)
 	}
 	assertContains(t, string(content), "font-size = 14")
-	assertContains(t, string(content), "command = ~/.config/ghostty/claude-wrapper.sh")
+	assertContains(t, string(content), "command = ~/.config/ghost-tab/wrapper.sh")
 }
 
 func TestGhostTab_GhosttyConfig_backup_replace_creates_backup(t *testing.T) {
@@ -242,7 +242,7 @@ esac
 func TestGhostTab_GhosttyConfig_creates_new_when_none_exists(t *testing.T) {
 	dir := t.TempDir()
 	configFile := filepath.Join(dir, "ghostty-config")
-	templateFile := writeTempFile(t, dir, "template-config", "command = ~/.config/ghostty/claude-wrapper.sh\n")
+	templateFile := writeTempFile(t, dir, "template-config", "command = ~/.config/ghost-tab/wrapper.sh\n")
 
 	// Verify config doesn't exist yet
 	if _, err := os.Stat(configFile); !os.IsNotExist(err) {
@@ -257,7 +257,7 @@ func TestGhostTab_GhosttyConfig_creates_new_when_none_exists(t *testing.T) {
 	if _, err := os.Stat(configFile); os.IsNotExist(err) {
 		t.Error("expected config file to exist after copy")
 	}
-	assertContains(t, out, "command = ~/.config/ghostty/claude-wrapper.sh")
+	assertContains(t, out, "command = ~/.config/ghost-tab/wrapper.sh")
 }
 
 // ---------- Section 5: Project Addition ----------
@@ -885,6 +885,40 @@ func TestWrapper_does_not_contain_inline_brew_check(t *testing.T) {
 	}
 	if strings.Contains(string(data), "brew outdated") {
 		t.Errorf("wrapper.sh still contains inline brew update check")
+	}
+}
+
+func TestGhosttyClaudeWrapper_file_does_not_exist_in_repo(t *testing.T) {
+	root := projectRoot(t)
+	path := filepath.Join(root, "ghostty", "claude-wrapper.sh")
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Errorf("ghostty/claude-wrapper.sh should not exist — it was the old bash entry point; use wrapper.sh instead")
+	}
+}
+
+func TestGhosttyConfig_template_uses_new_wrapper_path(t *testing.T) {
+	root := projectRoot(t)
+	data, err := os.ReadFile(filepath.Join(root, "ghostty", "config"))
+	if err != nil {
+		t.Fatalf("failed to read ghostty/config: %v", err)
+	}
+	content := string(data)
+	if strings.Contains(content, "claude-wrapper.sh") {
+		t.Errorf("ghostty/config template still references claude-wrapper.sh — update to ~/.config/ghost-tab/wrapper.sh")
+	}
+	if !strings.Contains(content, "ghost-tab/wrapper.sh") {
+		t.Errorf("ghostty/config template must use ~/.config/ghost-tab/wrapper.sh as the command")
+	}
+}
+
+func TestGhostTab_does_not_reference_claude_wrapper_migration(t *testing.T) {
+	root := projectRoot(t)
+	data, err := os.ReadFile(filepath.Join(root, "bin", "ghost-tab"))
+	if err != nil {
+		t.Fatalf("failed to read bin/ghost-tab: %v", err)
+	}
+	if strings.Contains(string(data), "claude-wrapper.sh") {
+		t.Errorf("bin/ghost-tab still contains legacy claude-wrapper.sh migration code — remove it")
 	}
 }
 

@@ -2,4 +2,4 @@ keybind = cmd+shift+left=previous_tab
 keybind = cmd+shift+right=next_tab
 keybind = cmd+t=new_tab
 macos-option-as-alt = left
-command = ~/.config/ghostty/claude-wrapper.sh
+command = ~/.config/ghost-tab/wrapper.sh

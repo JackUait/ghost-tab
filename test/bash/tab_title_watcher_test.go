@@ -455,20 +455,6 @@ func TestTabTitleWatcher_wrapper_disables_tmux_set_titles(t *testing.T) {
 	}
 }
 
-func TestTabTitleWatcher_ghostty_wrapper_disables_tmux_set_titles(t *testing.T) {
-	root := projectRoot(t)
-	wrapperPath := filepath.Join(root, "ghostty", "claude-wrapper.sh")
-	data, err := os.ReadFile(wrapperPath)
-	if err != nil {
-		t.Fatalf("failed to read ghostty/claude-wrapper.sh: %v", err)
-	}
-	content := string(data)
-
-	if !strings.Contains(content, "set-option set-titles off") {
-		t.Error("ghostty/claude-wrapper.sh must contain 'set-option set-titles off' in tmux new-session command to prevent tmux from overwriting tab titles")
-	}
-}
-
 // --- wrapper.sh: GHOST_TAB_MARKER_FILE passed to tmux via -e ---
 
 func TestTabTitleWatcher_wrapper_passes_marker_file_to_tmux(t *testing.T) {
@@ -509,42 +495,6 @@ func TestTabTitleWatcher_wrapper_passes_marker_file_to_tmux(t *testing.T) {
 	}
 }
 
-func TestTabTitleWatcher_ghostty_wrapper_passes_marker_file_to_tmux(t *testing.T) {
-	root := projectRoot(t)
-	wrapperPath := filepath.Join(root, "ghostty", "claude-wrapper.sh")
-	data, err := os.ReadFile(wrapperPath)
-	if err != nil {
-		t.Fatalf("failed to read ghostty/claude-wrapper.sh: %v", err)
-	}
-	content := string(data)
-
-	// The tmux new-session command must pass GHOST_TAB_MARKER_FILE via -e flag
-	if !strings.Contains(content, `-e "GHOST_TAB_MARKER_FILE=$GHOST_TAB_MARKER_FILE"`) {
-		t.Error("ghostty/claude-wrapper.sh must pass GHOST_TAB_MARKER_FILE to tmux new-session via -e flag")
-	}
-
-	// Verify the variable is defined BEFORE the tmux new-session command
-	lines := strings.Split(content, "\n")
-	definitionLine := -1
-	tmuxNewSessionLine := -1
-	for i, line := range lines {
-		if strings.Contains(line, `GHOST_TAB_MARKER_FILE="/tmp/ghost-tab-waiting-`) && !strings.HasPrefix(strings.TrimSpace(line), "#") {
-			definitionLine = i
-		}
-		if strings.Contains(line, "new-session") && strings.Contains(line, "GHOST_TAB_MARKER_FILE") {
-			tmuxNewSessionLine = i
-		}
-	}
-	if definitionLine == -1 {
-		t.Fatal("ghostty/claude-wrapper.sh must define GHOST_TAB_MARKER_FILE variable")
-	}
-	if tmuxNewSessionLine == -1 {
-		t.Fatal("ghostty/claude-wrapper.sh must use GHOST_TAB_MARKER_FILE in tmux new-session command")
-	}
-	if definitionLine >= tmuxNewSessionLine {
-		t.Errorf("GHOST_TAB_MARKER_FILE must be defined (line %d) before tmux new-session (line %d)", definitionLine+1, tmuxNewSessionLine+1)
-	}
-}
 
 // --- play_notification_sound ---
 
@@ -651,26 +601,6 @@ func TestTabTitleWatcher_wrapper_passes_config_dir_to_watcher(t *testing.T) {
 		}
 	}
 	t.Error("start_tab_title_watcher call not found in wrapper.sh")
-}
-
-func TestTabTitleWatcher_ghostty_wrapper_passes_config_dir_to_watcher(t *testing.T) {
-	root := projectRoot(t)
-	wrapperPath := filepath.Join(root, "ghostty", "claude-wrapper.sh")
-	data, err := os.ReadFile(wrapperPath)
-	if err != nil {
-		t.Fatalf("failed to read ghostty/claude-wrapper.sh: %v", err)
-	}
-	content := string(data)
-
-	for _, line := range strings.Split(content, "\n") {
-		if strings.Contains(line, "start_tab_title_watcher") && !strings.HasPrefix(strings.TrimSpace(line), "#") {
-			if !strings.Contains(line, "ghost-tab") {
-				t.Errorf("start_tab_title_watcher call should pass ghost-tab config dir, got: %s", line)
-			}
-			return
-		}
-	}
-	t.Error("start_tab_title_watcher call not found in ghostty/claude-wrapper.sh")
 }
 
 // --- Full marker lifecycle ---

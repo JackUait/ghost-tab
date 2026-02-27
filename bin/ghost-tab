@@ -260,17 +260,6 @@ if [ -d "$OLD_PROJECTS_DIR" ] && [ ! -d "$NEW_PROJECTS_DIR" ]; then
   info "Migrated config from vibecode-editor to ghost-tab"
 fi
 
-# Detect legacy Ghostty-only installation
-if [ -z "${SELECTED_TERMINAL:-}" ]; then
-  if [ -f "$HOME/.config/ghostty/claude-wrapper.sh" ] || [ -L "$HOME/.config/ghostty/claude-wrapper.sh" ]; then
-    TERMINAL_PREF_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/ghost-tab/terminal"
-    if [ ! -f "$TERMINAL_PREF_FILE" ]; then
-      info "Detected legacy Ghostty setup, migrating..."
-      save_terminal_preference "ghostty" "$TERMINAL_PREF_FILE"
-    fi
-  fi
-fi
-
 # ---------- Projects ----------
 header "Setting up projects..."
 PROJECTS_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/ghost-tab"
