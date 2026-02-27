@@ -282,6 +282,76 @@ echo '{"action":"install","terminal":"myterm","cask":"my-term-cask","selected":f
 	assertContains(t, out, "SELECTED=myterm")
 }
 
+func TestSelectTerminalInteractive_shows_error_when_tui_produces_empty_output(t *testing.T) {
+	// When ghost-tab-tui exists but produces no output (e.g. crash),
+	// the user should see an error message, not just silent failure.
+	tmpDir := t.TempDir()
+	// Mock TUI that writes an error to stderr and produces no stdout
+	binDir := mockCommand(t, tmpDir, "ghost-tab-tui", `echo "panic: something broke" >&2; exit 1`)
+	env := buildEnv(t, []string{binDir})
+
+	snippet := terminalSelectTuiSnippet(t,
+		`select_terminal_interactive`)
+	out, code := runBashSnippet(t, snippet, env)
+	if code == 0 {
+		t.Error("expected non-zero exit")
+	}
+	// Should show an error with context about what went wrong
+	assertContains(t, out, "something broke")
+}
+
+func TestSelectTerminalInteractive_shows_stderr_when_tui_outputs_cancel_with_error(t *testing.T) {
+	// When TUI outputs {"selected":false} but also has stderr content,
+	// it's a TUI failure (not a user cancel) — show the error.
+	tmpDir := t.TempDir()
+	binDir := mockCommand(t, tmpDir, "ghost-tab-tui",
+		`echo "TUI error: could not open TTY" >&2; echo '{"selected":false}'`)
+	env := buildEnv(t, []string{binDir})
+
+	snippet := terminalSelectTuiSnippet(t,
+		`select_terminal_interactive`)
+	out, code := runBashSnippet(t, snippet, env)
+	if code == 0 {
+		t.Error("expected non-zero exit")
+	}
+	// Should show the stderr content as an error
+	assertContains(t, out, "could not open TTY")
+}
+
+func TestSelectTerminalInteractive_silent_on_normal_cancel(t *testing.T) {
+	// When user presses Escape (no stderr), should NOT show error messages.
+	tmpDir := t.TempDir()
+	binDir := mockCommand(t, tmpDir, "ghost-tab-tui", `echo '{"selected":false}'`)
+	env := buildEnv(t, []string{binDir})
+
+	snippet := terminalSelectTuiSnippet(t,
+		`select_terminal_interactive`)
+	out, code := runBashSnippet(t, snippet, env)
+	if code == 0 {
+		t.Error("expected non-zero exit on cancel")
+	}
+	// Should NOT show error messages on normal cancel
+	assertNotContains(t, out, "failed")
+	assertNotContains(t, out, "error")
+}
+
+func TestSelectTerminalInteractive_shows_error_when_tui_crashes_silently(t *testing.T) {
+	// When ghost-tab-tui produces no output and no stderr,
+	// the user should see a helpful error message.
+	tmpDir := t.TempDir()
+	binDir := mockCommand(t, tmpDir, "ghost-tab-tui", `exit 1`)
+	env := buildEnv(t, []string{binDir})
+
+	snippet := terminalSelectTuiSnippet(t,
+		`select_terminal_interactive`)
+	out, code := runBashSnippet(t, snippet, env)
+	if code == 0 {
+		t.Error("expected non-zero exit")
+	}
+	// Should show a descriptive error, not just silently return 1
+	assertContains(t, out, "Terminal selector")
+}
+
 func TestSelectTerminalInteractive_passes_current_flag(t *testing.T) {
 	tmpDir := t.TempDir()
 	logFile := filepath.Join(tmpDir, "tui.log")

@@ -13,6 +13,9 @@ select_terminal_interactive() {
     return 1
   fi
 
+  local _tui_stderr
+  _tui_stderr="$(mktemp 2>/dev/null || echo "/tmp/ghost-tab-tui-err.$$")"
+
   while true; do
     # Build command args
     local args=("select-terminal")
@@ -27,16 +30,28 @@ select_terminal_interactive() {
     local result
     # Capture output regardless of exit code — bubbletea may exit non-zero
     # during cleanup even when the user completed an action successfully.
-    result=$(ghost-tab-tui "${args[@]}" 2>/dev/null) || true
+    # Capture stderr to a temp file so we can show it on failure.
+    result=$(ghost-tab-tui "${args[@]}" 2>"$_tui_stderr") || true
 
     # If no output at all, the TUI failed to run
     if [[ -z "$result" ]]; then
+      local tui_err=""
+      if [[ -f "$_tui_stderr" ]]; then
+        tui_err="$(cat "$_tui_stderr")"
+      fi
+      if [[ -n "$tui_err" ]]; then
+        error "Terminal selector failed: $tui_err"
+      else
+        error "Terminal selector failed to produce output. Try running: ghost-tab-tui select-terminal"
+      fi
+      rm -f "$_tui_stderr"
       return 1
     fi
 
     local selected
     if ! selected=$(echo "$result" | jq -r '.selected' 2>/dev/null); then
       error "Failed to parse terminal selection response"
+      rm -f "$_tui_stderr"
       return 1
     fi
 
@@ -59,6 +74,7 @@ select_terminal_interactive() {
           echo ""
           # Auto-select the just-installed terminal
           _selected_terminal="$terminal"
+          rm -f "$_tui_stderr"
           return 0
         else
           error "Failed to install $cask"
@@ -68,8 +84,17 @@ select_terminal_interactive() {
       continue
     fi
 
-    # User cancelled
+    # User cancelled (or TUI failed and fell back to selected:false)
     if [[ -z "$selected" || "$selected" == "null" || "$selected" != "true" ]]; then
+      # If stderr has content, the TUI likely failed — show the error
+      local tui_err=""
+      if [[ -f "$_tui_stderr" ]]; then
+        tui_err="$(cat "$_tui_stderr")"
+      fi
+      if [[ -n "$tui_err" ]]; then
+        error "Terminal selector failed: $tui_err"
+      fi
+      rm -f "$_tui_stderr"
       return 1
     fi
 
@@ -77,15 +102,18 @@ select_terminal_interactive() {
     local terminal
     if ! terminal=$(echo "$result" | jq -r '.terminal' 2>/dev/null); then
       error "Failed to parse selected terminal"
+      rm -f "$_tui_stderr"
       return 1
     fi
 
     if [[ -z "$terminal" || "$terminal" == "null" ]]; then
       error "TUI returned empty terminal selection"
+      rm -f "$_tui_stderr"
       return 1
     fi
 
     _selected_terminal="$terminal"
+    rm -f "$_tui_stderr"
     return 0
   done
 }

@@ -99,7 +99,7 @@ run_terminal_setup() {
     success "Terminal configured: $(get_terminal_display_name "$selected_terminal")"
     info "Open a new $(get_terminal_display_name "$selected_terminal") window to start coding."
   else
-    info "Terminal selection cancelled"
+    warn "Terminal setup did not complete. Run 'ghost-tab --terminal' to try again."
     exit 1
   fi
 }
@@ -203,7 +203,7 @@ if select_terminal_interactive; then
   echo ""
   success "Selected terminal: $(get_terminal_display_name "$SELECTED_TERMINAL")"
 else
-  info "Terminal selection cancelled"
+  warn "Terminal setup did not complete. Run 'ghost-tab --terminal' to try again."
   exit 1
 fi
 

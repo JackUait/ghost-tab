@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/jackuait/ghost-tab/internal/models"
@@ -34,7 +35,10 @@ func runSelectTerminal(cmd *cobra.Command, args []string) error {
 
 	ttyOpts, cleanup, err := util.TUITeaOptions()
 	if err != nil {
-		return fmt.Errorf("failed to run TUI: %w", err)
+		// Can't open TTY — output cancellation JSON so bash always gets parseable output.
+		fmt.Fprintf(os.Stderr, "failed to open terminal: %v\n", err)
+		fmt.Println(`{"selected":false}`)
+		return nil
 	}
 	defer cleanup()
 
@@ -43,16 +47,24 @@ func runSelectTerminal(cmd *cobra.Command, args []string) error {
 
 	finalModel, runErr := p.Run()
 
-	m := finalModel.(tui.TerminalSelectorModel)
+	// Safe type assertion — if model type is unexpected, output cancellation JSON.
+	m, ok := finalModel.(tui.TerminalSelectorModel)
+	if !ok {
+		if runErr != nil {
+			fmt.Fprintf(os.Stderr, "TUI error: %v\n", runErr)
+		}
+		fmt.Println(`{"selected":false}`)
+		return nil
+	}
+
 	selected := m.Selected()
 	installReq := m.InstallRequest()
 	installReqCask := m.InstallRequestCask()
 
-	// If the TUI errored but the user completed an action (install/select),
-	// output the result anyway — bubbletea may error during cleanup even
-	// after a successful interaction.
+	// If the TUI errored and the user didn't complete any action,
+	// report error to stderr but still output JSON for bash to parse.
 	if runErr != nil && installReq == "" && selected == nil {
-		return fmt.Errorf("failed to run TUI: %w", runErr)
+		fmt.Fprintf(os.Stderr, "TUI error: %v\n", runErr)
 	}
 
 	var result map[string]interface{}
