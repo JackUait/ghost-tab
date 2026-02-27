@@ -41,6 +41,7 @@ func TestRootCmd_SubcommandRegistered(t *testing.T) {
 		"select-ai-tool",
 		"add-project",
 		"settings-menu",
+		"config-menu",
 		"main-menu",
 		"multi-select-ai-tool",
 		"select-branch",
@@ -219,6 +220,29 @@ func TestSettingsMenuCmd_Exists(t *testing.T) {
 	}
 	if cmd.Name() != "settings-menu" {
 		t.Errorf("Expected 'settings-menu', got %q", cmd.Name())
+	}
+}
+
+func TestConfigMenuCmd_Exists(t *testing.T) {
+	cmd, _, err := rootCmd.Find([]string{"config-menu"})
+	if err != nil {
+		t.Fatalf("Failed to find config-menu: %v", err)
+	}
+	if cmd.Name() != "config-menu" {
+		t.Errorf("Expected 'config-menu', got %q", cmd.Name())
+	}
+}
+
+func TestConfigMenuCmd_Metadata(t *testing.T) {
+	cmd, _, err := rootCmd.Find([]string{"config-menu"})
+	if err != nil {
+		t.Fatalf("Failed to find config-menu: %v", err)
+	}
+	if cmd.Short != "Interactive configuration menu" {
+		t.Errorf("Expected Short %q, got %q", "Interactive configuration menu", cmd.Short)
+	}
+	if cmd.Long != "Shows configuration options and returns selected action as JSON" {
+		t.Errorf("Expected Long %q, got %q", "Shows configuration options and returns selected action as JSON", cmd.Long)
 	}
 }
 
