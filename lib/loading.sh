@@ -122,6 +122,12 @@ show_loading_screen() {
   # Clear screen, hide cursor (instant dark feedback)
   printf '\033[2J\033[H\033[?25l'
 
+  # Render first frame synchronously so the user always sees loading art,
+  # even if stop_loading_screen is called before the background loop starts.
+  local _init_rows _init_cols
+  read -r _init_rows _init_cols <<< "$(_detect_term_size)"
+  render_loading_frame "$tool" 0 "$_init_cols" "$_init_rows"
+
   # Symbols for floating particles
   local symbols=('·' '•' '°' '∘' '⋅' '∙')
 
@@ -132,7 +138,7 @@ show_loading_screen() {
     # Brief delay so terminal reports its final size after window opens
     sleep 0.1
 
-    local frame=0
+    local frame=1
     local rows cols
     local -a prev_sym_positions=()
     local prev_rows=0 prev_cols=0

@@ -184,3 +184,22 @@ func TestLoading_render_loading_frame_shifts_colors_between_frames(t *testing.T)
 		t.Error("expected different output for different frames")
 	}
 }
+
+// --- show_loading_screen / stop_loading_screen ---
+
+func TestLoading_show_loading_screen_renders_first_frame_before_background_loop(t *testing.T) {
+	root := projectRoot(t)
+	// Call show then immediately stop — no sleep in between.
+	// The first frame must be rendered synchronously so the user always
+	// sees the loading art, even when stop comes within the 100ms
+	// background-process startup delay.
+	script := fmt.Sprintf(`
+		source %q/lib/loading.sh
+		show_loading_screen claude
+		stop_loading_screen
+	`, root)
+	out, code := runBashSnippet(t, script, nil)
+	assertExitCode(t, code, 0)
+	// Should contain rendered art content even with immediate stop
+	assertContains(t, out, "d8888b")
+}
