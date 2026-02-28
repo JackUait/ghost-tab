@@ -74,7 +74,7 @@ func TestIterm2Adapter_setup_config_creates_json_file(t *testing.T) {
 	wrapperPath := "/path/to/wrapper.sh"
 
 	binDir, _ := mockDefaultsCommand(t, tmpDir, "mock-guid")
-	env := buildEnv(t, []string{binDir})
+	env := buildEnv(t, []string{binDir}, "HOME="+tmpDir)
 
 	snippet := iterm2AdapterSnippet(t,
 		fmt.Sprintf(`terminal_setup_config %q %q`, profilePath, wrapperPath))
@@ -92,7 +92,7 @@ func TestIterm2Adapter_setup_config_json_has_correct_profile(t *testing.T) {
 	wrapperPath := "/test/wrapper.sh"
 
 	binDir, _ := mockDefaultsCommand(t, tmpDir, "mock-guid")
-	env := buildEnv(t, []string{binDir})
+	env := buildEnv(t, []string{binDir}, "HOME="+tmpDir)
 
 	snippet := iterm2AdapterSnippet(t,
 		fmt.Sprintf(`terminal_setup_config %q %q`, profilePath, wrapperPath))
@@ -138,7 +138,7 @@ func TestIterm2Adapter_setup_config_overwrites_existing(t *testing.T) {
 	wrapperPath := "/new/wrapper.sh"
 
 	binDir, _ := mockDefaultsCommand(t, tmpDir, "mock-guid")
-	env := buildEnv(t, []string{binDir})
+	env := buildEnv(t, []string{binDir}, "HOME="+tmpDir)
 
 	snippet := iterm2AdapterSnippet(t,
 		fmt.Sprintf(`terminal_setup_config %q %q`, profilePath, wrapperPath))
@@ -165,14 +165,15 @@ func TestIterm2Adapter_setup_config_saves_previous_default_guid(t *testing.T) {
 	wrapperPath := "/path/to/wrapper.sh"
 
 	binDir, _ := mockDefaultsCommand(t, tmpDir, "previous-guid-ABC")
-	env := buildEnv(t, []string{binDir})
+	env := buildEnv(t, []string{binDir}, "HOME="+tmpDir)
 
 	snippet := iterm2AdapterSnippet(t,
 		fmt.Sprintf(`terminal_setup_config %q %q`, profilePath, wrapperPath))
 	_, code := runBashSnippet(t, snippet, env)
 	assertExitCode(t, code, 0)
 
-	savedGuidPath := filepath.Join(tmpDir, "DynamicProfiles", "ghost-tab-previous-guid")
+	// Saved GUID must be in config dir, NOT in DynamicProfiles dir
+	savedGuidPath := filepath.Join(tmpDir, ".config", "ghost-tab", "iterm2-previous-guid")
 	data, err := os.ReadFile(savedGuidPath)
 	if err != nil {
 		t.Fatalf("expected saved GUID file at %s: %v", savedGuidPath, err)
@@ -188,7 +189,7 @@ func TestIterm2Adapter_setup_config_sets_ghost_tab_as_default(t *testing.T) {
 	wrapperPath := "/path/to/wrapper.sh"
 
 	binDir, logFile := mockDefaultsCommand(t, tmpDir, "some-guid")
-	env := buildEnv(t, []string{binDir})
+	env := buildEnv(t, []string{binDir}, "HOME="+tmpDir)
 
 	snippet := iterm2AdapterSnippet(t,
 		fmt.Sprintf(`terminal_setup_config %q %q`, profilePath, wrapperPath))
@@ -202,13 +203,40 @@ func TestIterm2Adapter_setup_config_sets_ghost_tab_as_default(t *testing.T) {
 	assertContains(t, string(calls), "write com.googlecode.iterm2 Default Bookmark Guid -string ghost-tab-profile")
 }
 
+// Regression: iTerm2 scans ALL files in DynamicProfiles/ as JSON.
+// The saved GUID file must NOT be in that directory.
+func TestIterm2Adapter_setup_config_no_extra_files_in_profiles_dir(t *testing.T) {
+	tmpDir := t.TempDir()
+	profileDir := filepath.Join(tmpDir, "DynamicProfiles")
+	profilePath := filepath.Join(profileDir, "ghost-tab.json")
+	wrapperPath := "/path/to/wrapper.sh"
+
+	binDir, _ := mockDefaultsCommand(t, tmpDir, "some-guid")
+	env := buildEnv(t, []string{binDir}, "HOME="+tmpDir)
+
+	snippet := iterm2AdapterSnippet(t,
+		fmt.Sprintf(`terminal_setup_config %q %q`, profilePath, wrapperPath))
+	_, code := runBashSnippet(t, snippet, env)
+	assertExitCode(t, code, 0)
+
+	entries, err := os.ReadDir(profileDir)
+	if err != nil {
+		t.Fatalf("failed to read profiles dir: %v", err)
+	}
+	for _, entry := range entries {
+		if entry.Name() != "ghost-tab.json" {
+			t.Errorf("unexpected file in DynamicProfiles dir: %s (iTerm2 will try to parse it as JSON)", entry.Name())
+		}
+	}
+}
+
 func TestIterm2Adapter_cleanup_config_removes_json(t *testing.T) {
 	tmpDir := t.TempDir()
 	profilePath := filepath.Join(tmpDir, "ghost-tab.json")
 	os.WriteFile(profilePath, []byte(`{"Profiles":[]}`), 0644)
 
 	binDir, _ := mockDefaultsCommand(t, tmpDir, "")
-	env := buildEnv(t, []string{binDir})
+	env := buildEnv(t, []string{binDir}, "HOME="+tmpDir)
 
 	snippet := iterm2AdapterSnippet(t,
 		fmt.Sprintf(`terminal_cleanup_config %q`, profilePath))
@@ -226,7 +254,7 @@ func TestIterm2Adapter_cleanup_config_noop_if_missing(t *testing.T) {
 	profilePath := filepath.Join(tmpDir, "nonexistent.json")
 
 	binDir, _ := mockDefaultsCommand(t, tmpDir, "")
-	env := buildEnv(t, []string{binDir})
+	env := buildEnv(t, []string{binDir}, "HOME="+tmpDir)
 
 	snippet := iterm2AdapterSnippet(t,
 		fmt.Sprintf(`terminal_cleanup_config %q`, profilePath))
@@ -239,12 +267,14 @@ func TestIterm2Adapter_cleanup_config_restores_previous_default(t *testing.T) {
 	profilePath := filepath.Join(tmpDir, "ghost-tab.json")
 	os.WriteFile(profilePath, []byte(`{"Profiles":[]}`), 0644)
 
-	// Create saved GUID file (as terminal_setup_config would)
-	savedGuidPath := filepath.Join(tmpDir, "ghost-tab-previous-guid")
+	// Create saved GUID file in config dir (as terminal_setup_config would)
+	configDir := filepath.Join(tmpDir, ".config", "ghost-tab")
+	os.MkdirAll(configDir, 0755)
+	savedGuidPath := filepath.Join(configDir, "iterm2-previous-guid")
 	os.WriteFile(savedGuidPath, []byte("original-guid-XYZ"), 0644)
 
 	binDir, logFile := mockDefaultsCommand(t, tmpDir, "")
-	env := buildEnv(t, []string{binDir})
+	env := buildEnv(t, []string{binDir}, "HOME="+tmpDir)
 
 	snippet := iterm2AdapterSnippet(t,
 		fmt.Sprintf(`terminal_cleanup_config %q`, profilePath))

@@ -38,7 +38,8 @@ EOF
 
   # Save current default profile GUID and set Ghost Tab as default
   local saved_guid_path
-  saved_guid_path="$(dirname "$profile_path")/ghost-tab-previous-guid"
+  saved_guid_path="$HOME/.config/ghost-tab/iterm2-previous-guid"
+  mkdir -p "$(dirname "$saved_guid_path")"
   if defaults read com.googlecode.iterm2 "Default Bookmark Guid" > "$saved_guid_path" 2>/dev/null; then
     defaults write com.googlecode.iterm2 "Default Bookmark Guid" -string "ghost-tab-profile"
     success "Set Ghost Tab as default iTerm2 profile"
@@ -61,7 +62,7 @@ terminal_cleanup_config() {
 
   # Restore previous default profile
   local saved_guid_path
-  saved_guid_path="$(dirname "$profile_path")/ghost-tab-previous-guid"
+  saved_guid_path="$HOME/.config/ghost-tab/iterm2-previous-guid"
   if [ -f "$saved_guid_path" ]; then
     local previous_guid
     previous_guid="$(cat "$saved_guid_path")"
