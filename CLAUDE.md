@@ -206,7 +206,7 @@ All reusable functionality lives in `lib/` as sourced shell scripts:
 - **terminals/ghostty.sh**: Ghostty terminal adapter
 - **terminals/kitty.sh**: kitty terminal adapter
 - **terminals/wezterm.sh**: WezTerm terminal adapter
-- **terminals/iterm2.sh**: iTerm2 terminal adapter (PlistBuddy)
+- **terminals/iterm2.sh**: iTerm2 terminal adapter (Dynamic Profiles)
 - **tmux-session.sh**: tmux session creation and pane setup
 - **process.sh**: Process tree management and cleanup
 - **statusline.sh**: Status line generation logic

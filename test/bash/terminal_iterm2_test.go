@@ -19,6 +19,19 @@ func iterm2AdapterSnippet(t *testing.T, body string) string {
 		tuiPath, installPath, adapterPath, body)
 }
 
+// mockDefaultsCommand creates a mock 'defaults' command that logs all calls
+// and returns readOutput for 'read' operations.
+func mockDefaultsCommand(t *testing.T, dir string, readOutput string) (string, string) {
+	t.Helper()
+	logFile := filepath.Join(dir, "defaults-calls.log")
+	body := fmt.Sprintf(`echo "$@" >> %q
+if [ "$1" = "read" ]; then
+    echo %q
+fi`, logFile, readOutput)
+	binDir := mockCommand(t, dir, "defaults", body)
+	return binDir, logFile
+}
+
 func TestIterm2Adapter_get_config_path_returns_dynamic_profile(t *testing.T) {
 	snippet := iterm2AdapterSnippet(t, `terminal_get_config_path`)
 	out, code := runBashSnippet(t, snippet, nil)
@@ -60,9 +73,12 @@ func TestIterm2Adapter_setup_config_creates_json_file(t *testing.T) {
 	profilePath := filepath.Join(tmpDir, "DynamicProfiles", "ghost-tab.json")
 	wrapperPath := "/path/to/wrapper.sh"
 
+	binDir, _ := mockDefaultsCommand(t, tmpDir, "mock-guid")
+	env := buildEnv(t, []string{binDir})
+
 	snippet := iterm2AdapterSnippet(t,
 		fmt.Sprintf(`terminal_setup_config %q %q`, profilePath, wrapperPath))
-	_, code := runBashSnippet(t, snippet, nil)
+	_, code := runBashSnippet(t, snippet, env)
 	assertExitCode(t, code, 0)
 
 	if _, err := os.Stat(profilePath); os.IsNotExist(err) {
@@ -75,9 +91,12 @@ func TestIterm2Adapter_setup_config_json_has_correct_profile(t *testing.T) {
 	profilePath := filepath.Join(tmpDir, "DynamicProfiles", "ghost-tab.json")
 	wrapperPath := "/test/wrapper.sh"
 
+	binDir, _ := mockDefaultsCommand(t, tmpDir, "mock-guid")
+	env := buildEnv(t, []string{binDir})
+
 	snippet := iterm2AdapterSnippet(t,
 		fmt.Sprintf(`terminal_setup_config %q %q`, profilePath, wrapperPath))
-	_, code := runBashSnippet(t, snippet, nil)
+	_, code := runBashSnippet(t, snippet, env)
 	assertExitCode(t, code, 0)
 
 	data, err := os.ReadFile(profilePath)
@@ -117,9 +136,13 @@ func TestIterm2Adapter_setup_config_overwrites_existing(t *testing.T) {
 	os.WriteFile(profilePath, []byte(`{"Profiles":[{"Name":"Old"}]}`), 0644)
 
 	wrapperPath := "/new/wrapper.sh"
+
+	binDir, _ := mockDefaultsCommand(t, tmpDir, "mock-guid")
+	env := buildEnv(t, []string{binDir})
+
 	snippet := iterm2AdapterSnippet(t,
 		fmt.Sprintf(`terminal_setup_config %q %q`, profilePath, wrapperPath))
-	_, code := runBashSnippet(t, snippet, nil)
+	_, code := runBashSnippet(t, snippet, env)
 	assertExitCode(t, code, 0)
 
 	data, err := os.ReadFile(profilePath)
@@ -136,14 +159,60 @@ func TestIterm2Adapter_setup_config_overwrites_existing(t *testing.T) {
 	}
 }
 
+func TestIterm2Adapter_setup_config_saves_previous_default_guid(t *testing.T) {
+	tmpDir := t.TempDir()
+	profilePath := filepath.Join(tmpDir, "DynamicProfiles", "ghost-tab.json")
+	wrapperPath := "/path/to/wrapper.sh"
+
+	binDir, _ := mockDefaultsCommand(t, tmpDir, "previous-guid-ABC")
+	env := buildEnv(t, []string{binDir})
+
+	snippet := iterm2AdapterSnippet(t,
+		fmt.Sprintf(`terminal_setup_config %q %q`, profilePath, wrapperPath))
+	_, code := runBashSnippet(t, snippet, env)
+	assertExitCode(t, code, 0)
+
+	savedGuidPath := filepath.Join(tmpDir, "DynamicProfiles", "ghost-tab-previous-guid")
+	data, err := os.ReadFile(savedGuidPath)
+	if err != nil {
+		t.Fatalf("expected saved GUID file at %s: %v", savedGuidPath, err)
+	}
+	if strings.TrimSpace(string(data)) != "previous-guid-ABC" {
+		t.Errorf("saved GUID = %q, want %q", strings.TrimSpace(string(data)), "previous-guid-ABC")
+	}
+}
+
+func TestIterm2Adapter_setup_config_sets_ghost_tab_as_default(t *testing.T) {
+	tmpDir := t.TempDir()
+	profilePath := filepath.Join(tmpDir, "DynamicProfiles", "ghost-tab.json")
+	wrapperPath := "/path/to/wrapper.sh"
+
+	binDir, logFile := mockDefaultsCommand(t, tmpDir, "some-guid")
+	env := buildEnv(t, []string{binDir})
+
+	snippet := iterm2AdapterSnippet(t,
+		fmt.Sprintf(`terminal_setup_config %q %q`, profilePath, wrapperPath))
+	_, code := runBashSnippet(t, snippet, env)
+	assertExitCode(t, code, 0)
+
+	calls, err := os.ReadFile(logFile)
+	if err != nil {
+		t.Fatalf("failed to read defaults log: %v", err)
+	}
+	assertContains(t, string(calls), "write com.googlecode.iterm2 Default Bookmark Guid -string ghost-tab-profile")
+}
+
 func TestIterm2Adapter_cleanup_config_removes_json(t *testing.T) {
 	tmpDir := t.TempDir()
 	profilePath := filepath.Join(tmpDir, "ghost-tab.json")
 	os.WriteFile(profilePath, []byte(`{"Profiles":[]}`), 0644)
 
+	binDir, _ := mockDefaultsCommand(t, tmpDir, "")
+	env := buildEnv(t, []string{binDir})
+
 	snippet := iterm2AdapterSnippet(t,
 		fmt.Sprintf(`terminal_cleanup_config %q`, profilePath))
-	out, code := runBashSnippet(t, snippet, nil)
+	out, code := runBashSnippet(t, snippet, env)
 	assertExitCode(t, code, 0)
 	assertContains(t, out, "Removed Ghost Tab profile")
 
@@ -156,8 +225,42 @@ func TestIterm2Adapter_cleanup_config_noop_if_missing(t *testing.T) {
 	tmpDir := t.TempDir()
 	profilePath := filepath.Join(tmpDir, "nonexistent.json")
 
+	binDir, _ := mockDefaultsCommand(t, tmpDir, "")
+	env := buildEnv(t, []string{binDir})
+
 	snippet := iterm2AdapterSnippet(t,
 		fmt.Sprintf(`terminal_cleanup_config %q`, profilePath))
-	_, code := runBashSnippet(t, snippet, nil)
+	_, code := runBashSnippet(t, snippet, env)
 	assertExitCode(t, code, 0)
+}
+
+func TestIterm2Adapter_cleanup_config_restores_previous_default(t *testing.T) {
+	tmpDir := t.TempDir()
+	profilePath := filepath.Join(tmpDir, "ghost-tab.json")
+	os.WriteFile(profilePath, []byte(`{"Profiles":[]}`), 0644)
+
+	// Create saved GUID file (as terminal_setup_config would)
+	savedGuidPath := filepath.Join(tmpDir, "ghost-tab-previous-guid")
+	os.WriteFile(savedGuidPath, []byte("original-guid-XYZ"), 0644)
+
+	binDir, logFile := mockDefaultsCommand(t, tmpDir, "")
+	env := buildEnv(t, []string{binDir})
+
+	snippet := iterm2AdapterSnippet(t,
+		fmt.Sprintf(`terminal_cleanup_config %q`, profilePath))
+	out, code := runBashSnippet(t, snippet, env)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "Removed Ghost Tab profile")
+
+	// Verify defaults write was called to restore GUID
+	calls, err := os.ReadFile(logFile)
+	if err != nil {
+		t.Fatalf("failed to read defaults log: %v", err)
+	}
+	assertContains(t, string(calls), "write com.googlecode.iterm2 Default Bookmark Guid -string original-guid-XYZ")
+
+	// Verify saved GUID file was removed
+	if _, err := os.Stat(savedGuidPath); !os.IsNotExist(err) {
+		t.Error("expected saved GUID file to be removed")
+	}
 }
