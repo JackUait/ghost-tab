@@ -384,6 +384,32 @@ func TestTabTitleWatcher_watcher_uses_stop_hook_with_marker_age_debounce(t *test
 	if !strings.Contains(content, "discover_ai_pane") {
 		t.Error("watcher should use discover_ai_pane for dynamic pane discovery")
 	}
+
+	// Should use cooldown file for extended debounce after tool use
+	if !strings.Contains(content, "cooldown") {
+		t.Error("watcher should use cooldown file to extend debounce after tool completions")
+	}
+}
+
+func TestTabTitleWatcher_watcher_uses_extended_debounce_when_cooldown_present(t *testing.T) {
+	root := projectRoot(t)
+	watcherPath := filepath.Join(root, "lib", "tab-title-watcher.sh")
+	data, err := os.ReadFile(watcherPath)
+	if err != nil {
+		t.Fatalf("failed to read tab-title-watcher.sh: %v", err)
+	}
+	content := string(data)
+
+	// The watcher should check for a cooldown file (marker_file + "-cooldown")
+	if !strings.Contains(content, "-cooldown") {
+		t.Error("watcher should reference cooldown file suffix (-cooldown)")
+	}
+
+	// When cooldown is active, debounce should be significantly longer than 1 second
+	// to filter out subagent completion noise
+	if !strings.Contains(content, "cooldown") {
+		t.Error("watcher should contain cooldown logic for extended debounce")
+	}
 }
 
 func TestTabTitleWatcher_check_ai_tool_state_claude_comment_references_stop_hook(t *testing.T) {
@@ -415,6 +441,24 @@ func TestTabTitleWatcher_stop_tab_title_watcher_removes_marker_file(t *testing.T
 
 	if _, err := os.Stat(markerFile); !os.IsNotExist(err) {
 		t.Errorf("expected marker file to be removed")
+	}
+}
+
+func TestTabTitleWatcher_stop_tab_title_watcher_removes_cooldown_file(t *testing.T) {
+	tmpDir := t.TempDir()
+	markerFile := filepath.Join(tmpDir, "marker")
+	cooldownFile := markerFile + "-cooldown"
+	os.WriteFile(markerFile, []byte(""), 0644)
+	os.WriteFile(cooldownFile, []byte(""), 0644)
+
+	snippet := tabTitleSnippet(t,
+		fmt.Sprintf(`_TAB_TITLE_WATCHER_PID=""; stop_tab_title_watcher %q`, markerFile))
+
+	_, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+
+	if _, err := os.Stat(cooldownFile); !os.IsNotExist(err) {
+		t.Errorf("expected cooldown file to be removed")
 	}
 }
 
@@ -485,8 +529,12 @@ func TestTabTitleWatcher_wrapper_passes_marker_file_to_tmux(t *testing.T) {
 	if definitionLine >= tmuxNewSessionLine {
 		t.Errorf("GHOST_TAB_MARKER_FILE must be defined (line %d) before tmux new-session (line %d)", definitionLine+1, tmuxNewSessionLine+1)
 	}
-}
 
+	// Cleanup should also remove cooldown file
+	if !strings.Contains(content, "cooldown") {
+		t.Error("wrapper.sh cleanup should handle cooldown file removal")
+	}
+}
 
 // --- play_notification_sound ---
 

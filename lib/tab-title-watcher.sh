@@ -76,12 +76,24 @@ start_tab_title_watcher() {
       state=$(check_ai_tool_state "$ai_tool" "$session_name" "$tmux_cmd" "$marker_file" "$ai_pane")
 
       if [ "$state" = "waiting" ] && [ "$was_waiting" = false ]; then
-        # Debounce: only notify if marker has existed for >= 1 second.
-        # Subagent completions create/remove markers within milliseconds,
-        # so they never reach the 1s threshold.
-        local age
+        # Debounce: only notify if marker has existed long enough.
+        # After tool completions (subagent results, file writes, etc.),
+        # Claude thinks for 2-15+ seconds before acting. A PostToolUse
+        # hook creates a cooldown file to signal this window. When the
+        # cooldown file exists and is < 30s old, we use a longer 15s
+        # debounce to avoid false notifications. Otherwise, use the
+        # normal 1s debounce for genuine idle detection.
+        local age debounce_threshold=1
         age=$(marker_age "$marker_file") || continue
-        if [ "$age" -ge 1 ]; then
+        local cooldown_file="${marker_file}-cooldown"
+        if [ -f "$cooldown_file" ]; then
+          local cooldown_age
+          cooldown_age=$(marker_age "$cooldown_file") || true
+          if [ -n "$cooldown_age" ] && [ "$cooldown_age" -lt 30 ]; then
+            debounce_threshold=15
+          fi
+        fi
+        if [ "$age" -ge "$debounce_threshold" ]; then
           if [ "$tab_title_setting" = "full" ]; then
             set_tab_title_waiting "$project_name" "$ai_tool"
           else
@@ -114,5 +126,6 @@ stop_tab_title_watcher() {
   fi
   if [ -n "$marker_file" ]; then
     rm -f "$marker_file"
+    rm -f "${marker_file}-cooldown"
   fi
 }

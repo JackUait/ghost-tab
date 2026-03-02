@@ -49,6 +49,7 @@ hooks = settings.setdefault("hooks", {})
 
 stop_cmd = 'if [ -n "$GHOST_TAB_MARKER_FILE" ]; then touch "$GHOST_TAB_MARKER_FILE"; fi'
 clear_cmd = 'if [ -n "$GHOST_TAB_MARKER_FILE" ]; then rm -f "$GHOST_TAB_MARKER_FILE"; fi'
+cooldown_cmd = 'if [ -n "$GHOST_TAB_MARKER_FILE" ]; then touch "${GHOST_TAB_MARKER_FILE}-cooldown"; fi'
 
 marker = "GHOST_TAB_MARKER_FILE"
 
@@ -76,13 +77,22 @@ old_stop_needs_upgrade = stop_exists and not any(
     if any(marker in h.get("command", "") for h in entry.get("hooks", []))
 )
 
-if stop_exists and not old_stop_needs_upgrade:
-    # Current Stop format already installed
+# Check if PostToolUse cooldown hook exists (needs upgrade if missing)
+post_list = hooks.get("PostToolUse", [])
+cooldown_exists = any(
+    "cooldown" in h.get("command", "")
+    for entry in post_list
+    for h in entry.get("hooks", [])
+)
+needs_cooldown_upgrade = stop_exists and not old_stop_needs_upgrade and not cooldown_exists
+
+if stop_exists and not old_stop_needs_upgrade and not needs_cooldown_upgrade:
+    # Current format already installed (including PostToolUse cooldown)
     print("exists")
     sys.exit(0)
-elif notif_exists or old_stop_needs_upgrade:
+elif notif_exists or old_stop_needs_upgrade or needs_cooldown_upgrade:
     # Old format — remove ghost-tab hooks so they get re-added below
-    for event in ["Stop", "Notification", "PreToolUse", "UserPromptSubmit"]:
+    for event in ["Stop", "Notification", "PreToolUse", "PostToolUse", "UserPromptSubmit"]:
         event_list = hooks.get(event, [])
         new_list = [
             entry for entry in event_list
@@ -110,6 +120,11 @@ hooks.setdefault("PreToolUse", []).append({
 # Add PreToolUse catch-all hook (clears marker — Claude is actively working)
 hooks.setdefault("PreToolUse", []).append({
     "hooks": [{"type": "command", "command": clear_cmd}]
+})
+
+# Add PostToolUse catch-all hook (creates cooldown — suppresses subagent noise)
+hooks.setdefault("PostToolUse", []).append({
+    "hooks": [{"type": "command", "command": cooldown_cmd}]
 })
 
 # Add UserPromptSubmit hook (clears marker when user answers)
@@ -149,7 +164,7 @@ except (json.JSONDecodeError, ValueError, FileNotFoundError):
 hooks = settings.get("hooks", {})
 found = False
 
-for event in ["Stop", "Notification", "PreToolUse", "UserPromptSubmit"]:
+for event in ["Stop", "Notification", "PreToolUse", "PostToolUse", "UserPromptSubmit"]:
     event_list = hooks.get(event, [])
     new_list = [
         entry for entry in event_list

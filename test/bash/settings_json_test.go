@@ -63,7 +63,7 @@ func TestSettingsJson_merge_claude_settings_adds_status_line_to_existing(t *test
 
 // --- add_waiting_indicator_hooks ---
 
-func TestSettingsJson_add_waiting_indicator_hooks_creates_file_with_Stop_PreToolUse_and_UserPromptSubmit(t *testing.T) {
+func TestSettingsJson_add_waiting_indicator_hooks_creates_file_with_Stop_PreToolUse_PostToolUse_and_UserPromptSubmit(t *testing.T) {
 	tmpDir := t.TempDir()
 	settingsFile := filepath.Join(tmpDir, "settings.json")
 
@@ -81,9 +81,12 @@ func TestSettingsJson_add_waiting_indicator_hooks_creates_file_with_Stop_PreTool
 	content := string(data)
 	assertContains(t, content, `"Stop"`)
 	assertContains(t, content, `"PreToolUse"`)
+	assertContains(t, content, `"PostToolUse"`)
 	assertContains(t, content, `"UserPromptSubmit"`)
 	assertContains(t, content, "GHOST_TAB_MARKER_FILE")
 	assertContains(t, content, `"AskUserQuestion"`)
+	// PostToolUse hook should touch cooldown file
+	assertContains(t, content, "cooldown")
 	// Must NOT have Notification hook (replaced by Stop)
 	assertNotContains(t, content, `"Notification"`)
 }
@@ -126,7 +129,48 @@ func TestSettingsJson_add_waiting_indicator_hooks_adds_to_existing_settings(t *t
 
 func TestSettingsJson_add_waiting_indicator_hooks_reports_exists_when_duplicate(t *testing.T) {
 	tmpDir := t.TempDir()
-	// Current Stop format hooks already installed
+	// Current format hooks already installed (including PostToolUse cooldown)
+	settingsFile := writeTempFile(t, tmpDir, "settings.json", `{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then touch \"$GHOST_TAB_MARKER_FILE\"; fi"}]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "AskUserQuestion",
+        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then touch \"$GHOST_TAB_MARKER_FILE\"; fi"}]
+      },
+      {
+        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then rm -f \"$GHOST_TAB_MARKER_FILE\"; fi"}]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then touch \"${GHOST_TAB_MARKER_FILE}-cooldown\"; fi"}]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then rm -f \"$GHOST_TAB_MARKER_FILE\"; fi"}]
+      }
+    ]
+  }
+}
+`)
+
+	snippet := settingsJsonSnippet(t,
+		fmt.Sprintf(`add_waiting_indicator_hooks %q`, settingsFile))
+
+	out, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+	assertContains(t, strings.TrimSpace(out), "exists")
+}
+
+func TestSettingsJson_add_waiting_indicator_hooks_upgrades_format_without_PostToolUse(t *testing.T) {
+	tmpDir := t.TempDir()
+	// Old format: has Stop + PreToolUse with AskUserQuestion but NO PostToolUse cooldown hook
 	settingsFile := writeTempFile(t, tmpDir, "settings.json", `{
   "hooks": {
     "Stop": [
@@ -157,7 +201,21 @@ func TestSettingsJson_add_waiting_indicator_hooks_reports_exists_when_duplicate(
 
 	out, code := runBashSnippet(t, snippet, nil)
 	assertExitCode(t, code, 0)
-	assertContains(t, strings.TrimSpace(out), "exists")
+	assertContains(t, out, "upgraded")
+
+	data, err := os.ReadFile(settingsFile)
+	if err != nil {
+		t.Fatalf("failed to read settings.json: %v", err)
+	}
+	content := string(data)
+	// Should now include PostToolUse hook with cooldown
+	assertContains(t, content, `"PostToolUse"`)
+	assertContains(t, content, "cooldown")
+	// Should still have all other hooks
+	assertContains(t, content, `"Stop"`)
+	assertContains(t, content, `"PreToolUse"`)
+	assertContains(t, content, `"AskUserQuestion"`)
+	assertContains(t, content, `"UserPromptSubmit"`)
 }
 
 func TestSettingsJson_add_waiting_indicator_hooks_upgrades_notification_format_to_stop(t *testing.T) {
@@ -413,7 +471,7 @@ func TestSettingsJson_hook_commands_exit_zero_when_marker_env_var_set(t *testing
 
 func TestSettingsJson_remove_waiting_indicator_hooks_removes_old_stop_hooks(t *testing.T) {
 	tmpDir := t.TempDir()
-	// Old format with Stop hooks
+	// Full format with all hooks including PostToolUse
 	settingsFile := writeTempFile(t, tmpDir, "settings.json", `{
   "hooks": {
     "Stop": [
@@ -424,6 +482,11 @@ func TestSettingsJson_remove_waiting_indicator_hooks_removes_old_stop_hooks(t *t
     "PreToolUse": [
       {
         "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then rm -f \"$GHOST_TAB_MARKER_FILE\"; fi"}]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then touch \"${GHOST_TAB_MARKER_FILE}-cooldown\"; fi"}]
       }
     ],
     "UserPromptSubmit": [
@@ -652,6 +715,60 @@ func TestSettingsJson_PreToolUse_hook_clears_marker_for_other_tools(t *testing.T
 
 	if _, err := os.Stat(markerFile); !os.IsNotExist(err) {
 		t.Error("marker file should have been removed by catch-all PreToolUse, but it still exists")
+	}
+}
+
+func TestSettingsJson_PostToolUse_hook_creates_cooldown_file(t *testing.T) {
+	tmpDir := t.TempDir()
+	settingsFile := filepath.Join(tmpDir, "settings.json")
+
+	// Generate hooks
+	snippet := settingsJsonSnippet(t,
+		fmt.Sprintf(`add_waiting_indicator_hooks %q`, settingsFile))
+	_, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+
+	// Parse to find the PostToolUse hook
+	data, err := os.ReadFile(settingsFile)
+	if err != nil {
+		t.Fatalf("failed to read settings.json: %v", err)
+	}
+
+	type hookEntry struct {
+		Type    string `json:"type"`
+		Command string `json:"command"`
+	}
+	type hookGroup struct {
+		Hooks []hookEntry `json:"hooks"`
+	}
+	var settings struct {
+		Hooks map[string][]hookGroup `json:"hooks"`
+	}
+	if err := json.Unmarshal(data, &settings); err != nil {
+		t.Fatalf("failed to parse settings.json: %v", err)
+	}
+
+	var postToolCmd string
+	for _, group := range settings.Hooks["PostToolUse"] {
+		for _, h := range group.Hooks {
+			if strings.Contains(h.Command, "GHOST_TAB_MARKER_FILE") {
+				postToolCmd = h.Command
+			}
+		}
+	}
+	if postToolCmd == "" {
+		t.Fatal("no GHOST_TAB_MARKER_FILE PostToolUse hook found")
+	}
+
+	// The PostToolUse hook should create a cooldown file (marker-cooldown)
+	markerFile := filepath.Join(tmpDir, "test-marker")
+	bashScript := fmt.Sprintf(`export GHOST_TAB_MARKER_FILE=%q; %s`, markerFile, postToolCmd)
+	_, exitCode := runBashSnippet(t, bashScript, nil)
+	assertExitCode(t, exitCode, 0)
+
+	cooldownFile := markerFile + "-cooldown"
+	if _, err := os.Stat(cooldownFile); os.IsNotExist(err) {
+		t.Error("cooldown file should exist after PostToolUse hook, but it does not")
 	}
 }
 

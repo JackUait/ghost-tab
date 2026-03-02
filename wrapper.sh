@@ -175,12 +175,14 @@ cleanup() {
   stop_tab_title_watcher "$GHOST_TAB_MARKER_FILE"
   # Remove waiting indicator hooks if no other Ghost Tab sessions are running
   if [ "$SELECTED_AI_TOOL" = "claude" ]; then
-    # Clean up orphaned markers from dead sessions (e.g., after SIGKILL)
+    # Clean up orphaned markers and cooldown files from dead sessions (e.g., after SIGKILL)
     for marker in /tmp/ghost-tab-waiting-*; do
       [ -f "$marker" ] || continue
+      # Skip cooldown files — they'll be cleaned with their parent marker
+      [[ "$marker" == *-cooldown ]] && continue
       local pid="${marker##*-}"
       if ! kill -0 "$pid" 2>/dev/null; then
-        rm -f "$marker"
+        rm -f "$marker" "${marker}-cooldown"
       fi
     done
     if ! ls /tmp/ghost-tab-waiting-* &>/dev/null; then
