@@ -48,7 +48,8 @@ else:
 hooks = settings.setdefault("hooks", {})
 
 stop_cmd = 'if [ -n "$GHOST_TAB_MARKER_FILE" ]; then touch "$GHOST_TAB_MARKER_FILE"; fi'
-clear_cmd = 'if [ -n "$GHOST_TAB_MARKER_FILE" ]; then rm -f "$GHOST_TAB_MARKER_FILE"; fi'
+ask_cmd = 'if [ -n "$GHOST_TAB_MARKER_FILE" ]; then touch "$GHOST_TAB_MARKER_FILE" "${GHOST_TAB_MARKER_FILE}-ask"; fi'
+clear_cmd = 'if [ -n "$GHOST_TAB_MARKER_FILE" ]; then rm -f "$GHOST_TAB_MARKER_FILE" "${GHOST_TAB_MARKER_FILE}-ask"; fi'
 cooldown_cmd = 'if [ -n "$GHOST_TAB_MARKER_FILE" ]; then touch "${GHOST_TAB_MARKER_FILE}-cooldown"; fi'
 
 marker = "GHOST_TAB_MARKER_FILE"
@@ -92,11 +93,17 @@ catchall_needs_fix = stop_exists and not old_stop_needs_upgrade and not needs_co
     for entry in pre_list
 )
 
-if stop_exists and not old_stop_needs_upgrade and not needs_cooldown_upgrade and not catchall_needs_fix:
+# Check if AskUserQuestion hook is missing the -ask sidecar (needs upgrade)
+ask_needs_sidecar = stop_exists and not old_stop_needs_upgrade and not needs_cooldown_upgrade and not catchall_needs_fix and any(
+    entry.get("matcher") == "AskUserQuestion" and not any("-ask" in h.get("command", "") for h in entry.get("hooks", []))
+    for entry in pre_list
+)
+
+if stop_exists and not old_stop_needs_upgrade and not needs_cooldown_upgrade and not catchall_needs_fix and not ask_needs_sidecar:
     # Current format already installed (including PostToolUse cooldown)
     print("exists")
     sys.exit(0)
-elif notif_exists or old_stop_needs_upgrade or needs_cooldown_upgrade or catchall_needs_fix:
+elif notif_exists or old_stop_needs_upgrade or needs_cooldown_upgrade or catchall_needs_fix or ask_needs_sidecar:
     # Old format — remove ghost-tab hooks so they get re-added below
     for event in ["Stop", "Notification", "PreToolUse", "PostToolUse", "UserPromptSubmit"]:
         event_list = hooks.get(event, [])
@@ -117,10 +124,10 @@ hooks.setdefault("Stop", []).append({
     "hooks": [{"type": "command", "command": stop_cmd}]
 })
 
-# Add PreToolUse hook with matcher for AskUserQuestion (creates marker — user input needed)
+# Add PreToolUse hook with matcher for AskUserQuestion (creates marker + -ask sidecar)
 hooks.setdefault("PreToolUse", []).append({
     "matcher": "AskUserQuestion",
-    "hooks": [{"type": "command", "command": stop_cmd}]
+    "hooks": [{"type": "command", "command": ask_cmd}]
 })
 
 # Add PreToolUse catch-all hook (clears marker — Claude is actively working)

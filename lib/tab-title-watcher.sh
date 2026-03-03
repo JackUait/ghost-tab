@@ -85,12 +85,19 @@ start_tab_title_watcher() {
         # normal 1s debounce for genuine idle detection.
         local age debounce_threshold=1
         age=$(marker_age "$marker_file") || continue
-        local cooldown_file="${marker_file}-cooldown"
-        if [ -f "$cooldown_file" ]; then
-          local cooldown_age
-          cooldown_age=$(marker_age "$cooldown_file") || true
-          if [ -n "$cooldown_age" ] && [ "$cooldown_age" -lt 30 ]; then
-            debounce_threshold=15
+        local ask_file="${marker_file}-ask"
+        if [ -f "$ask_file" ]; then
+          # AskUserQuestion detected — definitive user-input-needed signal.
+          # Use short debounce regardless of cooldown.
+          debounce_threshold=1
+        else
+          local cooldown_file="${marker_file}-cooldown"
+          if [ -f "$cooldown_file" ]; then
+            local cooldown_age
+            cooldown_age=$(marker_age "$cooldown_file") || true
+            if [ -n "$cooldown_age" ] && [ "$cooldown_age" -lt 30 ]; then
+              debounce_threshold=15
+            fi
           fi
         fi
         if [ "$age" -ge "$debounce_threshold" ]; then
@@ -127,5 +134,6 @@ stop_tab_title_watcher() {
   if [ -n "$marker_file" ]; then
     rm -f "$marker_file"
     rm -f "${marker_file}-cooldown"
+    rm -f "${marker_file}-ask"
   fi
 }

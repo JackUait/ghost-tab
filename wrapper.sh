@@ -180,9 +180,10 @@ cleanup() {
       [ -f "$marker" ] || continue
       # Skip cooldown files — they'll be cleaned with their parent marker
       [[ "$marker" == *-cooldown ]] && continue
+      [[ "$marker" == *-ask ]] && continue
       local pid="${marker##*-}"
       if ! kill -0 "$pid" 2>/dev/null; then
-        rm -f "$marker" "${marker}-cooldown"
+        rm -f "$marker" "${marker}-cooldown" "${marker}-ask"
       fi
     done
     if ! ls /tmp/ghost-tab-waiting-* &>/dev/null; then
