@@ -756,3 +756,38 @@ func TestTabTitleWatcher_hook_commands_manage_marker_file_correctly(t *testing.T
 	_, code = runBashSnippet(t, noopCmd, nil)
 	assertExitCode(t, code, 0)
 }
+
+// --- ask sidecar file tests ---
+
+func TestTabTitleWatcher_watcher_source_contains_ask_sidecar_bypass(t *testing.T) {
+	root := projectRoot(t)
+	watcherPath := filepath.Join(root, "lib", "tab-title-watcher.sh")
+	data, err := os.ReadFile(watcherPath)
+	if err != nil {
+		t.Fatalf("failed to read tab-title-watcher.sh: %v", err)
+	}
+	content := string(data)
+
+	// The watcher should check for an -ask sidecar file
+	if !strings.Contains(content, "-ask") {
+		t.Error("watcher should reference -ask sidecar file suffix")
+	}
+}
+
+func TestTabTitleWatcher_stop_tab_title_watcher_removes_ask_sidecar(t *testing.T) {
+	tmpDir := t.TempDir()
+	markerFile := filepath.Join(tmpDir, "marker")
+	askFile := markerFile + "-ask"
+	os.WriteFile(markerFile, []byte(""), 0644)
+	os.WriteFile(askFile, []byte(""), 0644)
+
+	snippet := tabTitleSnippet(t,
+		fmt.Sprintf(`_TAB_TITLE_WATCHER_PID=""; stop_tab_title_watcher %q`, markerFile))
+
+	_, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+
+	if _, err := os.Stat(askFile); !os.IsNotExist(err) {
+		t.Errorf("expected -ask sidecar file to be removed")
+	}
+}

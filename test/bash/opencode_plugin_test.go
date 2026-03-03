@@ -129,13 +129,11 @@ func TestOpencodePlugin_exports_GhostTab(t *testing.T) {
 
 // --- Debounce threshold is reasonable ---
 
-func TestOpencodePlugin_debounce_threshold_is_at_least_10_seconds(t *testing.T) {
+func TestOpencodePlugin_long_debounce_threshold_is_at_least_10_seconds(t *testing.T) {
 	content := readPluginTemplate(t)
 
-	// The debounce should be long enough to filter out subagent processing windows.
-	// Subagent results cause 2-15+ seconds of thinking. A 10+ second debounce
-	// covers the documented gap range and aligns with Claude Code's cooldown.
-	// Check for a numeric constant >= 10000 (milliseconds)
+	// The LONG debounce (after tool use) should be >= 10 seconds to filter
+	// out subagent processing windows.
 	hasReasonableDebounce := false
 	for _, threshold := range []string{"10000", "15000", "20000", "30000"} {
 		if strings.Contains(content, threshold) {
@@ -157,5 +155,62 @@ func TestOpencodePlugin_kill_spinner_on_busy_is_immediate(t *testing.T) {
 	// because we want the tab title to reset immediately when the AI starts working
 	if !strings.Contains(content, "killSpinner") {
 		t.Error("plugin should contain killSpinner function")
+	}
+}
+
+// --- Dual-threshold debounce: tool.execute.after hook ---
+
+func TestOpencodePlugin_has_tool_execute_after_hook(t *testing.T) {
+	content := readPluginTemplate(t)
+
+	if !strings.Contains(content, "tool.execute.after") {
+		t.Error("plugin should have a tool.execute.after hook to track tool completions for cooldown")
+	}
+}
+
+func TestOpencodePlugin_tracks_last_tool_complete_time(t *testing.T) {
+	content := readPluginTemplate(t)
+
+	// Plugin should track when the last tool completed to implement dual-threshold debounce
+	if !strings.Contains(content, "lastToolComplete") {
+		t.Error("plugin should track last tool completion time (lastToolCompleteTime or similar)")
+	}
+}
+
+func TestOpencodePlugin_uses_dual_threshold_debounce(t *testing.T) {
+	content := readPluginTemplate(t)
+
+	// Plugin should have a short debounce for normal idle (no recent tool activity)
+	// and a long debounce after tool use
+	hasShortDebounce := false
+	for _, threshold := range []string{"1000", "2000", "3000"} {
+		if strings.Contains(content, threshold) {
+			hasShortDebounce = true
+			break
+		}
+	}
+	if !hasShortDebounce {
+		t.Error("plugin should have a short debounce threshold (1-3 seconds) for idle without recent tool activity")
+	}
+
+	hasLongDebounce := false
+	for _, threshold := range []string{"15000", "20000", "30000"} {
+		if strings.Contains(content, threshold) {
+			hasLongDebounce = true
+			break
+		}
+	}
+	if !hasLongDebounce {
+		t.Error("plugin should have a long debounce threshold (15+ seconds) for idle after tool use")
+	}
+}
+
+func TestOpencodePlugin_has_cooldown_window(t *testing.T) {
+	content := readPluginTemplate(t)
+
+	// Plugin should have a cooldown window to determine when tool activity is "recent"
+	// (mirrors Claude Code's 30-second cooldown window in tab-title-watcher.sh)
+	if !strings.Contains(content, "30000") && !strings.Contains(content, "COOLDOWN") {
+		t.Error("plugin should have a cooldown window constant (e.g., 30000ms or COOLDOWN_WINDOW_MS)")
 	}
 }
