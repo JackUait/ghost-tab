@@ -3,7 +3,9 @@ import { readFileSync, unlinkSync, existsSync } from "fs"
 import { join } from "path"
 import { tmpdir, homedir } from "os"
 
-const DEBOUNCE_MS = 15000
+const SHORT_DEBOUNCE_MS = 2000
+const LONG_DEBOUNCE_MS = 15000
+const COOLDOWN_WINDOW_MS = 30000
 
 const configPath = join(
   process.env.XDG_CONFIG_HOME || join(homedir(), ".config"),
@@ -59,9 +61,13 @@ function startSpinner(): void {
   proc.unref()
 }
 
+// Track last tool completion for cooldown-based debounce.
+// When a tool completed recently (within COOLDOWN_WINDOW_MS), use the long
+// debounce to filter out subagent processing gaps. Otherwise, use the short
+// debounce for fast genuine-idle notification.
+let lastToolCompleteTime = 0
+
 // Debounce timer: delays sound and spinner until the AI is genuinely idle.
-// Subagent completions cause brief idle events (gaps can be 15+ seconds of thinking
-// before the next action), so we wait DEBOUNCE_MS before notifying.
 let idleTimer: ReturnType<typeof setTimeout> | null = null
 
 function cancelIdleTimer(): void {
@@ -69,6 +75,12 @@ function cancelIdleTimer(): void {
     clearTimeout(idleTimer)
     idleTimer = null
   }
+}
+
+function getDebounceMs(): number {
+  return (Date.now() - lastToolCompleteTime < COOLDOWN_WINDOW_MS)
+    ? LONG_DEBOUNCE_MS
+    : SHORT_DEBOUNCE_MS
 }
 
 function onIdle(): void {
@@ -84,11 +96,15 @@ function onIdle(): void {
 
 export const GhostTab = async () => {
   return {
+    "tool.execute.after": async () => {
+      lastToolCompleteTime = Date.now()
+    },
     event: async ({ event }: { event: { type: string; properties?: any } }) => {
       if (event.type === "session.idle") {
-        // Don't fire immediately — debounce to filter out subagent completions.
+        // Debounce with cooldown-aware threshold: short when no recent tool
+        // activity, long after tool use to filter subagent processing gaps.
         cancelIdleTimer()
-        idleTimer = setTimeout(onIdle, DEBOUNCE_MS)
+        idleTimer = setTimeout(onIdle, getDebounceMs())
       }
       if (event.type === "session.status") {
         const status = event.properties?.status
