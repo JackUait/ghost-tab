@@ -22,13 +22,23 @@ function getProject(): string {
     const session = execSync("tmux display-message -p '#S'", {
       stdio: ["pipe", "pipe", "ignore"],
     }).toString().trim()
-    if (session) return session
+    if (session) {
+      // wrapper.sh names sessions "dev-<project>-<PID>"; extract just the project name.
+      const match = session.match(/^dev-(.+)-\d+$/)
+      if (match) return match[1]
+      return session
+    }
   } catch {}
   return process.cwd().split("/").pop() || "opencode"
 }
 
 function getPidFile(): string {
   return join(tmpdir(), `ghost-tab-spinner-${getProject()}.pid`)
+}
+
+function resetTabTitle(): void {
+  const project = getProject()
+  process.stdout.write(`\x1b]0;${project}\x07`)
 }
 
 function killSpinner(): void {
@@ -39,8 +49,7 @@ function killSpinner(): void {
       process.kill(pid)
     } catch {}
     try { unlinkSync(pf) } catch {}
-    const project = getProject()
-    process.stdout.write(`\x1b]0;${project}\x07`)
+    resetTabTitle()
   }
 }
 
@@ -84,6 +93,10 @@ function getDebounceMs(): number {
 }
 
 function onIdle(): void {
+  // Show ● dot indicator in tab title (like Claude Code's waiting indicator)
+  const project = getProject()
+  process.stdout.write(`\x1b]0;● ${project}\x07`)
+
   if (features.sound) {
     spawn("afplay", ["/System/Library/Sounds/Bottle.aiff"], { stdio: "ignore" })
   }
@@ -114,6 +127,8 @@ export const GhostTab = async () => {
           if (features.spinner) {
             killSpinner()
           }
+          // Clear ● dot indicator from tab title
+          resetTabTitle()
         }
       }
     },

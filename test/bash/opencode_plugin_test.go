@@ -214,3 +214,103 @@ func TestOpencodePlugin_has_cooldown_window(t *testing.T) {
 		t.Error("plugin should have a cooldown window constant (e.g., 30000ms or COOLDOWN_WINDOW_MS)")
 	}
 }
+
+// --- getProject: extracts clean project name from tmux session name ---
+
+func TestOpencodePlugin_getProject_strips_session_name_prefix_and_pid(t *testing.T) {
+	content := readPluginTemplate(t)
+
+	// wrapper.sh creates tmux sessions named "dev-<project>-<pid>".
+	// getProject() must extract just "<project>" from this session name,
+	// not return the raw "dev-<project>-<pid>" string.
+	// It should contain a regex or string manipulation to strip the prefix and PID suffix.
+	if !strings.Contains(content, `dev-`) || !strings.Contains(content, `\d+`) {
+		// Must have logic to parse the "dev-...-PID" format
+		t.Error("getProject should parse tmux session name format 'dev-<project>-<PID>' to extract project name")
+	}
+}
+
+// --- Dot indicator: ● prefix in tab title when waiting (like Claude Code) ---
+
+func TestOpencodePlugin_sets_dot_indicator_on_idle(t *testing.T) {
+	content := readPluginTemplate(t)
+
+	// The onIdle function should set the tab title with ● prefix via
+	// process.stdout.write, matching Claude Code's waiting indicator.
+	// This must happen regardless of the spinner feature flag.
+	// Check for ● inside a stdout.write call (not just a comment)
+	if !strings.Contains(content, "● ") {
+		t.Error("plugin should set tab title with ● dot prefix when idle (like Claude Code)")
+	}
+
+	// The ● must appear inside a process.stdout.write call within onIdle,
+	// not just as a comment
+	lines := strings.Split(content, "\n")
+	inOnIdle := false
+	hasDotWriteInOnIdle := false
+	braceDepth := 0
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.Contains(trimmed, "function onIdle") {
+			inOnIdle = true
+			braceDepth = 0
+		}
+		if inOnIdle {
+			braceDepth += strings.Count(trimmed, "{") - strings.Count(trimmed, "}")
+			// Must be an actual write call containing ●, not a comment
+			if strings.Contains(trimmed, "●") && strings.Contains(trimmed, "write") && !strings.HasPrefix(trimmed, "//") {
+				hasDotWriteInOnIdle = true
+				break
+			}
+			if braceDepth <= 0 && inOnIdle && strings.Contains(trimmed, "}") {
+				break
+			}
+		}
+	}
+	if !hasDotWriteInOnIdle {
+		t.Error("● dot indicator must be set via process.stdout.write inside onIdle (not just a comment)")
+	}
+}
+
+func TestOpencodePlugin_clears_dot_indicator_on_busy(t *testing.T) {
+	content := readPluginTemplate(t)
+
+	// When session becomes busy, the tab title must be reset to the plain
+	// project name (no ● prefix). This ensures the dot is cleared even
+	// when the spinner feature is disabled.
+	lines := strings.Split(content, "\n")
+	inBusyBlock := false
+	resetsTitle := false
+	braceDepth := 0
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.Contains(trimmed, `"busy"`) || strings.Contains(trimmed, `'busy'`) {
+			inBusyBlock = true
+			braceDepth = 1 // We're inside the if-block
+		}
+		if inBusyBlock {
+			braceDepth += strings.Count(trimmed, "{") - strings.Count(trimmed, "}")
+			// Should reset tab title via OSC escape sequence or a resetTabTitle helper
+			if strings.Contains(trimmed, "resetTabTitle") && !strings.HasPrefix(trimmed, "//") {
+				resetsTitle = true
+				break
+			}
+			// Stop scanning when we exit the busy block
+			if braceDepth <= 0 {
+				break
+			}
+		}
+	}
+	if !resetsTitle {
+		t.Error("busy handler should call resetTabTitle() to clear ● dot from tab title")
+	}
+}
+
+func TestOpencodePlugin_defines_resetTabTitle_function(t *testing.T) {
+	content := readPluginTemplate(t)
+
+	// resetTabTitle must be a real function definition, not just referenced
+	if !strings.Contains(content, "function resetTabTitle") {
+		t.Error("plugin should define a resetTabTitle function to clear tab title indicators")
+	}
+}
