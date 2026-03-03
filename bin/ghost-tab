@@ -333,6 +333,21 @@ if [ "$SELECTED_AI_TOOL" = "codex" ]; then
   fi
 fi
 
+# OpenCode plugin (install/upgrade for idle notification debounce)
+if [ "$SELECTED_AI_TOOL" = "opencode" ]; then
+  header "Setting up OpenCode plugin..."
+  _oc_plugin_dir="${XDG_CONFIG_HOME:-$HOME/.config}/opencode/plugins"
+  _oc_plugin_src="$SHARE_DIR/templates/opencode-plugin.ts"
+  _oc_plugin_dst="$_oc_plugin_dir/ghost-tab.ts"
+  if [ -f "$_oc_plugin_src" ]; then
+    mkdir -p "$_oc_plugin_dir"
+    cp "$_oc_plugin_src" "$_oc_plugin_dst"
+    success "OpenCode plugin installed at $_oc_plugin_dst"
+  else
+    warn "OpenCode plugin template not found at $_oc_plugin_src"
+  fi
+fi
+
 # ---------- Summary ----------
 header "Setup complete!"
 echo ""
