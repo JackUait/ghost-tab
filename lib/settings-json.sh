@@ -86,11 +86,17 @@ cooldown_exists = any(
 )
 needs_cooldown_upgrade = stop_exists and not old_stop_needs_upgrade and not cooldown_exists
 
-if stop_exists and not old_stop_needs_upgrade and not needs_cooldown_upgrade:
+# Check if catch-all PreToolUse has no matcher (needs upgrade to add negative lookahead)
+catchall_needs_fix = stop_exists and not old_stop_needs_upgrade and not needs_cooldown_upgrade and any(
+    not entry.get("matcher") and any("rm" in h.get("command", "") and marker in h.get("command", "") for h in entry.get("hooks", []))
+    for entry in pre_list
+)
+
+if stop_exists and not old_stop_needs_upgrade and not needs_cooldown_upgrade and not catchall_needs_fix:
     # Current format already installed (including PostToolUse cooldown)
     print("exists")
     sys.exit(0)
-elif notif_exists or old_stop_needs_upgrade or needs_cooldown_upgrade:
+elif notif_exists or old_stop_needs_upgrade or needs_cooldown_upgrade or catchall_needs_fix:
     # Old format — remove ghost-tab hooks so they get re-added below
     for event in ["Stop", "Notification", "PreToolUse", "PostToolUse", "UserPromptSubmit"]:
         event_list = hooks.get(event, [])
@@ -119,6 +125,7 @@ hooks.setdefault("PreToolUse", []).append({
 
 # Add PreToolUse catch-all hook (clears marker — Claude is actively working)
 hooks.setdefault("PreToolUse", []).append({
+    "matcher": "^(?!AskUserQuestion$)",
     "hooks": [{"type": "command", "command": clear_cmd}]
 })
 

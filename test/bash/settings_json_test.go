@@ -129,7 +129,7 @@ func TestSettingsJson_add_waiting_indicator_hooks_adds_to_existing_settings(t *t
 
 func TestSettingsJson_add_waiting_indicator_hooks_reports_exists_when_duplicate(t *testing.T) {
 	tmpDir := t.TempDir()
-	// Current format hooks already installed (including PostToolUse cooldown)
+	// Current format hooks already installed (including PostToolUse cooldown + catch-all matcher)
 	settingsFile := writeTempFile(t, tmpDir, "settings.json", `{
   "hooks": {
     "Stop": [
@@ -143,6 +143,7 @@ func TestSettingsJson_add_waiting_indicator_hooks_reports_exists_when_duplicate(
         "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then touch \"$GHOST_TAB_MARKER_FILE\"; fi"}]
       },
       {
+        "matcher": "^(?!AskUserQuestion$)",
         "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then rm -f \"$GHOST_TAB_MARKER_FILE\"; fi"}]
       }
     ],
@@ -260,6 +261,9 @@ func TestSettingsJson_add_waiting_indicator_hooks_upgrades_notification_format_t
 	// PreToolUse should use matcher instead of stdin reading
 	assertContains(t, content, `"AskUserQuestion"`)
 	assertNotContains(t, content, "$(cat)")
+	// Should include PostToolUse cooldown hook
+	assertContains(t, content, `"PostToolUse"`)
+	assertContains(t, content, "cooldown")
 }
 
 func TestSettingsJson_add_waiting_indicator_hooks_upgrades_v3_stop_ask_format_to_current(t *testing.T) {
@@ -305,6 +309,83 @@ func TestSettingsJson_add_waiting_indicator_hooks_upgrades_v3_stop_ask_format_to
 	// Should use matcher instead of stdin reading
 	assertContains(t, content, `"AskUserQuestion"`)
 	assertNotContains(t, content, "$(cat)")
+	// Should include PostToolUse cooldown hook
+	assertContains(t, content, `"PostToolUse"`)
+	assertContains(t, content, "cooldown")
+}
+
+func TestSettingsJson_add_waiting_indicator_hooks_catchall_PreToolUse_has_negative_lookahead_matcher(t *testing.T) {
+	tmpDir := t.TempDir()
+	settingsFile := filepath.Join(tmpDir, "settings.json")
+
+	snippet := settingsJsonSnippet(t,
+		fmt.Sprintf(`add_waiting_indicator_hooks %q`, settingsFile))
+
+	_, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+
+	data, err := os.ReadFile(settingsFile)
+	if err != nil {
+		t.Fatalf("settings.json should have been created: %v", err)
+	}
+	content := string(data)
+	// Catch-all PreToolUse must have a matcher that excludes AskUserQuestion
+	assertContains(t, content, `"matcher": "^(?!AskUserQuestion$)"`)
+}
+
+func TestSettingsJson_add_waiting_indicator_hooks_upgrades_catchall_without_matcher(t *testing.T) {
+	tmpDir := t.TempDir()
+	// Old format: has Stop + PreToolUse with AskUserQuestion + catch-all WITHOUT matcher + PostToolUse cooldown
+	// This is the pre-fix format that needs upgrading to add the negative lookahead
+	settingsFile := writeTempFile(t, tmpDir, "settings.json", `{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then touch \"$GHOST_TAB_MARKER_FILE\"; fi"}]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "AskUserQuestion",
+        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then touch \"$GHOST_TAB_MARKER_FILE\"; fi"}]
+      },
+      {
+        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then rm -f \"$GHOST_TAB_MARKER_FILE\"; fi"}]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then touch \"${GHOST_TAB_MARKER_FILE}-cooldown\"; fi"}]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then rm -f \"$GHOST_TAB_MARKER_FILE\"; fi"}]
+      }
+    ]
+  }
+}
+`)
+
+	snippet := settingsJsonSnippet(t,
+		fmt.Sprintf(`add_waiting_indicator_hooks %q`, settingsFile))
+
+	out, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "upgraded")
+
+	data, err := os.ReadFile(settingsFile)
+	if err != nil {
+		t.Fatalf("failed to read settings.json: %v", err)
+	}
+	content := string(data)
+	// After upgrade, catch-all should now have the negative lookahead matcher
+	assertContains(t, content, `"matcher": "^(?!AskUserQuestion$)"`)
+	// Should still have all hooks
+	assertContains(t, content, `"Stop"`)
+	assertContains(t, content, `"PreToolUse"`)
+	assertContains(t, content, `"PostToolUse"`)
+	assertContains(t, content, `"UserPromptSubmit"`)
 }
 
 // --- add_waiting_indicator_hooks: safe exit code format ---
@@ -599,6 +680,61 @@ func TestSettingsJson_remove_waiting_indicator_hooks_returns_not_found_when_abse
 	assertContains(t, strings.TrimSpace(out), "not_found")
 }
 
+// --- Stop hook behavior ---
+
+func TestSettingsJson_Stop_hook_creates_marker_file(t *testing.T) {
+	tmpDir := t.TempDir()
+	settingsFile := filepath.Join(tmpDir, "settings.json")
+
+	// Generate hooks
+	snippet := settingsJsonSnippet(t,
+		fmt.Sprintf(`add_waiting_indicator_hooks %q`, settingsFile))
+	_, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+
+	// Parse to find the Stop hook command
+	data, err := os.ReadFile(settingsFile)
+	if err != nil {
+		t.Fatalf("failed to read settings.json: %v", err)
+	}
+
+	type hookEntry struct {
+		Type    string `json:"type"`
+		Command string `json:"command"`
+	}
+	type hookGroup struct {
+		Hooks []hookEntry `json:"hooks"`
+	}
+	var settings struct {
+		Hooks map[string][]hookGroup `json:"hooks"`
+	}
+	if err := json.Unmarshal(data, &settings); err != nil {
+		t.Fatalf("failed to parse settings.json: %v", err)
+	}
+
+	var stopCmd string
+	for _, group := range settings.Hooks["Stop"] {
+		for _, h := range group.Hooks {
+			if strings.Contains(h.Command, "GHOST_TAB_MARKER_FILE") {
+				stopCmd = h.Command
+			}
+		}
+	}
+	if stopCmd == "" {
+		t.Fatal("no GHOST_TAB_MARKER_FILE Stop hook found")
+	}
+
+	// The Stop hook should touch (create) the marker file
+	markerFile := filepath.Join(tmpDir, "test-marker")
+	bashScript := fmt.Sprintf(`export GHOST_TAB_MARKER_FILE=%q; %s`, markerFile, stopCmd)
+	_, exitCode := runBashSnippet(t, bashScript, nil)
+	assertExitCode(t, exitCode, 0)
+
+	if _, err := os.Stat(markerFile); os.IsNotExist(err) {
+		t.Error("marker file should exist after Stop hook, but it does not")
+	}
+}
+
 // --- PreToolUse hook behavior ---
 
 func TestSettingsJson_PreToolUse_hook_creates_marker_for_AskUserQuestion(t *testing.T) {
@@ -689,10 +825,10 @@ func TestSettingsJson_PreToolUse_hook_clears_marker_for_other_tools(t *testing.T
 		t.Fatalf("failed to parse settings.json: %v", err)
 	}
 
-	// Find the catch-all PreToolUse hook (no matcher, has rm -f)
+	// Find the catch-all PreToolUse hook (negative lookahead matcher, has rm -f)
 	var clearCmd string
 	for _, group := range settings.Hooks["PreToolUse"] {
-		if group.Matcher == "" {
+		if group.Matcher != "" && group.Matcher != "AskUserQuestion" {
 			for _, h := range group.Hooks {
 				if strings.Contains(h.Command, "GHOST_TAB_MARKER_FILE") {
 					clearCmd = h.Command
@@ -701,7 +837,7 @@ func TestSettingsJson_PreToolUse_hook_clears_marker_for_other_tools(t *testing.T
 		}
 	}
 	if clearCmd == "" {
-		t.Fatal("no catch-all PreToolUse hook found (no matcher)")
+		t.Fatal("no catch-all PreToolUse hook found (with negative lookahead matcher)")
 	}
 
 	// Create marker, then run the catch-all hook — marker should be REMOVED
