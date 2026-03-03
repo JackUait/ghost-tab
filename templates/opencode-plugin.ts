@@ -3,7 +3,7 @@ import { readFileSync, unlinkSync, existsSync } from "fs"
 import { join } from "path"
 import { tmpdir, homedir } from "os"
 
-const DEBOUNCE_MS = 10000
+const DEBOUNCE_MS = 15000
 
 const configPath = join(
   process.env.XDG_CONFIG_HOME || join(homedir(), ".config"),
@@ -60,7 +60,7 @@ function startSpinner(): void {
 }
 
 // Debounce timer: delays sound and spinner until the AI is genuinely idle.
-// Subagent completions cause brief idle events (2-15+ seconds of thinking
+// Subagent completions cause brief idle events (gaps can be 15+ seconds of thinking
 // before the next action), so we wait DEBOUNCE_MS before notifying.
 let idleTimer: ReturnType<typeof setTimeout> | null = null
 

@@ -129,22 +129,22 @@ func TestOpencodePlugin_exports_GhostTab(t *testing.T) {
 
 // --- Debounce threshold is reasonable ---
 
-func TestOpencodePlugin_debounce_threshold_is_at_least_5_seconds(t *testing.T) {
+func TestOpencodePlugin_debounce_threshold_is_at_least_10_seconds(t *testing.T) {
 	content := readPluginTemplate(t)
 
 	// The debounce should be long enough to filter out subagent processing windows.
-	// Subagent results cause 2-15+ seconds of thinking. A 5+ second debounce
-	// should catch most false idle events.
-	// Check for a numeric constant >= 5000 (milliseconds)
+	// Subagent results cause 2-15+ seconds of thinking. A 10+ second debounce
+	// covers the documented gap range and aligns with Claude Code's cooldown.
+	// Check for a numeric constant >= 10000 (milliseconds)
 	hasReasonableDebounce := false
-	for _, threshold := range []string{"5000", "6000", "7000", "8000", "9000", "10000", "15000", "20000", "30000"} {
+	for _, threshold := range []string{"10000", "15000", "20000", "30000"} {
 		if strings.Contains(content, threshold) {
 			hasReasonableDebounce = true
 			break
 		}
 	}
 	if !hasReasonableDebounce {
-		t.Error("plugin should have a debounce threshold of at least 5000ms (5 seconds)")
+		t.Error("plugin should have a debounce threshold of at least 10000ms (10 seconds)")
 	}
 }
 
