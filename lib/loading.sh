@@ -60,8 +60,8 @@ render_loading_frame() {
   done
 
   # Center position
-  local start_row=$(( (rows - art_height) / 2 ))
-  local start_col=$(( (cols - art_width) / 2 ))
+  local start_row=$(( (rows - art_height) / 2 + 1 ))
+  local start_col=$(( (cols - art_width) / 2 + 1 ))
   if (( start_row < 1 )); then start_row=1; fi
   if (( start_col < 1 )); then start_col=1; fi
 

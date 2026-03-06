@@ -114,10 +114,11 @@ func TestLoading_render_loading_frame_centers_art_on_large_terminal(t *testing.T
 		root)
 	out, code := runBashSnippet(t, script, nil)
 	assertExitCode(t, code, 0)
-	// Art is 12 lines tall, 88 chars wide
-	// Center: row=(50-12)/2=19, col=(200-88)/2=56
-	// First line cursor position should be \033[19;56H
-	assertContains(t, out, "\033[19;56H")
+	// Art is 12 lines tall, 88 chars wide.
+	// Terminal coordinates are 1-based, so centering needs +1:
+	//   row = (50-12)/2 + 1 = 20   (19 rows above, 19 below)
+	//   col = (200-88)/2 + 1 = 57  (56 cols left, 56 right)
+	assertContains(t, out, "\033[20;57H")
 }
 
 // --- get_tool_palette ---
