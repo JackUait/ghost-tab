@@ -1,5 +1,8 @@
 docs/plans/
 
+# macOS Finder metadata
+.DS_Store
+
 # Go artifacts
 bin/ghost-tab-tui
 *.test
