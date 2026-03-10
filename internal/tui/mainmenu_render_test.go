@@ -657,12 +657,12 @@ func TestInputBox_UsesRoundedCorners(t *testing.T) {
 func TestDeleteBox_UsesRoundedCorners(t *testing.T) {
 	m := newTestMenu()
 	m.deleteMode = true
-	box := m.renderDeleteBox()
+	box := m.renderMenuBox()
 	raw := stripAnsi(box)
 	lines := strings.Split(raw, "\n")
 
 	if len(lines) < 2 {
-		t.Fatal("renderDeleteBox produced fewer than 2 lines")
+		t.Fatal("renderMenuBox (delete mode) produced fewer than 2 lines")
 	}
 	topLine := lines[0]
 	bottomLine := lines[len(lines)-1]
