@@ -2932,6 +2932,64 @@ func TestMainMenu_View_DeleteMode_NoRedBackground(t *testing.T) {
 	}
 }
 
+func TestMainMenu_View_DeleteMode_ShowsAITool(t *testing.T) {
+	prev := lipgloss.ColorProfile()
+	lipgloss.SetColorProfile(termenv.Ascii)
+	defer lipgloss.SetColorProfile(prev)
+
+	m := tui.NewMainMenu(testProjects(), testAITools(), "claude", "animated")
+	newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	mm := newModel.(*tui.MainMenuModel)
+
+	view := mm.View()
+
+	// The AI tool name should appear in delete mode (from the title row chooser)
+	// testAITools() includes "claude" → displayed as "Claude Code"
+	if !strings.Contains(view, "Claude") {
+		t.Error("Delete mode view should show AI tool name in title row")
+	}
+}
+
+func TestMainMenu_View_DeleteMode_ShowsActionItems(t *testing.T) {
+	prev := lipgloss.ColorProfile()
+	lipgloss.SetColorProfile(termenv.Ascii)
+	defer lipgloss.SetColorProfile(prev)
+
+	m := tui.NewMainMenu(testProjects(), testAITools(), "claude", "animated")
+	newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	mm := newModel.(*tui.MainMenuModel)
+
+	view := mm.View()
+
+	// Action items should be visible
+	if !strings.Contains(view, "Add new project") {
+		t.Error("Delete mode view should show 'Add new project' action item")
+	}
+	if !strings.Contains(view, "Delete a project") {
+		t.Error("Delete mode view should show 'Delete a project' action item")
+	}
+}
+
+func TestMainMenu_View_DeleteMode_NoActionItemSelected(t *testing.T) {
+	prev := lipgloss.ColorProfile()
+	lipgloss.SetColorProfile(termenv.Ascii)
+	defer lipgloss.SetColorProfile(prev)
+
+	projects := testProjects() // 3 projects
+	m := tui.NewMainMenu(projects, testAITools(), "claude", "animated")
+	// Enter delete mode
+	newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	mm := newModel.(*tui.MainMenuModel)
+
+	view := mm.View()
+
+	// Count occurrences of ▎ — only one should appear (the delete-selected project)
+	count := strings.Count(view, "▎")
+	if count != 1 {
+		t.Errorf("Delete mode view should have exactly 1 ▎ marker (delete-selected project), got %d", count)
+	}
+}
+
 func TestMainMenu_View_FeedbackMessage(t *testing.T) {
 	lipgloss.SetColorProfile(termenv.Ascii)
 	dir := t.TempDir()
