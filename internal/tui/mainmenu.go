@@ -1832,7 +1832,7 @@ func (m *MainMenuModel) renderMenuBox() string {
 					marker := primaryBoldStyle.Render("\u258e")
 					connStyled := primaryBoldStyle.Render(connector)
 					branchText := primaryBoldStyle.Render(branchDisplay)
-					content := "  " + marker + "    " + connStyled + " " + branchText
+					content := "     " + marker + " " + connStyled + " " + branchText
 					padding := menuContentWidth - lipgloss.Width(content)
 					if padding < 0 {
 						padding = 0
@@ -1875,7 +1875,7 @@ func (m *MainMenuModel) renderMenuBox() string {
 				marker := primaryBoldStyle.Render("\u258e")
 				connStyled := primaryBoldStyle.Render(addConnector)
 				addLabel := primaryBoldStyle.Render("+ Add worktree")
-				content := "  " + marker + "    " + connStyled + " " + addLabel
+				content := "     " + marker + " " + connStyled + " " + addLabel
 				padding := menuContentWidth - lipgloss.Width(content)
 				if padding < 0 {
 					padding = 0
