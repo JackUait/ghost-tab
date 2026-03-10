@@ -23,6 +23,42 @@ type bobTickMsg struct{}
 // sleepTickMsg is sent on each sleep timer tick.
 type sleepTickMsg struct{}
 
+// worktreeDoneMsg is sent after a worktree creation attempt completes.
+type worktreeDoneMsg struct {
+	path string
+	err  error
+}
+
+// computeWorktreePath returns the destination path for a new worktree.
+// It mirrors the bash compute_worktree_path function in lib/menu-tui.sh.
+// branch is sanitised: "origin/" prefix stripped, "/" replaced with "-".
+func computeWorktreePath(projectPath, projectName, branch, settingsFile string) string {
+	// Strip origin/ prefix
+	if strings.HasPrefix(branch, "origin/") {
+		branch = branch[len("origin/"):]
+	}
+	// Replace / with -
+	sanitized := strings.ReplaceAll(branch, "/", "-")
+
+	worktreeBase := ""
+	if settingsFile != "" {
+		if data, err := os.ReadFile(settingsFile); err == nil {
+			for _, line := range strings.Split(string(data), "\n") {
+				if strings.HasPrefix(line, "worktree_base=") {
+					worktreeBase = strings.TrimPrefix(line, "worktree_base=")
+					break
+				}
+			}
+		}
+	}
+
+	if worktreeBase != "" {
+		return filepath.Join(worktreeBase, projectName+"--"+sanitized)
+	}
+	parentDir := filepath.Dir(projectPath)
+	return filepath.Join(parentDir, projectName+"--"+sanitized)
+}
+
 const (
 	// bobTickInterval is the animation tick rate (~60fps).
 	bobTickInterval = 16 * time.Millisecond
@@ -38,13 +74,13 @@ const (
 
 // MainMenuResult represents the JSON output when the main menu exits.
 type MainMenuResult struct {
-	Action       string `json:"action"`
-	Name         string `json:"name,omitempty"`
-	Path         string `json:"path,omitempty"`
-	AITool       string `json:"ai_tool"`
-	GhostDisplay string `json:"ghost_display,omitempty"`
-	TabTitle     string `json:"tab_title,omitempty"`
-	SoundName *string `json:"sound_name,omitempty"`
+	Action       string  `json:"action"`
+	Name         string  `json:"name,omitempty"`
+	Path         string  `json:"path,omitempty"`
+	AITool       string  `json:"ai_tool"`
+	GhostDisplay string  `json:"ghost_display,omitempty"`
+	TabTitle     string  `json:"tab_title,omitempty"`
+	SoundName    *string `json:"sound_name,omitempty"`
 }
 
 // MenuLayout describes how the ghost and menu are arranged at a given terminal size.
@@ -116,9 +152,9 @@ type MainMenuModel struct {
 	tabTitle            string
 	initialTabTitle     string
 	tabTitleChanged     bool
-	soundName        string // "" means Off
-	initialSoundName string
-	soundNameChanged bool
+	soundName           string // "" means Off
+	initialSoundName    string
+	soundNameChanged    bool
 	zzz                 *ZzzAnimation
 	centerOffsetY       int
 
@@ -151,6 +187,10 @@ type MainMenuModel struct {
 
 	// Worktree expand/collapse state (project index -> expanded)
 	expandedWorktrees map[int]bool
+
+	// worktreePendingProjectIdx tracks which project index is waiting for a
+	// branch picker result. -1 means no pending worktree.
+	worktreePendingProjectIdx int
 }
 
 // NewMainMenu creates a new main menu model.
@@ -164,15 +204,16 @@ func NewMainMenu(projects []models.Project, aiTools []string, currentAI string, 
 	}
 
 	return &MainMenuModel{
-		projects:            projects,
-		aiTools:             aiTools,
-		selectedAI:          selectedAI,
-		selectedItem:        0,
-		ghostDisplay:        ghostDisplay,
-		initialGhostDisplay: ghostDisplay,
-		theme:               ThemeForTool(currentAI),
-		zzz:                 NewZzzAnimation(),
-		expandedWorktrees:   make(map[int]bool),
+		projects:                  projects,
+		aiTools:                   aiTools,
+		selectedAI:                selectedAI,
+		selectedItem:              0,
+		ghostDisplay:              ghostDisplay,
+		initialGhostDisplay:       ghostDisplay,
+		theme:                     ThemeForTool(currentAI),
+		zzz:                       NewZzzAnimation(),
+		expandedWorktrees:         make(map[int]bool),
+		worktreePendingProjectIdx: -1,
 	}
 }
 
@@ -639,6 +680,11 @@ func (m *MainMenuModel) SettingsFile() string { return m.settingsFile }
 // SetSoundFile sets the file path for sound features persistence.
 func (m *MainMenuModel) SetSoundFile(path string) { m.soundFile = path }
 
+// SetWorktreeProject sets the pending worktree project index (for testing).
+func (m *MainMenuModel) SetWorktreeProject(projectIdx int, _ string) {
+	m.worktreePendingProjectIdx = projectIdx
+}
+
 // SoundFile returns the file path for sound features persistence.
 func (m *MainMenuModel) SoundFile() string { return m.soundFile }
 
@@ -793,7 +839,8 @@ func (m *MainMenuModel) tabTitleForResult() string {
 }
 
 // selectCurrent produces a result for the currently selected item.
-func (m *MainMenuModel) selectCurrent() {
+// Returns a tea.Cmd if the item requires a navigation action (e.g. push a screen).
+func (m *MainMenuModel) selectCurrent() tea.Cmd {
 	itemType, projectIdx, worktreeIdx := m.ResolveItem(m.selectedItem)
 
 	switch itemType {
@@ -818,15 +865,17 @@ func (m *MainMenuModel) selectCurrent() {
 			SoundName:    m.soundNameForResult(),
 		}
 	case "add-worktree":
-		m.result = &MainMenuResult{
-			Action:       "add-worktree",
-			Name:         m.projects[projectIdx].Name,
-			Path:         m.projects[projectIdx].Path,
-			AITool:       m.CurrentAITool(),
-			GhostDisplay: m.ghostDisplayForResult(),
-			TabTitle:     m.tabTitleForResult(),
-			SoundName:    m.soundNameForResult(),
-		}
+		// Store the project index so BranchPickerDoneMsg can reference it.
+		m.worktreePendingProjectIdx = projectIdx
+		// Load branches and push the branch picker onto the navigation stack.
+		wtCmd := exec.Command("git", "-C", m.projects[projectIdx].Path, "worktree", "list", "--porcelain")
+		wtOut, _ := wtCmd.Output()
+		mainBranch := models.ParseMainBranch(string(wtOut))
+		branches := models.ListBranches(m.projects[projectIdx].Path)
+		worktrees := models.DetectWorktrees(m.projects[projectIdx].Path)
+		available := models.FilterAvailableBranches(branches, worktrees, mainBranch)
+		picker := NewBranchPicker(available, m.theme, m.projects[projectIdx].Path)
+		return func() tea.Msg { return PushScreenMsg{Model: picker} }
 	case "action":
 		if projectIdx < len(actionNames) {
 			m.result = &MainMenuResult{
@@ -839,7 +888,10 @@ func (m *MainMenuModel) selectCurrent() {
 		}
 	}
 
-	m.quitting = true
+	if m.result != nil {
+		m.quitting = true
+	}
+	return nil
 }
 
 // setActionResult produces a result for the given action name.
@@ -849,7 +901,7 @@ func (m *MainMenuModel) setActionResult(action string) {
 		AITool:       m.CurrentAITool(),
 		GhostDisplay: m.ghostDisplayForResult(),
 		TabTitle:     m.tabTitleForResult(),
-		SoundName: m.soundNameForResult(),
+		SoundName:    m.soundNameForResult(),
 	}
 	m.quitting = true
 }
@@ -919,6 +971,39 @@ func (m *MainMenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.SetSize(msg.Width, msg.Height)
 		return m, nil
 
+	case BranchPickerDoneMsg:
+		if !msg.Selected || m.worktreePendingProjectIdx < 0 {
+			m.worktreePendingProjectIdx = -1
+			return m, nil
+		}
+		projectIdx := m.worktreePendingProjectIdx
+		m.worktreePendingProjectIdx = -1
+		projectPath := m.projects[projectIdx].Path
+		projectName := m.projects[projectIdx].Name
+		branch := msg.Branch
+		settingsFile := m.settingsFile
+		return m, func() tea.Msg {
+			worktreePath := computeWorktreePath(projectPath, projectName, branch, settingsFile)
+			cmd := exec.Command("git", "-C", projectPath, "worktree", "add", worktreePath, branch)
+			if err := cmd.Run(); err != nil {
+				return worktreeDoneMsg{err: err, path: worktreePath}
+			}
+			return worktreeDoneMsg{path: worktreePath}
+		}
+
+	case worktreeDoneMsg:
+		if msg.err != nil {
+			m.feedbackMsg = "Failed to create worktree: " + msg.err.Error()
+			m.feedbackStyle = "error"
+		} else {
+			m.feedbackMsg = "Created worktree at " + msg.path
+			m.feedbackStyle = "success"
+		}
+		m.feedbackTimer = FeedbackDismissTicks
+		// Reload worktrees so the new entry appears.
+		models.PopulateWorktrees(m.projects)
+		return m, nil
+
 	case tea.MouseMsg:
 		// Reset sleep state on any mouse activity
 		m.Wake()
@@ -928,7 +1013,9 @@ func (m *MainMenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if item >= 0 {
 				if m.selectedItem == item {
 					// Already selected, activate (double-click-like behavior)
-					m.selectCurrent()
+					if cmd := m.selectCurrent(); cmd != nil {
+						return m, cmd
+					}
 					return m, tea.Quit
 				}
 				m.selectedItem = item
@@ -982,11 +1069,13 @@ func (m *MainMenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				}
 			}
-			m.selectCurrent()
+			if cmd := m.selectCurrent(); cmd != nil {
+				return m, cmd
+			}
 			return m, tea.Quit
 		case tea.KeyEsc:
-			m.setActionResult("quit")
-			return m, tea.Quit
+			// Emit PopScreenMsg — AppModel handles double-Esc timeout to quit.
+			return m, func() tea.Msg { return PopScreenMsg{} }
 		case tea.KeyCtrlC:
 			m.setActionResult("quit")
 			return m, tea.Quit
@@ -1032,7 +1121,9 @@ func (m *MainMenuModel) handleRune(r rune) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.JumpTo(n)
-		m.selectCurrent()
+		if cmd := m.selectCurrent(); cmd != nil {
+			return m, cmd
+		}
 		return m, tea.Quit
 	}
 	return m, nil
@@ -1238,7 +1329,7 @@ func (m *MainMenuModel) submitInputMode() (tea.Model, tea.Cmd) {
 		AITool:       m.CurrentAITool(),
 		GhostDisplay: m.ghostDisplayForResult(),
 		TabTitle:     m.tabTitleForResult(),
-		SoundName: m.soundNameForResult(),
+		SoundName:    m.soundNameForResult(),
 	}
 	m.quitting = true
 	return m, tea.Quit

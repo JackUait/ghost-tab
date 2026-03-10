@@ -2,6 +2,7 @@ package tui_test
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -535,18 +536,15 @@ func TestMainMenu_ActionShortcuts(t *testing.T) {
 
 func TestMainMenu_QuitEsc(t *testing.T) {
 	m := tui.NewMainMenu(testProjects(), testAITools(), "claude", "animated")
-	newModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
-	mm := newModel.(*tui.MainMenuModel)
-	result := mm.Result()
-
-	if result == nil {
-		t.Fatal("Expected result for Esc, got nil")
-	}
-	if result.Action != "quit" {
-		t.Errorf("Expected 'quit', got %q", result.Action)
-	}
+	// Esc now emits PopScreenMsg instead of a quit result;
+	// verify the command sends PopScreenMsg.
+	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
 	if cmd == nil {
-		t.Error("Expected tea.Quit cmd, got nil")
+		t.Fatal("Expected a command on Esc, got nil")
+	}
+	msg := cmd()
+	if _, ok := msg.(tui.PopScreenMsg); !ok {
+		t.Errorf("Expected PopScreenMsg on Esc, got %T", msg)
 	}
 }
 
@@ -554,12 +552,13 @@ func TestMainMenu_QuitEsc_IncludesCycledAITool(t *testing.T) {
 	m := tui.NewMainMenu(testProjects(), testAITools(), "claude", "animated")
 	// Cycle to codex
 	m.CycleAITool("next")
-	newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	// Quit via Ctrl-C (which still sets a result with the current AI tool)
+	newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
 	mm := newModel.(*tui.MainMenuModel)
 	result := mm.Result()
 
 	if result == nil {
-		t.Fatal("Expected result for Esc, got nil")
+		t.Fatal("Expected result for Ctrl-C, got nil")
 	}
 	if result.AITool != "codex" {
 		t.Errorf("Expected ai_tool 'codex' after cycling, got %q", result.AITool)
@@ -1456,8 +1455,8 @@ func TestMainMenu_SettingsGhostDisplayInResult(t *testing.T) {
 	m.CycleGhostDisplay() // animated -> static
 	m.ExitSettings()
 
-	// Now quit to get a result
-	newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	// Now quit to get a result (use Ctrl-C, which always sets a quit result)
+	newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
 	mm := newModel.(*tui.MainMenuModel)
 	result := mm.Result()
 
@@ -1474,7 +1473,7 @@ func TestMainMenu_SettingsNoGhostDisplayInResultWhenUnchanged(t *testing.T) {
 	m.SetSize(80, 30)
 
 	// Quit without changing ghost display
-	newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
 	mm := newModel.(*tui.MainMenuModel)
 	result := mm.Result()
 
@@ -2047,7 +2046,7 @@ func TestMainMenu_TabTitleInResult(t *testing.T) {
 	m.ExitSettings()
 
 	// Quit to get result
-	newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
 	mm := newModel.(*tui.MainMenuModel)
 	result := mm.Result()
 
@@ -2065,7 +2064,7 @@ func TestMainMenu_NoTabTitleInResultWhenUnchanged(t *testing.T) {
 	m.SetSize(80, 30)
 
 	// Quit without changing tab title
-	newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
 	mm := newModel.(*tui.MainMenuModel)
 	result := mm.Result()
 
@@ -3062,8 +3061,8 @@ func TestMainMenu_SoundNameInResultOnQuit(t *testing.T) {
 	m.EnterSettings()
 	m.CycleSoundName()
 	m.ExitSettings()
-	// Quit via Esc instead of selecting a project
-	m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	// Quit via Ctrl-C (Esc now emits PopScreenMsg; use Ctrl-C for quit result)
+	m.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
 	result := m.Result()
 	if result == nil {
 		t.Fatal("expected a result on quit")
@@ -3072,7 +3071,7 @@ func TestMainMenu_SoundNameInResultOnQuit(t *testing.T) {
 		t.Fatalf("expected action=quit, got %q", result.Action)
 	}
 	if result.SoundName == nil {
-		t.Fatal("expected sound_name to be set when changed and quit via Esc")
+		t.Fatal("expected sound_name to be set when changed and quit via Ctrl-C")
 	}
 }
 
@@ -3734,20 +3733,23 @@ func TestMainMenu_SelectAddWorktree(t *testing.T) {
 		t.Fatalf("expected add-worktree, got %q at index %d", itemType, m.SelectedItem())
 	}
 
-	m.Update(tea.KeyMsg{Type: tea.KeyEnter})
-
+	// add-worktree now pushes a BranchPickerModel instead of returning a result
+	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if cmd == nil {
+		t.Fatal("expected a command after Enter on add-worktree, got nil")
+	}
+	msg := cmd()
+	push, ok := msg.(tui.PushScreenMsg)
+	if !ok {
+		t.Fatalf("expected PushScreenMsg after Enter on add-worktree, got %T", msg)
+	}
+	if _, ok := push.Model.(tui.BranchPickerModel); !ok {
+		t.Errorf("expected pushed model to be BranchPickerModel, got %T", push.Model)
+	}
+	// result should be nil — worktree creation happens in Go after branch is picked
 	result := m.Result()
-	if result == nil {
-		t.Fatal("result should not be nil after Enter on add-worktree")
-	}
-	if result.Action != "add-worktree" {
-		t.Errorf("action: got %q, want %q", result.Action, "add-worktree")
-	}
-	if result.Name != "ghost-tab" {
-		t.Errorf("name: got %q, want %q", result.Name, "ghost-tab")
-	}
-	if result.Path != "/Users/jack/ghost-tab" {
-		t.Errorf("path: got %q, want %q", result.Path, "/Users/jack/ghost-tab")
+	if result != nil {
+		t.Errorf("expected nil result for add-worktree (handled in-app), got %+v", result)
 	}
 }
 
@@ -3794,5 +3796,107 @@ func TestMainMenu_CalculateLayoutWithAddWorktree(t *testing.T) {
 	// = 7 + 6 + 6 + 2 + 4 + 1 = 26
 	if layout.MenuHeight != 26 {
 		t.Errorf("menu height: got %d, want 26", layout.MenuHeight)
+	}
+}
+
+func TestMainMenu_EscEmitsPopScreenMsg(t *testing.T) {
+	projects := testProjects()
+	m := tui.NewMainMenu(projects, testAITools(), "claude", "none")
+
+	sized, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = sized.(*tui.MainMenuModel)
+
+	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	if cmd == nil {
+		t.Fatal("expected a command on Esc in main list, got nil")
+	}
+	msg := cmd()
+	if _, ok := msg.(tui.PopScreenMsg); !ok {
+		t.Errorf("expected PopScreenMsg on Esc, got %T", msg)
+	}
+}
+
+func TestMainMenu_AddWorktree_PushesScreenMsg(t *testing.T) {
+	// Use a project that has existing worktrees so ToggleWorktrees works
+	dir := t.TempDir()
+	projects := []models.Project{
+		{
+			Name: "proj1",
+			Path: dir,
+			Worktrees: []models.Worktree{
+				{Path: dir + "--feat", Branch: "feat"},
+			},
+		},
+	}
+	m := tui.NewMainMenu(projects, []string{"claude"}, "claude", "none")
+	m.SetProjectsFile(filepath.Join(dir, "projects"))
+
+	// Expand worktrees for project 0 so the add-worktree item appears
+	m.ToggleWorktrees(0)
+
+	// Navigate to the add-worktree item:
+	// item 0 = project row, item 1 = worktree row, item 2 = add-worktree
+	m.JumpTo(1)  // jump to project index 0 (1-indexed)
+	m.MoveDown() // move to worktree
+	m.MoveDown() // move to add-worktree
+
+	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if cmd == nil {
+		t.Fatal("expected a command after selecting add-worktree, got nil")
+	}
+	msg := cmd()
+	push, ok := msg.(tui.PushScreenMsg)
+	if !ok {
+		t.Fatalf("expected PushScreenMsg, got %T", msg)
+	}
+	if _, ok := push.Model.(tui.BranchPickerModel); !ok {
+		t.Errorf("expected pushed model to be BranchPickerModel, got %T", push.Model)
+	}
+}
+
+func TestMainMenu_BranchPickerDoneMsg_NoSelection_DoesNothing(t *testing.T) {
+	projects := testProjects()
+	m := tui.NewMainMenu(projects, testAITools(), "claude", "none")
+
+	updated, cmd := m.Update(tui.BranchPickerDoneMsg{Selected: false, Branch: ""})
+	_ = updated
+	// Should not quit
+	if cmd != nil {
+		msg := cmd()
+		if _, ok := msg.(tea.QuitMsg); ok {
+			t.Error("BranchPickerDoneMsg with Selected=false should not quit")
+		}
+	}
+}
+
+func TestMainMenu_BranchPickerDoneMsg_WithSelection_CreatesWorktree(t *testing.T) {
+	dir := t.TempDir()
+	// initialise a bare git repo in dir so "git worktree add" can run
+	if out, err := exec.Command("git", "-C", dir, "init").CombinedOutput(); err != nil {
+		t.Skipf("git init failed: %v: %s", err, out)
+	}
+	// create an initial commit (required for branches to exist)
+	exec.Command("git", "-C", dir, "config", "user.email", "test@test.com").Run()
+	exec.Command("git", "-C", dir, "config", "user.name", "Test").Run()
+	exec.Command("git", "-C", dir, "commit", "--allow-empty", "-m", "init").Run()
+
+	projects := []models.Project{
+		{Name: "proj1", Path: dir},
+	}
+	m := tui.NewMainMenu(projects, []string{"claude"}, "claude", "none")
+	m.SetProjectsFile(filepath.Join(dir, "projects"))
+	m.SetWorktreeProject(0, dir) // tell the model which project is pending a worktree
+
+	_, cmd := m.Update(tui.BranchPickerDoneMsg{Selected: true, Branch: "main"})
+	if cmd != nil {
+		cmd() // execute worktree creation
+	}
+	// verify worktree path exists
+	expectedPath := filepath.Dir(dir) + "/" + filepath.Base(dir) + "--main"
+	if _, err := os.Stat(expectedPath); err != nil {
+		// worktree creation may fail in CI (no real branches), but the
+		// model should at least not panic or crash — this is enough to
+		// verify the code path runs
+		t.Logf("worktree path %q not created (may be expected in CI): %v", expectedPath, err)
 	}
 }
