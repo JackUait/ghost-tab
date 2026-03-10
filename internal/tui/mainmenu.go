@@ -173,6 +173,11 @@ type MainMenuModel struct {
 	feedbackStyle string // "success" or "error"
 	feedbackTimer int    // bob ticks remaining
 
+	// Move-flash: briefly highlights the row that was just moved.
+	// moveFlashIdx is the project index to flash; -1 means inactive.
+	moveFlashIdx   int
+	moveFlashTimer int // bob ticks remaining
+
 	// File path for project file operations
 	projectsFile string
 
@@ -218,6 +223,7 @@ func NewMainMenu(projects []models.Project, aiTools []string, currentAI string, 
 		zzz:                       NewZzzAnimation(),
 		expandedWorktrees:         make(map[int]bool),
 		worktreePendingProjectIdx: -1,
+		moveFlashIdx:              -1,
 	}
 }
 
@@ -479,7 +485,7 @@ func (m *MainMenuModel) MoveProjectUp() {
 
 	// Move cursor to follow the project.
 	m.selectedItem = m.projectToFlatIndex(projectIdx - 1)
-	m.setFeedback("Moved up", "success")
+	m.setMoveFlash(projectIdx - 1)
 }
 
 // MoveProjectDown moves the project at the current cursor position one slot
@@ -524,7 +530,7 @@ func (m *MainMenuModel) MoveProjectDown() {
 
 	// Move cursor to follow the project.
 	m.selectedItem = m.projectToFlatIndex(projectIdx + 1)
-	m.setFeedback("Moved down", "success")
+	m.setMoveFlash(projectIdx + 1)
 }
 
 // JumpTo jumps to the given 1-indexed project number.
@@ -1103,6 +1109,12 @@ func (m *MainMenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.feedbackStyle = ""
 				}
 			}
+			if m.moveFlashTimer > 0 {
+				m.moveFlashTimer--
+				if m.moveFlashTimer == 0 {
+					m.moveFlashIdx = -1
+				}
+			}
 			return m, m.bobTickCmd()
 		}
 		return m, nil
@@ -1388,6 +1400,11 @@ func (m *MainMenuModel) setFeedback(msg, style string) {
 	m.feedbackMsg = msg
 	m.feedbackStyle = style
 	m.feedbackTimer = FeedbackDismissTicks
+}
+
+func (m *MainMenuModel) setMoveFlash(projectIdx int) {
+	m.moveFlashIdx = projectIdx
+	m.moveFlashTimer = FeedbackDismissTicks
 }
 
 func (m *MainMenuModel) updateInputMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -1788,6 +1805,7 @@ func (m *MainMenuModel) renderMenuBox() string {
 	updateStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("220"))
 	neutralTextStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
 	neutralDimStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
+	moveFlashStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("214")).Bold(true)
 
 	hLine := strings.Repeat("\u2500", menuInnerWidth)
 	topBorder := dimStyle.Render("\u256d" + hLine + "\u256e")
@@ -1841,6 +1859,7 @@ func (m *MainMenuModel) renderMenuBox() string {
 	numProjects := len(m.projects)
 	for i, proj := range m.projects {
 		selected := m.selectedItem == m.projectToFlatIndex(i)
+		flashing := m.moveFlashIdx == i && m.moveFlashTimer > 0
 		num := fmt.Sprintf("%d", i+1)
 
 		var nameLine string
@@ -1888,13 +1907,21 @@ func (m *MainMenuModel) renderMenuBox() string {
 			}
 			pathLine = leftBorder + pathContent + strings.Repeat(" ", pathPadding) + rightBorder
 		} else {
-			numText := neutralDimStyle.Render(num)
+			// Choose style: amber flash when recently moved, neutral otherwise.
+			rowNameStyle := neutralTextStyle
+			rowDimStyle := neutralDimStyle
+			if flashing {
+				rowNameStyle = moveFlashStyle
+				rowDimStyle = moveFlashStyle
+			}
+
+			numText := rowDimStyle.Render(num)
 			truncName := TruncateMiddle(proj.Name, menuContentWidth-6-len(num))
-			nameText := neutralTextStyle.Render(truncName)
+			nameText := rowNameStyle.Render(truncName)
 			nameContent := "    " + numText + "  " + nameText
 
 			if wtIndicator != "" {
-				wtStyled := neutralDimStyle.Render(wtIndicator)
+				wtStyled := rowDimStyle.Render(wtIndicator)
 				gap := menuContentWidth - lipgloss.Width(nameContent) - lipgloss.Width(wtStyled)
 				if gap < 1 {
 					gap = 1
@@ -1908,7 +1935,7 @@ func (m *MainMenuModel) renderMenuBox() string {
 				nameLine = leftBorder + nameContent + strings.Repeat(" ", namePadding) + rightBorder
 			}
 
-			pathContent := "       " + neutralDimStyle.Render(shortPath)
+			pathContent := "       " + rowDimStyle.Render(shortPath)
 			pathPadding := menuContentWidth - lipgloss.Width(pathContent)
 			if pathPadding < 0 {
 				pathPadding = 0

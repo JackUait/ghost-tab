@@ -182,3 +182,95 @@ func TestMoveProjectDown_noopAtLastProject(t *testing.T) {
 		t.Errorf("expected selectedItem to remain 2, got %d", m.selectedItem)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Move-flash feedback
+// ---------------------------------------------------------------------------
+
+// TestMoveProjectUp_setsFlashOnMovedProject verifies that after a successful
+// MoveProjectUp the moveFlashIdx is set to the project's new index and
+// moveFlashTimer is positive (flash is active).
+func TestMoveProjectUp_setsFlashOnMovedProject(t *testing.T) {
+	m := newReorderMenu(t)
+	m.selectedItem = 1 // project "beta" at index 1
+
+	m.MoveProjectUp()
+
+	// beta moved to index 0 — flash must point at index 0
+	if m.moveFlashIdx != 0 {
+		t.Errorf("expected moveFlashIdx=0 after MoveProjectUp, got %d", m.moveFlashIdx)
+	}
+	if m.moveFlashTimer <= 0 {
+		t.Errorf("expected moveFlashTimer>0 after MoveProjectUp, got %d", m.moveFlashTimer)
+	}
+}
+
+// TestMoveProjectDown_setsFlashOnMovedProject verifies that after a successful
+// MoveProjectDown the moveFlashIdx is set to the project's new index and
+// moveFlashTimer is positive (flash is active).
+func TestMoveProjectDown_setsFlashOnMovedProject(t *testing.T) {
+	m := newReorderMenu(t)
+	m.selectedItem = 0 // project "alpha" at index 0
+
+	m.MoveProjectDown()
+
+	// alpha moved to index 1 — flash must point at index 1
+	if m.moveFlashIdx != 1 {
+		t.Errorf("expected moveFlashIdx=1 after MoveProjectDown, got %d", m.moveFlashIdx)
+	}
+	if m.moveFlashTimer <= 0 {
+		t.Errorf("expected moveFlashTimer>0 after MoveProjectDown, got %d", m.moveFlashTimer)
+	}
+}
+
+// TestMoveProjectUp_noFlashWhenAlreadyFirst verifies that when MoveProjectUp is
+// a no-op (project is already first), no flash is activated.
+func TestMoveProjectUp_noFlashWhenAlreadyFirst(t *testing.T) {
+	m := newReorderMenu(t)
+	m.selectedItem = 0 // project "alpha" already first
+
+	m.MoveProjectUp()
+
+	if m.moveFlashIdx != -1 {
+		t.Errorf("expected moveFlashIdx=-1 (no flash) after no-op MoveProjectUp, got %d", m.moveFlashIdx)
+	}
+}
+
+// TestMoveProjectDown_noFlashWhenAlreadyLast verifies that when MoveProjectDown is
+// a no-op (project is already last), no flash is activated.
+func TestMoveProjectDown_noFlashWhenAlreadyLast(t *testing.T) {
+	m := newReorderMenu(t)
+	m.selectedItem = 2 // project "gamma" already last
+
+	m.MoveProjectDown()
+
+	if m.moveFlashIdx != -1 {
+		t.Errorf("expected moveFlashIdx=-1 (no flash) after no-op MoveProjectDown, got %d", m.moveFlashIdx)
+	}
+}
+
+// TestMoveProjectUp_noFeedbackBanner verifies that MoveProjectUp no longer sets
+// the text feedback banner (feedbackMsg should be empty after a successful move).
+func TestMoveProjectUp_noFeedbackBanner(t *testing.T) {
+	m := newReorderMenu(t)
+	m.selectedItem = 1
+
+	m.MoveProjectUp()
+
+	if m.feedbackMsg != "" {
+		t.Errorf("expected no feedback banner after MoveProjectUp, got %q", m.feedbackMsg)
+	}
+}
+
+// TestMoveProjectDown_noFeedbackBanner verifies that MoveProjectDown no longer sets
+// the text feedback banner (feedbackMsg should be empty after a successful move).
+func TestMoveProjectDown_noFeedbackBanner(t *testing.T) {
+	m := newReorderMenu(t)
+	m.selectedItem = 0
+
+	m.MoveProjectDown()
+
+	if m.feedbackMsg != "" {
+		t.Errorf("expected no feedback banner after MoveProjectDown, got %q", m.feedbackMsg)
+	}
+}
