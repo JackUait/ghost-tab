@@ -202,7 +202,7 @@ func (m *AutocompleteModel) View() string {
 
 	var b strings.Builder
 
-	b.WriteString(borderStyle.Render("┌" + strings.Repeat("─", boxWidth) + "┐"))
+	b.WriteString(borderStyle.Render("╭" + strings.Repeat("─", boxWidth) + "╮"))
 	b.WriteString("\n")
 
 	for i, s := range m.suggestions {
@@ -217,7 +217,7 @@ func (m *AutocompleteModel) View() string {
 		b.WriteString("\n")
 	}
 
-	b.WriteString(borderStyle.Render("└" + strings.Repeat("─", boxWidth) + "┘"))
+	b.WriteString(borderStyle.Render("╰" + strings.Repeat("─", boxWidth) + "╯"))
 	b.WriteString("\n")
 	b.WriteString(hintStyle.Render("↑↓ navigate  ⏎ complete  Esc cancel"))
 

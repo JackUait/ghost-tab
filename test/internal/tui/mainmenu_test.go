@@ -747,9 +747,9 @@ func TestMainMenu_ViewContainsBorders(t *testing.T) {
 	m := tui.NewMainMenu(projects, []string{"claude"}, "claude", "animated")
 	m.SetSize(80, 30)
 	view := m.View()
-	// Should contain box-drawing borders
-	if !strings.Contains(view, "\u250c") || !strings.Contains(view, "\u2518") {
-		t.Error("view should contain box-drawing borders")
+	// Should contain rounded box-drawing borders
+	if !strings.Contains(view, "\u256d") || !strings.Contains(view, "\u256f") {
+		t.Error("view should contain rounded box-drawing borders")
 	}
 	if !strings.Contains(view, "Ghost Tab") {
 		t.Error("view should contain 'Ghost Tab' title")
@@ -2142,10 +2142,10 @@ func TestMainMenu_SideLayoutGhostVerticallyCentered(t *testing.T) {
 	ghostCapLine := -1
 	menuBottomLine := -1
 	for i, line := range lines {
-		if menuTopLine == -1 && strings.Contains(line, "\u250c") { // ┌
+		if menuTopLine == -1 && strings.Contains(line, "\u256d") { // ╭
 			menuTopLine = i
 		}
-		if strings.Contains(line, "\u2518") { // ┘
+		if strings.Contains(line, "\u256f") { // ╯
 			menuBottomLine = i
 		}
 		if ghostCapLine == -1 && strings.Contains(line, "\u2584") { // ▄ (ghost cap)

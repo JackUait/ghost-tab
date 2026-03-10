@@ -283,9 +283,18 @@ func TestAutocompleteModel_View_WithSuggestions(t *testing.T) {
 	if !strings.Contains(view, "beta/") {
 		t.Error("View should contain suggestion 'beta/'")
 	}
-	// Should contain border characters
-	if !strings.Contains(view, "\u250c") || !strings.Contains(view, "\u2514") {
-		t.Error("View should contain box border characters")
+	// Should contain rounded border characters
+	if !strings.Contains(view, "\u256d") { // ╭
+		t.Error("View should contain rounded top-left border ╭")
+	}
+	if !strings.Contains(view, "\u256f") { // ╯
+		t.Error("View should contain rounded bottom-right border ╯")
+	}
+	if !strings.Contains(view, "\u256e") { // ╮
+		t.Error("View should contain rounded top-right border ╮")
+	}
+	if !strings.Contains(view, "\u2570") { // ╰
+		t.Error("View should contain rounded bottom-left border ╰")
 	}
 }
 

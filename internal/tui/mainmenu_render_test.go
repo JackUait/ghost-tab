@@ -592,6 +592,89 @@ func TestMenuBox_ContentRowsHavePadding(t *testing.T) {
 	}
 }
 
+func TestMenuBox_UsesRoundedCorners(t *testing.T) {
+	m := newTestMenu()
+	box := m.renderMenuBox()
+	raw := stripAnsi(box)
+	lines := strings.Split(raw, "\n")
+
+	if len(lines) < 2 {
+		t.Fatal("renderMenuBox produced fewer than 2 lines")
+	}
+	topLine := lines[0]
+	bottomLine := lines[len(lines)-1]
+
+	if !strings.HasPrefix(topLine, "╭") || !strings.HasSuffix(topLine, "╮") {
+		t.Errorf("top border should use rounded corners ╭╮, got: %q", topLine)
+	}
+	if !strings.HasPrefix(bottomLine, "╰") || !strings.HasSuffix(bottomLine, "╯") {
+		t.Errorf("bottom border should use rounded corners ╰╯, got: %q", bottomLine)
+	}
+}
+
+func TestSettingsBox_UsesRoundedCorners(t *testing.T) {
+	m := newTestMenu()
+	m.settingsMode = true
+	box := m.renderSettingsBox()
+	raw := stripAnsi(box)
+	lines := strings.Split(raw, "\n")
+
+	if len(lines) < 2 {
+		t.Fatal("renderSettingsBox produced fewer than 2 lines")
+	}
+	topLine := lines[0]
+	bottomLine := lines[len(lines)-1]
+
+	if !strings.HasPrefix(topLine, "╭") || !strings.HasSuffix(topLine, "╮") {
+		t.Errorf("top border should use rounded corners ╭╮, got: %q", topLine)
+	}
+	if !strings.HasPrefix(bottomLine, "╰") || !strings.HasSuffix(bottomLine, "╯") {
+		t.Errorf("bottom border should use rounded corners ╰╯, got: %q", bottomLine)
+	}
+}
+
+func TestInputBox_UsesRoundedCorners(t *testing.T) {
+	m := newTestMenu()
+	m.inputMode = "add-project"
+	box := m.renderInputBox()
+	raw := stripAnsi(box)
+	lines := strings.Split(raw, "\n")
+
+	if len(lines) < 2 {
+		t.Fatal("renderInputBox produced fewer than 2 lines")
+	}
+	topLine := lines[0]
+	bottomLine := lines[len(lines)-1]
+
+	if !strings.HasPrefix(topLine, "╭") || !strings.HasSuffix(topLine, "╮") {
+		t.Errorf("top border should use rounded corners ╭╮, got: %q", topLine)
+	}
+	if !strings.HasPrefix(bottomLine, "╰") || !strings.HasSuffix(bottomLine, "╯") {
+		t.Errorf("bottom border should use rounded corners ╰╯, got: %q", bottomLine)
+	}
+}
+
+func TestDeleteBox_UsesRoundedCorners(t *testing.T) {
+	m := newTestMenu()
+	m.deleteMode = true
+	box := m.renderDeleteBox()
+	raw := stripAnsi(box)
+	lines := strings.Split(raw, "\n")
+
+	if len(lines) < 2 {
+		t.Fatal("renderDeleteBox produced fewer than 2 lines")
+	}
+	topLine := lines[0]
+	bottomLine := lines[len(lines)-1]
+
+	if !strings.HasPrefix(topLine, "╭") || !strings.HasSuffix(topLine, "╮") {
+		t.Errorf("top border should use rounded corners ╭╮, got: %q", topLine)
+	}
+	if !strings.HasPrefix(bottomLine, "╰") || !strings.HasSuffix(bottomLine, "╯") {
+		t.Errorf("bottom border should use rounded corners ╰╯, got: %q", bottomLine)
+	}
+}
+
 // stripAnsi removes ANSI escape sequences from a string.
 func stripAnsi(s string) string {
 	var result strings.Builder

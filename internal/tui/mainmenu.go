@@ -1418,9 +1418,9 @@ func (m *MainMenuModel) renderSettingsBox() string {
 	stateStyle := lipgloss.NewStyle().Foreground(stateColor)
 
 	hLine := strings.Repeat("\u2500", menuInnerWidth)
-	topBorder := dimStyle.Render("\u250c" + hLine + "\u2510")
+	topBorder := dimStyle.Render("\u256d" + hLine + "\u256e")
 	separator := dimStyle.Render("\u251c" + hLine + "\u2524")
-	bottomBorder := dimStyle.Render("\u2514" + hLine + "\u2518")
+	bottomBorder := dimStyle.Render("\u2570" + hLine + "\u256f")
 	leftBorder := dimStyle.Render("\u2502")
 	rightBorder := strings.Repeat(" ", menuPadding) + dimStyle.Render("\u2502")
 
@@ -1536,9 +1536,9 @@ func (m *MainMenuModel) renderMenuBox() string {
 	neutralDimStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
 
 	hLine := strings.Repeat("\u2500", menuInnerWidth)
-	topBorder := dimStyle.Render("\u250c" + hLine + "\u2510")
+	topBorder := dimStyle.Render("\u256d" + hLine + "\u256e")
 	separator := dimStyle.Render("\u251c" + hLine + "\u2524")
-	bottomBorder := dimStyle.Render("\u2514" + hLine + "\u2518")
+	bottomBorder := dimStyle.Render("\u2570" + hLine + "\u256f")
 	leftBorder := dimStyle.Render("\u2502")
 	rightBorder := strings.Repeat(" ", menuPadding) + dimStyle.Render("\u2502")
 
@@ -1838,9 +1838,9 @@ func (m *MainMenuModel) renderInputBox() string {
 	errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
 
 	hLine := strings.Repeat("\u2500", menuInnerWidth)
-	topBorder := dimStyle.Render("\u250c" + hLine + "\u2510")
+	topBorder := dimStyle.Render("\u256d" + hLine + "\u256e")
 	separator := dimStyle.Render("\u251c" + hLine + "\u2524")
-	bottomBorder := dimStyle.Render("\u2514" + hLine + "\u2518")
+	bottomBorder := dimStyle.Render("\u2570" + hLine + "\u256f")
 	leftBorder := dimStyle.Render("\u2502")
 	rightBorder := strings.Repeat(" ", menuPadding) + dimStyle.Render("\u2502")
 	emptyRow := leftBorder + strings.Repeat(" ", menuContentWidth) + rightBorder
@@ -1936,9 +1936,9 @@ func (m *MainMenuModel) renderDeleteBox() string {
 	deleteHighlight := lipgloss.NewStyle().Background(lipgloss.Color("196")).Foreground(lipgloss.Color("15"))
 
 	hLine := strings.Repeat("\u2500", menuInnerWidth)
-	topBorder := dimStyle.Render("\u250c" + hLine + "\u2510")
+	topBorder := dimStyle.Render("\u256d" + hLine + "\u256e")
 	separator := dimStyle.Render("\u251c" + hLine + "\u2524")
-	bottomBorder := dimStyle.Render("\u2514" + hLine + "\u2518")
+	bottomBorder := dimStyle.Render("\u2570" + hLine + "\u256f")
 	leftBorder := dimStyle.Render("\u2502")
 	rightBorder := strings.Repeat(" ", menuPadding) + dimStyle.Render("\u2502")
 	emptyRow := leftBorder + strings.Repeat(" ", menuContentWidth) + rightBorder

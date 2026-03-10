@@ -141,7 +141,7 @@ func TestBranchPicker_EscClearsFilter(t *testing.T) {
 	}
 }
 
-func TestBranchPicker_ViewHasBoxBorders(t *testing.T) {
+func TestBranchPicker_ViewHasRoundedCorners(t *testing.T) {
 	branches := []string{"feature/auth", "develop"}
 	m := tui.NewBranchPicker(branches, testTheme(), "/tmp/project")
 
@@ -149,17 +149,43 @@ func TestBranchPicker_ViewHasBoxBorders(t *testing.T) {
 	m = sized.(tui.BranchPickerModel)
 
 	view := m.View()
-	if !strings.Contains(view, "\u250c") { // ┌
-		t.Error("expected top-left border character")
+	if !strings.Contains(view, "\u256d") { // ╭
+		t.Error("expected rounded top-left border character ╭")
 	}
-	if !strings.Contains(view, "\u2518") { // ┘
-		t.Error("expected bottom-right border character")
+	if !strings.Contains(view, "\u256f") { // ╯
+		t.Error("expected rounded bottom-right border character ╯")
+	}
+	if !strings.Contains(view, "\u256e") { // ╮
+		t.Error("expected rounded top-right border character ╮")
+	}
+	if !strings.Contains(view, "\u2570") { // ╰
+		t.Error("expected rounded bottom-left border character ╰")
 	}
 	if !strings.Contains(view, "Select Branch") {
 		t.Error("expected title in view")
 	}
 	if !strings.Contains(view, "feature/auth") {
 		t.Error("expected branch name in view")
+	}
+}
+
+func TestBranchPicker_DeleteBoxHasRoundedCorners(t *testing.T) {
+	branches := []string{"feature/auth", "develop"}
+	m := tui.NewBranchPicker(branches, testTheme(), "/tmp/project")
+
+	sized, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	m = sized.(tui.BranchPickerModel)
+
+	// Enter delete mode
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	m = updated.(tui.BranchPickerModel)
+
+	view := m.View()
+	if !strings.Contains(view, "\u256d") { // ╭
+		t.Error("delete box: expected rounded top-left border character ╭")
+	}
+	if !strings.Contains(view, "\u256f") { // ╯
+		t.Error("delete box: expected rounded bottom-right border character ╯")
 	}
 }
 
