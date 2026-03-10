@@ -45,6 +45,39 @@ func RemoveProject(line, filePath string) error {
 	return os.WriteFile(filePath, []byte(result), 0644)
 }
 
+// RewriteProjectsFile atomically rewrites the entire projects file with the
+// given ordered list of projects. Each project is written as "name:path\n".
+// An empty list produces an empty file.
+func RewriteProjectsFile(projects []models.Project, filePath string) error {
+	if err := os.MkdirAll(filepath.Dir(filePath), 0755); err != nil {
+		return err
+	}
+
+	var sb strings.Builder
+	for _, p := range projects {
+		sb.WriteString(p.Name + ":" + p.Path + "\n")
+	}
+
+	// Write to a temp file in the same directory, then rename for atomicity.
+	tmpFile, err := os.CreateTemp(filepath.Dir(filePath), ".projects-tmp-*")
+	if err != nil {
+		return err
+	}
+	tmpPath := tmpFile.Name()
+
+	if _, err := tmpFile.WriteString(sb.String()); err != nil {
+		tmpFile.Close()
+		os.Remove(tmpPath)
+		return err
+	}
+	if err := tmpFile.Close(); err != nil {
+		os.Remove(tmpPath)
+		return err
+	}
+
+	return os.Rename(tmpPath, filePath)
+}
+
 // IsDuplicateProject checks if an expanded path already exists in the project list.
 func IsDuplicateProject(expandedPath string, projects []models.Project) bool {
 	cleaned := strings.TrimRight(expandedPath, "/")

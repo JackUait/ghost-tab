@@ -300,6 +300,108 @@ func TestRemoveProject_EdgeCases(t *testing.T) {
 	}
 }
 
+// --- RewriteProjectsFile tests ---
+
+func TestRewriteProjectsFile_writesAllProjects(t *testing.T) {
+	dir := t.TempDir()
+	filePath := filepath.Join(dir, "projects")
+
+	projects := []models.Project{
+		{Name: "alpha", Path: "/path/alpha"},
+		{Name: "beta", Path: "/path/beta"},
+		{Name: "gamma", Path: "/path/gamma"},
+	}
+
+	if err := tui.RewriteProjectsFile(projects, filePath); err != nil {
+		t.Fatalf("RewriteProjectsFile failed: %v", err)
+	}
+
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		t.Fatalf("ReadFile failed: %v", err)
+	}
+
+	lines := strings.Split(strings.TrimRight(string(data), "\n"), "\n")
+	if len(lines) != 3 {
+		t.Fatalf("expected 3 lines, got %d: %v", len(lines), lines)
+	}
+	if lines[0] != "alpha:/path/alpha" {
+		t.Errorf("line 0: got %q, want %q", lines[0], "alpha:/path/alpha")
+	}
+	if lines[1] != "beta:/path/beta" {
+		t.Errorf("line 1: got %q, want %q", lines[1], "beta:/path/beta")
+	}
+	if lines[2] != "gamma:/path/gamma" {
+		t.Errorf("line 2: got %q, want %q", lines[2], "gamma:/path/gamma")
+	}
+}
+
+func TestRewriteProjectsFile_atomicReplace(t *testing.T) {
+	dir := t.TempDir()
+	filePath := filepath.Join(dir, "projects")
+
+	// Write initial content
+	initial := []models.Project{{Name: "old", Path: "/old"}}
+	if err := tui.RewriteProjectsFile(initial, filePath); err != nil {
+		t.Fatalf("initial write failed: %v", err)
+	}
+
+	// Overwrite with new content
+	updated := []models.Project{
+		{Name: "new1", Path: "/new1"},
+		{Name: "new2", Path: "/new2"},
+	}
+	if err := tui.RewriteProjectsFile(updated, filePath); err != nil {
+		t.Fatalf("second write failed: %v", err)
+	}
+
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		t.Fatalf("ReadFile failed: %v", err)
+	}
+	content := string(data)
+	if strings.Contains(content, "old") {
+		t.Errorf("old content still present: %q", content)
+	}
+	if !strings.Contains(content, "new1:/new1") {
+		t.Errorf("new1 not found in: %q", content)
+	}
+	if !strings.Contains(content, "new2:/new2") {
+		t.Errorf("new2 not found in: %q", content)
+	}
+}
+
+func TestRewriteProjectsFile_emptyList(t *testing.T) {
+	dir := t.TempDir()
+	filePath := filepath.Join(dir, "projects")
+
+	if err := tui.RewriteProjectsFile([]models.Project{}, filePath); err != nil {
+		t.Fatalf("RewriteProjectsFile failed: %v", err)
+	}
+
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		t.Fatalf("ReadFile failed: %v", err)
+	}
+	if string(data) != "" {
+		t.Errorf("expected empty file, got: %q", string(data))
+	}
+}
+
+func TestRewriteProjectsFile_createsParentDirs(t *testing.T) {
+	dir := t.TempDir()
+	filePath := filepath.Join(dir, "nested", "deep", "projects")
+
+	projects := []models.Project{{Name: "p", Path: "/p"}}
+	if err := tui.RewriteProjectsFile(projects, filePath); err != nil {
+		t.Fatalf("RewriteProjectsFile failed: %v", err)
+	}
+
+	if _, err := os.Stat(filePath); err != nil {
+		t.Errorf("file not created: %v", err)
+	}
+}
+
 // --- IsDuplicateProject edge cases (ported from project-actions.bats) ---
 
 func TestIsDuplicateProject_EdgeCases(t *testing.T) {
