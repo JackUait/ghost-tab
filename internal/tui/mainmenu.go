@@ -1809,8 +1809,6 @@ func (m *MainMenuModel) renderMenuBox() string {
 	moveFlashStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("214")).Bold(true)
 	deleteStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Bold(true)
 	deleteDimStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
-	_ = deleteStyle
-	_ = deleteDimStyle
 
 	hLine := strings.Repeat("\u2500", menuInnerWidth)
 	topBorder := dimStyle.Render("\u256d" + hLine + "\u256e")
@@ -1863,8 +1861,13 @@ func (m *MainMenuModel) renderMenuBox() string {
 	// Project items
 	numProjects := len(m.projects)
 	for i, proj := range m.projects {
-		selected := m.selectedItem == m.projectToFlatIndex(i)
-		flashing := m.moveFlashIdx == i && m.moveFlashTimer > 0
+		selected := func() bool {
+			if m.deleteMode {
+				return m.deleteSelected == i
+			}
+			return m.selectedItem == m.projectToFlatIndex(i)
+		}()
+		flashing := !m.deleteMode && m.moveFlashIdx == i && m.moveFlashTimer > 0
 		num := fmt.Sprintf("%d", i+1)
 
 		var nameLine string
@@ -1884,10 +1887,13 @@ func (m *MainMenuModel) renderMenuBox() string {
 		}
 
 		if selected {
-			// Use flash style when the row was just moved, primary otherwise.
+			// Delete mode: red styles. Normal mode: primary or flash.
 			selNameStyle := primaryBoldStyle
 			selPathStyle := primaryStyle
-			if flashing {
+			if m.deleteMode {
+				selNameStyle = deleteStyle
+				selPathStyle = deleteDimStyle
+			} else if flashing {
 				selNameStyle = moveFlashStyle
 				selPathStyle = moveFlashStyle
 			}
