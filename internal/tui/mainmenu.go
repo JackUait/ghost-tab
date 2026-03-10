@@ -2236,7 +2236,10 @@ func (m *MainMenuModel) renderDeleteBox() string {
 	dimStyle := lipgloss.NewStyle().Foreground(m.theme.Dim)
 	primaryBoldStyle := lipgloss.NewStyle().Foreground(m.theme.Primary).Bold(true)
 	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("247"))
-	deleteHighlight := lipgloss.NewStyle().Background(lipgloss.Color("196")).Foreground(lipgloss.Color("15"))
+	deleteStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Bold(true)
+	deleteDimStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
+	neutralTextStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
+	neutralDimStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
 
 	hLine := strings.Repeat("\u2500", menuInnerWidth)
 	topBorder := dimStyle.Render("\u256d" + hLine + "\u256e")
@@ -2267,23 +2270,26 @@ func (m *MainMenuModel) renderDeleteBox() string {
 		shortPath := TruncateMiddle(shortenHomePath(proj.Path), menuContentWidth-7)
 
 		if selected {
-			nameText := deleteHighlight.Render(" " + num + "  " + TruncateMiddle(proj.Name, menuContentWidth-8-len(num)) + " ")
-			nameContent := "  " + nameText
+			marker := deleteStyle.Render("\u258e") // ▎
+			truncName := TruncateMiddle(proj.Name, menuContentWidth-7-len(num))
+			nameText := deleteStyle.Render(num + "  " + truncName)
+			nameContent := "  " + marker + " " + nameText
 			namePadding := menuContentWidth - lipgloss.Width(nameContent)
 			if namePadding < 0 {
 				namePadding = 0
 			}
 			lines = append(lines, leftBorder+nameContent+strings.Repeat(" ", namePadding)+rightBorder)
 
-			pathContent := "       " + dimStyle.Render(shortPath)
+			pathContent := "       " + deleteDimStyle.Render(shortPath)
 			pathPadding := menuContentWidth - lipgloss.Width(pathContent)
 			if pathPadding < 0 {
 				pathPadding = 0
 			}
 			lines = append(lines, leftBorder+pathContent+strings.Repeat(" ", pathPadding)+rightBorder)
 		} else {
-			numText := dimStyle.Render(num)
-			nameText := dimStyle.Render(TruncateMiddle(proj.Name, menuContentWidth-6-len(num)))
+			numText := neutralDimStyle.Render(num)
+			truncName := TruncateMiddle(proj.Name, menuContentWidth-6-len(num))
+			nameText := neutralTextStyle.Render(truncName)
 			nameContent := "    " + numText + "  " + nameText
 			namePadding := menuContentWidth - lipgloss.Width(nameContent)
 			if namePadding < 0 {
@@ -2291,7 +2297,7 @@ func (m *MainMenuModel) renderDeleteBox() string {
 			}
 			lines = append(lines, leftBorder+nameContent+strings.Repeat(" ", namePadding)+rightBorder)
 
-			pathContent := "       " + dimStyle.Render(shortPath)
+			pathContent := "       " + neutralDimStyle.Render(shortPath)
 			pathPadding := menuContentWidth - lipgloss.Width(pathContent)
 			if pathPadding < 0 {
 				pathPadding = 0
