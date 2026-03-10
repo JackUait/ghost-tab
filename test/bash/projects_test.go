@@ -316,6 +316,32 @@ cat %q
 	assertContains(t, out, "app2:/path/to/app2")
 }
 
+func TestLoadProjects_roundTripAfterRewrite(t *testing.T) {
+	// Simulate what RewriteProjectsFile produces: plain "name:path\n" lines.
+	dir := t.TempDir()
+	// Write a file in the exact format RewriteProjectsFile produces.
+	content := "beta:/path/beta\nalpha:/path/alpha\ngamma:/path/gamma\n"
+	writeTempFile(t, dir, "projects", content)
+
+	out, code := runBashFunc(t, "lib/projects.sh", "load_projects",
+		[]string{filepath.Join(dir, "projects")}, nil)
+	assertExitCode(t, code, 0)
+
+	lines := nonEmptyLines(out)
+	if len(lines) != 3 {
+		t.Fatalf("expected 3 lines, got %d: %v", len(lines), lines)
+	}
+	if lines[0] != "beta:/path/beta" {
+		t.Errorf("pos 0: got %q, want %q", lines[0], "beta:/path/beta")
+	}
+	if lines[1] != "alpha:/path/alpha" {
+		t.Errorf("pos 1: got %q, want %q", lines[1], "alpha:/path/alpha")
+	}
+	if lines[2] != "gamma:/path/gamma" {
+		t.Errorf("pos 2: got %q, want %q", lines[2], "gamma:/path/gamma")
+	}
+}
+
 // ============================================================
 // path_expand tests
 // ============================================================
