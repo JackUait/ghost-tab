@@ -4,6 +4,7 @@
 build:
 	@echo "Building ghost-tab-tui..."
 	go build -o bin/ghost-tab-tui ./cmd/ghost-tab-tui
+	@codesign --sign - --force bin/ghost-tab-tui
 	@echo "✓ Built bin/ghost-tab-tui"
 
 # Install to local bin
