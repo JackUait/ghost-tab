@@ -2051,7 +2051,7 @@ func (m *MainMenuModel) renderMenuBox() string {
 	// Action items
 	for i, action := range actionLabels {
 		actionIdx := numProjects + m.expandedWorktreeCount() + i
-		selected := m.selectedItem == actionIdx
+		selected := !m.deleteMode && m.selectedItem == actionIdx
 
 		var actionLine string
 		if selected {
@@ -2108,7 +2108,9 @@ func (m *MainMenuModel) renderMenuBox() string {
 
 	sep := dimStyle.Render(" · ")
 	var helpContent string
-	if m.showEscHint {
+	if m.deleteMode {
+		helpContent = helpStyle.Render("\u2191\u2193 navigate") + sep + helpStyle.Render("1-9 jump") + sep + helpStyle.Render("\u23ce delete") + sep + helpStyle.Render("Q cancel")
+	} else if m.showEscHint {
 		helpContent = helpStyle.Render("Press Esc again to quit")
 	} else {
 		var parts []string
@@ -2340,8 +2342,6 @@ func (m *MainMenuModel) View() string {
 	var menuBox string
 	if m.settingsMode {
 		menuBox = m.renderSettingsBox()
-	} else if m.deleteMode {
-		menuBox = m.renderDeleteBox()
 	} else if m.inputMode != "" {
 		menuBox = m.renderInputBox()
 	} else {
