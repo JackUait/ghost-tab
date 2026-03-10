@@ -449,8 +449,19 @@ func (m *MainMenuModel) MoveProjectUp() {
 		return // already first
 	}
 
-	// Swap in the projects slice.
-	m.projects[projectIdx], m.projects[projectIdx-1] = m.projects[projectIdx-1], m.projects[projectIdx]
+	// Build the new order without mutating m.projects yet.
+	newProjects := make([]models.Project, len(m.projects))
+	copy(newProjects, m.projects)
+	newProjects[projectIdx], newProjects[projectIdx-1] = newProjects[projectIdx-1], newProjects[projectIdx]
+
+	// Persist first — only mutate memory on success.
+	if err := RewriteProjectsFile(newProjects, m.projectsFile); err != nil {
+		m.setFeedback("Failed to save order", "error")
+		return
+	}
+
+	// Apply to memory.
+	m.projects = newProjects
 
 	// Keep expand states consistent with their projects.
 	expandedA := m.expandedWorktrees[projectIdx]
@@ -468,13 +479,7 @@ func (m *MainMenuModel) MoveProjectUp() {
 
 	// Move cursor to follow the project.
 	m.selectedItem = m.projectToFlatIndex(projectIdx - 1)
-
-	// Persist.
-	if err := RewriteProjectsFile(m.projects, m.projectsFile); err != nil {
-		m.setFeedback("Failed to save order", "error")
-	} else {
-		m.setFeedback("Moved up", "success")
-	}
+	m.setFeedback("Moved up", "success")
 }
 
 // MoveProjectDown moves the project at the current cursor position one slot
@@ -489,8 +494,19 @@ func (m *MainMenuModel) MoveProjectDown() {
 		return // already last
 	}
 
-	// Swap in the projects slice.
-	m.projects[projectIdx], m.projects[projectIdx+1] = m.projects[projectIdx+1], m.projects[projectIdx]
+	// Build the new order without mutating m.projects yet.
+	newProjects := make([]models.Project, len(m.projects))
+	copy(newProjects, m.projects)
+	newProjects[projectIdx], newProjects[projectIdx+1] = newProjects[projectIdx+1], newProjects[projectIdx]
+
+	// Persist first — only mutate memory on success.
+	if err := RewriteProjectsFile(newProjects, m.projectsFile); err != nil {
+		m.setFeedback("Failed to save order", "error")
+		return
+	}
+
+	// Apply to memory.
+	m.projects = newProjects
 
 	// Keep expand states consistent with their projects.
 	expandedA := m.expandedWorktrees[projectIdx]
@@ -508,13 +524,7 @@ func (m *MainMenuModel) MoveProjectDown() {
 
 	// Move cursor to follow the project.
 	m.selectedItem = m.projectToFlatIndex(projectIdx + 1)
-
-	// Persist.
-	if err := RewriteProjectsFile(m.projects, m.projectsFile); err != nil {
-		m.setFeedback("Failed to save order", "error")
-	} else {
-		m.setFeedback("Moved down", "success")
-	}
+	m.setFeedback("Moved down", "success")
 }
 
 // JumpTo jumps to the given 1-indexed project number.
