@@ -85,15 +85,18 @@ func runMainMenu(cmd *cobra.Command, args []string) error {
 	}
 	defer cleanup()
 
+	appModel := tui.NewAppModel(model)
 	opts := append([]tea.ProgramOption{tea.WithAltScreen(), tea.WithMouseCellMotion()}, ttyOpts...)
-	p := tea.NewProgram(model, opts...)
+	p := tea.NewProgram(appModel, opts...)
 
 	finalModel, err := p.Run()
 	if err != nil {
 		return fmt.Errorf("failed to run TUI: %w", err)
 	}
 
-	m := finalModel.(*tui.MainMenuModel)
+	// Extract MainMenuModel from inside AppModel.
+	app := finalModel.(tui.AppModel)
+	m := app.InnerMainMenu()
 	result := m.Result()
 
 	if result == nil {
