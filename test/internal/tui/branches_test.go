@@ -387,3 +387,62 @@ func TestBranchPicker_HelpBarShowsSlash(t *testing.T) {
 		t.Error("expected help bar to show '/ filter'")
 	}
 }
+
+func TestBranchPicker_Cancel_EmitsPopScreenMsg(t *testing.T) {
+	branches := []string{"feature/auth", "fix/cleanup"}
+	m := tui.NewBranchPicker(branches, testTheme(), "/tmp/project")
+
+	sized, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	m = sized.(tui.BranchPickerModel)
+
+	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	if cmd == nil {
+		t.Fatal("expected a command on Esc, got nil")
+	}
+	msg := cmd()
+	if _, ok := msg.(tui.PopScreenMsg); !ok {
+		t.Errorf("expected PopScreenMsg on Esc, got %T", msg)
+	}
+}
+
+func TestBranchPicker_PopResult_ReturnsNilWhenNothingSelected(t *testing.T) {
+	branches := []string{"feature/auth"}
+	m := tui.NewBranchPicker(branches, testTheme(), "/tmp/project")
+
+	sized, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	m = sized.(tui.BranchPickerModel)
+
+	// Esc without selecting
+	m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+
+	if m.PopResult() != nil {
+		t.Error("expected nil PopResult when nothing was selected")
+	}
+}
+
+func TestBranchPicker_PopResult_ReturnsBranchPickerDoneMsgWhenSelected(t *testing.T) {
+	branches := []string{"feature/auth", "fix/cleanup"}
+	m := tui.NewBranchPicker(branches, testTheme(), "/tmp/project")
+
+	sized, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	m = sized.(tui.BranchPickerModel)
+
+	// Select first branch
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(tui.BranchPickerModel)
+
+	result := m.PopResult()
+	if result == nil {
+		t.Fatal("expected non-nil PopResult after selection")
+	}
+	done, ok := result.(tui.BranchPickerDoneMsg)
+	if !ok {
+		t.Fatalf("expected BranchPickerDoneMsg, got %T", result)
+	}
+	if !done.Selected {
+		t.Error("expected Selected=true")
+	}
+	if done.Branch != "feature/auth" {
+		t.Errorf("expected branch 'feature/auth', got %q", done.Branch)
+	}
+}

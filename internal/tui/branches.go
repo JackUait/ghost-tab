@@ -14,12 +14,19 @@ type BranchDeletedMsg struct {
 	Err    error
 }
 
+// BranchPickerDoneMsg is relayed by AppModel to MainMenuModel after the branch
+// picker is popped from the navigation stack.
+type BranchPickerDoneMsg struct {
+	Selected bool
+	Branch   string
+}
+
 // BranchPickerModel lets the user pick a branch from a filterable list.
 // It renders with box-drawing borders matching the main menu style.
 type BranchPickerModel struct {
 	allBranches    []string
 	filtered       []string
-	filtering      bool   // whether filter mode is active (activated by '/')
+	filtering      bool // whether filter mode is active (activated by '/')
 	filterText     string
 	cursor         int // index in filtered list
 	offset         int // scroll offset for visible window
@@ -93,8 +100,12 @@ func (m BranchPickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.applyFilter()
 				return m, nil
 			}
-			m.quitting = true
-			return m, tea.Quit
+			// Ctrl-C quits immediately; Esc pops the navigation stack.
+			if msg.Type == tea.KeyCtrlC {
+				m.quitting = true
+				return m, tea.Quit
+			}
+			return m, func() tea.Msg { return PopScreenMsg{} }
 
 		case tea.KeyEnter:
 			if len(m.filtered) > 0 && m.cursor < len(m.filtered) {
@@ -102,7 +113,7 @@ func (m BranchPickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.selected = &name
 			}
 			m.quitting = true
-			return m, tea.Quit
+			return m, func() tea.Msg { return PopScreenMsg{} }
 
 		case tea.KeyUp:
 			if m.cursor > 0 {
@@ -558,4 +569,13 @@ func (m BranchPickerModel) centerBox(lines []string) string {
 // Selected returns the selected branch name, or nil if cancelled.
 func (m BranchPickerModel) Selected() *string {
 	return m.selected
+}
+
+// PopResult implements tui.ResultProvider. Returns a BranchPickerDoneMsg
+// that AppModel relays to MainMenuModel when this screen is popped.
+func (m BranchPickerModel) PopResult() tea.Msg {
+	if m.selected != nil {
+		return BranchPickerDoneMsg{Selected: true, Branch: *m.selected}
+	}
+	return nil
 }
