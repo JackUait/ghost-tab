@@ -1807,6 +1807,10 @@ func (m *MainMenuModel) renderMenuBox() string {
 	neutralTextStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
 	neutralDimStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
 	moveFlashStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("214")).Bold(true)
+	deleteStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Bold(true)
+	deleteDimStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
+	_ = deleteStyle
+	_ = deleteDimStyle
 
 	hLine := strings.Repeat("\u2500", menuInnerWidth)
 	topBorder := dimStyle.Render("\u256d" + hLine + "\u256e")
