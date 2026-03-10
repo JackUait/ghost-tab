@@ -1545,7 +1545,7 @@ func (m *MainMenuModel) renderSettingsBox() string {
 	lines = append(lines, topBorder)
 
 	// Title row
-	title := primaryBoldStyle.Render("\u2b21  Settings")
+	title := primaryBoldStyle.Render("Settings")
 	titlePadding := menuContentWidth - lipgloss.Width(title) - 1
 	if titlePadding < 0 {
 		titlePadding = 0
@@ -1664,7 +1664,7 @@ func (m *MainMenuModel) renderMenuBox() string {
 	lines = append(lines, topBorder)
 
 	// Title row
-	title := primaryBoldStyle.Render("\u2b21  Ghost Tab")
+	title := primaryBoldStyle.Render("Ghost Tab")
 	aiDisplay := AIToolDisplayName(m.CurrentAITool())
 	var aiPart string
 	if len(m.aiTools) > 1 {
@@ -1971,7 +1971,7 @@ func (m *MainMenuModel) renderInputBox() string {
 
 	lines = append(lines, topBorder)
 
-	title := primaryBoldStyle.Render("\u2b21  Ghost Tab")
+	title := primaryBoldStyle.Render("Ghost Tab")
 	var label string
 	if m.inputMode == "add-project" {
 		label = "Add Project"
@@ -2069,7 +2069,7 @@ func (m *MainMenuModel) renderDeleteBox() string {
 
 	lines = append(lines, topBorder)
 
-	title := primaryBoldStyle.Render("\u2b21  Ghost Tab")
+	title := primaryBoldStyle.Render("Ghost Tab")
 	titleContent := title + " " + dimStyle.Render("\u00b7 Delete")
 	titlePadding := menuContentWidth - lipgloss.Width(titleContent) - 1
 	if titlePadding < 0 {

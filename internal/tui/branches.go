@@ -356,7 +356,7 @@ func (m BranchPickerModel) renderSelectBox() string {
 	lines = append(lines, topBorder)
 
 	// Title row
-	title := primaryBoldStyle.Render("\u2b21  Select Branch")
+	title := primaryBoldStyle.Render("Select Branch")
 	titlePadding := menuContentWidth - lipgloss.Width(title) - 1
 	if titlePadding < 0 {
 		titlePadding = 0
@@ -479,7 +479,7 @@ func (m BranchPickerModel) renderDeleteBox() string {
 	lines = append(lines, topBorder)
 
 	// Title row with "· Delete" suffix
-	title := primaryBoldStyle.Render("\u2b21  Select Branch")
+	title := primaryBoldStyle.Render("Select Branch")
 	titleContent := title + " " + dimStyle.Render("\u00b7 Delete")
 	titlePadding := menuContentWidth - lipgloss.Width(titleContent) - 1
 	if titlePadding < 0 {
