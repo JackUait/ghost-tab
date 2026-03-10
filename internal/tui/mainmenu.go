@@ -176,6 +176,10 @@ type MainMenuModel struct {
 	// File path for project file operations
 	projectsFile string
 
+	// showEscHint is set by AppModel to display "Press Esc again to quit" in
+	// the help row instead of the normal key hints — no extra line is added.
+	showEscHint bool
+
 	// File path for AI tool preference persistence
 	aiToolFile string
 
@@ -658,6 +662,10 @@ func (m *MainMenuModel) WantsEsc() bool {
 
 // SetSettingsMode directly sets settings mode — intended for tests only.
 func (m *MainMenuModel) SetSettingsMode(v bool) { m.settingsMode = v }
+
+// SetShowEscHint tells the model to display the "Press Esc again to quit"
+// hint inside the help row instead of the normal key hints.
+func (m *MainMenuModel) SetShowEscHint(v bool) { m.showEscHint = v }
 
 // EnterInputModeForTest directly sets input mode — intended for tests only.
 func (m *MainMenuModel) EnterInputModeForTest(mode string) { m.inputMode = mode }
@@ -1914,15 +1922,19 @@ func (m *MainMenuModel) renderMenuBox() string {
 	}
 
 	var helpText string
-	if len(m.aiTools) > 1 {
+	if m.showEscHint {
+		helpText = "Press Esc again to quit"
+	} else if len(m.aiTools) > 1 {
 		helpText = "\u2191\u2193 navigate \u2190\u2192 AI S settings"
 	} else {
 		helpText = "\u2191\u2193 navigate S settings"
 	}
-	if hasWorktrees {
+	if !m.showEscHint && hasWorktrees {
 		helpText += " w worktrees"
 	}
-	helpText += " \u23ce select"
+	if !m.showEscHint {
+		helpText += " \u23ce select"
+	}
 	helpContent := helpStyle.Render(helpText)
 	helpPadding := menuContentWidth - lipgloss.Width(helpContent) - 1 // -1 for leading space
 	if helpPadding < 0 {

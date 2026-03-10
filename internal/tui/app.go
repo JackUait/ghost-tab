@@ -4,7 +4,6 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 )
 
 // PushScreenMsg tells AppModel to push a new screen onto the navigation stack.
@@ -154,23 +153,26 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (a AppModel) View() string {
-	view := a.top().View()
-	if a.showEscHint {
-		hintStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
-		hint := hintStyle.Render("  Press Esc again to quit")
-		if view != "" {
-			view = view + "\n" + hint
-		} else {
-			view = hint
-		}
+	// If the top model can receive the hint state, push it in so the model
+	// renders the hint in-place (no extra line, no layout shift).
+	top := a.top()
+	if hr, ok := top.(EscHintReceiver); ok {
+		hr.SetShowEscHint(a.showEscHint)
 	}
-	return view
+	return top.View()
 }
 
 // ResultProvider is implemented by models that want to pass a result back to
 // the model below them on the stack when they are popped.
 type ResultProvider interface {
 	PopResult() tea.Msg
+}
+
+// EscHintReceiver is implemented by models that can render the "Press Esc again
+// to quit" hint in-place (e.g. inside their help row) so that no extra line is
+// added to the output and the layout does not shift.
+type EscHintReceiver interface {
+	SetShowEscHint(bool)
 }
 
 // EscInterceptor is implemented by models that want to handle Esc internally
