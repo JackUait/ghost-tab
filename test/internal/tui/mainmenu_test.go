@@ -2894,6 +2894,44 @@ func TestMainMenu_View_DeleteMode(t *testing.T) {
 	}
 }
 
+func TestMainMenu_View_DeleteMode_SelectedItemUsesMarker(t *testing.T) {
+	prev := lipgloss.ColorProfile()
+	lipgloss.SetColorProfile(termenv.Ascii)
+	defer lipgloss.SetColorProfile(prev)
+	m := tui.NewMainMenu(testProjects(), testAITools(), "claude", "animated")
+	// Enter delete mode by pressing 'd'
+	newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	mm := newModel.(*tui.MainMenuModel)
+
+	view := mm.View()
+
+	// Selected item (index 0, "ghost-tab") should have the ▎ marker
+	if !strings.Contains(view, "▎") {
+		t.Error("Delete mode selected item should contain the ▎ marker")
+	}
+}
+
+func TestMainMenu_View_DeleteMode_NoRedBackground(t *testing.T) {
+	// With TrueColor profile, ANSI escape sequences ARE emitted.
+	// Assert the delete mode view does NOT use background ANSI color codes.
+	// Lipgloss may combine fg+bg into one sequence like \x1b[97;48;5;196m,
+	// so we look for the background code fragment anywhere in the view.
+	// Check both 256-color (48;5;) and TrueColor RGB (48;2;) background codes.
+	prev := lipgloss.ColorProfile()
+	lipgloss.SetColorProfile(termenv.TrueColor)
+	defer lipgloss.SetColorProfile(prev)
+	m := tui.NewMainMenu(testProjects(), testAITools(), "claude", "animated")
+	newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	mm := newModel.(*tui.MainMenuModel)
+
+	view := mm.View()
+
+	// Background codes: 48;5; (256-color) or 48;2; (TrueColor RGB)
+	if strings.Contains(view, "48;5;") || strings.Contains(view, "48;2;") {
+		t.Error("Delete mode view should not use background ANSI color codes")
+	}
+}
+
 func TestMainMenu_View_FeedbackMessage(t *testing.T) {
 	lipgloss.SetColorProfile(termenv.Ascii)
 	dir := t.TempDir()
