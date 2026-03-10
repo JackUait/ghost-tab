@@ -402,6 +402,48 @@ func TestRewriteProjectsFile_createsParentDirs(t *testing.T) {
 	}
 }
 
+func TestRewriteProjectsFile_orderPreserved(t *testing.T) {
+	// Simulates: load 3 projects, swap index 0 and 1, rewrite, reload.
+	dir := t.TempDir()
+	filePath := filepath.Join(dir, "projects")
+
+	original := []models.Project{
+		{Name: "alpha", Path: "/alpha"},
+		{Name: "beta", Path: "/beta"},
+		{Name: "gamma", Path: "/gamma"},
+	}
+	if err := tui.RewriteProjectsFile(original, filePath); err != nil {
+		t.Fatalf("write failed: %v", err)
+	}
+
+	// Simulate swap: move beta before alpha
+	swapped := []models.Project{
+		{Name: "beta", Path: "/beta"},
+		{Name: "alpha", Path: "/alpha"},
+		{Name: "gamma", Path: "/gamma"},
+	}
+	if err := tui.RewriteProjectsFile(swapped, filePath); err != nil {
+		t.Fatalf("rewrite failed: %v", err)
+	}
+
+	reloaded, err := models.LoadProjects(filePath)
+	if err != nil {
+		t.Fatalf("LoadProjects failed: %v", err)
+	}
+	if len(reloaded) != 3 {
+		t.Fatalf("expected 3 projects, got %d", len(reloaded))
+	}
+	if reloaded[0].Name != "beta" {
+		t.Errorf("pos 0: got %q, want %q", reloaded[0].Name, "beta")
+	}
+	if reloaded[1].Name != "alpha" {
+		t.Errorf("pos 1: got %q, want %q", reloaded[1].Name, "alpha")
+	}
+	if reloaded[2].Name != "gamma" {
+		t.Errorf("pos 2: got %q, want %q", reloaded[2].Name, "gamma")
+	}
+}
+
 // --- IsDuplicateProject edge cases (ported from project-actions.bats) ---
 
 func TestIsDuplicateProject_EdgeCases(t *testing.T) {

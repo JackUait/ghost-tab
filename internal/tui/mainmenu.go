@@ -437,6 +437,86 @@ func (m *MainMenuModel) MoveDown() {
 	m.selectedItem = (m.selectedItem + 1) % total
 }
 
+// MoveProjectUp moves the project at the current cursor position one slot up
+// in the list, persists the new order, and follows the cursor to the project.
+// No-op if the cursor is not on a project or the project is already first.
+func (m *MainMenuModel) MoveProjectUp() {
+	itemType, projectIdx, _ := m.ResolveItem(m.selectedItem)
+	if itemType != "project" {
+		return
+	}
+	if projectIdx == 0 {
+		return // already first
+	}
+
+	// Swap in the projects slice.
+	m.projects[projectIdx], m.projects[projectIdx-1] = m.projects[projectIdx-1], m.projects[projectIdx]
+
+	// Keep expand states consistent with their projects.
+	expandedA := m.expandedWorktrees[projectIdx]
+	expandedB := m.expandedWorktrees[projectIdx-1]
+	if expandedA {
+		m.expandedWorktrees[projectIdx-1] = true
+	} else {
+		delete(m.expandedWorktrees, projectIdx-1)
+	}
+	if expandedB {
+		m.expandedWorktrees[projectIdx] = true
+	} else {
+		delete(m.expandedWorktrees, projectIdx)
+	}
+
+	// Move cursor to follow the project.
+	m.selectedItem = m.projectToFlatIndex(projectIdx - 1)
+
+	// Persist.
+	if err := RewriteProjectsFile(m.projects, m.projectsFile); err != nil {
+		m.setFeedback("Failed to save order", "error")
+	} else {
+		m.setFeedback("Moved up", "success")
+	}
+}
+
+// MoveProjectDown moves the project at the current cursor position one slot
+// down in the list, persists the new order, and follows the cursor.
+// No-op if the cursor is not on a project or the project is already last.
+func (m *MainMenuModel) MoveProjectDown() {
+	itemType, projectIdx, _ := m.ResolveItem(m.selectedItem)
+	if itemType != "project" {
+		return
+	}
+	if projectIdx == len(m.projects)-1 {
+		return // already last
+	}
+
+	// Swap in the projects slice.
+	m.projects[projectIdx], m.projects[projectIdx+1] = m.projects[projectIdx+1], m.projects[projectIdx]
+
+	// Keep expand states consistent with their projects.
+	expandedA := m.expandedWorktrees[projectIdx]
+	expandedB := m.expandedWorktrees[projectIdx+1]
+	if expandedA {
+		m.expandedWorktrees[projectIdx+1] = true
+	} else {
+		delete(m.expandedWorktrees, projectIdx+1)
+	}
+	if expandedB {
+		m.expandedWorktrees[projectIdx] = true
+	} else {
+		delete(m.expandedWorktrees, projectIdx)
+	}
+
+	// Move cursor to follow the project.
+	m.selectedItem = m.projectToFlatIndex(projectIdx + 1)
+
+	// Persist.
+	if err := RewriteProjectsFile(m.projects, m.projectsFile); err != nil {
+		m.setFeedback("Failed to save order", "error")
+	} else {
+		m.setFeedback("Moved down", "success")
+	}
+}
+
 // JumpTo jumps to the given 1-indexed project number.
 // Does nothing if n is out of range or beyond the number of projects.
 func (m *MainMenuModel) JumpTo(n int) {
