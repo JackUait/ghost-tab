@@ -3492,24 +3492,23 @@ func TestMainMenu_WKeyTogglesAllWorktrees(t *testing.T) {
 	m := tui.NewMainMenu(projects, testAITools(), "claude", "animated")
 	m.SetSize(100, 40)
 
-	// Press 'w' — should expand ALL projects with worktrees (0 and 2)
+	// 'w' is now cursor-scoped: it only toggles the project under the cursor.
+	// Cursor starts at index 0 (project "ghost-tab"), so pressing 'w' expands
+	// only project 0 and leaves project 2 collapsed.
 	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'w'}}
 	m.Update(msg)
 
 	if !m.IsExpanded(0) {
 		t.Error("expected project 0 to be expanded after 'w'")
 	}
-	if !m.IsExpanded(2) {
-		t.Error("expected project 2 to be expanded after 'w'")
+	if m.IsExpanded(2) {
+		t.Error("expected project 2 to remain collapsed (cursor was on project 0)")
 	}
 
-	// Press 'w' again — should collapse all
+	// Press 'w' again with cursor still on project 0 — should collapse it
 	m.Update(msg)
 	if m.IsExpanded(0) {
 		t.Error("expected project 0 to be collapsed after second 'w'")
-	}
-	if m.IsExpanded(2) {
-		t.Error("expected project 2 to be collapsed after second 'w'")
 	}
 }
 

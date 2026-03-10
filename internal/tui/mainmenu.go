@@ -238,6 +238,7 @@ func (m *MainMenuModel) TotalItems() int {
 
 // ToggleWorktrees toggles expand/collapse for the given project index.
 // No-op if the project has no worktrees.
+// The cursor is anchored to the same logical item before and after the toggle.
 func (m *MainMenuModel) ToggleWorktrees(projectIdx int) {
 	if projectIdx < 0 || projectIdx >= len(m.projects) {
 		return
@@ -246,20 +247,58 @@ func (m *MainMenuModel) ToggleWorktrees(projectIdx int) {
 		return
 	}
 
+	// Snapshot the logical item under the cursor before mutating.
+	anchorType, anchorProjectIdx, anchorWorktreeIdx := m.ResolveItem(m.selectedItem)
+
 	if m.expandedWorktrees[projectIdx] {
-		// Collapsing: if selection is on one of this project's worktrees or add-worktree, snap to project
-		flatIdx := m.projectToFlatIndex(projectIdx)
-		removedCount := len(m.projects[projectIdx].Worktrees) + 1 // worktrees + add-worktree
-		if m.selectedItem > flatIdx && m.selectedItem <= flatIdx+removedCount {
-			m.selectedItem = flatIdx
-		} else if m.selectedItem > flatIdx+removedCount {
-			// Adjust selection for removed items
-			m.selectedItem -= removedCount
-		}
 		delete(m.expandedWorktrees, projectIdx)
 	} else {
 		m.expandedWorktrees[projectIdx] = true
 	}
+
+	// Restore cursor to the same logical item.
+	m.selectedItem = m.resolveToFlatIndex(anchorType, anchorProjectIdx, anchorWorktreeIdx)
+}
+
+// resolveToFlatIndex converts a logical item (as returned by ResolveItem) back
+// to its flat index in the current list layout. If the item no longer exists
+// (e.g. a worktree row after collapse), it falls back to the parent project row.
+func (m *MainMenuModel) resolveToFlatIndex(itemType string, projectIdx int, worktreeIdx int) int {
+	switch itemType {
+	case "project":
+		return m.projectToFlatIndex(projectIdx)
+	case "worktree":
+		// If the project is still expanded, restore to the worktree row.
+		if m.expandedWorktrees[projectIdx] && worktreeIdx < len(m.projects[projectIdx].Worktrees) {
+			return m.projectToFlatIndex(projectIdx) + 1 + worktreeIdx
+		}
+		// Project collapsed — fall back to the project row.
+		return m.projectToFlatIndex(projectIdx)
+	case "add-worktree":
+		// If the project is still expanded, restore to the add-worktree row.
+		if m.expandedWorktrees[projectIdx] {
+			return m.projectToFlatIndex(projectIdx) + 1 + len(m.projects[projectIdx].Worktrees)
+		}
+		// Project collapsed — fall back to the project row.
+		return m.projectToFlatIndex(projectIdx)
+	case "action":
+		// projectIdx holds the action offset for "action" items.
+		actionStart := len(m.projects) + m.expandedWorktreeCount()
+		return actionStart + projectIdx
+	}
+	return 0
+}
+
+// ToggleWorktreesAtCursor toggles expand/collapse for the project that the
+// cursor is currently on. If the cursor is on a worktree or add-worktree row,
+// it toggles that row's parent project. No-op on action rows.
+func (m *MainMenuModel) ToggleWorktreesAtCursor() {
+	itemType, projectIdx, _ := m.ResolveItem(m.selectedItem)
+	switch itemType {
+	case "project", "worktree", "add-worktree":
+		m.ToggleWorktrees(projectIdx)
+	}
+	// "action" → no-op
 }
 
 // expandedWorktreeCount returns the total number of visible worktree entries
@@ -318,6 +357,7 @@ func (m *MainMenuModel) ResolveItem(flatIdx int) (itemType string, projectIdx in
 
 // ToggleAllWorktrees expands all projects with worktrees if any are collapsed,
 // or collapses all if every one is already expanded.
+// The cursor is anchored to the same logical item before and after the toggle.
 func (m *MainMenuModel) ToggleAllWorktrees() {
 	// Check if all projects with worktrees are already expanded
 	allExpanded := true
@@ -328,19 +368,12 @@ func (m *MainMenuModel) ToggleAllWorktrees() {
 		}
 	}
 
+	// Snapshot the logical item under the cursor before mutating the list.
+	anchorType, anchorProjectIdx, anchorWorktreeIdx := m.ResolveItem(m.selectedItem)
+
 	if allExpanded {
-		// Collapse all — reset selection to avoid pointing at a removed worktree row
-		oldTotal := m.TotalItems()
+		// Collapse all
 		m.expandedWorktrees = make(map[int]bool)
-		// Clamp selection: resolve to nearest valid item
-		newTotal := m.TotalItems()
-		if m.selectedItem >= newTotal {
-			m.selectedItem = newTotal - 1
-			if m.selectedItem < 0 {
-				m.selectedItem = 0
-			}
-		}
-		_ = oldTotal // suppress unused
 	} else {
 		// Expand all projects that have worktrees
 		for i, proj := range m.projects {
@@ -349,6 +382,9 @@ func (m *MainMenuModel) ToggleAllWorktrees() {
 			}
 		}
 	}
+
+	// Restore cursor to the same logical item.
+	m.selectedItem = m.resolveToFlatIndex(anchorType, anchorProjectIdx, anchorWorktreeIdx)
 }
 
 // IsExpanded returns whether the given project index is expanded.
@@ -1133,7 +1169,7 @@ func (m *MainMenuModel) handleRune(r rune) (tea.Model, tea.Cmd) {
 		m.setActionResult("plain-terminal")
 		return m, tea.Quit
 	case 'w', 'W':
-		m.ToggleAllWorktrees()
+		m.ToggleWorktreesAtCursor()
 		return m, nil
 	case 's', 'S':
 		m.settingsMode = true
