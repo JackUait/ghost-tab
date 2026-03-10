@@ -1879,9 +1879,17 @@ func (m *MainMenuModel) renderMenuBox() string {
 		}
 
 		if selected {
-			marker := primaryBoldStyle.Render("\u258e")
+			// Use flash style when the row was just moved, primary otherwise.
+			selNameStyle := primaryBoldStyle
+			selPathStyle := primaryStyle
+			if flashing {
+				selNameStyle = moveFlashStyle
+				selPathStyle = moveFlashStyle
+			}
+
+			marker := selNameStyle.Render("\u258e")
 			truncName := TruncateMiddle(proj.Name, menuContentWidth-7-len(num))
-			nameText := primaryBoldStyle.Render(num + "  " + truncName)
+			nameText := selNameStyle.Render(num + "  " + truncName)
 			// "  ▎ 1  name" -> 2 spaces + marker + space + num + 2 spaces + name
 			nameContent := "  " + marker + " " + nameText
 
@@ -1900,7 +1908,7 @@ func (m *MainMenuModel) renderMenuBox() string {
 				nameLine = leftBorder + nameContent + strings.Repeat(" ", namePadding) + rightBorder
 			}
 
-			pathContent := "       " + primaryStyle.Render(shortPath)
+			pathContent := "       " + selPathStyle.Render(shortPath)
 			pathPadding := menuContentWidth - lipgloss.Width(pathContent)
 			if pathPadding < 0 {
 				pathPadding = 0
