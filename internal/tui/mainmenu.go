@@ -1199,6 +1199,12 @@ func (m *MainMenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyDown:
 			m.MoveDown()
 			return m, nil
+		case tea.KeyShiftUp:
+			m.MoveProjectUp()
+			return m, nil
+		case tea.KeyShiftDown:
+			m.MoveProjectDown()
+			return m, nil
 		case tea.KeyLeft:
 			m.CycleAITool("prev")
 			return m, nil
@@ -1248,6 +1254,12 @@ func (m *MainMenuModel) handleRune(r rune) (tea.Model, tea.Cmd) {
 		return m, nil
 	case 'k':
 		m.MoveUp()
+		return m, nil
+	case 'J':
+		m.MoveProjectDown()
+		return m, nil
+	case 'K':
+		m.MoveProjectUp()
 		return m, nil
 	case 'a', 'A':
 		return m.enterInputMode("add-project")
@@ -2055,6 +2067,9 @@ func (m *MainMenuModel) renderMenuBox() string {
 	} else {
 		var parts []string
 		parts = append(parts, helpStyle.Render("\u2191\u2193 navigate"))
+		if len(m.projects) > 1 {
+			parts = append(parts, helpStyle.Render("Shift+\u2191\u2193 move"))
+		}
 		if len(m.aiTools) > 1 {
 			parts = append(parts, helpStyle.Render("\u2190\u2192 AI"))
 		}
