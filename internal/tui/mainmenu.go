@@ -103,6 +103,7 @@ var actionLabels = []struct {
 	{"D", "Delete a project"},
 	{"O", "Open once"},
 	{"P", "Plain terminal"},
+	{"S", "Settings"},
 }
 
 // aiToolDisplayNames maps tool names to their display names.
@@ -2101,25 +2102,29 @@ func (m *MainMenuModel) renderMenuBox() string {
 		helpContent = helpStyle.Render("Press Esc again to quit")
 	} else {
 		var parts []string
-		parts = append(parts, helpStyle.Render("\u2191\u2193 navigate"))
 		if len(m.projects) > 1 {
 			parts = append(parts, helpStyle.Render("Shift+\u2191\u2193 move"))
 		}
 		if len(m.aiTools) > 1 {
 			parts = append(parts, helpStyle.Render("\u2190\u2192 AI"))
 		}
-		parts = append(parts, helpStyle.Render("S settings"))
 		if hasWorktrees {
 			parts = append(parts, helpStyle.Render("w trees"))
 		}
 		parts = append(parts, helpStyle.Render("\u23ce select"))
 		helpContent = strings.Join(parts, sep)
 	}
-	helpPadding := menuContentWidth - lipgloss.Width(helpContent) - 1 // -1 for leading space
-	if helpPadding < 0 {
-		helpPadding = 0
+	helpAvailable := menuContentWidth
+	helpWidth := lipgloss.Width(helpContent)
+	helpLeft := (helpAvailable - helpWidth) / 2
+	if helpLeft < 0 {
+		helpLeft = 0
 	}
-	helpRow := leftBorder + " " + helpContent + strings.Repeat(" ", helpPadding) + rightBorder
+	helpRight := helpAvailable - helpWidth - helpLeft
+	if helpRight < 0 {
+		helpRight = 0
+	}
+	helpRow := leftBorder + strings.Repeat(" ", helpLeft) + helpContent + strings.Repeat(" ", helpRight) + rightBorder
 	lines = append(lines, helpRow)
 
 	// Bottom border
