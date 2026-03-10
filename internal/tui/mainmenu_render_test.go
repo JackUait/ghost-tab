@@ -421,8 +421,8 @@ func TestMenuBox_HelpTextIncludesWorktreeKey(t *testing.T) {
 	box := m.renderMenuBox()
 	raw := stripAnsi(box)
 
-	if !strings.Contains(raw, "w worktrees") && !strings.Contains(raw, "W worktrees") {
-		t.Errorf("expected help text to mention 'w worktrees', got:\n%s", raw)
+	if !strings.Contains(raw, "w trees") && !strings.Contains(raw, "W trees") {
+		t.Errorf("expected help text to mention 'w trees', got:\n%s", raw)
 	}
 }
 

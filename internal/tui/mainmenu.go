@@ -1599,9 +1599,10 @@ func (m *MainMenuModel) renderSettingsBox() string {
 	lines = append(lines, separator)
 
 	// Help row
-	helpText := "\u2191\u2193 navigate  \u2190\u2192 cycle  Esc close"
-	helpContent := helpStyle.Render(helpText)
-	helpPadding := menuContentWidth - lipgloss.Width(helpContent) - 1
+	sep := dimStyle.Render(" · ")
+	helpContent := helpStyle.Render("\u2191\u2193 navigate") + sep + helpStyle.Render("\u2190\u2192 cycle") + sep + helpStyle.Render("Esc close")
+	helpContentWidth := lipgloss.Width(helpContent)
+	helpPadding := menuContentWidth - helpContentWidth - 1
 	if helpPadding < 0 {
 		helpPadding = 0
 	}
@@ -1921,21 +1922,23 @@ func (m *MainMenuModel) renderMenuBox() string {
 		}
 	}
 
-	var helpText string
+	sep := dimStyle.Render(" · ")
+	var helpContent string
 	if m.showEscHint {
-		helpText = "Press Esc again to quit"
-	} else if len(m.aiTools) > 1 {
-		helpText = "\u2191\u2193 navigate \u2190\u2192 AI S settings"
+		helpContent = helpStyle.Render("Press Esc again to quit")
 	} else {
-		helpText = "\u2191\u2193 navigate S settings"
+		var parts []string
+		parts = append(parts, helpStyle.Render("\u2191\u2193 navigate"))
+		if len(m.aiTools) > 1 {
+			parts = append(parts, helpStyle.Render("\u2190\u2192 AI"))
+		}
+		parts = append(parts, helpStyle.Render("S settings"))
+		if hasWorktrees {
+			parts = append(parts, helpStyle.Render("w trees"))
+		}
+		parts = append(parts, helpStyle.Render("\u23ce select"))
+		helpContent = strings.Join(parts, sep)
 	}
-	if !m.showEscHint && hasWorktrees {
-		helpText += " w worktrees"
-	}
-	if !m.showEscHint {
-		helpText += " \u23ce select"
-	}
-	helpContent := helpStyle.Render(helpText)
 	helpPadding := menuContentWidth - lipgloss.Width(helpContent) - 1 // -1 for leading space
 	if helpPadding < 0 {
 		helpPadding = 0
@@ -2028,13 +2031,13 @@ func (m *MainMenuModel) renderInputBox() string {
 	lines = append(lines, emptyRow)
 	lines = append(lines, separator)
 
-	var helpText string
+	sep := dimStyle.Render(" · ")
+	var helpContent string
 	if m.autocomplete.ShowSuggestions() {
-		helpText = "\u2191\u2193 navigate  \u23ce complete  Esc cancel"
+		helpContent = helpStyle.Render("\u2191\u2193 navigate") + sep + helpStyle.Render("\u23ce complete") + sep + helpStyle.Render("Esc cancel")
 	} else {
-		helpText = "Tab complete  \u23ce confirm  Esc cancel"
+		helpContent = helpStyle.Render("Tab complete") + sep + helpStyle.Render("\u23ce confirm") + sep + helpStyle.Render("Esc cancel")
 	}
-	helpContent := helpStyle.Render(helpText)
 	helpPadding := menuContentWidth - lipgloss.Width(helpContent) - 1
 	if helpPadding < 0 {
 		helpPadding = 0
@@ -2119,8 +2122,8 @@ func (m *MainMenuModel) renderDeleteBox() string {
 	lines = append(lines, emptyRow)
 	lines = append(lines, separator)
 
-	helpText := "\u2191\u2193 navigate  1-9 jump  \u23ce delete  Q cancel"
-	helpContent := helpStyle.Render(helpText)
+	sep := dimStyle.Render(" · ")
+	helpContent := helpStyle.Render("\u2191\u2193 navigate") + sep + helpStyle.Render("1-9 jump") + sep + helpStyle.Render("\u23ce delete") + sep + helpStyle.Render("Q cancel")
 	helpPadding := menuContentWidth - lipgloss.Width(helpContent) - 1
 	if helpPadding < 0 {
 		helpPadding = 0
