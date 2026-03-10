@@ -649,6 +649,22 @@ func (m *MainMenuModel) InInputMode() bool { return m.inputMode != "" }
 // InDeleteMode returns true if the menu is currently in delete mode.
 func (m *MainMenuModel) InDeleteMode() bool { return m.deleteMode }
 
+// WantsEsc implements EscInterceptor. It returns true when the menu is in a
+// sub-mode (settings, input, or delete) where Esc should navigate back within
+// the menu rather than triggering the AppModel double-Esc quit flow.
+func (m *MainMenuModel) WantsEsc() bool {
+	return m.settingsMode || m.inputMode != "" || m.deleteMode
+}
+
+// SetSettingsMode directly sets settings mode — intended for tests only.
+func (m *MainMenuModel) SetSettingsMode(v bool) { m.settingsMode = v }
+
+// EnterInputModeForTest directly sets input mode — intended for tests only.
+func (m *MainMenuModel) EnterInputModeForTest(mode string) { m.inputMode = mode }
+
+// EnterDeleteModeForTest directly sets delete mode — intended for tests only.
+func (m *MainMenuModel) EnterDeleteModeForTest() { m.deleteMode = true }
+
 // DeleteSelected returns the index of the selected item in delete mode.
 func (m *MainMenuModel) DeleteSelected() int { return m.deleteSelected }
 

@@ -117,18 +117,25 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	// Handle Esc at depth 1 (double-Esc to quit).
+	// Only intercept if the top model does not want to handle Esc itself
+	// (e.g. to close a sub-panel or exit an input mode).
 	if km, ok := msg.(tea.KeyMsg); ok && km.Type == tea.KeyEsc && len(a.stack) == 1 {
-		if a.showEscHint && !a.escPressedAt.IsZero() &&
-			time.Since(a.escPressedAt) < escHintTimeout {
-			// Second Esc within window — quit.
-			return a, tea.Quit
+		// If the child claims Esc, delegate to it.
+		if ei, ok := a.top().(EscInterceptor); ok && ei.WantsEsc() {
+			// Fall through to the delegate-to-top-model path below.
+		} else {
+			if a.showEscHint && !a.escPressedAt.IsZero() &&
+				time.Since(a.escPressedAt) < escHintTimeout {
+				// Second Esc within window — quit.
+				return a, tea.Quit
+			}
+			// First Esc — show hint, start timer.
+			a.showEscHint = true
+			a.escPressedAt = time.Now()
+			return a, tea.Tick(escHintTimeout, func(time.Time) tea.Msg {
+				return escHintExpiredMsg{}
+			})
 		}
-		// First Esc — show hint, start timer.
-		a.showEscHint = true
-		a.escPressedAt = time.Now()
-		return a, tea.Tick(escHintTimeout, func(time.Time) tea.Msg {
-			return escHintExpiredMsg{}
-		})
 	}
 
 	// Any other keypress clears the hint.
@@ -164,4 +171,16 @@ func (a AppModel) View() string {
 // the model below them on the stack when they are popped.
 type ResultProvider interface {
 	PopResult() tea.Msg
+}
+
+// EscInterceptor is implemented by models that want to handle Esc internally
+// (e.g. to close a sub-panel or exit a sub-mode) rather than having AppModel
+// apply the double-Esc quit logic. AppModel checks WantsEsc() before deciding
+// whether to intercept or delegate.
+type EscInterceptor interface {
+	// WantsEsc returns true when the model is in a state where Esc should be
+	// consumed by the model itself (e.g. settings panel open, input mode active).
+	// Return false when the model is in its normal top-level state so that
+	// AppModel can apply the double-Esc-to-quit protection.
+	WantsEsc() bool
 }
