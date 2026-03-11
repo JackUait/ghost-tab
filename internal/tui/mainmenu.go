@@ -1643,23 +1643,105 @@ func (m *MainMenuModel) deleteMoveDown() {
 }
 
 // confirmDeleteFlat is a temporary stub — Task 9 will replace this with real dispatch.
+// confirmDeleteFlat dispatches to the appropriate deletion handler based on
+// what the current deleteSelected flat index points to.
 func (m *MainMenuModel) confirmDeleteFlat() (tea.Model, tea.Cmd) {
-	return m.confirmDelete() // temporary, Task 9 will replace this
+	itemType, projectIdx, wtIdx := m.ResolveItem(m.deleteSelected)
+	switch itemType {
+	case "project":
+		return m.confirmDeleteProject(projectIdx)
+	case "worktree":
+		return m.confirmDeleteWorktree(projectIdx, wtIdx)
+	default:
+		m.exitDeleteMode()
+		return m, nil
+	}
 }
 
-// forceDeleteWorktree is a temporary stub — Task 9 will replace this.
-func (m *MainMenuModel) forceDeleteWorktree() (tea.Model, tea.Cmd) {
-	return m, nil // temporary, Task 9 will replace this
-}
+// confirmDeleteWorktree attempts to remove the worktree at (projectIdx, wtIdx) without force.
+// On dirty error, sets pendingForceDeleteWT and shows a prompt. On other errors, shows error feedback.
+func (m *MainMenuModel) confirmDeleteWorktree(projectIdx, wtIdx int) (tea.Model, tea.Cmd) {
+	if projectIdx >= len(m.projects) || wtIdx >= len(m.projects[projectIdx].Worktrees) {
+		m.exitDeleteMode()
+		return m, nil
+	}
+	wt := m.projects[projectIdx].Worktrees[wtIdx]
+	projectPath := m.projects[projectIdx].Path
 
-// confirmDelete removes the selected project from the projects file and updates the list.
-func (m *MainMenuModel) confirmDelete() (tea.Model, tea.Cmd) {
-	if m.deleteSelected >= len(m.projects) {
+	if err := models.RemoveWorktree(projectPath, wt.Path, false); err != nil {
+		if models.IsWorktreeDirtyError(err) {
+			m.pendingForceDeleteWT = &pendingWorktreeDelete{projectIdx: projectIdx, wtIdx: wtIdx}
+			m.setFeedback("Worktree has changes — press Y to force remove", "error")
+			return m, nil
+		}
+		m.setFeedback("Failed to remove worktree", "error")
 		m.exitDeleteMode()
 		return m, nil
 	}
 
-	proj := m.projects[m.deleteSelected]
+	return m.reloadAfterWorktreeRemoval(wt.Branch)
+}
+
+// forceDeleteWorktree runs git worktree remove --force for the pending worktree.
+func (m *MainMenuModel) forceDeleteWorktree() (tea.Model, tea.Cmd) {
+	pending := m.pendingForceDeleteWT
+	m.pendingForceDeleteWT = nil
+	if pending == nil || pending.projectIdx >= len(m.projects) ||
+		pending.wtIdx >= len(m.projects[pending.projectIdx].Worktrees) {
+		m.exitDeleteMode()
+		return m, nil
+	}
+	wt := m.projects[pending.projectIdx].Worktrees[pending.wtIdx]
+	projectPath := m.projects[pending.projectIdx].Path
+
+	if err := models.RemoveWorktree(projectPath, wt.Path, true); err != nil {
+		m.setFeedback("Failed to force remove worktree", "error")
+		m.exitDeleteMode()
+		return m, nil
+	}
+
+	return m.reloadAfterWorktreeRemoval(wt.Branch)
+}
+
+// reloadAfterWorktreeRemoval reloads projects+worktrees, resets state, and exits delete mode.
+func (m *MainMenuModel) reloadAfterWorktreeRemoval(branch string) (tea.Model, tea.Cmd) {
+	projects, _ := models.LoadProjects(m.projectsFile)
+	models.PopulateWorktrees(projects)
+	m.projects = projects
+	m.expandedWorktrees = make(map[int]bool)
+
+	items := m.DeletableItems()
+	found := false
+	for _, v := range items {
+		if v == m.deleteSelected {
+			found = true
+			break
+		}
+	}
+	if !found && len(items) > 0 {
+		m.deleteSelected = items[0]
+	}
+
+	if m.selectedItem >= m.TotalItems() {
+		m.selectedItem = m.TotalItems() - 1
+		if m.selectedItem < 0 {
+			m.selectedItem = 0
+		}
+	}
+
+	m.exitDeleteMode()
+	m.setFeedback("Removed worktree "+branch, "success")
+	return m, nil
+}
+
+// confirmDeleteProject removes the project at projectIdx from the projects file and updates the list.
+func (m *MainMenuModel) confirmDeleteProject(projectIdx int) (tea.Model, tea.Cmd) {
+	if projectIdx >= len(m.projects) {
+		m.exitDeleteMode()
+		return m, nil
+	}
+
+	proj := m.projects[projectIdx]
 	line := proj.Name + ":" + proj.Path
 
 	if err := RemoveProject(line, m.projectsFile); err != nil {
