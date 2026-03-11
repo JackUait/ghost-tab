@@ -1925,7 +1925,7 @@ func (m *MainMenuModel) renderMenuBox() string {
 	for i, proj := range m.projects {
 		selected := func() bool {
 			if m.deleteMode {
-				return m.deleteSelected == i
+				return m.deleteSelected == m.projectToFlatIndex(i)
 			}
 			return m.selectedItem == m.projectToFlatIndex(i)
 		}()
@@ -2033,12 +2033,30 @@ func (m *MainMenuModel) renderMenuBox() string {
 			connector := "\u251c\u2500"
 			for j, wt := range proj.Worktrees {
 				wtFlatIdx := m.projectToFlatIndex(i) + 1 + j
-				wtSelected := m.selectedItem == wtFlatIdx
+				wtSelected := !m.deleteMode && m.selectedItem == wtFlatIdx
+				wtDeleteSelected := m.deleteMode && m.deleteSelected == wtFlatIdx
 				var wtBranchLine, wtPathLine string
 				branchDisplay := TruncateMiddle(wt.Branch, menuContentWidth-11)
 				shortWtPath := TruncateMiddle(shortenHomePath(wt.Path), menuContentWidth-11)
 
-				if wtSelected {
+				if wtDeleteSelected {
+					marker := deleteStyle.Render("\u258e")
+					connStyled := deleteStyle.Render(connector)
+					branchText := deleteStyle.Render(branchDisplay)
+					content := "     " + marker + " " + connStyled + " " + branchText
+					padding := menuContentWidth - lipgloss.Width(content)
+					if padding < 0 {
+						padding = 0
+					}
+					wtBranchLine = leftBorder + content + strings.Repeat(" ", padding) + rightBorder
+
+					pathContent := "          " + deleteDimStyle.Render(shortWtPath)
+					pathPadding := menuContentWidth - lipgloss.Width(pathContent)
+					if pathPadding < 0 {
+						pathPadding = 0
+					}
+					wtPathLine = leftBorder + pathContent + strings.Repeat(" ", pathPadding) + rightBorder
+				} else if wtSelected {
 					marker := primaryBoldStyle.Render("\u258e")
 					connStyled := primaryBoldStyle.Render(connector)
 					branchText := primaryBoldStyle.Render(branchDisplay)
