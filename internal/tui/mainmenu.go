@@ -1720,7 +1720,15 @@ func (m *MainMenuModel) reloadAfterWorktreeRemoval(branch string) (tea.Model, te
 	projects, _ := models.LoadProjects(m.projectsFile)
 	models.PopulateWorktrees(projects)
 	m.projects = projects
-	m.expandedWorktrees = make(map[int]bool)
+
+	// Preserve expanded state for projects that still exist and still have worktrees.
+	newExpanded := make(map[int]bool)
+	for i, proj := range m.projects {
+		if m.expandedWorktrees[i] && len(proj.Worktrees) > 0 {
+			newExpanded[i] = true
+		}
+	}
+	m.expandedWorktrees = newExpanded
 
 	items := m.DeletableItems()
 	found := false
