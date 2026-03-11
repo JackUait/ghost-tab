@@ -4039,3 +4039,86 @@ func TestDeletableItems_WithExpandedWorktrees(t *testing.T) {
 		}
 	}
 }
+
+func TestDeleteMode_FlatIndex_StartsAtFirstDeletable(t *testing.T) {
+	// On entering delete mode, deleteSelected should be the first deletable flat index.
+	// With no expansions that is 0 — this test also passes today, so it's a regression guard.
+	projects := testProjects()
+	m := tui.NewMainMenu(projects, testAITools(), "claude", "animated")
+	newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	mm := newModel.(*tui.MainMenuModel)
+	if mm.DeleteSelected() != 0 {
+		t.Errorf("DeleteSelected after entering delete mode: want 0, got %d", mm.DeleteSelected())
+	}
+}
+
+func TestDeleteMode_FlatIndex_NavigatesPastWorktrees(t *testing.T) {
+	// With project 0 expanded (2 worktrees), pressing ↓ twice in delete mode
+	// should land on the first worktree (flat=1), then second worktree (flat=2).
+	projects := []models.Project{
+		{Name: "proj1", Path: "/p1", Worktrees: []models.Worktree{
+			{Path: "/p1--feat", Branch: "feat"},
+			{Path: "/p1--fix", Branch: "fix"},
+		}},
+		{Name: "proj2", Path: "/p2"},
+	}
+	m := tui.NewMainMenu(projects, []string{"claude"}, "claude", "none")
+	m.SetSize(80, 30)
+	// Expand project 0
+	newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'w'}})
+	mm := newModel.(*tui.MainMenuModel)
+	// Enter delete mode
+	newModel2, _ := mm.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	mm2 := newModel2.(*tui.MainMenuModel)
+
+	if mm2.DeleteSelected() != 0 {
+		t.Fatalf("initial DeleteSelected: want 0, got %d", mm2.DeleteSelected())
+	}
+
+	// Down once → flat=1 (first worktree)
+	newModel3, _ := mm2.Update(tea.KeyMsg{Type: tea.KeyDown})
+	mm3 := newModel3.(*tui.MainMenuModel)
+	if mm3.DeleteSelected() != 1 {
+		t.Errorf("after first ↓: want 1, got %d", mm3.DeleteSelected())
+	}
+
+	// Down again → flat=2 (second worktree)
+	newModel4, _ := mm3.Update(tea.KeyMsg{Type: tea.KeyDown})
+	mm4 := newModel4.(*tui.MainMenuModel)
+	if mm4.DeleteSelected() != 2 {
+		t.Errorf("after second ↓: want 2, got %d", mm4.DeleteSelected())
+	}
+
+	// Down again → flat=4 (proj2, skip add-worktree at 3)
+	newModel5, _ := mm4.Update(tea.KeyMsg{Type: tea.KeyDown})
+	mm5 := newModel5.(*tui.MainMenuModel)
+	if mm5.DeleteSelected() != 4 {
+		t.Errorf("after third ↓: want 4, got %d", mm5.DeleteSelected())
+	}
+}
+
+func TestDeleteMode_FlatIndex_NumberJumpsByDeletablePosition(t *testing.T) {
+	// With project 0 expanded (1 worktree), pressing '2' should jump to
+	// the 2nd deletable item (flat=1, the worktree), not project index 1.
+	projects := []models.Project{
+		{Name: "proj1", Path: "/p1", Worktrees: []models.Worktree{
+			{Path: "/p1--feat", Branch: "feat"},
+		}},
+		{Name: "proj2", Path: "/p2"},
+	}
+	m := tui.NewMainMenu(projects, []string{"claude"}, "claude", "none")
+	m.SetSize(80, 30)
+	// Expand project 0
+	newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'w'}})
+	mm := newModel.(*tui.MainMenuModel)
+	// Enter delete mode
+	newModel2, _ := mm.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	mm2 := newModel2.(*tui.MainMenuModel)
+
+	// '2' should jump to the 2nd deletable item = flat index 1 (the worktree)
+	newModel3, _ := mm2.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}})
+	mm3 := newModel3.(*tui.MainMenuModel)
+	if mm3.DeleteSelected() != 1 {
+		t.Errorf("after '2': want flat=1 (worktree), got %d", mm3.DeleteSelected())
+	}
+}
