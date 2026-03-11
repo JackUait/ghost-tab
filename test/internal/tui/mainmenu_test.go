@@ -3995,3 +3995,47 @@ func TestMainMenu_BranchPickerDoneMsg_WithSelection_CreatesWorktree(t *testing.T
 		t.Logf("worktree path %q not created (may be expected in CI): %v", expectedPath, err)
 	}
 }
+
+func TestDeletableItems_ProjectsOnly(t *testing.T) {
+	// No expanded worktrees → only project flat indices
+	projects := testProjects() // 3 projects
+	m := tui.NewMainMenu(projects, testAITools(), "claude", "animated")
+
+	items := m.DeletableItems()
+	// Expected: [0, 1, 2] — projectToFlatIndex(0)=0, (1)=1, (2)=2 (no expansions)
+	if len(items) != 3 {
+		t.Fatalf("want 3 deletable items, got %d: %v", len(items), items)
+	}
+	if items[0] != 0 || items[1] != 1 || items[2] != 2 {
+		t.Errorf("want [0 1 2], got %v", items)
+	}
+}
+
+func TestDeletableItems_WithExpandedWorktrees(t *testing.T) {
+	// One expanded project with 2 worktrees → project + its 2 worktrees appear,
+	// the "add worktree" item does NOT appear, action items do NOT appear.
+	projects := []models.Project{
+		{Name: "proj1", Path: "/p1", Worktrees: []models.Worktree{
+			{Path: "/p1--feat", Branch: "feat"},
+			{Path: "/p1--fix", Branch: "fix"},
+		}},
+		{Name: "proj2", Path: "/p2"},
+	}
+	m := tui.NewMainMenu(projects, []string{"claude"}, "claude", "none")
+	m.SetSize(80, 30)
+	// Expand project 0 via 'w' key
+	newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'w'}})
+	mm := newModel.(*tui.MainMenuModel)
+
+	items := mm.DeletableItems()
+	// proj1 flat=0, wt0 flat=1, wt1 flat=2, proj2 flat=4 (skip add-worktree at 3)
+	want := []int{0, 1, 2, 4}
+	if len(items) != len(want) {
+		t.Fatalf("want %v, got %v", want, items)
+	}
+	for i, v := range want {
+		if items[i] != v {
+			t.Errorf("items[%d]: want %d, got %d", i, v, items[i])
+		}
+	}
+}
