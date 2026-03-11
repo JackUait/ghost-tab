@@ -4345,3 +4345,72 @@ func TestDeleteMode_ConfirmDelete_WorktreeTarget_Dirty(t *testing.T) {
 		t.Errorf("expected success feedback after force removal, got: %s", view2)
 	}
 }
+
+func TestDeleteMode_PreservesCursorPosition(t *testing.T) {
+	// When the user's main cursor is on a project row and they enter delete mode,
+	// deleteSelected should start at that project's flat index (not always 0).
+	projects := []models.Project{
+		{Name: "proj1", Path: "/p1"},
+		{Name: "proj2", Path: "/p2"},
+		{Name: "proj3", Path: "/p3"},
+	}
+	m := tui.NewMainMenu(projects, []string{"claude"}, "claude", "none")
+	m.SetSize(80, 30)
+
+	// Navigate down twice so selectedItem points at proj3 (flat index 2).
+	newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	newModel, _ = newModel.(*tui.MainMenuModel).Update(tea.KeyMsg{Type: tea.KeyDown})
+	mm := newModel.(*tui.MainMenuModel)
+	if mm.SelectedItem() != 2 {
+		t.Fatalf("precondition: expected selectedItem=2, got %d", mm.SelectedItem())
+	}
+
+	// Enter delete mode.
+	newModel2, _ := mm.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	mm2 := newModel2.(*tui.MainMenuModel)
+
+	// deleteSelected should match the pre-existing cursor position (flat index 2).
+	if mm2.DeleteSelected() != 2 {
+		t.Errorf("DeleteSelected after entering delete mode: want 2 (cursor position), got %d", mm2.DeleteSelected())
+	}
+}
+
+func TestDeleteMode_FallsBackToFirstDeletableWhenCursorOnNonDeletable(t *testing.T) {
+	// When the main cursor is on a non-deletable row (e.g., an action row),
+	// enterDeleteMode should fall back to the first deletable item.
+	projects := []models.Project{
+		{Name: "proj1", Path: "/p1"},
+	}
+	m := tui.NewMainMenu(projects, []string{"claude"}, "claude", "none")
+	m.SetSize(80, 30)
+
+	// Move cursor past all projects onto the action rows (keep pressing down until
+	// we're past the last project flat index).
+	total := m.TotalItems()
+	mm := m
+	for i := 0; i < total; i++ {
+		newModel, _ := mm.Update(tea.KeyMsg{Type: tea.KeyDown})
+		mm = newModel.(*tui.MainMenuModel)
+		itemType, _, _ := mm.ResolveItem(mm.SelectedItem())
+		if itemType == "action" {
+			break
+		}
+	}
+	itemType, _, _ := mm.ResolveItem(mm.SelectedItem())
+	if itemType != "action" {
+		t.Skip("could not navigate to an action row — skipping test")
+	}
+
+	// Enter delete mode — cursor is on an action row (non-deletable).
+	newModel2, _ := mm.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	mm2 := newModel2.(*tui.MainMenuModel)
+
+	// Should fall back to the first deletable item (flat index 0).
+	deletable := mm2.DeletableItems()
+	if len(deletable) == 0 {
+		t.Fatal("DeletableItems returned empty")
+	}
+	if mm2.DeleteSelected() != deletable[0] {
+		t.Errorf("DeleteSelected fallback: want %d (first deletable), got %d", deletable[0], mm2.DeleteSelected())
+	}
+}

@@ -1546,7 +1546,16 @@ func (m *MainMenuModel) enterDeleteMode() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	m.deleteMode = true
-	m.deleteSelected = 0
+	// Preserve the user's current cursor position if it is a valid delete target;
+	// otherwise fall back to the first deletable item.
+	items := m.DeletableItems()
+	m.deleteSelected = items[0]
+	for _, idx := range items {
+		if idx == m.selectedItem {
+			m.deleteSelected = m.selectedItem
+			break
+		}
+	}
 	return m, nil
 }
 
