@@ -1589,6 +1589,9 @@ func (m *MainMenuModel) updateDeleteMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			case r == 'q' || r == 'Q':
 				m.exitDeleteMode()
 				return m, nil
+			case r == 'd' || r == 'D':
+				m.exitDeleteMode()
+				return m, nil
 			case r == 'y' || r == 'Y':
 				if m.pendingForceDeleteWT != nil {
 					return m.forceDeleteWorktree()
@@ -1712,7 +1715,7 @@ func (m *MainMenuModel) forceDeleteWorktree() (tea.Model, tea.Cmd) {
 	return m.reloadAfterWorktreeRemoval(wt.Branch)
 }
 
-// reloadAfterWorktreeRemoval reloads projects+worktrees, resets state, and exits delete mode.
+// reloadAfterWorktreeRemoval reloads projects+worktrees, resets state, and stays in delete mode.
 func (m *MainMenuModel) reloadAfterWorktreeRemoval(branch string) (tea.Model, tea.Cmd) {
 	projects, _ := models.LoadProjects(m.projectsFile)
 	models.PopulateWorktrees(projects)
@@ -1738,7 +1741,6 @@ func (m *MainMenuModel) reloadAfterWorktreeRemoval(branch string) (tea.Model, te
 		}
 	}
 
-	m.exitDeleteMode()
 	m.setFeedback("Removed worktree "+branch, "success")
 	return m, nil
 }
@@ -1771,7 +1773,23 @@ func (m *MainMenuModel) confirmDeleteProject(projectIdx int) (tea.Model, tea.Cmd
 		}
 	}
 
-	m.exitDeleteMode()
+	// Clamp deleteSelected to a valid deletable item; exit if none remain.
+	items := m.DeletableItems()
+	if len(items) == 0 {
+		m.exitDeleteMode()
+	} else {
+		found := false
+		for _, v := range items {
+			if v == m.deleteSelected {
+				found = true
+				break
+			}
+		}
+		if !found {
+			m.deleteSelected = items[0]
+		}
+	}
+
 	m.setFeedback("Deleted "+proj.Name, "success")
 	return m, nil
 }

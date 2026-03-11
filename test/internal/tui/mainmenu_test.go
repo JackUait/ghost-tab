@@ -2657,8 +2657,8 @@ func TestMainMenu_DeleteProject_ConfirmDeletes(t *testing.T) {
 	newModel3, _ := mm2.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	mm3 := newModel3.(*tui.MainMenuModel)
 
-	if mm3.InDeleteMode() {
-		t.Error("Should exit delete mode after deletion")
+	if !mm3.InDeleteMode() {
+		t.Error("Should remain in delete mode after deletion")
 	}
 	if mm3.FeedbackMsg() == "" {
 		t.Error("Expected feedback after deletion")
@@ -4275,9 +4275,9 @@ func TestDeleteMode_ConfirmDelete_WorktreeTarget_Success(t *testing.T) {
 	newModel4, _ := mm3.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	mm4 := newModel4.(*tui.MainMenuModel)
 
-	// Should exit delete mode and show success feedback
-	if mm4.InDeleteMode() {
-		t.Error("should have exited delete mode after worktree deletion")
+	// Should stay in delete mode and show success feedback
+	if !mm4.InDeleteMode() {
+		t.Error("should remain in delete mode after worktree deletion")
 	}
 	view := mm4.View()
 	if !strings.Contains(view, "Removed") && !strings.Contains(view, "feat") {
@@ -4337,8 +4337,8 @@ func TestDeleteMode_ConfirmDelete_WorktreeTarget_Dirty(t *testing.T) {
 	newModel5, _ := mm4.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'Y'}})
 	mm5 := newModel5.(*tui.MainMenuModel)
 
-	if mm5.InDeleteMode() {
-		t.Error("should have exited delete mode after force removal")
+	if !mm5.InDeleteMode() {
+		t.Error("should remain in delete mode after force removal")
 	}
 	view2 := mm5.View()
 	if !strings.Contains(view2, "Removed") && !strings.Contains(view2, "feat") {
@@ -4412,5 +4412,107 @@ func TestDeleteMode_FallsBackToFirstDeletableWhenCursorOnNonDeletable(t *testing
 	}
 	if mm2.DeleteSelected() != deletable[0] {
 		t.Errorf("DeleteSelected fallback: want %d (first deletable), got %d", deletable[0], mm2.DeleteSelected())
+	}
+}
+
+func TestDeleteMode_StaysOpenAfterProjectDeletion(t *testing.T) {
+	// After deleting a project, delete mode should remain active so the user
+	// can delete more items without re-entering delete mode.
+	dir := t.TempDir()
+	projectsFile := filepath.Join(dir, "projects")
+	if err := os.WriteFile(projectsFile, []byte("proj1:/p1\nproj2:/p2\nproj3:/p3\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	projects := []models.Project{
+		{Name: "proj1", Path: "/p1"},
+		{Name: "proj2", Path: "/p2"},
+		{Name: "proj3", Path: "/p3"},
+	}
+	m := tui.NewMainMenu(projects, []string{"claude"}, "claude", "none")
+	m.SetSize(80, 30)
+	m.SetProjectsFile(projectsFile)
+
+	// Enter delete mode (cursor on proj1).
+	newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	mm := newModel.(*tui.MainMenuModel)
+
+	// Confirm deletion of proj1.
+	newModel2, _ := mm.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	mm2 := newModel2.(*tui.MainMenuModel)
+
+	// Delete mode must still be active.
+	if !mm2.InDeleteMode() {
+		t.Error("delete mode should remain active after deleting a project")
+	}
+	// Feedback should mention the deleted project.
+	view := mm2.View()
+	if !strings.Contains(view, "proj1") && !strings.Contains(view, "Deleted") {
+		t.Errorf("expected success feedback after deletion, got: %s", view)
+	}
+}
+
+func TestDeleteMode_StaysOpenAfterWorktreeDeletion(t *testing.T) {
+	// After deleting a worktree, delete mode should remain active.
+	dir := t.TempDir()
+	if out, err := exec.Command("git", "-C", dir, "init").CombinedOutput(); err != nil {
+		t.Skipf("git init: %v: %s", err, out)
+	}
+	exec.Command("git", "-C", dir, "config", "user.email", "test@test.com").Run()
+	exec.Command("git", "-C", dir, "config", "user.name", "Test").Run()
+	exec.Command("git", "-C", dir, "commit", "--allow-empty", "-m", "init").Run()
+	exec.Command("git", "-C", dir, "branch", "feat").Run()
+	wtPath := filepath.Join(t.TempDir(), "feat")
+	if out, err := exec.Command("git", "-C", dir, "worktree", "add", wtPath, "feat").CombinedOutput(); err != nil {
+		t.Skipf("git worktree add: %v: %s", err, out)
+	}
+
+	projects := []models.Project{
+		{Name: "myproj", Path: dir, Worktrees: []models.Worktree{
+			{Path: wtPath, Branch: "feat"},
+		}},
+	}
+	m := tui.NewMainMenu(projects, []string{"claude"}, "claude", "none")
+	m.SetSize(80, 30)
+	m.SetProjectsFile(filepath.Join(dir, "projects"))
+
+	// Expand project 0, enter delete mode, navigate to worktree (flat=1).
+	newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'w'}})
+	mm := newModel.(*tui.MainMenuModel)
+	newModel2, _ := mm.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	mm2 := newModel2.(*tui.MainMenuModel)
+	newModel3, _ := mm2.Update(tea.KeyMsg{Type: tea.KeyDown})
+	mm3 := newModel3.(*tui.MainMenuModel)
+	if mm3.DeleteSelected() != 1 {
+		t.Fatalf("precondition: deleteSelected should be 1, got %d", mm3.DeleteSelected())
+	}
+
+	// Confirm deletion.
+	newModel4, _ := mm3.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	mm4 := newModel4.(*tui.MainMenuModel)
+
+	// Delete mode must still be active.
+	if !mm4.InDeleteMode() {
+		t.Error("delete mode should remain active after deleting a worktree")
+	}
+}
+
+func TestDeleteMode_DKeyExitsDeleteMode(t *testing.T) {
+	// Pressing 'd' while already in delete mode should exit delete mode.
+	projects := testProjects()
+	m := tui.NewMainMenu(projects, testAITools(), "claude", "animated")
+
+	// Enter delete mode.
+	newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	mm := newModel.(*tui.MainMenuModel)
+	if !mm.InDeleteMode() {
+		t.Fatal("precondition: should be in delete mode after pressing 'd'")
+	}
+
+	// Press 'd' again — should exit.
+	newModel2, _ := mm.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	mm2 := newModel2.(*tui.MainMenuModel)
+	if mm2.InDeleteMode() {
+		t.Error("pressing 'd' in delete mode should exit delete mode")
 	}
 }
