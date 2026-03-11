@@ -4122,3 +4122,57 @@ func TestDeleteMode_FlatIndex_NumberJumpsByDeletablePosition(t *testing.T) {
 		t.Errorf("after '2': want flat=1 (worktree), got %d", mm3.DeleteSelected())
 	}
 }
+
+func TestDeleteMode_RenderWorktreeMarker(t *testing.T) {
+	prev := lipgloss.ColorProfile()
+	lipgloss.SetColorProfile(termenv.Ascii)
+	defer lipgloss.SetColorProfile(prev)
+
+	// proj1 expanded with 1 worktree "feat"
+	projects := []models.Project{
+		{Name: "proj1", Path: "/p1", Worktrees: []models.Worktree{
+			{Path: "/p1--feat", Branch: "feat"},
+		}},
+		{Name: "proj2", Path: "/p2"},
+	}
+	m := tui.NewMainMenu(projects, []string{"claude"}, "claude", "none")
+	m.SetSize(80, 30)
+	// Expand project 0
+	newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'w'}})
+	mm := newModel.(*tui.MainMenuModel)
+	// Enter delete mode
+	newModel2, _ := mm.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	mm2 := newModel2.(*tui.MainMenuModel)
+	// Navigate down once → deleteSelected = 1 (the worktree)
+	newModel3, _ := mm2.Update(tea.KeyMsg{Type: tea.KeyDown})
+	mm3 := newModel3.(*tui.MainMenuModel)
+
+	if mm3.DeleteSelected() != 1 {
+		t.Fatalf("precondition: DeleteSelected should be 1, got %d", mm3.DeleteSelected())
+	}
+
+	view := mm3.View()
+
+	// The worktree row for "feat" must contain the ▎ marker
+	lines := strings.Split(view, "\n")
+	markerOnFeatLine := false
+	for _, line := range lines {
+		if strings.Contains(line, "feat") && strings.Contains(line, "▎") {
+			markerOnFeatLine = true
+		}
+	}
+	if !markerOnFeatLine {
+		t.Error("delete mode should show ▎ marker on the targeted worktree row (feat)")
+	}
+
+	// The project row "proj1" must NOT have the ▎ marker
+	markerOnProj1 := false
+	for _, line := range lines {
+		if strings.Contains(line, "proj1") && strings.Contains(line, "▎") {
+			markerOnProj1 = true
+		}
+	}
+	if markerOnProj1 {
+		t.Error("delete mode should not show ▎ marker on the project row when a worktree is targeted")
+	}
+}
