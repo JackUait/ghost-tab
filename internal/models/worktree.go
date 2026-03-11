@@ -1,6 +1,8 @@
 package models
 
 import (
+	"errors"
+	"fmt"
 	"os/exec"
 	"strings"
 )
@@ -187,4 +189,43 @@ func ParseMainBranch(output string) string {
 		}
 	}
 	return ""
+}
+
+// WorktreeDirtyError is returned by RemoveWorktree when the worktree has
+// uncommitted changes and force=false.
+type WorktreeDirtyError struct {
+	Stderr string
+}
+
+func (e *WorktreeDirtyError) Error() string {
+	return "worktree has uncommitted changes: " + e.Stderr
+}
+
+// IsWorktreeDirtyError reports whether err is a WorktreeDirtyError.
+func IsWorktreeDirtyError(err error) bool {
+	var e *WorktreeDirtyError
+	return errors.As(err, &e)
+}
+
+// RemoveWorktree runs `git -C projectPath worktree remove [--force] wtPath`.
+// If force is false and the worktree has uncommitted changes, a *WorktreeDirtyError
+// is returned. Other failures return a plain error with stderr.
+func RemoveWorktree(projectPath, wtPath string, force bool) error {
+	args := []string{"-C", projectPath, "worktree", "remove"}
+	if force {
+		args = append(args, "--force")
+	}
+	args = append(args, wtPath)
+	cmd := exec.Command("git", args...)
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		return nil
+	}
+	stderr := strings.TrimSpace(string(out))
+	lower := strings.ToLower(stderr)
+	if strings.Contains(lower, "modified") || strings.Contains(lower, "untracked") ||
+		strings.Contains(lower, "dirty") || strings.Contains(lower, "changes") {
+		return &WorktreeDirtyError{Stderr: stderr}
+	}
+	return fmt.Errorf("git worktree remove: %s", stderr)
 }
