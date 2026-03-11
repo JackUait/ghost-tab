@@ -4233,3 +4233,115 @@ func TestRemoveWorktree_IsDirtyError(t *testing.T) {
 		t.Errorf("RemoveWorktree dirty: expected IsWorktreeDirtyError to be true, err=%v", err)
 	}
 }
+
+func TestDeleteMode_ConfirmDelete_WorktreeTarget_Success(t *testing.T) {
+	// Set up a real git repo with a worktree so removal can succeed
+	dir := t.TempDir()
+	if out, err := exec.Command("git", "-C", dir, "init").CombinedOutput(); err != nil {
+		t.Skipf("git init: %v: %s", err, out)
+	}
+	exec.Command("git", "-C", dir, "config", "user.email", "test@test.com").Run()
+	exec.Command("git", "-C", dir, "config", "user.name", "Test").Run()
+	exec.Command("git", "-C", dir, "commit", "--allow-empty", "-m", "init").Run()
+	exec.Command("git", "-C", dir, "branch", "feat").Run()
+	wtPath := filepath.Join(t.TempDir(), "feat")
+	if out, err := exec.Command("git", "-C", dir, "worktree", "add", wtPath, "feat").CombinedOutput(); err != nil {
+		t.Skipf("git worktree add: %v: %s", err, out)
+	}
+
+	projects := []models.Project{
+		{Name: "myproj", Path: dir, Worktrees: []models.Worktree{
+			{Path: wtPath, Branch: "feat"},
+		}},
+	}
+	m := tui.NewMainMenu(projects, []string{"claude"}, "claude", "none")
+	m.SetSize(80, 30)
+	m.SetProjectsFile(filepath.Join(dir, "projects"))
+
+	// Expand project 0 and enter delete mode
+	newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'w'}})
+	mm := newModel.(*tui.MainMenuModel)
+	newModel2, _ := mm.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	mm2 := newModel2.(*tui.MainMenuModel)
+	// Navigate to worktree (flat=1)
+	newModel3, _ := mm2.Update(tea.KeyMsg{Type: tea.KeyDown})
+	mm3 := newModel3.(*tui.MainMenuModel)
+
+	if mm3.DeleteSelected() != 1 {
+		t.Fatalf("precondition: deleteSelected should be 1, got %d", mm3.DeleteSelected())
+	}
+
+	// Confirm deletion
+	newModel4, _ := mm3.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	mm4 := newModel4.(*tui.MainMenuModel)
+
+	// Should exit delete mode and show success feedback
+	if mm4.InDeleteMode() {
+		t.Error("should have exited delete mode after worktree deletion")
+	}
+	view := mm4.View()
+	if !strings.Contains(view, "Removed") && !strings.Contains(view, "feat") {
+		t.Errorf("expected success feedback mentioning 'Removed' or 'feat', got view: %s", view)
+	}
+}
+
+func TestDeleteMode_ConfirmDelete_WorktreeTarget_Dirty(t *testing.T) {
+	// Set up dirty worktree — confirms that pendingForceDeleteWT is set and feedback shown
+	dir := t.TempDir()
+	if out, err := exec.Command("git", "-C", dir, "init").CombinedOutput(); err != nil {
+		t.Skipf("git init: %v: %s", err, out)
+	}
+	exec.Command("git", "-C", dir, "config", "user.email", "test@test.com").Run()
+	exec.Command("git", "-C", dir, "config", "user.name", "Test").Run()
+	exec.Command("git", "-C", dir, "commit", "--allow-empty", "-m", "init").Run()
+	exec.Command("git", "-C", dir, "branch", "feat").Run()
+	wtPath := filepath.Join(t.TempDir(), "feat")
+	if out, err := exec.Command("git", "-C", dir, "worktree", "add", wtPath, "feat").CombinedOutput(); err != nil {
+		t.Skipf("git worktree add: %v: %s", err, out)
+	}
+	// Make it dirty
+	os.WriteFile(filepath.Join(wtPath, "dirty.txt"), []byte("dirty"), 0644)
+
+	projects := []models.Project{
+		{Name: "myproj", Path: dir, Worktrees: []models.Worktree{
+			{Path: wtPath, Branch: "feat"},
+		}},
+	}
+	m := tui.NewMainMenu(projects, []string{"claude"}, "claude", "none")
+	m.SetSize(80, 30)
+	m.SetProjectsFile(filepath.Join(dir, "projects"))
+
+	// Expand, enter delete mode, navigate to worktree
+	newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'w'}})
+	mm := newModel.(*tui.MainMenuModel)
+	newModel2, _ := mm.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	mm2 := newModel2.(*tui.MainMenuModel)
+	newModel3, _ := mm2.Update(tea.KeyMsg{Type: tea.KeyDown})
+	mm3 := newModel3.(*tui.MainMenuModel)
+
+	// Confirm deletion — should fail dirty and set pending
+	newModel4, _ := mm3.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	mm4 := newModel4.(*tui.MainMenuModel)
+
+	// Should stay in delete mode
+	if !mm4.InDeleteMode() {
+		t.Error("should remain in delete mode when worktree is dirty")
+	}
+	// View should mention "changes" or "force" or "Y"
+	view := mm4.View()
+	if !strings.Contains(view, "Y") && !strings.Contains(view, "force") && !strings.Contains(view, "changes") {
+		t.Errorf("expected dirty worktree feedback in view, got: %s", view)
+	}
+
+	// Pressing Y should force-remove
+	newModel5, _ := mm4.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'Y'}})
+	mm5 := newModel5.(*tui.MainMenuModel)
+
+	if mm5.InDeleteMode() {
+		t.Error("should have exited delete mode after force removal")
+	}
+	view2 := mm5.View()
+	if !strings.Contains(view2, "Removed") && !strings.Contains(view2, "feat") {
+		t.Errorf("expected success feedback after force removal, got: %s", view2)
+	}
+}
