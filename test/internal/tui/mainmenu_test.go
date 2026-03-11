@@ -4516,3 +4516,64 @@ func TestDeleteMode_DKeyExitsDeleteMode(t *testing.T) {
 		t.Error("pressing 'd' in delete mode should exit delete mode")
 	}
 }
+
+func TestDeleteMode_KeepsWorktreesExpandedAfterWorktreeDeletion(t *testing.T) {
+	// After deleting a worktree, the parent project should remain expanded
+	// so the user can see and delete remaining worktrees without re-expanding.
+	dir := t.TempDir()
+	if out, err := exec.Command("git", "-C", dir, "init").CombinedOutput(); err != nil {
+		t.Skipf("git init: %v: %s", err, out)
+	}
+	exec.Command("git", "-C", dir, "config", "user.email", "test@test.com").Run()
+	exec.Command("git", "-C", dir, "config", "user.name", "Test").Run()
+	exec.Command("git", "-C", dir, "commit", "--allow-empty", "-m", "init").Run()
+	exec.Command("git", "-C", dir, "branch", "feat").Run()
+	exec.Command("git", "-C", dir, "branch", "fix").Run()
+
+	wt1Path := filepath.Join(t.TempDir(), "feat")
+	if out, err := exec.Command("git", "-C", dir, "worktree", "add", wt1Path, "feat").CombinedOutput(); err != nil {
+		t.Skipf("git worktree add feat: %v: %s", err, out)
+	}
+	wt2Path := filepath.Join(t.TempDir(), "fix")
+	if out, err := exec.Command("git", "-C", dir, "worktree", "add", wt2Path, "fix").CombinedOutput(); err != nil {
+		t.Skipf("git worktree add fix: %v: %s", err, out)
+	}
+
+	projects := []models.Project{
+		{Name: "myproj", Path: dir, Worktrees: []models.Worktree{
+			{Path: wt1Path, Branch: "feat"},
+			{Path: wt2Path, Branch: "fix"},
+		}},
+	}
+	projectsFile := filepath.Join(dir, "projects")
+	if err := os.WriteFile(projectsFile, []byte("myproj:"+dir+"\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	m := tui.NewMainMenu(projects, []string{"claude"}, "claude", "none")
+	m.SetSize(80, 30)
+	m.SetProjectsFile(projectsFile)
+
+	// Expand project 0 and enter delete mode.
+	newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'w'}})
+	mm := newModel.(*tui.MainMenuModel)
+	if !mm.IsExpanded(0) {
+		t.Fatal("precondition: project 0 should be expanded")
+	}
+	newModel2, _ := mm.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	mm2 := newModel2.(*tui.MainMenuModel)
+
+	// Navigate to first worktree (flat=1) and delete it.
+	newModel3, _ := mm2.Update(tea.KeyMsg{Type: tea.KeyDown})
+	mm3 := newModel3.(*tui.MainMenuModel)
+	if mm3.DeleteSelected() != 1 {
+		t.Fatalf("precondition: deleteSelected should be 1, got %d", mm3.DeleteSelected())
+	}
+	newModel4, _ := mm3.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	mm4 := newModel4.(*tui.MainMenuModel)
+
+	// Project 0 must still be expanded after the deletion.
+	if !mm4.IsExpanded(0) {
+		t.Error("project should remain expanded after one of its worktrees is deleted")
+	}
+}
