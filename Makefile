@@ -12,6 +12,7 @@ install: build
 	@echo "Installing to ~/.local/bin..."
 	mkdir -p $(HOME)/.local/bin
 	cp bin/ghost-tab-tui $(HOME)/.local/bin/
+	@codesign --sign - --force $(HOME)/.local/bin/ghost-tab-tui
 	@echo "✓ Installed ghost-tab-tui"
 
 # Run tests
