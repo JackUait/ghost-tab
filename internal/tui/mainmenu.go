@@ -29,6 +29,12 @@ type worktreeDoneMsg struct {
 	err  error
 }
 
+// pendingWorktreeDelete holds a worktree awaiting force-removal confirmation.
+type pendingWorktreeDelete struct {
+	projectIdx int
+	wtIdx      int
+}
+
 // computeWorktreePath returns the destination path for a new worktree.
 // It mirrors the bash compute_worktree_path function in lib/menu-tui.sh.
 // branch is sanitised: "origin/" prefix stripped, "/" replaced with "-".
@@ -166,8 +172,9 @@ type MainMenuModel struct {
 	inputErr     error
 
 	// Delete mode
-	deleteMode     bool
-	deleteSelected int
+	deleteMode           bool
+	deleteSelected       int
+	pendingForceDeleteWT *pendingWorktreeDelete
 
 	// Feedback message
 	feedbackMsg   string
@@ -1559,21 +1566,13 @@ func (m *MainMenuModel) updateDeleteMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.setActionResult("quit")
 		return m, tea.Quit
 	case tea.KeyUp:
-		if m.deleteSelected > 0 {
-			m.deleteSelected--
-		} else {
-			m.deleteSelected = len(m.projects) - 1
-		}
+		m.deleteMoveUp()
 		return m, nil
 	case tea.KeyDown:
-		if m.deleteSelected < len(m.projects)-1 {
-			m.deleteSelected++
-		} else {
-			m.deleteSelected = 0
-		}
+		m.deleteMoveDown()
 		return m, nil
 	case tea.KeyEnter:
-		return m.confirmDelete()
+		return m.confirmDeleteFlat()
 	case tea.KeyRunes:
 		if len(msg.Runes) == 1 {
 			r := TranslateRune(msg.Runes[0])
@@ -1581,30 +1580,76 @@ func (m *MainMenuModel) updateDeleteMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			case r == 'q' || r == 'Q':
 				m.exitDeleteMode()
 				return m, nil
-			case r == 'j':
-				if m.deleteSelected < len(m.projects)-1 {
-					m.deleteSelected++
-				} else {
-					m.deleteSelected = 0
+			case r == 'y' || r == 'Y':
+				if m.pendingForceDeleteWT != nil {
+					return m.forceDeleteWorktree()
 				}
+				return m, nil
+			case r == 'j':
+				m.deleteMoveDown()
 				return m, nil
 			case r == 'k':
-				if m.deleteSelected > 0 {
-					m.deleteSelected--
-				} else {
-					m.deleteSelected = len(m.projects) - 1
-				}
+				m.deleteMoveUp()
 				return m, nil
 			case r >= '1' && r <= '9':
-				n := int(r - '0')
-				if n >= 1 && n <= len(m.projects) {
-					m.deleteSelected = n - 1
+				n := int(r-'0') - 1 // 0-based index into DeletableItems
+				items := m.DeletableItems()
+				if n >= 0 && n < len(items) {
+					m.deleteSelected = items[n]
 				}
 				return m, nil
 			}
 		}
 	}
 	return m, nil
+}
+
+// deleteMoveUp moves the delete cursor to the previous deletable item (wrapping).
+func (m *MainMenuModel) deleteMoveUp() {
+	items := m.DeletableItems()
+	if len(items) == 0 {
+		return
+	}
+	for i, v := range items {
+		if v == m.deleteSelected {
+			if i == 0 {
+				m.deleteSelected = items[len(items)-1]
+			} else {
+				m.deleteSelected = items[i-1]
+			}
+			return
+		}
+	}
+	m.deleteSelected = items[0]
+}
+
+// deleteMoveDown moves the delete cursor to the next deletable item (wrapping).
+func (m *MainMenuModel) deleteMoveDown() {
+	items := m.DeletableItems()
+	if len(items) == 0 {
+		return
+	}
+	for i, v := range items {
+		if v == m.deleteSelected {
+			if i == len(items)-1 {
+				m.deleteSelected = items[0]
+			} else {
+				m.deleteSelected = items[i+1]
+			}
+			return
+		}
+	}
+	m.deleteSelected = items[0]
+}
+
+// confirmDeleteFlat is a temporary stub — Task 9 will replace this with real dispatch.
+func (m *MainMenuModel) confirmDeleteFlat() (tea.Model, tea.Cmd) {
+	return m.confirmDelete() // temporary, Task 9 will replace this
+}
+
+// forceDeleteWorktree is a temporary stub — Task 9 will replace this.
+func (m *MainMenuModel) forceDeleteWorktree() (tea.Model, tea.Cmd) {
+	return m, nil // temporary, Task 9 will replace this
 }
 
 // confirmDelete removes the selected project from the projects file and updates the list.
