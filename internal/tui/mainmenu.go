@@ -333,6 +333,23 @@ func (m *MainMenuModel) projectToFlatIndex(projectIdx int) int {
 	return flat
 }
 
+// DeletableItems returns the sorted list of flat indices that are valid delete
+// targets: project rows and visible worktree rows. Add-worktree rows and action
+// rows are excluded.
+func (m *MainMenuModel) DeletableItems() []int {
+	var items []int
+	for i, proj := range m.projects {
+		items = append(items, m.projectToFlatIndex(i))
+		if m.expandedWorktrees[i] {
+			for j := range proj.Worktrees {
+				items = append(items, m.projectToFlatIndex(i)+1+j)
+			}
+			// skip the add-worktree item at projectToFlatIndex(i)+1+len(proj.Worktrees)
+		}
+	}
+	return items
+}
+
 // ResolveItem maps a flat selectedItem index to what it represents.
 // Returns: itemType ("project", "worktree", "add-worktree", or "action"), projectIdx, worktreeIdx.
 // For "action", projectIdx is the action offset (0=add, 1=delete, etc).
