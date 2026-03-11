@@ -4176,3 +4176,60 @@ func TestDeleteMode_RenderWorktreeMarker(t *testing.T) {
 		t.Error("delete mode should not show ▎ marker on the project row when a worktree is targeted")
 	}
 }
+
+func TestRemoveWorktree_Clean(t *testing.T) {
+	dir := t.TempDir()
+	if out, err := exec.Command("git", "-C", dir, "init").CombinedOutput(); err != nil {
+		t.Skipf("git init failed: %v: %s", err, out)
+	}
+	exec.Command("git", "-C", dir, "config", "user.email", "test@test.com").Run()
+	exec.Command("git", "-C", dir, "config", "user.name", "Test").Run()
+	exec.Command("git", "-C", dir, "commit", "--allow-empty", "-m", "init").Run()
+
+	// Create a branch and worktree
+	exec.Command("git", "-C", dir, "branch", "feat").Run()
+	wtPath := filepath.Join(t.TempDir(), "feat")
+	if out, err := exec.Command("git", "-C", dir, "worktree", "add", wtPath, "feat").CombinedOutput(); err != nil {
+		t.Skipf("git worktree add failed: %v: %s", err, out)
+	}
+
+	// Remove it without force — should succeed on a clean worktree
+	err := models.RemoveWorktree(dir, wtPath, false)
+	if err != nil {
+		t.Errorf("RemoveWorktree clean: unexpected error: %v", err)
+	}
+	// Verify path is gone
+	if _, statErr := os.Stat(wtPath); !os.IsNotExist(statErr) {
+		t.Error("worktree path should not exist after clean removal")
+	}
+}
+
+func TestRemoveWorktree_IsDirtyError(t *testing.T) {
+	dir := t.TempDir()
+	if out, err := exec.Command("git", "-C", dir, "init").CombinedOutput(); err != nil {
+		t.Skipf("git init failed: %v: %s", err, out)
+	}
+	exec.Command("git", "-C", dir, "config", "user.email", "test@test.com").Run()
+	exec.Command("git", "-C", dir, "config", "user.name", "Test").Run()
+	exec.Command("git", "-C", dir, "commit", "--allow-empty", "-m", "init").Run()
+
+	exec.Command("git", "-C", dir, "branch", "feat").Run()
+	wtPath := filepath.Join(t.TempDir(), "feat")
+	if out, err := exec.Command("git", "-C", dir, "worktree", "add", wtPath, "feat").CombinedOutput(); err != nil {
+		t.Skipf("git worktree add failed: %v: %s", err, out)
+	}
+
+	// Write an uncommitted file to make it dirty
+	if err := os.WriteFile(filepath.Join(wtPath, "dirty.txt"), []byte("dirty"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Removing without force should fail
+	err := models.RemoveWorktree(dir, wtPath, false)
+	if err == nil {
+		t.Error("RemoveWorktree dirty: expected error but got nil")
+	}
+	if !models.IsWorktreeDirtyError(err) {
+		t.Errorf("RemoveWorktree dirty: expected IsWorktreeDirtyError to be true, err=%v", err)
+	}
+}
