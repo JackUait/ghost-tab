@@ -2,6 +2,7 @@ package bash_test
 
 import (
 	"fmt"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -187,6 +188,88 @@ func TestLoading_render_loading_frame_shifts_colors_between_frames(t *testing.T)
 }
 
 // --- show_loading_screen / stop_loading_screen ---
+
+// TestLoading_show_loading_screen_rerenders_on_size_change verifies the first-frame
+// race-condition fix: when stty reports a small/wrong size on the first call but the
+// correct larger size on the second call (simulating a PTY that hasn't reported its
+// final window size yet), show_loading_screen must:
+//  1. Detect the size change after the brief sleep
+//  2. Clear the screen (\033[2J)
+//  3. Re-render frame 0 with the corrected (larger) dimensions
+//
+// The art is 10 lines × 88 chars wide.
+// For the corrected terminal (40 rows × 160 cols):
+//
+//	row = (40-10)/2 + 1 = 16
+//	col = (160-88)/2 + 1 = 37
+//
+// So we expect \033[16;37H in the output (the corrected first-line cursor position).
+func TestLoading_show_loading_screen_rerenders_on_size_change(t *testing.T) {
+	root := projectRoot(t)
+	dir := t.TempDir()
+
+	// Counter file: stty reads it to know which call number this is.
+	counterFile := writeTempFile(t, dir, "stty_count", "0")
+
+	// Mock stty: first call returns small size (10 40), subsequent calls return correct size (40 160).
+	// We use a counter file to track invocations across subshell boundaries.
+	sttyBody := fmt.Sprintf(`
+count=$(cat %q 2>/dev/null || echo 0)
+count=$((count + 1))
+echo "$count" > %q
+if [ "$count" -le 1 ]; then
+  echo "10 40"
+else
+  echo "40 160"
+fi
+`, counterFile, counterFile)
+	binDir := mockCommand(t, dir, "stty", sttyBody)
+	env := buildEnv(t, []string{binDir})
+
+	// show_loading_screen then immediately stop (background loop never meaningfully runs).
+	script := fmt.Sprintf(`
+		source %q/lib/loading.sh
+		show_loading_screen claude
+		stop_loading_screen
+	`, root)
+	out, code := runBashSnippet(t, script, env)
+	assertExitCode(t, code, 0)
+
+	// Must contain a second clear-screen escape (after the initial one in show_loading_screen).
+	// We count occurrences: initial show emits one \033[2J, re-render emits a second.
+	clearSeq := "\033[2J"
+	count := strings.Count(out, clearSeq)
+	if count < 2 {
+		t.Errorf("expected at least 2 occurrences of \\033[2J (screen clear), got %d\noutput: %q", count, out)
+	}
+
+	// The corrected render must position the art at row=16, col=37 (40×160 terminal).
+	assertContains(t, out, "\033[16;37H")
+}
+
+func TestLoading_show_loading_screen_no_rerender_when_size_unchanged(t *testing.T) {
+	root := projectRoot(t)
+	dir := t.TempDir()
+
+	// Mock stty always returns the same size (30 120).
+	mockCommand(t, dir, "stty", `echo "30 120"`)
+	env := buildEnv(t, []string{filepath.Join(dir, "bin")})
+
+	script := fmt.Sprintf(`
+		source %q/lib/loading.sh
+		show_loading_screen claude
+		stop_loading_screen
+	`, root)
+	out, code := runBashSnippet(t, script, env)
+	assertExitCode(t, code, 0)
+
+	// Only the initial \033[2J from show_loading_screen — no extra clear from re-render.
+	clearSeq := "\033[2J"
+	count := strings.Count(out, clearSeq)
+	if count != 1 {
+		t.Errorf("expected exactly 1 occurrence of \\033[2J (no re-render), got %d\noutput: %q", count, out)
+	}
+}
 
 func TestLoading_show_loading_screen_renders_first_frame_before_background_loop(t *testing.T) {
 	root := projectRoot(t)

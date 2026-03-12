@@ -128,6 +128,19 @@ show_loading_screen() {
   read -r _init_rows _init_cols <<< "$(_detect_term_size)"
   render_loading_frame "$tool" 0 "$_init_cols" "$_init_rows"
 
+  # First-frame race-condition fix: the PTY may not have reported its final
+  # window size when we queried above (returning the fallback 24×80 or a stale
+  # value). Sleep briefly to let the PTY deliver the TIOCGWINSZ response, then
+  # re-query. If the size changed, clear and re-render so frame 0 is correctly
+  # centred before the background animation loop takes over.
+  sleep 0.05
+  local _recheck_rows _recheck_cols
+  read -r _recheck_rows _recheck_cols <<< "$(_detect_term_size)"
+  if (( _recheck_rows != _init_rows || _recheck_cols != _init_cols )); then
+    printf '\033[2J'
+    render_loading_frame "$tool" 0 "$_recheck_cols" "$_recheck_rows"
+  fi
+
   # Symbols for floating particles
   local symbols=('·' '•' '°' '∘' '⋅' '∙')
 
