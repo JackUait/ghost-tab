@@ -106,7 +106,7 @@ var actionLabels = []struct {
 	label    string
 }{
 	{"A", "Add new project"},
-	{"D", "Delete a project"},
+	{"D", "Delete a project or a worktree"},
 	{"O", "Open once"},
 	{"P", "Plain terminal"},
 	{"S", "Settings"},
@@ -833,6 +833,9 @@ func (m *MainMenuModel) EnterDeleteModeForTest() { m.deleteMode = true }
 // DeleteSelected returns the index of the selected item in delete mode.
 func (m *MainMenuModel) DeleteSelected() int { return m.deleteSelected }
 
+// SettingsSelected returns the currently highlighted settings item index.
+func (m *MainMenuModel) SettingsSelected() int { return m.settingsSelected }
+
 // FeedbackMsg returns the current feedback message.
 func (m *MainMenuModel) FeedbackMsg() string { return m.feedbackMsg }
 
@@ -1350,14 +1353,12 @@ func (m *MainMenuModel) updateSettings(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case tea.KeyUp:
-		if m.settingsSelected > 0 {
-			m.settingsSelected--
-		}
+		const n = 3
+		m.settingsSelected = (m.settingsSelected - 1 + n) % n
 		return m, nil
 	case tea.KeyDown:
-		if m.settingsSelected < 2 {
-			m.settingsSelected++
-		}
+		const n = 3
+		m.settingsSelected = (m.settingsSelected + 1) % 3
 		return m, nil
 	case tea.KeyRight:
 		switch m.settingsSelected {
@@ -1384,14 +1385,11 @@ func (m *MainMenuModel) updateSettings(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			r := TranslateRune(msg.Runes[0])
 			switch r {
 			case 'j':
-				if m.settingsSelected < 2 {
-					m.settingsSelected++
-				}
+				m.settingsSelected = (m.settingsSelected + 1) % 3
 				return m, nil
 			case 'k':
-				if m.settingsSelected > 0 {
-					m.settingsSelected--
-				}
+				const n = 3
+				m.settingsSelected = (m.settingsSelected - 1 + n) % n
 				return m, nil
 			}
 		}

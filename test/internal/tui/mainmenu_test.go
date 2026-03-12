@@ -1505,6 +1505,76 @@ func TestMainMenu_SettingsNavigationKeys(t *testing.T) {
 	}
 }
 
+func TestMainMenu_SettingsNavigationWraps(t *testing.T) {
+	const numItems = 3
+
+	t.Run("down wraps from last to first", func(t *testing.T) {
+		m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
+		m.SetSize(80, 30)
+		m.EnterSettings()
+
+		// Navigate to the last item (index 2)
+		for i := 0; i < numItems-1; i++ {
+			m.Update(tea.KeyMsg{Type: tea.KeyDown})
+		}
+		if m.SettingsSelected() != numItems-1 {
+			t.Fatalf("expected to be on last item (%d), got %d", numItems-1, m.SettingsSelected())
+		}
+
+		// One more Down should wrap to index 0
+		newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
+		mm := newModel.(*tui.MainMenuModel)
+		if mm.SettingsSelected() != 0 {
+			t.Errorf("Down on last item should wrap to 0, got %d", mm.SettingsSelected())
+		}
+	})
+
+	t.Run("up wraps from first to last", func(t *testing.T) {
+		m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
+		m.SetSize(80, 30)
+		m.EnterSettings()
+
+		// Start at index 0 (default after EnterSettings)
+		if m.SettingsSelected() != 0 {
+			t.Fatalf("expected initial index 0, got %d", m.SettingsSelected())
+		}
+
+		// Up from first item should wrap to last
+		newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyUp})
+		mm := newModel.(*tui.MainMenuModel)
+		if mm.SettingsSelected() != numItems-1 {
+			t.Errorf("Up on first item should wrap to %d, got %d", numItems-1, mm.SettingsSelected())
+		}
+	})
+
+	t.Run("j wraps from last to first", func(t *testing.T) {
+		m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
+		m.SetSize(80, 30)
+		m.EnterSettings()
+
+		for i := 0; i < numItems-1; i++ {
+			m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+		}
+		newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+		mm := newModel.(*tui.MainMenuModel)
+		if mm.SettingsSelected() != 0 {
+			t.Errorf("j on last item should wrap to 0, got %d", mm.SettingsSelected())
+		}
+	})
+
+	t.Run("k wraps from first to last", func(t *testing.T) {
+		m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
+		m.SetSize(80, 30)
+		m.EnterSettings()
+
+		newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
+		mm := newModel.(*tui.MainMenuModel)
+		if mm.SettingsSelected() != numItems-1 {
+			t.Errorf("k on first item should wrap to %d, got %d", numItems-1, mm.SettingsSelected())
+		}
+	})
+}
+
 func TestMainMenu_SettingsDoesNotQuit(t *testing.T) {
 	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
 	m.SetSize(80, 30)
@@ -2965,8 +3035,8 @@ func TestMainMenu_View_DeleteMode_ShowsActionItems(t *testing.T) {
 	if !strings.Contains(view, "Add new project") {
 		t.Error("Delete mode view should show 'Add new project' action item")
 	}
-	if !strings.Contains(view, "Delete a project") {
-		t.Error("Delete mode view should show 'Delete a project' action item")
+	if !strings.Contains(view, "Delete a project or a worktree") {
+		t.Error("Delete mode view should show 'Delete a project or a worktree' action item")
 	}
 }
 

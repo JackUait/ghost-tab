@@ -32,7 +32,7 @@ That's it — only requirements are **`macOS`** and **`Node.js 16+`**. Everythin
     ~/Projects/another-project
 ──────────────────────────────────────
   A Add new project
-  D Delete a project
+  D Delete a project or a worktree
   O Open once
   P Plain terminal
 ──────────────────────────────────────
