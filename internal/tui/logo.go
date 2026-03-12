@@ -4,6 +4,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 type logoTickMsg time.Time
@@ -12,6 +13,8 @@ type LogoModel struct {
 	tool     string
 	frame    int
 	quitting bool
+	width    int
+	height   int
 }
 
 // NewLogo creates a LogoModel that displays the ghost art for the given AI tool.
@@ -37,7 +40,12 @@ func tickCmd() tea.Cmd {
 type quitMsg struct{}
 
 func (m LogoModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg.(type) {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
+		return m, nil
+
 	case logoTickMsg:
 		m.frame = (m.frame + 1) % 2
 		if !m.quitting {
@@ -63,5 +71,8 @@ func (m LogoModel) View() string {
 	}
 
 	lines := GhostForTool(m.tool, false)
+	if m.width > 0 && m.height > 0 {
+		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, RenderGhost(lines))
+	}
 	return RenderGhost(lines)
 }
