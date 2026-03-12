@@ -2,7 +2,6 @@ package bash_test
 
 import (
 	"fmt"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -245,6 +244,22 @@ fi
 
 	// The corrected render must position the art at row=16, col=37 (40×160 terminal).
 	assertContains(t, out, "\033[16;37H")
+
+	// Tighter ordering assertion: the second \033[2J (the re-clear) must appear
+	// before \033[16;37H (the corrected cursor position), proving the re-render
+	// happens after the re-clear and not from an earlier accidental clear.
+	posFirstClear := strings.Index(out, clearSeq)
+	posSecondClear := strings.Index(out[posFirstClear+len(clearSeq):], clearSeq)
+	posCorrectedPos := strings.Index(out, "\033[16;37H")
+	if posSecondClear < 0 {
+		t.Fatalf("could not find second %q in output", clearSeq)
+	}
+	// posSecondClear is relative to after the first clear; make it absolute.
+	absSecondClear := posFirstClear + len(clearSeq) + posSecondClear
+	if absSecondClear >= posCorrectedPos {
+		t.Errorf("expected second \\033[2J (at %d) to come before \\033[16;37H (at %d)",
+			absSecondClear, posCorrectedPos)
+	}
 }
 
 func TestLoading_show_loading_screen_no_rerender_when_size_unchanged(t *testing.T) {
@@ -252,8 +267,8 @@ func TestLoading_show_loading_screen_no_rerender_when_size_unchanged(t *testing.
 	dir := t.TempDir()
 
 	// Mock stty always returns the same size (30 120).
-	mockCommand(t, dir, "stty", `echo "30 120"`)
-	env := buildEnv(t, []string{filepath.Join(dir, "bin")})
+	binDir := mockCommand(t, dir, "stty", `echo "30 120"`)
+	env := buildEnv(t, []string{binDir})
 
 	script := fmt.Sprintf(`
 		source %q/lib/loading.sh
