@@ -20,13 +20,6 @@ func init() {
 	rootCmd.AddCommand(showLogoCmd)
 }
 
-// buildShowLogoOpts prepends tea.WithAltScreen() to ttyOpts so the logo
-// renders on a clean full-screen canvas, matching the pattern used by every
-// other interactive command in this package.
-func buildShowLogoOpts(ttyOpts []tea.ProgramOption) []tea.ProgramOption {
-	return append([]tea.ProgramOption{tea.WithAltScreen()}, ttyOpts...)
-}
-
 func runShowLogo(cmd *cobra.Command, args []string) error {
 	tui.ApplyTheme(tui.ThemeForTool(aiToolFlag))
 
@@ -38,7 +31,7 @@ func runShowLogo(cmd *cobra.Command, args []string) error {
 	}
 	defer cleanup()
 
-	opts := buildShowLogoOpts(ttyOpts)
+	opts := append([]tea.ProgramOption{tea.WithAltScreen()}, ttyOpts...)
 	p := tea.NewProgram(model, opts...)
 
 	_, err = p.Run()

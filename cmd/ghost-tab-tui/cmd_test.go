@@ -8,34 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 )
-
-// TestShowLogo_BuildOptsIncludesAltScreen verifies that buildShowLogoOpts
-// returns exactly one option when given no TTY options — that one option
-// being the WithAltScreen() call. We check length and non-nil without
-// reaching into bubbletea internals.
-func TestShowLogo_BuildOptsIncludesAltScreen(t *testing.T) {
-	opts := buildShowLogoOpts(nil)
-	if len(opts) != 1 {
-		t.Fatalf("expected 1 option (WithAltScreen), got %d", len(opts))
-	}
-	if opts[0] == nil {
-		t.Error("expected a non-nil option for WithAltScreen")
-	}
-}
-
-// TestShowLogo_BuildOptsPreservesExtraOpts verifies that buildShowLogoOpts
-// keeps the caller-provided ttyOpts after the leading WithAltScreen entry.
-func TestShowLogo_BuildOptsPreservesExtraOpts(t *testing.T) {
-	sentinel := tea.WithoutCatchPanics()
-	opts := buildShowLogoOpts([]tea.ProgramOption{sentinel})
-
-	if len(opts) != 2 {
-		t.Fatalf("expected 2 options, got %d", len(opts))
-	}
-}
 
 func TestRootCmd_HasVersion(t *testing.T) {
 	if rootCmd.Version == "" {
