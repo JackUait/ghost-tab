@@ -4,9 +4,9 @@ import (
 	"fmt"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/spf13/cobra"
 	"github.com/jackuait/ghost-tab/internal/tui"
 	"github.com/jackuait/ghost-tab/internal/util"
+	"github.com/spf13/cobra"
 )
 
 var showLogoCmd = &cobra.Command{
@@ -20,6 +20,13 @@ func init() {
 	rootCmd.AddCommand(showLogoCmd)
 }
 
+// buildShowLogoOpts prepends tea.WithAltScreen() to ttyOpts so the logo
+// renders on a clean full-screen canvas, matching the pattern used by every
+// other interactive command in this package.
+func buildShowLogoOpts(ttyOpts []tea.ProgramOption) []tea.ProgramOption {
+	return append([]tea.ProgramOption{tea.WithAltScreen()}, ttyOpts...)
+}
+
 func runShowLogo(cmd *cobra.Command, args []string) error {
 	tui.ApplyTheme(tui.ThemeForTool(aiToolFlag))
 
@@ -31,7 +38,8 @@ func runShowLogo(cmd *cobra.Command, args []string) error {
 	}
 	defer cleanup()
 
-	p := tea.NewProgram(model, ttyOpts...)
+	opts := buildShowLogoOpts(ttyOpts)
+	p := tea.NewProgram(model, opts...)
 
 	_, err = p.Run()
 	return err
