@@ -82,20 +82,25 @@ func TestLogoModel_View_centers_when_dimensions_known(t *testing.T) {
 	got := m.View()
 	raw := RenderGhost(GhostForTool("", false))
 
-	// lipgloss.Place pads to fill the canvas — the output should be larger than raw
-	if len(got) <= len(raw) {
-		t.Errorf("expected centered output to be larger than raw ghost (padded by lipgloss.Place)\ngot len=%d, raw len=%d", len(got), len(raw))
+	// lipgloss.Place pads each line to the full width and pads vertically,
+	// so the raw string is not a literal substring. Verify content is preserved
+	// by checking that at least one raw line's trimmed content appears in the output.
+	rawLines := strings.Split(raw, "\n")
+	found := false
+	for _, rl := range rawLines {
+		trimmed := strings.TrimSpace(rl)
+		if trimmed != "" && strings.Contains(got, trimmed) {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected centered output to contain ghost art content from raw output")
 	}
 
-	// The output should start with spaces (top/left padding from lipgloss.Place)
-	if !strings.HasPrefix(got, " ") && !strings.HasPrefix(got, "\n") {
-		t.Errorf("expected centered output to start with padding spaces or newlines, got: %q", got[:min(20, len(got))])
+	// lipgloss.Place fills the full canvas height — output must have exactly 40 lines
+	lines := strings.Split(got, "\n")
+	if len(lines) != 40 {
+		t.Errorf("expected centered output to have 40 lines (= terminal height), got %d", len(lines))
 	}
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }
