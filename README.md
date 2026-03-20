@@ -2,7 +2,10 @@
 
 A **`Ghostty`** + **`tmux`** wrapper that launches a three-pane dev session with **`Claude Code`**, **`lazygit`**, and a spare terminal. Automatically cleans up all processes when the window is closed — no zombie **`Claude Code`** processes.
 
-![ghost-tab screenshot](docs/screenshot.png)
+<p>
+  <img src="docs/screenshot-session.png" width="58%" />
+  <img src="docs/screenshot-selector.png" width="40%" />
+</p>
 
 ---
 
