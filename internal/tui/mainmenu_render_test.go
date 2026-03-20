@@ -2,6 +2,7 @@ package tui
 
 import (
 	"os"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -400,7 +401,9 @@ func TestMenuBox_NoIndicatorWithoutWorktrees(t *testing.T) {
 	box := m.renderMenuBox()
 	raw := stripAnsi(box)
 
-	if strings.Contains(raw, "worktree") {
+	// Check for the worktree count badge (e.g. "2 worktrees" or "1 worktree"),
+	// not the delete action label which legitimately contains "or a worktree".
+	if regexp.MustCompile(`\d+ worktrees?`).MatchString(raw) {
 		t.Errorf("expected no worktree indicator for project without worktrees, got:\n%s", raw)
 	}
 }
