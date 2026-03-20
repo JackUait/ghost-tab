@@ -55,7 +55,6 @@ unset _gt_libs _gt_lib
 
 TMUX_CMD="$(command -v tmux)"
 LAZYGIT_CMD="$(command -v lazygit)"
-BROOT_CMD="$(command -v broot)"
 CLAUDE_CMD="$(command -v claude)"
 CODEX_CMD="$(command -v codex)"
 COPILOT_CMD="$(command -v copilot)"
@@ -219,7 +218,5 @@ start_tab_title_watcher "$SESSION_NAME" "$SELECTED_AI_TOOL" "$PROJECT_NAME" "$_t
   split-window -h -p 50 -c "$PROJECT_DIR" \
   "$AI_LAUNCH_CMD; exec bash" \; \
   select-pane -t 0 \; \
-  split-window -v -p 50 -c "$PROJECT_DIR" \
-  "trap exit TERM; while true; do $BROOT_CMD $PROJECT_DIR; done" \; \
   split-window -v -p 30 -c "$PROJECT_DIR" \; \
-  select-pane -t 3
+  select-pane -t 2

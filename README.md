@@ -1,6 +1,6 @@
 # Ghost Tab
 
-A **`Ghostty`** + **`tmux`** wrapper that launches a four-pane dev session with **`Claude Code`**, **`lazygit`**, **`broot`**, and a spare terminal. Automatically cleans up all processes when the window is closed — no zombie **`Claude Code`** processes.
+A **`Ghostty`** + **`tmux`** wrapper that launches a three-pane dev session with **`Claude Code`**, **`lazygit`**, and a spare terminal. Automatically cleans up all processes when the window is closed — no zombie **`Claude Code`** processes.
 
 ![ghost-tab screenshot](docs/screenshot.png)
 
@@ -12,7 +12,7 @@ A **`Ghostty`** + **`tmux`** wrapper that launches a four-pane dev session with 
 npx ghost-tab
 ```
 
-That's it — only requirements are **`macOS`** and **`Node.js 16+`**. Everything (**`Ghostty`**, **`tmux`**, **`lazygit`**, **`broot`**, **`Claude Code`**) is installed automatically.
+That's it — only requirements are **`macOS`** and **`Node.js 16+`**. Everything (**`Ghostty`**, **`tmux`**, **`lazygit`**, **`Claude Code`**) is installed automatically.
 
 ---
 
@@ -46,7 +46,7 @@ That's it — only requirements are **`macOS`** and **`Node.js 16+`**. Everythin
 - **Path autocomplete** when adding projects (with Tab completion)
 - **Plain terminal** opens a bare shell with no tmux overhead
 
-**Step 3.** The four-pane **`tmux`** session launches automatically with **`Claude Code`** already focused — start typing your prompt right away.
+**Step 3.** The three-pane **`tmux`** session launches automatically with **`Claude Code`** already focused — start typing your prompt right away.
 
 > [!TIP]
 > You can also open a specific project directly from the terminal:
@@ -69,7 +69,7 @@ That's it — only requirements are **`macOS`** and **`Node.js 16+`**. Everythin
 
 ## What `ghost-tab` Does
 
-1. Downloads **`tmux`**, **`lazygit`**, **`broot`**, and **`jq`** natively (no package manager required)
+1. Downloads **`tmux`**, **`lazygit`**, and **`jq`** natively (no package manager required)
 2. Installs **`Claude Code`** via native installer (auto-updates)
 3. Prompts to install **`Ghostty`** from ghostty.org if not already installed
 4. Sets up the **`Ghostty`** config (with merge option if you have an existing one)

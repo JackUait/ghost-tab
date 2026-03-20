@@ -113,7 +113,7 @@ Scroll up to "IMMEDIATE COMPLETION CHECKLIST" and verify ALL items before declar
 
 ## Project Overview
 
-Ghost Tab is a terminal + tmux wrapper that launches a four-pane dev session with AI coding tools (Claude Code, Codex CLI, Copilot CLI, OpenCode), lazygit, broot, and a spare terminal. It supports multiple terminal emulators (Ghostty, iTerm2, WezTerm, kitty) and handles complete process cleanup when windows close (no zombie processes).
+Ghost Tab is a terminal + tmux wrapper that launches a three-pane dev session with AI coding tools (Claude Code, Codex CLI, Copilot CLI, OpenCode), lazygit, and a spare terminal. It supports multiple terminal emulators (Ghostty, iTerm2, WezTerm, kitty) and handles complete process cleanup when windows close (no zombie processes).
 
 **Key Features:**
 - Interactive project selector with TUI
@@ -232,7 +232,6 @@ Terminal window (Ghostty/iTerm2/WezTerm/kitty)
    └─ tmux session
       ├─ AI tool (Claude Code/Codex/etc)
       ├─ lazygit
-      ├─ broot
       └─ spare shell
 ```
 

@@ -115,37 +115,6 @@ ensure_lazygit() {
   fi
 }
 
-# Install broot from Canop/broot GitHub releases.
-ensure_broot() {
-  if command -v broot &>/dev/null; then
-    success "broot already installed"
-    return 0
-  fi
-  local arch broot_arch tag version tmp_dir url
-  arch="$(detect_arch)" || return 1
-  case "$arch" in
-    arm64)   broot_arch="aarch64-apple-darwin" ;;
-    x86_64)  broot_arch="x86_64-apple-darwin" ;;
-  esac
-  tag="$(get_latest_release_tag "Canop/broot")" || return 1
-  version="${tag#v}"
-  tmp_dir="$(mktemp -d)"
-  # shellcheck disable=SC2064
-  trap "rm -rf '$tmp_dir'" RETURN
-  url="https://github.com/Canop/broot/releases/download/${tag}/broot_${version}.zip"
-  info "Downloading broot..."
-  if curl -fsSL -o "$tmp_dir/broot.zip" "$url"; then
-    unzip -q -d "$tmp_dir" "$tmp_dir/broot.zip"
-    mkdir -p "$HOME/.local/bin"
-    mv "$tmp_dir/${broot_arch}/broot" "$HOME/.local/bin/broot"
-    chmod +x "$HOME/.local/bin/broot"
-    success "broot installed"
-  else
-    warn "Failed to install broot"
-    return 1
-  fi
-}
-
 # Install or update ghost-tab-tui by downloading the pre-built binary from the ghost-tab release.
 # Args: share_dir (to read VERSION from)
 # Checks installed binary version against VERSION file and re-downloads if mismatched.
@@ -183,7 +152,6 @@ ensure_base_requirements() {
   ensure_jq
   ensure_tmux
   ensure_lazygit
-  ensure_broot
 }
 
 # Install a Homebrew cask if the .app isn't in /Applications.
