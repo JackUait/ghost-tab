@@ -1,6 +1,6 @@
 # Ghost Tab
 
-A **`Ghostty`** + **`tmux`** wrapper that launches a three-pane dev session with **`Claude Code`**, **`lazygit`**, and a spare terminal. Automatically cleans up all processes when the window is closed — no zombie **`Claude Code`** processes.
+A **`Ghostty`** + **`tmux`** wrapper that launches a three-pane dev session with an AI coding tool (**`Claude Code`**, **`Codex`**, **`Copilot`**, or **`OpenCode`**), **`lazygit`**, and a spare terminal. Automatically cleans up all processes when the window is closed — no zombie processes.
 
 <p>
   <img src="docs/screenshot-selector.png" width="49%" />
@@ -15,7 +15,7 @@ A **`Ghostty`** + **`tmux`** wrapper that launches a three-pane dev session with
 npx ghost-tab
 ```
 
-That's it — only requirements are **`macOS`** and **`Node.js 16+`**. Everything (**`Ghostty`**, **`tmux`**, **`lazygit`**, **`Claude Code`**) is installed automatically.
+That's it — only requirements are **`macOS`** and **`Node.js 16+`**. Everything (**`Ghostty`**, **`tmux`**, **`lazygit`**, and your chosen AI tool) is installed automatically.
 
 ---
 
