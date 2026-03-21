@@ -75,11 +75,10 @@ func TestGhosttyAdapter_setup_config_replaces_existing(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to read config: %v", err)
 	}
-	content := strings.TrimSpace(string(data))
-	expected := "command = " + wrapperPath
-	if content != expected {
-		t.Errorf("got %q, want %q", content, expected)
-	}
+	content := string(data)
+	assertContains(t, content, "command = "+wrapperPath)
+	assertNotContains(t, content, "command = /old/path")
+	assertContains(t, content, "macos-enable-login-shell = false")
 }
 
 func TestGhosttyAdapter_setup_config_preserves_other_settings(t *testing.T) {
@@ -119,6 +118,66 @@ func TestGhosttyAdapter_cleanup_config_removes_command_line(t *testing.T) {
 	assertContains(t, content, "font-size = 14")
 	assertContains(t, content, "theme = dark")
 	assertNotContains(t, content, "command =")
+}
+
+func TestGhosttyAdapter_setup_config_sets_login_shell_false(t *testing.T) {
+	// Ghostty 1.2.3 wraps command paths with:
+	//   /usr/bin/login -flp user /bin/bash --noprofile --norc -c exec -l <path>
+	// This is broken because bash treats -c's arg as just "exec" (no-op).
+	// Setting macos-enable-login-shell = false makes Ghostty exec the script directly.
+	tmpDir := t.TempDir()
+	configFile := filepath.Join(tmpDir, "config")
+	wrapperPath := filepath.Join(tmpDir, "wrapper.sh")
+
+	snippet := ghosttyAdapterSnippet(t,
+		fmt.Sprintf(`terminal_setup_config %q %q`, configFile, wrapperPath))
+	_, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+
+	data, err := os.ReadFile(configFile)
+	if err != nil {
+		t.Fatalf("failed to read config: %v", err)
+	}
+	assertContains(t, string(data), "macos-enable-login-shell = false")
+}
+
+func TestGhosttyAdapter_setup_config_replaces_existing_login_shell_setting(t *testing.T) {
+	tmpDir := t.TempDir()
+	configFile := writeTempFile(t, tmpDir, "config", "macos-enable-login-shell = true\n")
+	wrapperPath := filepath.Join(tmpDir, "wrapper.sh")
+
+	snippet := ghosttyAdapterSnippet(t,
+		fmt.Sprintf(`terminal_setup_config %q %q`, configFile, wrapperPath))
+	_, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+
+	data, err := os.ReadFile(configFile)
+	if err != nil {
+		t.Fatalf("failed to read config: %v", err)
+	}
+	content := string(data)
+	assertContains(t, content, "macos-enable-login-shell = false")
+	assertNotContains(t, content, "macos-enable-login-shell = true")
+}
+
+func TestGhosttyAdapter_cleanup_config_removes_login_shell_setting(t *testing.T) {
+	tmpDir := t.TempDir()
+	configFile := writeTempFile(t, tmpDir, "config",
+		"font-size = 14\ncommand = /some/path\nmacos-enable-login-shell = false\ntheme = dark\n")
+
+	snippet := ghosttyAdapterSnippet(t,
+		fmt.Sprintf(`terminal_cleanup_config %q`, configFile))
+	_, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+
+	data, err := os.ReadFile(configFile)
+	if err != nil {
+		t.Fatalf("failed to read config: %v", err)
+	}
+	content := string(data)
+	assertContains(t, content, "font-size = 14")
+	assertContains(t, content, "theme = dark")
+	assertNotContains(t, content, "macos-enable-login-shell")
 }
 
 func TestGhosttyAdapter_terminal_install_skips_when_app_exists(t *testing.T) {
