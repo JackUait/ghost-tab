@@ -12,6 +12,7 @@ type Project struct {
 	Name      string
 	Path      string
 	Worktrees []Worktree
+	Stale     bool
 }
 
 // ParseProjectName extracts the project name from a "name:path" line.
@@ -61,9 +62,12 @@ func LoadProjects(filepath string) ([]Project, error) {
 			continue // Skip malformed lines
 		}
 
+		path := strings.TrimSpace(parts[1])
+		_, statErr := os.Stat(path)
 		projects = append(projects, Project{
-			Name: strings.TrimSpace(parts[0]),
-			Path: strings.TrimSpace(parts[1]),
+			Name:  strings.TrimSpace(parts[0]),
+			Path:  path,
+			Stale: statErr != nil,
 		})
 	}
 
