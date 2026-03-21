@@ -225,6 +225,10 @@ type MainMenuModel struct {
 	// worktreePendingProjectIdx tracks which project index is waiting for a
 	// branch picker result. -1 means no pending worktree.
 	worktreePendingProjectIdx int
+
+	// staleConfirmIdx holds the index of the stale project awaiting launch
+	// confirmation. -1 means no confirmation is active.
+	staleConfirmIdx int
 }
 
 // NewMainMenu creates a new main menu model.
@@ -249,6 +253,7 @@ func NewMainMenu(projects []models.Project, aiTools []string, currentAI string, 
 		expandedWorktrees:         make(map[int]bool),
 		worktreePendingProjectIdx: -1,
 		moveFlashIdx:              -1,
+		staleConfirmIdx:           -1,
 	}
 }
 
@@ -966,6 +971,10 @@ func (m *MainMenuModel) Result() *MainMenuResult {
 	return m.result
 }
 
+// StaleConfirmIdx returns the index of the stale project awaiting launch
+// confirmation, or -1 if no confirmation is active.
+func (m *MainMenuModel) StaleConfirmIdx() int { return m.staleConfirmIdx }
+
 // CalculateLayout determines how the ghost and menu should be arranged.
 func (m *MainMenuModel) CalculateLayout(width, height int) MenuLayout {
 	numProjects := len(m.projects)
@@ -1093,6 +1102,10 @@ func (m *MainMenuModel) selectCurrent() tea.Cmd {
 
 	switch itemType {
 	case "project":
+		if m.projects[projectIdx].Stale {
+			m.staleConfirmIdx = projectIdx
+			return nil
+		}
 		m.result = &MainMenuResult{
 			Action:       "select-project",
 			Name:         m.projects[projectIdx].Name,
@@ -1294,6 +1307,30 @@ func (m *MainMenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Delete mode intercepts all key handling
 		if m.deleteMode {
 			return m.updateDeleteMode(msg)
+		}
+
+		// Stale confirmation mode intercepts all key handling
+		if m.staleConfirmIdx >= 0 {
+			switch msg.String() {
+			case "y", "Y":
+				savedIdx := m.staleConfirmIdx
+				m.staleConfirmIdx = -1
+				m.result = &MainMenuResult{
+					Action:       "select-project",
+					Name:         m.projects[savedIdx].Name,
+					Path:         m.projects[savedIdx].Path,
+					AITool:       m.CurrentAITool(),
+					GhostDisplay: m.ghostDisplayForResult(),
+					TabTitle:     m.tabTitleForResult(),
+					SoundName:    m.soundNameForResult(),
+				}
+				m.quitting = true
+				return m, tea.Quit
+			default:
+				// n, N, Enter, Esc, anything else → cancel
+				m.staleConfirmIdx = -1
+				return m, nil
+			}
 		}
 
 		switch msg.Type {
@@ -2280,6 +2317,7 @@ func (m *MainMenuModel) renderMenuBox() string {
 	neutralDimStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
 	moveFlashStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("214")).Bold(true)
 	deleteStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Bold(true)
+	staleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("220"))
 	deleteDimStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
 
 	hLine := strings.Repeat("\u2500", menuInnerWidth)
@@ -2374,7 +2412,14 @@ func (m *MainMenuModel) renderMenuBox() string {
 			truncName := TruncateMiddle(proj.Name, menuContentWidth-7-len(num))
 			nameText := selNameStyle.Render(num + "  " + truncName)
 			// "  ▎ 1  name" -> 2 spaces + marker + space + num + 2 spaces + name
-			nameContent := "  " + marker + " " + nameText
+			// For stale projects, replace the first 2 spaces with "⚠ " marker.
+			var namePrefix string
+			if proj.Stale && !m.deleteMode {
+				namePrefix = staleStyle.Render("⚠") + " "
+			} else {
+				namePrefix = "  "
+			}
+			nameContent := namePrefix + marker + " " + nameText
 
 			if wtIndicator != "" {
 				wtStyled := dimStyle.Render(wtIndicator)
@@ -2409,7 +2454,14 @@ func (m *MainMenuModel) renderMenuBox() string {
 			numText := rowDimStyle.Render(num)
 			truncName := TruncateMiddle(proj.Name, menuContentWidth-6-len(num))
 			nameText := rowNameStyle.Render(truncName)
-			nameContent := "    " + numText + "  " + nameText
+			// For stale projects, replace the leading 2 spaces with "⚠ " marker.
+			var rowPrefix string
+			if proj.Stale {
+				rowPrefix = staleStyle.Render("⚠") + " "
+			} else {
+				rowPrefix = "  "
+			}
+			nameContent := rowPrefix + "  " + numText + "  " + nameText
 
 			if wtIndicator != "" {
 				wtStyled := rowDimStyle.Render(wtIndicator)
@@ -2582,6 +2634,25 @@ func (m *MainMenuModel) renderMenuBox() string {
 			fbPadding = 0
 		}
 		lines = append(lines, leftBorder+fbContent+strings.Repeat(" ", fbPadding)+rightBorder)
+	}
+
+	// Stale confirmation prompt (if active)
+	if m.staleConfirmIdx >= 0 && m.staleConfirmIdx < len(m.projects) {
+		stalePath := m.projects[m.staleConfirmIdx].Path
+		warnLine := staleStyle.Render("⚠") + " " + staleStyle.Render("Path not found: "+stalePath)
+		warnContent := "  " + warnLine
+		warnPadding := menuContentWidth - lipgloss.Width(warnContent)
+		if warnPadding < 0 {
+			warnPadding = 0
+		}
+		lines = append(lines, leftBorder+warnContent+strings.Repeat(" ", warnPadding)+rightBorder)
+
+		promptLine := neutralDimStyle.Render("  Launch anyway? [y/N]")
+		promptPadding := menuContentWidth - lipgloss.Width(promptLine)
+		if promptPadding < 0 {
+			promptPadding = 0
+		}
+		lines = append(lines, leftBorder+promptLine+strings.Repeat(" ", promptPadding)+rightBorder)
 	}
 
 	// Separator before help

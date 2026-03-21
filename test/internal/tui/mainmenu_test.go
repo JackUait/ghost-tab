@@ -4904,3 +4904,85 @@ func TestSettings_NavWrapsWithFourItems(t *testing.T) {
 		t.Errorf("expected settingsSelected=0 after wrapping past 4 items, got %d", m.SettingsSelected())
 	}
 }
+
+func TestStale_MarkerRenderedForStaleProject(t *testing.T) {
+	projects := []models.Project{
+		{Name: "good", Path: "/exists", Stale: false},
+		{Name: "bad", Path: "/nonexistent", Stale: true},
+	}
+	m := tui.NewMainMenu(projects, []string{"claude"}, "claude", "animated")
+	view := stripAnsi(m.View())
+	if !strings.Contains(view, "⚠") {
+		t.Error("expected ⚠ marker for stale project in view")
+	}
+}
+
+func TestStale_NoMarkerForHealthyProject(t *testing.T) {
+	projects := []models.Project{
+		{Name: "good", Path: "/exists", Stale: false},
+	}
+	m := tui.NewMainMenu(projects, []string{"claude"}, "claude", "animated")
+	view := stripAnsi(m.View())
+	if strings.Contains(view, "⚠") {
+		t.Error("expected no ⚠ marker when project is healthy")
+	}
+}
+
+func TestStale_SelectionShowsConfirmation(t *testing.T) {
+	projects := []models.Project{
+		{Name: "bad", Path: "/nonexistent", Stale: true},
+	}
+	m := tui.NewMainMenu(projects, []string{"claude"}, "claude", "animated")
+	// Select the stale project (Enter with project focused)
+	result, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	mm := result.(*tui.MainMenuModel)
+	view := stripAnsi(mm.View())
+	if !strings.Contains(view, "Launch anyway") {
+		t.Errorf("expected stale confirmation prompt, got: %q", view)
+	}
+}
+
+func TestStale_NKeyAtConfirmationCancels(t *testing.T) {
+	projects := []models.Project{
+		{Name: "bad", Path: "/nonexistent", Stale: true},
+	}
+	m := tui.NewMainMenu(projects, []string{"claude"}, "claude", "animated")
+	result, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter}) // select → confirmation
+	mm := result.(*tui.MainMenuModel)
+	result2, _ := mm.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("n")})
+	mm2 := result2.(*tui.MainMenuModel)
+	if mm2.StaleConfirmIdx() >= 0 {
+		t.Error("expected stale confirmation dismissed after n")
+	}
+	if mm2.Result() != nil {
+		t.Error("expected no result after cancelling stale confirmation")
+	}
+}
+
+func TestStale_EnterKeyAtConfirmationCancels(t *testing.T) {
+	// Enter = accept default N = cancel
+	projects := []models.Project{{Name: "bad", Path: "/nonexistent", Stale: true}}
+	m := tui.NewMainMenu(projects, []string{"claude"}, "claude", "animated")
+	result, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	mm := result.(*tui.MainMenuModel)
+	result2, _ := mm.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	mm2 := result2.(*tui.MainMenuModel)
+	if mm2.StaleConfirmIdx() >= 0 {
+		t.Error("expected stale confirmation dismissed after Enter (default N)")
+	}
+}
+
+func TestStale_YKeyAtConfirmationProceeds(t *testing.T) {
+	projects := []models.Project{{Name: "bad", Path: "/nonexistent", Stale: true}}
+	m := tui.NewMainMenu(projects, []string{"claude"}, "claude", "animated")
+	result, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter}) // select → confirmation
+	mm := result.(*tui.MainMenuModel)
+	result2, _ := mm.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+	mm2 := result2.(*tui.MainMenuModel)
+	if mm2.StaleConfirmIdx() >= 0 {
+		t.Error("expected stale confirmation dismissed after y")
+	}
+	if mm2.Result() == nil {
+		t.Error("expected a result (launch) after y at stale confirmation")
+	}
+}
