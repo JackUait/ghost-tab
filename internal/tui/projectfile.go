@@ -88,3 +88,13 @@ func IsDuplicateProject(expandedPath string, projects []models.Project) bool {
 	}
 	return false
 }
+
+// IsDuplicateName checks if a project name already exists in the project list (exact match).
+func IsDuplicateName(name string, projects []models.Project) bool {
+	for _, p := range projects {
+		if p.Name == name {
+			return true
+		}
+	}
+	return false
+}

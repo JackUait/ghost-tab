@@ -337,3 +337,31 @@ func TestIsDuplicateProject_empty_list(t *testing.T) {
 		t.Error("expected false for empty project list, got true")
 	}
 }
+
+// --- IsDuplicateName tests ---
+
+func TestIsDuplicateName(t *testing.T) {
+	projects := []models.Project{
+		{Name: "ghost-tab", Path: "/path/a"},
+		{Name: "web", Path: "/path/b"},
+	}
+
+	tests := []struct {
+		name string
+		want bool
+	}{
+		{"ghost-tab", true},
+		{"web", true},
+		{"api", false},
+		{"Ghost-Tab", false}, // case-sensitive
+		{"", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tui.IsDuplicateName(tt.name, projects)
+			if got != tt.want {
+				t.Errorf("IsDuplicateName(%q) = %v, want %v", tt.name, got, tt.want)
+			}
+		})
+	}
+}
