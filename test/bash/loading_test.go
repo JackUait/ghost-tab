@@ -2,6 +2,8 @@ package bash_test
 
 import (
 	"fmt"
+	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -68,6 +70,33 @@ func TestLoading_detect_term_size_returns_two_positive_numbers(t *testing.T) {
 	parts := strings.Fields(strings.TrimSpace(out))
 	if len(parts) != 2 {
 		t.Fatalf("expected 2 values, got %d: %q", len(parts), out)
+	}
+	for _, p := range parts {
+		num, err := strconv.Atoi(p)
+		if err != nil {
+			t.Errorf("non-numeric value: %q", p)
+		}
+		if num <= 0 {
+			t.Errorf("expected positive number, got %d", num)
+		}
+	}
+}
+
+func TestLoading_detect_term_size_works_in_posix_mode(t *testing.T) {
+	// Regression test: Ghostty 1.2.x runs bash with --posix via its /bin/sh -c
+	// expansion path. In POSIX mode, process substitution < <(...) is a syntax
+	// error that prevented loading.sh from being sourced at all.
+	root := projectRoot(t)
+	modulePath := filepath.Join(root, "lib", "loading.sh")
+	script := fmt.Sprintf("source %q && _detect_term_size", modulePath)
+	cmd := exec.Command("bash", "--posix", "-c", script)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("bash --posix failed (syntax error in POSIX mode?): %v\noutput: %s", err, out)
+	}
+	parts := strings.Fields(strings.TrimSpace(string(out)))
+	if len(parts) != 2 {
+		t.Fatalf("expected 2 values, got %d: %q", len(parts), string(out))
 	}
 	for _, p := range parts {
 		num, err := strconv.Atoi(p)

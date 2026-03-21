@@ -93,8 +93,10 @@ _detect_term_size() {
     fi
   fi
 
-  # Method 2: stty size from stdin
-  if read -r _r _c < <(stty size 2>/dev/null); then
+  # Method 2: stty size from stdin (command substitution avoids process substitution
+  # which is disabled in bash --posix mode triggered by Ghostty's /bin/sh -c path)
+  _size=$(stty size 2>/dev/null)
+  if read -r _r _c <<< "$_size"; then
     if (( _r > 0 && _c > 0 )); then
       echo "$_r $_c"
       return

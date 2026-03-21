@@ -44,7 +44,7 @@ terminal_install() {
 # Args: config_path wrapper_path
 terminal_setup_config() {
   local config_path="$1" wrapper_path="$2"
-  local wrapper_line="command = /bin/bash -l $wrapper_path"
+  local wrapper_line="command = direct:/bin/bash -l $wrapper_path"
 
   if [ -f "$config_path" ] && grep -q '^command[[:space:]]*=' "$config_path"; then
     sed -i '' 's|^command[[:space:]]*=.*|'"$wrapper_line"'|' "$config_path"

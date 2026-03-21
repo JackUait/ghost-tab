@@ -57,7 +57,7 @@ func TestGhosttyAdapter_setup_config_creates_new(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to read config: %v", err)
 	}
-	assertContains(t, string(data), "command = /bin/bash -l "+wrapperPath)
+	assertContains(t, string(data), "command = direct:/bin/bash -l "+wrapperPath)
 }
 
 func TestGhosttyAdapter_setup_config_replaces_existing(t *testing.T) {
@@ -76,7 +76,7 @@ func TestGhosttyAdapter_setup_config_replaces_existing(t *testing.T) {
 		t.Fatalf("failed to read config: %v", err)
 	}
 	content := string(data)
-	assertContains(t, content, "command = /bin/bash -l "+wrapperPath)
+	assertContains(t, content, "command = direct:/bin/bash -l "+wrapperPath)
 	assertNotContains(t, content, "/old/path")
 }
 
@@ -97,16 +97,19 @@ func TestGhosttyAdapter_setup_config_preserves_other_settings(t *testing.T) {
 	content := string(data)
 	assertContains(t, content, "font-size = 14")
 	assertContains(t, content, "theme = dark")
-	assertContains(t, content, "command = /bin/bash -l "+wrapperPath)
+	assertContains(t, content, "command = direct:/bin/bash -l "+wrapperPath)
 }
 
-func TestGhosttyAdapter_setup_config_uses_bash_to_avoid_ghostty_exec_l_bug(t *testing.T) {
-	// Ghostty 1.2.x wraps bare script paths with:
-	//   /usr/bin/login -flp user /bin/bash --noprofile --norc -c exec -l <path>
-	// This is broken: bash treats -c's argument as just "exec" (a no-op), so the
-	// script never runs and Ghostty exits after 248ms showing "failed to launch".
-	// Using "/bin/bash -l <path>" as the command triggers Ghostty's "/bin/sh -c"
-	// code path instead, which works correctly.
+func TestGhosttyAdapter_setup_config_uses_direct_prefix(t *testing.T) {
+	// Ghostty 1.2.x has two broken code paths for launching scripts:
+	// 1. Bare path: wraps with "bash --noprofile --norc -c exec -l <path>" — exec is
+	//    a no-op, script never runs, Ghostty exits in 248ms.
+	// 2. Path with args (e.g. "/bin/bash -l <path>"): uses "/bin/sh -c" expansion.
+	//    On macOS /bin/sh is bash in POSIX mode, which adds "--posix" to the launch
+	//    command. In POSIX mode, process substitution <(...) is a syntax error that
+	//    prevents loading.sh from being sourced.
+	// Fix: use "direct:" prefix to bypass the /bin/sh -c mechanism entirely, so
+	// Ghostty exec's "/bin/bash -l <path>" directly without adding --posix.
 	tmpDir := t.TempDir()
 	configFile := filepath.Join(tmpDir, "config")
 	wrapperPath := filepath.Join(tmpDir, "wrapper.sh")
@@ -121,15 +124,16 @@ func TestGhosttyAdapter_setup_config_uses_bash_to_avoid_ghostty_exec_l_bug(t *te
 		t.Fatalf("failed to read config: %v", err)
 	}
 	content := string(data)
-	// Must use /bin/bash -l to trigger the /bin/sh -c code path in Ghostty.
-	assertContains(t, content, "command = /bin/bash -l")
-	// Must NOT be a bare script path (which would trigger the broken exec -l path).
+	// Must use direct: to bypass /bin/sh -c (which causes --posix mode).
+	assertContains(t, content, "command = direct:/bin/bash -l")
+	// Must NOT be a bare script path (broken exec -l) or without direct: (adds --posix).
 	assertNotContains(t, content, "command = "+wrapperPath)
+	assertNotContains(t, content, "command = /bin/bash -l")
 }
 
 func TestGhosttyAdapter_cleanup_config_removes_command_line(t *testing.T) {
 	tmpDir := t.TempDir()
-	configFile := writeTempFile(t, tmpDir, "config", "font-size = 14\ncommand = /bin/bash -l /some/path\ntheme = dark\n")
+	configFile := writeTempFile(t, tmpDir, "config", "font-size = 14\ncommand = direct:/bin/bash -l/some/path\ntheme = dark\n")
 
 	snippet := ghosttyAdapterSnippet(t,
 		fmt.Sprintf(`terminal_cleanup_config %q`, configFile))
