@@ -508,6 +508,59 @@ func TestPathExpand_handles_broken_symlink(t *testing.T) {
 }
 
 // ============================================================
+// get_projects_root tests
+// ============================================================
+
+func TestGetProjectsRoot_AbsentFile(t *testing.T) {
+	dir := t.TempDir()
+	out, code := runBashFunc(t, "lib/projects.sh", "get_projects_root",
+		[]string{filepath.Join(dir, "projects-root")}, nil)
+	assertExitCode(t, code, 0)
+	if strings.TrimSpace(out) != "" {
+		t.Errorf("expected empty output when file absent, got %q", out)
+	}
+}
+
+func TestGetProjectsRoot_ReturnsStoredPath(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "projects-root")
+	os.WriteFile(file, []byte("/Users/jack/Projects\n"), 0644)
+	out, code := runBashFunc(t, "lib/projects.sh", "get_projects_root",
+		[]string{file}, nil)
+	assertExitCode(t, code, 0)
+	if strings.TrimSpace(out) != "/Users/jack/Projects" {
+		t.Errorf("got %q", strings.TrimSpace(out))
+	}
+}
+
+func TestSetProjectsRoot_WritesExpandedPath(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "projects-root")
+	home := os.Getenv("HOME")
+	_, code := runBashFunc(t, "lib/projects.sh", "set_projects_root",
+		[]string{file, "~/Projects"}, nil)
+	assertExitCode(t, code, 0)
+	data, _ := os.ReadFile(file)
+	got := strings.TrimSpace(string(data))
+	want := home + "/Projects"
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestSetProjectsRoot_EmptyArgRemovesFile(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "projects-root")
+	os.WriteFile(file, []byte("/Users/jack/Projects\n"), 0644)
+	_, code := runBashFunc(t, "lib/projects.sh", "set_projects_root",
+		[]string{file, ""}, nil)
+	assertExitCode(t, code, 0)
+	if _, err := os.Stat(file); !os.IsNotExist(err) {
+		t.Error("expected file to be removed, but it still exists")
+	}
+}
+
+// ============================================================
 // Helpers local to this file
 // ============================================================
 
