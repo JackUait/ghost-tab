@@ -4834,7 +4834,9 @@ func TestAddProject_AutoSuffixHiddenWhenTouched(t *testing.T) {
 func TestAddProject_PreFillsPathWithProjectsRoot(t *testing.T) {
 	dir := t.TempDir()
 	rootFile := filepath.Join(dir, "projects-root")
-	os.WriteFile(rootFile, []byte(dir+"\n"), 0644) //nolint:errcheck
+	if err := os.WriteFile(rootFile, []byte(dir+"\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
 	m.SetProjectsRootFile(rootFile)
