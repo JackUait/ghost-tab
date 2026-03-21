@@ -1674,14 +1674,14 @@ func (m *MainMenuModel) submitInputMode() (tea.Model, tea.Cmd) {
 	expanded := filepath.Clean(util.ExpandPath(path))
 
 	if IsDuplicateProject(expanded, m.projects) {
-		m.nameErr = fmt.Errorf("Project already exists")
+		m.nameErr = fmt.Errorf("project already exists")
 		return m, nil
 	}
 
 	if IsDuplicateName(name, m.projects) {
 		if !m.nameWarnShown {
 			m.nameWarnShown = true
-			m.nameErr = fmt.Errorf("A project named '%s' already exists — press Enter again to add anyway", name)
+			m.nameErr = fmt.Errorf("a project named '%s' already exists — press Enter again to add anyway", name)
 			return m, nil
 		}
 		// Second Enter: user confirmed, proceed.
@@ -1689,7 +1689,7 @@ func (m *MainMenuModel) submitInputMode() (tea.Model, tea.Cmd) {
 	m.nameWarnShown = false
 
 	if err := AppendProject(name, expanded, m.projectsFile); err != nil {
-		m.nameErr = fmt.Errorf("Failed to save: %v", err)
+		m.nameErr = fmt.Errorf("failed to save: %v", err)
 		return m, nil
 	}
 

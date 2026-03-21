@@ -2674,6 +2674,28 @@ func TestAddProject_DuplicateNameSoftWarn(t *testing.T) {
 	}
 }
 
+func TestAddProject_DuplicatePathShowsError(t *testing.T) {
+	dir := t.TempDir()
+	existingPath := filepath.Join(dir, "existing")
+	os.MkdirAll(existingPath, 0755)
+
+	existing := []models.Project{{Name: "existing", Path: existingPath}}
+	m := tui.NewMainMenu(existing, []string{"claude"}, "claude", "animated")
+	m.SetProjectsFile(filepath.Join(dir, "projects"))
+	m.EnterInputModeForTest("add-project")
+	m.SetPathInputValue(existingPath)
+	m.Update(tea.KeyMsg{Type: tea.KeyEnter}) // advance to name
+	m.SetNameInputValue("different-name")
+	result, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter}) // submit
+	mm := result.(*tui.MainMenuModel)
+	if mm.NameErr() == nil {
+		t.Error("expected error for duplicate path")
+	}
+	if mm.InInputMode() == false {
+		t.Error("expected to remain in input mode after duplicate path error")
+	}
+}
+
 func TestAddProject_EscFromNameClearsSoftWarn(t *testing.T) {
 	dir := t.TempDir()
 	projDir := filepath.Join(dir, "proj")
@@ -4761,31 +4783,6 @@ func TestDeleteMode_KeepsWorktreesExpandedAfterWorktreeDeletion(t *testing.T) {
 var ansiEscRe = regexp.MustCompile(`\x1b\[[0-9;]*m`)
 
 func stripAnsi(s string) string { return ansiEscRe.ReplaceAllString(s, "") }
-
-func TestAddProject_TabWithAutocompleteDoeNotAdvanceFocus(t *testing.T) {
-	// Tab when autocomplete suggestions are visible should accept suggestion, not advance focus
-	// This test sets up a scenario where autocomplete would show suggestions (using a real dir prefix)
-	dir := t.TempDir()
-	// Create a subdirectory so the parent has a child to suggest
-	os.MkdirAll(filepath.Join(dir, "my-sub"), 0755)
-
-	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
-	m.EnterInputModeForTest("add-project")
-	// Set path to the temp dir + "/" so suggestions would appear for children
-	// We can't easily test the full autocomplete UI in unit tests,
-	// so we test the underlying logic: if InputFocusPath is still true after Tab
-	// when there are no suggestions, it advances. Test the no-suggestion case here.
-	// The with-suggestion case relies on AutocompleteModel internals.
-	// Just verify Tab without suggestions advances focus:
-	m.SetPathInputValue(dir)
-	// Dismiss autocomplete explicitly to simulate no suggestions
-	result, _ := m.Update(tea.KeyMsg{Type: tea.KeyTab})
-	mm := result.(*tui.MainMenuModel)
-	// Tab without suggestions (and with a valid dir) should advance to name field
-	if mm.InputFocusPath() {
-		t.Error("expected Tab without autocomplete suggestions to advance to name field")
-	}
-}
 
 func TestAddProject_TabWithoutAutocompleteAdvancesToName(t *testing.T) {
 	dir := t.TempDir()
