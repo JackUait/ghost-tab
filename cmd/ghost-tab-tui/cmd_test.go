@@ -297,6 +297,17 @@ func TestRunMainMenu_MalformedProjectsFile(t *testing.T) {
 	_ = err
 }
 
+func TestMainMenuCmd_HasProjectsRootFileFlag(t *testing.T) {
+	cmd, _, _ := rootCmd.Find([]string{"main-menu"})
+	flag := cmd.Flags().Lookup("projects-root-file")
+	if flag == nil {
+		t.Fatal("Expected --projects-root-file flag on main-menu")
+	}
+	if flag.DefValue != "" {
+		t.Errorf("Expected default %q, got %q", "", flag.DefValue)
+	}
+}
+
 func TestSelectBranchCmd_HasProjectPathFlag(t *testing.T) {
 	cmd, _, _ := rootCmd.Find([]string{"select-branch"})
 	flag := cmd.Flags().Lookup("project-path")
