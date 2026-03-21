@@ -1514,7 +1514,7 @@ func TestMainMenu_SettingsNavigationWraps(t *testing.T) {
 		m.SetSize(80, 30)
 		m.EnterSettings()
 
-		// Navigate to the last item (index 2)
+		// Navigate to the last item (index 3)
 		for i := 0; i < numItems-1; i++ {
 			m.Update(tea.KeyMsg{Type: tea.KeyDown})
 		}

@@ -1436,7 +1436,7 @@ func (m *MainMenuModel) updateSettings(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case tea.KeyDown:
 		const n = 4
-		m.settingsSelected = (m.settingsSelected + 1) % 4
+		m.settingsSelected = (m.settingsSelected + 1) % n
 		return m, nil
 	case tea.KeyRight:
 		switch m.settingsSelected {
