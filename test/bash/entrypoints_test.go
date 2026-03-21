@@ -576,7 +576,7 @@ func createWrapperTestEnv(t *testing.T) (tmpDir, wrapperDir, binDir, shareDir st
 	// Copy real lib files for sourcing
 	libFiles := []string{
 		"tui.sh", "ai-tools.sh", "projects.sh", "process.sh", "input.sh",
-		"update.sh", "menu-tui.sh", "project-actions.sh", "project-actions-tui.sh",
+		"update.sh", "menu-tui.sh", "project-actions.sh",
 		"tmux-session.sh",
 	}
 	for _, f := range libFiles {

@@ -48,6 +48,15 @@ func PathSuggestionProvider(maxResults int) SuggestionProvider {
 	}
 }
 
+// GetPathSuggestions is a convenience wrapper around PathSuggestionProvider.
+// Returns nil for empty input (unlike PathSuggestionProvider which defaults to ~/).
+func GetPathSuggestions(input string) []string {
+	if input == "" {
+		return nil
+	}
+	return PathSuggestionProvider(8)(input)
+}
+
 // searchPathSuggestions returns directory suggestions for the given input path.
 func searchPathSuggestions(input string) []string {
 	expanded := util.ExpandPath(input)

@@ -39,7 +39,6 @@ func TestRootCmd_SubcommandRegistered(t *testing.T) {
 		"show-logo",
 		"select-project",
 		"select-ai-tool",
-		"add-project",
 		"config-menu",
 		"main-menu",
 		"multi-select-ai-tool",
@@ -232,16 +231,6 @@ func TestConfigMenuCmd_Metadata(t *testing.T) {
 	}
 	if cmd.Long != "Shows configuration options and returns selected action as JSON" {
 		t.Errorf("Expected Long %q, got %q", "Shows configuration options and returns selected action as JSON", cmd.Long)
-	}
-}
-
-func TestAddProjectCmd_Exists(t *testing.T) {
-	cmd, _, err := rootCmd.Find([]string{"add-project"})
-	if err != nil {
-		t.Fatalf("Failed to find add-project: %v", err)
-	}
-	if cmd.Name() != "add-project" {
-		t.Errorf("Expected 'add-project', got %q", cmd.Name())
 	}
 }
 
