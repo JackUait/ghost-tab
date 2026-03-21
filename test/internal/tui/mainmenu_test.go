@@ -1507,7 +1507,7 @@ func TestMainMenu_SettingsNavigationKeys(t *testing.T) {
 }
 
 func TestMainMenu_SettingsNavigationWraps(t *testing.T) {
-	const numItems = 3
+	const numItems = 4
 
 	t.Run("down wraps from last to first", func(t *testing.T) {
 		m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
@@ -4855,5 +4855,52 @@ func TestAddProject_NoPreFillWhenRootFileAbsent(t *testing.T) {
 
 	if m.PathInputValue() != "" {
 		t.Errorf("expected empty path when root file absent, got %q", m.PathInputValue())
+	}
+}
+
+func TestSettings_ProjectsRootItem_AppearsInSettingsBox(t *testing.T) {
+	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
+	m.EnterSettings()
+	view := stripAnsi(m.View())
+	if !strings.Contains(view, "Default projects dir") {
+		t.Error("expected 'Default projects dir' in settings view")
+	}
+}
+
+func TestSettings_ProjectsRootItem_ShowsNotSet(t *testing.T) {
+	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
+	m.EnterSettings()
+	view := stripAnsi(m.View())
+	if !strings.Contains(view, "(not set)") {
+		t.Errorf("expected '(not set)' when no root configured, view: %q", view)
+	}
+}
+
+func TestSettings_ProjectsRootItem_ShowsCurrentValue(t *testing.T) {
+	dir := t.TempDir()
+	rootFile := filepath.Join(dir, "projects-root")
+	if err := os.WriteFile(rootFile, []byte(dir), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
+	m.SetProjectsRootFile(rootFile)
+	m.LoadProjectsRoot()
+	m.EnterSettings()
+	view := stripAnsi(m.View())
+	if !strings.Contains(view, filepath.Base(dir)) {
+		t.Errorf("expected root path in view, got: %q", view)
+	}
+}
+
+func TestSettings_NavWrapsWithFourItems(t *testing.T) {
+	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
+	m.EnterSettings()
+	// Navigate down 4 times — should wrap back to 0
+	for i := 0; i < 4; i++ {
+		m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	}
+	if m.SettingsSelected() != 0 {
+		t.Errorf("expected settingsSelected=0 after wrapping past 4 items, got %d", m.SettingsSelected())
 	}
 }

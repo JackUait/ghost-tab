@@ -198,6 +198,13 @@ type MainMenuModel struct {
 
 	// File path for projects root directory preference
 	projectsRootFile string
+	// projectsRoot is the current value loaded from projectsRootFile; "" = not set.
+	projectsRoot string
+
+	// Settings panel inline text input for "Default projects dir" item.
+	settingsInputMode bool
+	settingsInput     textinput.Model
+	settingsInputErr  error
 
 	// showEscHint is set by AppModel to display "Press Esc again to quit" in
 	// the help row instead of the normal key hints — no extra line is added.
@@ -824,7 +831,7 @@ func (m *MainMenuModel) InDeleteMode() bool { return m.deleteMode }
 // sub-mode (settings, input, or delete) where Esc should navigate back within
 // the menu rather than triggering the AppModel double-Esc quit flow.
 func (m *MainMenuModel) WantsEsc() bool {
-	return m.settingsMode || m.inputMode != "" || m.deleteMode
+	return m.settingsMode || m.inputMode != "" || m.deleteMode || m.settingsInputMode
 }
 
 // SetSettingsMode directly sets settings mode — intended for tests only.
@@ -860,6 +867,12 @@ func (m *MainMenuModel) ProjectsFile() string { return m.projectsFile }
 
 // SetProjectsRootFile sets the file path for the default projects root directory.
 func (m *MainMenuModel) SetProjectsRootFile(path string) { m.projectsRootFile = path }
+
+// LoadProjectsRoot reads the projects root value from projectsRootFile and
+// stores it in projectsRoot so the settings panel can display it.
+func (m *MainMenuModel) LoadProjectsRoot() {
+	m.projectsRoot = readProjectsRoot(m.projectsRootFile)
+}
 
 // SetAIToolFile sets the file path for AI tool preference persistence.
 // When set, CycleAITool writes the new tool to this file immediately.
@@ -1384,6 +1397,9 @@ func (m *MainMenuModel) handleRune(r rune) (tea.Model, tea.Cmd) {
 
 // updateSettings handles key events while in settings mode.
 func (m *MainMenuModel) updateSettings(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.settingsInputMode {
+		return m.updateSettingsInput(msg)
+	}
 	switch msg.Type {
 	case tea.KeyEsc:
 		m.settingsMode = false
@@ -1401,15 +1417,26 @@ func (m *MainMenuModel) updateSettings(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.CycleTabTitle()
 		case 2:
 			m.CycleSoundName()
+		case 3:
+			// Open text input for projects root
+			m.settingsInputMode = true
+			si := textinput.New()
+			si.Placeholder = "e.g., ~/Projects"
+			si.Width = menuContentWidth - 11
+			si.SetValue(m.projectsRoot)
+			si.Focus()
+			m.settingsInput = si
+			m.settingsInputErr = nil
+			return m, textinput.Blink
 		}
 		return m, nil
 	case tea.KeyUp:
-		const n = 3
+		const n = 4
 		m.settingsSelected = (m.settingsSelected - 1 + n) % n
 		return m, nil
 	case tea.KeyDown:
-		const n = 3
-		m.settingsSelected = (m.settingsSelected + 1) % 3
+		const n = 4
+		m.settingsSelected = (m.settingsSelected + 1) % 4
 		return m, nil
 	case tea.KeyRight:
 		switch m.settingsSelected {
@@ -1436,16 +1463,50 @@ func (m *MainMenuModel) updateSettings(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			r := TranslateRune(msg.Runes[0])
 			switch r {
 			case 'j':
-				m.settingsSelected = (m.settingsSelected + 1) % 3
+				m.settingsSelected = (m.settingsSelected + 1) % 4
 				return m, nil
 			case 'k':
-				const n = 3
+				const n = 4
 				m.settingsSelected = (m.settingsSelected - 1 + n) % n
 				return m, nil
 			}
 		}
 	}
 	return m, nil
+}
+
+// updateSettingsInput handles key events while in settings input mode (editing projects root).
+func (m *MainMenuModel) updateSettingsInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.Type {
+	case tea.KeyEsc, tea.KeyCtrlC:
+		m.settingsInputMode = false
+		m.settingsInput.Blur()
+		return m, nil
+	case tea.KeyEnter:
+		val := strings.TrimSpace(m.settingsInput.Value())
+		if val != "" {
+			expanded := util.ExpandPath(val)
+			if _, err := os.Stat(expanded); err != nil {
+				m.settingsInputErr = fmt.Errorf("directory not found")
+				return m, nil
+			}
+			if err := os.WriteFile(m.projectsRootFile, []byte(expanded+"\n"), 0644); err != nil {
+				m.settingsInputErr = fmt.Errorf("failed to save: %v", err)
+				return m, nil
+			}
+			m.projectsRoot = expanded
+		} else {
+			os.Remove(m.projectsRootFile) //nolint:errcheck
+			m.projectsRoot = ""
+		}
+		m.settingsInputMode = false
+		m.settingsInput.Blur()
+		return m, nil
+	}
+	var cmd tea.Cmd
+	m.settingsInput, cmd = m.settingsInput.Update(msg)
+	m.settingsInputErr = nil
+	return m, cmd
 }
 
 // readProjectsRoot reads the default projects root from the given file.
@@ -2118,15 +2179,56 @@ func (m *MainMenuModel) renderSettingsBox() string {
 	}
 	lines = append(lines, m.renderSettingsItem(2, soundLabel, soundState, soundStyle, primaryBoldStyle, leftBorder, rightBorder))
 
+	// Default projects dir item
+	var rootState string
+	if m.projectsRoot == "" {
+		rootState = "(not set)"
+	} else {
+		rootState = shortenHomePath(m.projectsRoot)
+	}
+	rootColor := lipgloss.Color("241") // gray when not set
+	if m.projectsRoot != "" {
+		rootColor = lipgloss.Color("114") // green when set
+	}
+	rootStyle := lipgloss.NewStyle().Foreground(rootColor)
+	if m.settingsInputMode && m.settingsSelected == 3 {
+		// Render inline text input
+		inputView := m.settingsInput.View()
+		inputWidth := lipgloss.Width(inputView)
+		inputPadding := menuContentWidth - inputWidth - 1
+		if inputPadding < 0 {
+			inputPadding = 0
+		}
+		inputRow := leftBorder + " " + inputView + strings.Repeat(" ", inputPadding) + rightBorder
+		lines = append(lines, inputRow)
+		if m.settingsInputErr != nil {
+			errText := lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Render(m.settingsInputErr.Error())
+			errPadding := menuContentWidth - lipgloss.Width(errText) - 1
+			if errPadding < 0 {
+				errPadding = 0
+			}
+			errRow := leftBorder + " " + errText + strings.Repeat(" ", errPadding) + rightBorder
+			lines = append(lines, errRow)
+		}
+	} else {
+		lines = append(lines, m.renderSettingsItem(3, "Default projects dir", rootState, rootStyle, primaryBoldStyle, leftBorder, rightBorder))
+	}
+
 	// Empty row
 	lines = append(lines, emptyRow)
 
 	// Separator before help
 	lines = append(lines, separator)
 
-	// Help row
+	// Help row — show ⏎ edit hint for item 3 (projects dir), ← → cycle for others
 	sep := dimStyle.Render(" · ")
-	helpContent := helpStyle.Render("\u2191\u2193 navigate") + sep + helpStyle.Render("\u2190\u2192 cycle") + sep + helpStyle.Render("Esc close")
+	var cycleOrEdit string
+	if m.settingsSelected == 3 {
+		cycleOrEdit = helpStyle.Render("\u23ce edit")
+	} else {
+		cycleOrEdit = helpStyle.Render("\u2190\u2192 cycle")
+	}
+	helpContent := helpStyle.Render("\u2191\u2193 navigate") + sep + cycleOrEdit + sep + helpStyle.Render("Esc close")
 	helpContentWidth := lipgloss.Width(helpContent)
 	helpPadding := menuContentWidth - helpContentWidth - 1
 	if helpPadding < 0 {
