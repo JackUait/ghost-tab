@@ -2461,7 +2461,9 @@ func TestMainMenu_AddProject_EscCancelsInputMode(t *testing.T) {
 	}
 }
 
-func TestMainMenu_AddProject_EmptyEnterCancels(t *testing.T) {
+func TestMainMenu_AddProject_EmptyEnterStaysAndShowsError(t *testing.T) {
+	// With the two-field form, pressing Enter on an empty path shows an error
+	// and keeps the user in input mode (does not cancel).
 	m := tui.NewMainMenu(testProjects(), testAITools(), "claude", "animated")
 	newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
 	mm := newModel.(*tui.MainMenuModel)
@@ -2469,8 +2471,8 @@ func TestMainMenu_AddProject_EmptyEnterCancels(t *testing.T) {
 	newModel2, _ := mm.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	mm2 := newModel2.(*tui.MainMenuModel)
 
-	if mm2.InInputMode() {
-		t.Error("Input mode should be cancelled on empty Enter")
+	if !mm2.InInputMode() {
+		t.Error("Input mode should stay active on empty path Enter (shows error)")
 	}
 }
 
@@ -2488,25 +2490,25 @@ func TestMainMenu_AddProject_SubmitValid(t *testing.T) {
 	)
 	m.SetProjectsFile(projFile)
 
-	// Enter add mode
-	newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
-	mm := newModel.(*tui.MainMenuModel)
+	// Enter add mode via the two-field helpers: set path directly and advance.
+	m.EnterInputModeForTest("add-project")
+	m.SetPathInputValue(targetDir)
 
-	// Type the path character by character
-	for _, r := range targetDir {
-		mm.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+	// Advance to name field (Enter on path with no autocomplete suggestions).
+	result1, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	mm1 := result1.(*tui.MainMenuModel)
+	if mm1.InputFocusPath() {
+		t.Fatal("Expected focus on name field after advancing from path")
 	}
 
-	// First Enter accepts autocomplete suggestion (adds trailing /),
-	// second Enter submits (no suggestions for empty directory)
-	mm.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	newModel3, _ := mm.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	mm3 := newModel3.(*tui.MainMenuModel)
+	// Name is auto-derived; submit by pressing Enter on name field.
+	result2, _ := mm1.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	mm2 := result2.(*tui.MainMenuModel)
 
-	if mm3.InInputMode() {
+	if mm2.InInputMode() {
 		t.Error("Should exit input mode after valid submit")
 	}
-	if mm3.FeedbackMsg() == "" {
+	if mm2.FeedbackMsg() == "" {
 		t.Error("Expected feedback message after adding project")
 	}
 
@@ -2555,18 +2557,16 @@ func TestMainMenu_FeedbackTimer_Dismisses(t *testing.T) {
 	m := tui.NewMainMenu(nil, testAITools(), "claude", "animated")
 	m.SetProjectsFile(projFile)
 
-	// Enter add mode
-	newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
-	mm := newModel.(*tui.MainMenuModel)
+	// Enter add mode via two-field helpers.
+	m.EnterInputModeForTest("add-project")
+	m.SetPathInputValue(targetDir)
 
-	// Type the path
-	for _, r := range targetDir {
-		mm.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
-	}
+	// Advance to name field.
+	result1, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	mm1 := result1.(*tui.MainMenuModel)
 
-	// First Enter accepts autocomplete suggestion, second Enter submits
-	mm.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	newModel2, _ := mm.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	// Submit with auto-derived name.
+	newModel2, _ := mm1.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	mm2 := newModel2.(*tui.MainMenuModel)
 
 	if mm2.FeedbackMsg() == "" {
@@ -2584,6 +2584,115 @@ func TestMainMenu_FeedbackTimer_Dismisses(t *testing.T) {
 }
 
 // Delete mode tests
+// Two-field add-project form tests
+func TestAddProject_PathFieldFocusedFirst(t *testing.T) {
+	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
+	m.EnterInputModeForTest("add-project")
+	if !m.InputFocusPath() {
+		t.Error("expected path field focused first")
+	}
+}
+
+func TestAddProject_NameAutoFillsFromPath(t *testing.T) {
+	dir := t.TempDir()
+	projDir := filepath.Join(dir, "my-project")
+	os.MkdirAll(projDir, 0755)
+
+	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
+	m.EnterInputModeForTest("add-project")
+	m.SetPathInputValue(projDir)
+	result, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	mm := result.(*tui.MainMenuModel)
+	if mm.NameInputValue() != "my-project" {
+		t.Errorf("expected name 'my-project', got %q", mm.NameInputValue())
+	}
+}
+
+func TestAddProject_NameAutoDeriveLockOnEdit(t *testing.T) {
+	dir := t.TempDir()
+	projDir := filepath.Join(dir, "my-project")
+	os.MkdirAll(projDir, 0755)
+
+	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
+	m.EnterInputModeForTest("add-project")
+	m.SetPathInputValue(projDir)
+	result, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	mm := result.(*tui.MainMenuModel)
+	// User edits name — lock auto-derive
+	mm.SetNameInputValue("custom-name")
+	mm.SetNameTouched(true)
+	// Changing path should NOT overwrite custom name
+	mm.SetPathInputValue(filepath.Join(dir, "other"))
+	mm.TriggerAutoDeriveName()
+	if mm.NameInputValue() != "custom-name" {
+		t.Errorf("expected locked name 'custom-name', got %q", mm.NameInputValue())
+	}
+}
+
+func TestAddProject_ShiftTabReturnsToCopyField(t *testing.T) {
+	dir := t.TempDir()
+	projDir := filepath.Join(dir, "proj")
+	os.MkdirAll(projDir, 0755)
+
+	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
+	m.EnterInputModeForTest("add-project")
+	m.SetPathInputValue(projDir)
+	result, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter}) // advance to name
+	mm := result.(*tui.MainMenuModel)
+	result2, _ := mm.Update(tea.KeyMsg{Type: tea.KeyShiftTab})
+	mm2 := result2.(*tui.MainMenuModel)
+	if !mm2.InputFocusPath() {
+		t.Error("expected Shift+Tab to return to path field")
+	}
+}
+
+func TestAddProject_DuplicateNameSoftWarn(t *testing.T) {
+	dir := t.TempDir()
+	projDir := filepath.Join(dir, "existing")
+	os.MkdirAll(projDir, 0755)
+	projDir2 := filepath.Join(dir, "new-path")
+	os.MkdirAll(projDir2, 0755)
+
+	existing := []models.Project{{Name: "existing", Path: projDir}}
+	m := tui.NewMainMenu(existing, []string{"claude"}, "claude", "animated")
+	m.SetProjectsFile(filepath.Join(dir, "projects"))
+	m.EnterInputModeForTest("add-project")
+	m.SetPathInputValue(projDir2)
+	m.Update(tea.KeyMsg{Type: tea.KeyEnter}) // advance to name
+	m.SetNameInputValue("existing")
+	result, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter}) // first Enter: warn
+	mm := result.(*tui.MainMenuModel)
+	if mm.NameErr() == nil {
+		t.Error("expected soft-warn error on first Enter with duplicate name")
+	}
+	// Second Enter: confirm
+	result2, _ := mm.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	mm2 := result2.(*tui.MainMenuModel)
+	if mm2.InInputMode() {
+		t.Error("expected input mode exited after second Enter")
+	}
+}
+
+func TestAddProject_EscFromNameClearsSoftWarn(t *testing.T) {
+	dir := t.TempDir()
+	projDir := filepath.Join(dir, "proj")
+	os.MkdirAll(projDir, 0755)
+
+	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
+	m.EnterInputModeForTest("add-project")
+	m.SetPathInputValue(projDir)
+	m.Update(tea.KeyMsg{Type: tea.KeyEnter}) // advance to name
+	m.SetNameWarnShown(true)
+	result, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	mm := result.(*tui.MainMenuModel)
+	if mm.NameWarnShown() {
+		t.Error("expected soft-warn cleared after Esc from name field")
+	}
+	if !mm.InputFocusPath() {
+		t.Error("expected focus returned to path field after Esc from name")
+	}
+}
+
 func TestMainMenu_DeleteProject_EntersDeleteMode(t *testing.T) {
 	m := tui.NewMainMenu(testProjects(), testAITools(), "claude", "animated")
 	newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})

@@ -171,6 +171,13 @@ type MainMenuModel struct {
 	autocomplete AutocompleteModel
 	inputErr     error
 
+	// Two-field add-project form state
+	nameInput      textinput.Model
+	nameTouched    bool  // user manually edited name; disable auto-derive
+	nameErr        error
+	nameWarnShown  bool  // true after first Enter on duplicate name; second Enter confirms
+	inputFocusPath bool  // true = path field focused, false = name field focused
+
 	// Delete mode
 	deleteMode           bool
 	deleteSelected       int
@@ -824,8 +831,8 @@ func (m *MainMenuModel) SetSettingsMode(v bool) { m.settingsMode = v }
 // hint inside the help row instead of the normal key hints.
 func (m *MainMenuModel) SetShowEscHint(v bool) { m.showEscHint = v }
 
-// EnterInputModeForTest directly sets input mode — intended for tests only.
-func (m *MainMenuModel) EnterInputModeForTest(mode string) { m.inputMode = mode }
+// EnterInputModeForTest calls the real enterInputMode — intended for tests only.
+func (m *MainMenuModel) EnterInputModeForTest(mode string) { m.enterInputMode(mode) } //nolint:unparam
 
 // EnterDeleteModeForTest directly sets delete mode — intended for tests only.
 func (m *MainMenuModel) EnterDeleteModeForTest() { m.deleteMode = true }
@@ -871,6 +878,36 @@ func (m *MainMenuModel) SetWorktreeProject(projectIdx int, _ string) {
 
 // SoundFile returns the file path for sound features persistence.
 func (m *MainMenuModel) SoundFile() string { return m.soundFile }
+
+// InputFocusPath returns true when the path field is focused in the two-field form.
+func (m *MainMenuModel) InputFocusPath() bool { return m.inputFocusPath }
+
+// NameInputValue returns the current name field value.
+func (m *MainMenuModel) NameInputValue() string { return m.nameInput.Value() }
+
+// PathInputValue returns the current path field value.
+func (m *MainMenuModel) PathInputValue() string { return m.pathInput.Value() }
+
+// SetPathInputValue sets the path field value — intended for tests only.
+func (m *MainMenuModel) SetPathInputValue(v string) { m.pathInput.SetValue(v) }
+
+// SetNameInputValue sets the name field value — intended for tests only.
+func (m *MainMenuModel) SetNameInputValue(v string) { m.nameInput.SetValue(v) }
+
+// SetNameTouched sets the nameTouched flag — intended for tests only.
+func (m *MainMenuModel) SetNameTouched(v bool) { m.nameTouched = v }
+
+// SetNameWarnShown sets the nameWarnShown flag — intended for tests only.
+func (m *MainMenuModel) SetNameWarnShown(v bool) { m.nameWarnShown = v }
+
+// NameErr returns the current name field error.
+func (m *MainMenuModel) NameErr() error { return m.nameErr }
+
+// NameWarnShown returns true when the duplicate-name soft-warn is active.
+func (m *MainMenuModel) NameWarnShown() bool { return m.nameWarnShown }
+
+// TriggerAutoDeriveName calls maybeAutoDeriveName — intended for tests only.
+func (m *MainMenuModel) TriggerAutoDeriveName() { m.maybeAutoDeriveName() }
 
 // BobPhase returns the current bob animation phase (0 to 2*pi).
 func (m *MainMenuModel) BobPhase() float64 { return m.bobPhase }
@@ -1400,6 +1437,11 @@ func (m *MainMenuModel) updateSettings(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m *MainMenuModel) enterInputMode(mode string) (tea.Model, tea.Cmd) {
 	m.inputMode = mode
 	m.inputErr = nil
+	m.nameErr = nil
+	m.nameTouched = false
+	m.nameWarnShown = false
+	m.inputFocusPath = true
+
 	ti := textinput.New()
 	ti.Placeholder = "Project path (e.g., ~/code/project)"
 	ti.Focus()
@@ -1408,6 +1450,12 @@ func (m *MainMenuModel) enterInputMode(mode string) (tea.Model, tea.Cmd) {
 	// for both: 8 (label "  Path: ") + 2 (prompt "> ") + 1 (cursor) = 11.
 	ti.Width = menuContentWidth - 11
 	m.pathInput = ti
+
+	ni := textinput.New()
+	ni.Placeholder = "Project name"
+	ni.Width = menuContentWidth - 11
+	m.nameInput = ni
+
 	m.autocomplete = NewAutocomplete(PathSuggestionProvider(8), 8)
 	return m, textinput.Blink
 }
@@ -1415,7 +1463,12 @@ func (m *MainMenuModel) enterInputMode(mode string) (tea.Model, tea.Cmd) {
 func (m *MainMenuModel) exitInputMode() {
 	m.inputMode = ""
 	m.inputErr = nil
+	m.nameErr = nil
+	m.nameTouched = false
+	m.nameWarnShown = false
+	m.inputFocusPath = true
 	m.pathInput.Blur()
+	m.nameInput.Blur()
 	m.autocomplete.Dismiss()
 }
 
@@ -1431,6 +1484,14 @@ func (m *MainMenuModel) setMoveFlash(projectIdx int) {
 }
 
 func (m *MainMenuModel) updateInputMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// For open-once mode, always use path-only flow.
+	if m.inputMode == "open-once" || m.inputFocusPath {
+		return m.updateInputModePath(msg)
+	}
+	return m.updateInputModeName(msg)
+}
+
+func (m *MainMenuModel) updateInputModePath(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.Type {
 	case tea.KeyEsc:
 		if m.autocomplete.ShowSuggestions() {
@@ -1444,12 +1505,12 @@ func (m *MainMenuModel) updateInputMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.setActionResult("quit")
 		return m, tea.Quit
 	case tea.KeyUp:
-		if m.autocomplete.ShowSuggestions() && len(m.autocomplete.Suggestions()) > 0 {
+		if m.autocomplete.ShowSuggestions() {
 			m.autocomplete.MoveUp()
 			return m, nil
 		}
 	case tea.KeyDown:
-		if m.autocomplete.ShowSuggestions() && len(m.autocomplete.Suggestions()) > 0 {
+		if m.autocomplete.ShowSuggestions() {
 			m.autocomplete.MoveDown()
 			return m, nil
 		}
@@ -1457,17 +1518,25 @@ func (m *MainMenuModel) updateInputMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.autocomplete.ShowSuggestions() && len(m.autocomplete.Suggestions()) > 0 {
 			accepted := m.autocomplete.AcceptSelected()
 			m.pathInput.SetValue(accepted)
-			m.autocomplete.SetInput(m.pathInput.Value())
+			m.autocomplete.SetInput(accepted)
 			m.autocomplete.RefreshSuggestions()
+			m.maybeAutoDeriveName()
 			return m, nil
+		}
+		if m.inputMode == "add-project" {
+			return m.advanceToNameField()
 		}
 	case tea.KeyEnter:
 		if m.autocomplete.ShowSuggestions() && len(m.autocomplete.Suggestions()) > 0 {
 			accepted := m.autocomplete.AcceptSelected()
 			m.pathInput.SetValue(accepted)
-			m.autocomplete.SetInput(m.pathInput.Value())
+			m.autocomplete.SetInput(accepted)
 			m.autocomplete.RefreshSuggestions()
+			m.maybeAutoDeriveName()
 			return m, nil
+		}
+		if m.inputMode == "add-project" {
+			return m.advanceToNameField()
 		}
 		return m.submitInputMode()
 	}
@@ -1481,60 +1550,142 @@ func (m *MainMenuModel) updateInputMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	} else {
 		m.autocomplete.Dismiss()
 	}
+	if m.inputMode == "add-project" {
+		m.maybeAutoDeriveName()
+	}
 	return m, cmd
 }
 
-func (m *MainMenuModel) submitInputMode() (tea.Model, tea.Cmd) {
+// advanceToNameField validates the path and moves focus to the name field.
+func (m *MainMenuModel) advanceToNameField() (tea.Model, tea.Cmd) {
 	path := strings.TrimSpace(m.pathInput.Value())
-
 	if path == "" {
-		m.exitInputMode()
+		m.inputErr = fmt.Errorf("project path cannot be empty")
 		return m, nil
 	}
-
-	expanded := filepath.Clean(util.ExpandPath(path))
-
 	if err := util.ValidatePath(path); err != nil {
 		m.inputErr = fmt.Errorf("Directory not found")
 		return m, nil
 	}
+	m.inputErr = nil
+	m.inputFocusPath = false
+	m.pathInput.Blur()
+	m.nameInput.Focus()
+	m.maybeAutoDeriveName()
+	return m, textinput.Blink
+}
 
-	name := filepath.Base(expanded)
+// maybeAutoDeriveName sets the name field from the path basename if the user has not edited it.
+func (m *MainMenuModel) maybeAutoDeriveName() {
+	if m.nameTouched {
+		return
+	}
+	path := strings.TrimSpace(m.pathInput.Value())
+	if path == "" {
+		return
+	}
+	expanded := filepath.Clean(util.ExpandPath(path))
+	base := filepath.Base(expanded)
+	if base != "" && base != "." && base != "/" {
+		m.nameInput.SetValue(base)
+	}
+}
 
-	if m.inputMode == "add-project" {
-		if IsDuplicateProject(expanded, m.projects) {
-			m.inputErr = fmt.Errorf("Project already exists")
-			return m, nil
-		}
-
-		if err := AppendProject(name, expanded, m.projectsFile); err != nil {
-			m.inputErr = fmt.Errorf("Failed to save: %v", err)
-			return m, nil
-		}
-
-		projects, _ := models.LoadProjects(m.projectsFile)
-		models.PopulateWorktrees(projects)
-		m.projects = projects
-		m.expandedWorktrees = make(map[int]bool)
-
+func (m *MainMenuModel) updateInputModeName(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.Type {
+	case tea.KeyEsc, tea.KeyShiftTab:
+		// Return to path field and clear soft-warn.
+		m.nameWarnShown = false
+		m.nameErr = nil
+		m.inputFocusPath = true
+		m.nameInput.Blur()
+		m.pathInput.Focus()
+		return m, textinput.Blink
+	case tea.KeyCtrlC:
 		m.exitInputMode()
-		m.setFeedback("Added "+name, "success")
+		m.setActionResult("quit")
+		return m, tea.Quit
+	case tea.KeyEnter:
+		return m.submitInputMode()
+	}
+
+	var cmd tea.Cmd
+	prev := m.nameInput.Value()
+	m.nameInput, cmd = m.nameInput.Update(msg)
+	if m.nameInput.Value() != prev {
+		m.nameTouched = true
+		m.nameWarnShown = false
+		m.nameErr = nil
+	}
+	return m, cmd
+}
+
+func (m *MainMenuModel) submitInputMode() (tea.Model, tea.Cmd) {
+	// open-once: validate path and return result.
+	if m.inputMode == "open-once" {
+		path := strings.TrimSpace(m.pathInput.Value())
+		if path == "" {
+			m.exitInputMode()
+			return m, nil
+		}
+		if err := util.ValidatePath(path); err != nil {
+			m.inputErr = fmt.Errorf("Directory not found")
+			return m, nil
+		}
+		expanded := filepath.Clean(util.ExpandPath(path))
+		name := filepath.Base(expanded)
+		m.exitInputMode()
+		m.result = &MainMenuResult{
+			Action:       "open-once",
+			Name:         name,
+			Path:         expanded,
+			AITool:       m.CurrentAITool(),
+			GhostDisplay: m.ghostDisplayForResult(),
+			TabTitle:     m.tabTitleForResult(),
+			SoundName:    m.soundNameForResult(),
+		}
+		m.quitting = true
+		return m, tea.Quit
+	}
+
+	// add-project: both fields already validated; submit.
+	name := strings.TrimSpace(m.nameInput.Value())
+	if name == "" {
+		m.nameErr = fmt.Errorf("project name cannot be empty")
 		return m, nil
 	}
 
-	// open-once: return result with path
-	m.exitInputMode()
-	m.result = &MainMenuResult{
-		Action:       "open-once",
-		Name:         name,
-		Path:         expanded,
-		AITool:       m.CurrentAITool(),
-		GhostDisplay: m.ghostDisplayForResult(),
-		TabTitle:     m.tabTitleForResult(),
-		SoundName:    m.soundNameForResult(),
+	path := strings.TrimSpace(m.pathInput.Value())
+	expanded := filepath.Clean(util.ExpandPath(path))
+
+	if IsDuplicateProject(expanded, m.projects) {
+		m.nameErr = fmt.Errorf("Project already exists")
+		return m, nil
 	}
-	m.quitting = true
-	return m, tea.Quit
+
+	if IsDuplicateName(name, m.projects) {
+		if !m.nameWarnShown {
+			m.nameWarnShown = true
+			m.nameErr = fmt.Errorf("A project named '%s' already exists — press Enter again to add anyway", name)
+			return m, nil
+		}
+		// Second Enter: user confirmed, proceed.
+	}
+	m.nameWarnShown = false
+
+	if err := AppendProject(name, expanded, m.projectsFile); err != nil {
+		m.nameErr = fmt.Errorf("Failed to save: %v", err)
+		return m, nil
+	}
+
+	projects, _ := models.LoadProjects(m.projectsFile)
+	models.PopulateWorktrees(projects)
+	m.projects = projects
+	m.expandedWorktrees = make(map[int]bool)
+
+	m.exitInputMode()
+	m.setFeedback("Added "+name, "success")
+	return m, nil
 }
 
 // enterDeleteMode switches to delete mode (stub - Task 4 will implement fully).
@@ -2395,7 +2546,7 @@ func (m *MainMenuModel) renderInputBox() string {
 		lines = append(lines, leftBorder+errContent+strings.Repeat(" ", errPadding)+rightBorder)
 	}
 
-	// Autocomplete suggestions rendered inside the box
+	// Autocomplete suggestions rendered inside the box (path field only)
 	if m.autocomplete.ShowSuggestions() {
 		selectedStyle := lipgloss.NewStyle().Reverse(true)
 		lines = append(lines, emptyRow)
@@ -2417,6 +2568,36 @@ func (m *MainMenuModel) renderInputBox() string {
 		}
 	}
 
+	// Name field (add-project mode only)
+	if m.inputMode == "add-project" {
+		nameLabel := "  Name: "
+		nameView := m.nameInput.View()
+		nameBase := nameLabel + nameView
+		namePadding := menuContentWidth - lipgloss.Width(nameBase)
+		if namePadding < 0 {
+			namePadding = 0
+		}
+		var nameRow string
+		if !m.nameTouched && namePadding >= 7 {
+			// Append " (auto)" hint within available padding.
+			autoHint := helpStyle.Render(" (auto)")
+			nameRow = leftBorder + nameBase + autoHint + strings.Repeat(" ", namePadding-7) + rightBorder
+		} else {
+			nameRow = leftBorder + nameBase + strings.Repeat(" ", namePadding) + rightBorder
+		}
+		lines = append(lines, nameRow)
+
+		if m.nameErr != nil {
+			errMsg := errorStyle.Render(m.nameErr.Error())
+			nameErrContent := "  " + errMsg
+			nameErrPadding := menuContentWidth - lipgloss.Width(nameErrContent)
+			if nameErrPadding < 0 {
+				nameErrPadding = 0
+			}
+			lines = append(lines, leftBorder+nameErrContent+strings.Repeat(" ", nameErrPadding)+rightBorder)
+		}
+	}
+
 	lines = append(lines, emptyRow)
 	lines = append(lines, separator)
 
@@ -2424,6 +2605,8 @@ func (m *MainMenuModel) renderInputBox() string {
 	var helpContent string
 	if m.autocomplete.ShowSuggestions() {
 		helpContent = helpStyle.Render("\u2191\u2193 navigate") + sep + helpStyle.Render("\u23ce complete") + sep + helpStyle.Render("Esc cancel")
+	} else if m.inputMode == "add-project" && !m.inputFocusPath {
+		helpContent = helpStyle.Render("\u21e7Tab back") + sep + helpStyle.Render("\u23ce confirm") + sep + helpStyle.Render("Esc back")
 	} else {
 		helpContent = helpStyle.Render("Tab complete") + sep + helpStyle.Render("\u23ce confirm") + sep + helpStyle.Render("Esc cancel")
 	}
@@ -2434,9 +2617,7 @@ func (m *MainMenuModel) renderInputBox() string {
 	lines = append(lines, leftBorder+" "+helpContent+strings.Repeat(" ", helpPadding)+rightBorder)
 	lines = append(lines, bottomBorder)
 
-	result := strings.Join(lines, "\n")
-
-	return result
+	return strings.Join(lines, "\n")
 }
 
 // View implements tea.Model. Renders the full box-drawing menu with optional ghost.
