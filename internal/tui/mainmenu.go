@@ -895,7 +895,15 @@ func (m *MainMenuModel) SetPathInputValue(v string) { m.pathInput.SetValue(v) }
 func (m *MainMenuModel) SetNameInputValue(v string) { m.nameInput.SetValue(v) }
 
 // SetNameTouched sets the nameTouched flag — intended for tests only.
-func (m *MainMenuModel) SetNameTouched(v bool) { m.nameTouched = v }
+// When setting to true, the name input is widened to remove the (auto) hint reservation.
+func (m *MainMenuModel) SetNameTouched(v bool) {
+	m.nameTouched = v
+	if v {
+		m.nameInput.Width = menuContentWidth - 11
+	} else {
+		m.nameInput.Width = menuContentWidth - 18
+	}
+}
 
 // SetNameWarnShown sets the nameWarnShown flag — intended for tests only.
 func (m *MainMenuModel) SetNameWarnShown(v bool) { m.nameWarnShown = v }
@@ -1453,7 +1461,10 @@ func (m *MainMenuModel) enterInputMode(mode string) (tea.Model, tea.Cmd) {
 
 	ni := textinput.New()
 	ni.Placeholder = "Project name"
-	ni.Width = menuContentWidth - 11
+	// Reserve 7 chars for the " (auto)" hint shown when the user has not
+	// manually edited the name.  The width is widened to menuContentWidth-11
+	// once the user touches the field (see updateInputModeName).
+	ni.Width = menuContentWidth - 18
 	m.nameInput = ni
 
 	m.autocomplete = NewAutocomplete(PathSuggestionProvider(8), 8)
@@ -1564,7 +1575,7 @@ func (m *MainMenuModel) advanceToNameField() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if err := util.ValidatePath(path); err != nil {
-		m.inputErr = fmt.Errorf("Directory not found")
+		m.inputErr = err
 		return m, nil
 	}
 	m.inputErr = nil
@@ -1613,6 +1624,10 @@ func (m *MainMenuModel) updateInputModeName(msg tea.KeyMsg) (tea.Model, tea.Cmd)
 	prev := m.nameInput.Value()
 	m.nameInput, cmd = m.nameInput.Update(msg)
 	if m.nameInput.Value() != prev {
+		if !m.nameTouched {
+			// First edit: widen the name field now that (auto) hint is gone.
+			m.nameInput.Width = menuContentWidth - 11
+		}
 		m.nameTouched = true
 		m.nameWarnShown = false
 		m.nameErr = nil
@@ -1629,7 +1644,7 @@ func (m *MainMenuModel) submitInputMode() (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		if err := util.ValidatePath(path); err != nil {
-			m.inputErr = fmt.Errorf("Directory not found")
+			m.inputErr = err
 			return m, nil
 		}
 		expanded := filepath.Clean(util.ExpandPath(path))
@@ -2578,10 +2593,16 @@ func (m *MainMenuModel) renderInputBox() string {
 			namePadding = 0
 		}
 		var nameRow string
-		if !m.nameTouched && namePadding >= 7 {
-			// Append " (auto)" hint within available padding.
+		if !m.nameTouched {
+			// Append " (auto)" hint; name field width is pre-reduced by 7 to
+			// guarantee this always fits within the box.
 			autoHint := helpStyle.Render(" (auto)")
-			nameRow = leftBorder + nameBase + autoHint + strings.Repeat(" ", namePadding-7) + rightBorder
+			autoHintWidth := 7
+			trailing := namePadding - autoHintWidth
+			if trailing < 0 {
+				trailing = 0
+			}
+			nameRow = leftBorder + nameBase + autoHint + strings.Repeat(" ", trailing) + rightBorder
 		} else {
 			nameRow = leftBorder + nameBase + strings.Repeat(" ", namePadding) + rightBorder
 		}
