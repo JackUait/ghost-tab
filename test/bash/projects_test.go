@@ -533,6 +533,35 @@ func TestGetProjectsRoot_ReturnsStoredPath(t *testing.T) {
 	}
 }
 
+func TestGetProjectsRoot_ReadsOnlyFirstLine(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "projects-root")
+	// File with multiple lines - should only read the first
+	os.WriteFile(file, []byte("/Users/jack/Projects\n/Users/jack/Other\n"), 0644)
+	out, code := runBashFunc(t, "lib/projects.sh", "get_projects_root",
+		[]string{file}, nil)
+	assertExitCode(t, code, 0)
+	lines := strings.Split(strings.TrimSpace(out), "\n")
+	if len(lines) != 1 {
+		t.Errorf("expected 1 line, got %d: %v", len(lines), lines)
+	}
+	if lines[0] != "/Users/jack/Projects" {
+		t.Errorf("got %q, want %q", lines[0], "/Users/jack/Projects")
+	}
+}
+
+func TestGetProjectsRoot_HandlesEmptyFile(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "projects-root")
+	os.WriteFile(file, []byte(""), 0644)
+	out, code := runBashFunc(t, "lib/projects.sh", "get_projects_root",
+		[]string{file}, nil)
+	assertExitCode(t, code, 0)
+	if strings.TrimSpace(out) != "" {
+		t.Errorf("expected empty output, got %q", strings.TrimSpace(out))
+	}
+}
+
 func TestSetProjectsRoot_WritesExpandedPath(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "projects-root")
