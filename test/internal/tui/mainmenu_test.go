@@ -4830,3 +4830,28 @@ func TestAddProject_AutoSuffixHiddenWhenTouched(t *testing.T) {
 		t.Errorf("expected no '(auto)' suffix after user edits name, got: %q", view)
 	}
 }
+
+func TestAddProject_PreFillsPathWithProjectsRoot(t *testing.T) {
+	dir := t.TempDir()
+	rootFile := filepath.Join(dir, "projects-root")
+	os.WriteFile(rootFile, []byte(dir+"\n"), 0644) //nolint:errcheck
+
+	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
+	m.SetProjectsRootFile(rootFile)
+	m.EnterInputModeForTest("add-project")
+
+	if !strings.HasPrefix(m.PathInputValue(), dir) {
+		t.Errorf("expected path pre-filled with %q, got %q", dir, m.PathInputValue())
+	}
+}
+
+func TestAddProject_NoPreFillWhenRootFileAbsent(t *testing.T) {
+	dir := t.TempDir()
+	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
+	m.SetProjectsRootFile(filepath.Join(dir, "missing-file"))
+	m.EnterInputModeForTest("add-project")
+
+	if m.PathInputValue() != "" {
+		t.Errorf("expected empty path when root file absent, got %q", m.PathInputValue())
+	}
+}

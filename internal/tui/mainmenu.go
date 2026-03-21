@@ -196,6 +196,9 @@ type MainMenuModel struct {
 	// File path for project file operations
 	projectsFile string
 
+	// File path for projects root directory preference
+	projectsRootFile string
+
 	// showEscHint is set by AppModel to display "Press Esc again to quit" in
 	// the help row instead of the normal key hints — no extra line is added.
 	showEscHint bool
@@ -855,6 +858,9 @@ func (m *MainMenuModel) SetProjectsFile(path string) { m.projectsFile = path }
 // ProjectsFile returns the file path for project file operations.
 func (m *MainMenuModel) ProjectsFile() string { return m.projectsFile }
 
+// SetProjectsRootFile sets the file path for the default projects root directory.
+func (m *MainMenuModel) SetProjectsRootFile(path string) { m.projectsRootFile = path }
+
 // SetAIToolFile sets the file path for AI tool preference persistence.
 // When set, CycleAITool writes the new tool to this file immediately.
 func (m *MainMenuModel) SetAIToolFile(path string) { m.aiToolFile = path }
@@ -1442,6 +1448,19 @@ func (m *MainMenuModel) updateSettings(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// readProjectsRoot reads the default projects root from the given file.
+// Returns empty string if the file is missing or unreadable.
+func readProjectsRoot(file string) string {
+	if file == "" {
+		return ""
+	}
+	data, err := os.ReadFile(file)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(data))
+}
+
 func (m *MainMenuModel) enterInputMode(mode string) (tea.Model, tea.Cmd) {
 	m.inputMode = mode
 	m.inputErr = nil
@@ -1457,6 +1476,14 @@ func (m *MainMenuModel) enterInputMode(mode string) (tea.Model, tea.Cmd) {
 	// total width, but text mode renders prompt + Width + 1 (cursor). Account
 	// for both: 8 (label "  Path: ") + 2 (prompt "> ") + 1 (cursor) = 11.
 	ti.Width = menuContentWidth - 11
+	if root := readProjectsRoot(m.projectsRootFile); root != "" {
+		prefill := root
+		if !strings.HasSuffix(prefill, "/") {
+			prefill += "/"
+		}
+		ti.SetValue(prefill)
+		ti.CursorEnd()
+	}
 	m.pathInput = ti
 
 	ni := textinput.New()
