@@ -786,11 +786,14 @@ func TestMainMenu_ViewHelpRow(t *testing.T) {
 	m := tui.NewMainMenu(nil, []string{"claude", "codex"}, "claude", "animated")
 	m.SetSize(80, 30)
 	view := m.View()
-	if !strings.Contains(view, "navigate") {
-		t.Error("help row should mention navigate")
+	if strings.Contains(view, "navigate") {
+		t.Error("help row should NOT mention navigate")
 	}
 	if !strings.Contains(view, "AI") {
 		t.Error("help row should mention AI when multiple available")
+	}
+	if !strings.Contains(view, "delete") {
+		t.Error("help row should mention delete")
 	}
 }
 
@@ -863,8 +866,11 @@ func TestMainMenu_ViewHelpRowSingleTool(t *testing.T) {
 	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
 	m.SetSize(80, 30)
 	view := m.View()
-	if !strings.Contains(view, "navigate") {
-		t.Error("help row should mention navigate")
+	if strings.Contains(view, "navigate") {
+		t.Error("help row should NOT mention navigate")
+	}
+	if !strings.Contains(view, "delete") {
+		t.Error("help row should mention delete")
 	}
 	// Single tool: no AI tool mention in help
 	if strings.Contains(view, "AI tool") {

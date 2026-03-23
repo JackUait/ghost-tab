@@ -2675,7 +2675,6 @@ func (m *MainMenuModel) renderMenuBox() string {
 		helpContent = helpStyle.Render("Press Esc again to quit")
 	} else {
 		var parts []string
-		parts = append(parts, helpStyle.Render("\u2191\u2193 navigate"))
 		if len(m.projects) > 1 {
 			parts = append(parts, helpStyle.Render("Shift+\u2191\u2193 move"))
 		}
@@ -2685,6 +2684,7 @@ func (m *MainMenuModel) renderMenuBox() string {
 		if hasWorktrees {
 			parts = append(parts, helpStyle.Render("w trees"))
 		}
+		parts = append(parts, helpStyle.Render("d delete"))
 		parts = append(parts, helpStyle.Render("\u23ce select"))
 		helpContent = strings.Join(parts, sep)
 	}

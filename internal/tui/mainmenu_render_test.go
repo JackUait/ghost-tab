@@ -87,9 +87,12 @@ func TestMenuBox_HelpTextPresent(t *testing.T) {
 	box := m.renderMenuBox()
 
 	raw := stripAnsi(box)
-	// Help text should contain navigation hints
-	if !strings.Contains(raw, "navigate") {
-		t.Error("help text missing 'navigate'")
+	// Help text should not contain navigate hint; should contain delete and select
+	if strings.Contains(raw, "navigate") {
+		t.Error("help text should NOT contain 'navigate'")
+	}
+	if !strings.Contains(raw, "delete") {
+		t.Error("help text missing 'delete' hint")
 	}
 	if !strings.Contains(raw, "AI") {
 		t.Error("help text missing 'AI' hint (expected when multiple AI tools available)")
