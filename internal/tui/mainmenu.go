@@ -2688,13 +2688,12 @@ func (m *MainMenuModel) renderMenuBox() string {
 		parts = append(parts, helpStyle.Render("\u23ce select"))
 		helpContent = strings.Join(parts, sep)
 	}
-	helpAvailable := menuContentWidth
 	helpWidth := lipgloss.Width(helpContent)
-	helpLeft := (helpAvailable - helpWidth) / 2
+	helpLeft := (menuInnerWidth - helpWidth) / 2
 	if helpLeft < 0 {
 		helpLeft = 0
 	}
-	helpRight := helpAvailable - helpWidth - helpLeft
+	helpRight := menuInnerWidth - helpWidth - helpLeft - menuPadding
 	if helpRight < 0 {
 		helpRight = 0
 	}

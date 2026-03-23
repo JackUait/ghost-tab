@@ -82,6 +82,59 @@ func TestMenuBox_AIToolHasTrailingSpace(t *testing.T) {
 	}
 }
 
+func TestMenuBox_HelpTextCentered(t *testing.T) {
+	// Minimal hint ("d delete · ⏎ select") should be visually centered.
+	// The rightBorder includes menuPadding=2 spaces, so those count toward
+	// the right-side whitespace. leftPad should roughly equal rightPad.
+	m := NewMainMenu(nil, []string{"claude"}, "claude", "animated")
+	m.width = 100
+	m.height = 40
+	box := m.renderMenuBox()
+	raw := stripAnsi(box)
+	lines := strings.Split(raw, "\n")
+
+	var helpLine string
+	for _, l := range lines {
+		if strings.Contains(l, "delete") && strings.Contains(l, "select") {
+			helpLine = l
+			break
+		}
+	}
+	if helpLine == "" {
+		t.Fatal("could not find help row in:\n" + raw)
+	}
+
+	runes := []rune(helpLine)
+	// inner = everything between left border │ and right border │
+	inner := runes[1 : len(runes)-1]
+
+	leftPad := 0
+	for _, r := range inner {
+		if r != ' ' {
+			break
+		}
+		leftPad++
+	}
+	rightPad := 0
+	for i := len(inner) - 1; i >= 0; i-- {
+		if inner[i] != ' ' {
+			break
+		}
+		rightPad++
+	}
+
+	// rightBorder has menuPadding=2 built-in spaces, so rightPad includes those.
+	// For centered text: leftPad ≈ rightPad (within 1 for odd-width content).
+	diff := leftPad - rightPad
+	if diff < 0 {
+		diff = -diff
+	}
+	if diff > 1 {
+		t.Errorf("help row not centered: leftPad=%d rightPad=%d (diff %d > 1); line=%q",
+			leftPad, rightPad, diff, helpLine)
+	}
+}
+
 func TestMenuBox_HelpTextPresent(t *testing.T) {
 	m := newTestMenu()
 	box := m.renderMenuBox()
