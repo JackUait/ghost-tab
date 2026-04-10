@@ -174,6 +174,27 @@ ensure_cask() {
   fi
 }
 
+# Install OpenCode via npm, removing any brew-installed version first.
+ensure_opencode() {
+  # Remove brew-installed opencode if present
+  if brew list opencode &>/dev/null; then
+    info "Removing brew-installed OpenCode..."
+    brew uninstall opencode &>/dev/null || true
+  fi
+
+  if command -v opencode &>/dev/null; then
+    success "OpenCode already installed"
+    return 0
+  fi
+
+  info "Installing OpenCode..."
+  if npm install -g opencode-ai@latest &>/dev/null; then
+    success "OpenCode installed"
+  else
+    warn "OpenCode installation failed — install manually: npm install -g opencode-ai@latest"
+  fi
+}
+
 # Install a command-line tool if not already on PATH.
 # Usage: ensure_command "cmd" "install_cmd" "post_msg" "display_name"
 ensure_command() {

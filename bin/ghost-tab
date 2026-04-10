@@ -179,7 +179,7 @@ if select_ai_tool_interactive; then
       ensure_command "copilot" "brew install copilot-cli" "" "Copilot CLI"
       ;;
     opencode)
-      ensure_command "opencode" "brew install anomalyco/tap/opencode" "" "OpenCode"
+      ensure_opencode
       ;;
   esac
 else
