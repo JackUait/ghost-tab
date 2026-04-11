@@ -394,41 +394,37 @@ func TestEnsureCask_exits_nonzero_when_brew_fails(t *testing.T) {
 // ensure_opencode tests
 // ============================================================
 
-func TestEnsureOpencode_skips_when_already_installed_and_not_from_brew(t *testing.T) {
+func TestEnsureOpencode_ready_when_npx_available_and_not_from_brew(t *testing.T) {
 	dir := t.TempDir()
-	// Mock opencode already on PATH (from npm)
-	binDir := mockCommand(t, dir, "opencode", `echo "opencode"`)
+	// Mock npx on PATH
+	binDir := mockCommand(t, dir, "npx", `echo "npx"`)
 	// Mock brew list opencode to fail (not installed via brew)
 	mockCommand(t, dir, "brew", `exit 1`)
 	snippet := installSnippet(t, `ensure_opencode`)
 	env := buildEnv(t, []string{binDir})
 	out, code := runBashSnippet(t, snippet, env)
 	assertExitCode(t, code, 0)
-	assertContains(t, out, "already installed")
+	assertContains(t, out, "OpenCode ready")
 }
 
-func TestEnsureOpencode_installs_via_npm_when_not_on_path(t *testing.T) {
+func TestEnsureOpencode_warns_when_npx_not_available(t *testing.T) {
 	dir := t.TempDir()
-	npmLog := filepath.Join(dir, "npm_calls")
-	// Mock npm to log calls and succeed
-	binDir := mockCommand(t, dir, "npm", fmt.Sprintf(`echo "$@" >> %q`, npmLog))
+	// No npx on PATH — use restricted PATH
+	binDir := filepath.Join(dir, "bin")
+	os.MkdirAll(binDir, 0755)
 	// Mock brew list to fail (not from brew)
 	mockCommand(t, dir, "brew", `exit 1`)
-	// No opencode on PATH — use restricted PATH with only mock dir
 	symlinkUsrBinTools(t, binDir, "grep", "sed", "tr")
 	snippet := installSnippet(t, `ensure_opencode`)
 	env := buildEnv(t, nil, "PATH="+binDir+":/bin")
 	out, code := runBashSnippet(t, snippet, env)
 	assertExitCode(t, code, 0)
-	assertContains(t, out, "OpenCode installed")
-	calls, _ := os.ReadFile(npmLog)
-	assertContains(t, string(calls), "install -g opencode-ai@latest")
+	assertContains(t, out, "Node.js")
 }
 
-func TestEnsureOpencode_removes_brew_opencode_before_npm_install(t *testing.T) {
+func TestEnsureOpencode_removes_brew_opencode(t *testing.T) {
 	dir := t.TempDir()
 	brewLog := filepath.Join(dir, "brew_calls")
-	npmLog := filepath.Join(dir, "npm_calls")
 	// Mock brew: "list opencode" succeeds (installed via brew), log uninstall
 	binDir := mockCommand(t, dir, "brew", fmt.Sprintf(`
 echo "$@" >> %q
@@ -436,9 +432,8 @@ if [ "$1" = "list" ] && [ "$2" = "opencode" ]; then exit 0; fi
 if [ "$1" = "uninstall" ]; then exit 0; fi
 exit 1
 `, brewLog))
-	// Mock npm
-	mockCommand(t, dir, "npm", fmt.Sprintf(`echo "$@" >> %q`, npmLog))
-	// No opencode on PATH after brew uninstall
+	// Mock npx available
+	mockCommand(t, dir, "npx", `echo "npx"`)
 	symlinkUsrBinTools(t, binDir, "grep", "sed", "tr")
 	snippet := installSnippet(t, `ensure_opencode`)
 	env := buildEnv(t, nil, "PATH="+binDir+":/bin")
@@ -447,20 +442,5 @@ exit 1
 	brewCalls, _ := os.ReadFile(brewLog)
 	assertContains(t, string(brewCalls), "uninstall opencode")
 	assertContains(t, out, "Removing brew-installed OpenCode")
-	npmCalls, _ := os.ReadFile(npmLog)
-	assertContains(t, string(npmCalls), "install -g opencode-ai@latest")
-}
-
-func TestEnsureOpencode_warns_on_npm_install_failure(t *testing.T) {
-	dir := t.TempDir()
-	// Mock npm to fail
-	binDir := mockCommand(t, dir, "npm", `exit 1`)
-	// Mock brew list to fail (not from brew)
-	mockCommand(t, dir, "brew", `exit 1`)
-	symlinkUsrBinTools(t, binDir, "grep", "sed", "tr")
-	snippet := installSnippet(t, `ensure_opencode`)
-	env := buildEnv(t, nil, "PATH="+binDir+":/bin")
-	out, code := runBashSnippet(t, snippet, env)
-	assertExitCode(t, code, 0)
-	assertContains(t, out, "installation failed")
+	assertContains(t, out, "OpenCode ready")
 }

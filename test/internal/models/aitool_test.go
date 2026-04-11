@@ -72,7 +72,8 @@ func TestDetectAITools_AllToolsDetected(t *testing.T) {
 	os.Mkdir(binDir, 0755)
 
 	// Create all 4 mock executables (note: "gh copilot" uses "gh" as the binary)
-	for _, cmd := range []string{"claude", "codex", "gh", "opencode"} {
+	// OpenCode is detected via "npx" availability (launched as npx opencode-ai@latest)
+	for _, cmd := range []string{"claude", "codex", "gh", "npx"} {
 		os.WriteFile(filepath.Join(binDir, cmd), []byte("#!/bin/bash\necho test"), 0755)
 	}
 

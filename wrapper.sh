@@ -58,7 +58,11 @@ LAZYGIT_CMD="$(command -v lazygit)"
 CLAUDE_CMD="$(command -v claude)"
 CODEX_CMD="$(command -v codex)"
 COPILOT_CMD="$(command -v copilot)"
-OPENCODE_CMD="$(command -v opencode)"
+if command -v npx &>/dev/null; then
+  OPENCODE_CMD="npx opencode-ai@latest"
+else
+  OPENCODE_CMD=""
+fi
 
 # AI tool preference
 AI_TOOL_PREF_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/ghost-tab/ai-tool"

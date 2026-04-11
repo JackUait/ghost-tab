@@ -37,11 +37,16 @@ func DetectAITools() []AITool {
 		{Name: "claude", Command: "claude"},
 		{Name: "codex", Command: "codex"},
 		{Name: "copilot", Command: "gh copilot"},
-		{Name: "opencode", Command: "opencode"},
+		{Name: "opencode", Command: "npx opencode-ai@latest"},
 	}
 
 	for i := range tools {
-		tools[i].Installed = isCommandAvailable(tools[i].Command)
+		detectCmd := tools[i].Command
+		// OpenCode is launched via npx — detect by checking for the npx binary
+		if tools[i].Name == "opencode" {
+			detectCmd = "npx"
+		}
+		tools[i].Installed = isCommandAvailable(detectCmd)
 	}
 
 	return tools

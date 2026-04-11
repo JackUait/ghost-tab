@@ -34,9 +34,9 @@ func TestBuildAILaunchCmd(t *testing.T) {
 		}
 	})
 
-	t.Run("opencode passes project dir", func(t *testing.T) {
-		result := util.BuildAILaunchCmd("opencode", "/usr/bin/opencode", "/my/project", nil)
-		expected := `/usr/bin/opencode "/my/project"`
+	t.Run("opencode passes project dir via npx", func(t *testing.T) {
+		result := util.BuildAILaunchCmd("opencode", "npx opencode-ai@latest", "/my/project", nil)
+		expected := `npx opencode-ai@latest "/my/project"`
 		if result != expected {
 			t.Errorf("got %q, want %q", result, expected)
 		}
@@ -53,8 +53,8 @@ func TestBuildAILaunchCmd(t *testing.T) {
 	})
 
 	t.Run("handles project path with spaces (opencode)", func(t *testing.T) {
-		result := util.BuildAILaunchCmd("opencode", "/usr/bin/opencode", "/path/with spaces", nil)
-		expected := `/usr/bin/opencode "/path/with spaces"`
+		result := util.BuildAILaunchCmd("opencode", "npx opencode-ai@latest", "/path/with spaces", nil)
+		expected := `npx opencode-ai@latest "/path/with spaces"`
 		if result != expected {
 			t.Errorf("got %q, want %q", result, expected)
 		}
@@ -77,8 +77,8 @@ func TestBuildAILaunchCmd(t *testing.T) {
 	})
 
 	t.Run("handles project path with double quotes (opencode)", func(t *testing.T) {
-		result := util.BuildAILaunchCmd("opencode", "/usr/bin/opencode", `/path/with"quotes`, nil)
-		expected := `/usr/bin/opencode "/path/with"quotes"`
+		result := util.BuildAILaunchCmd("opencode", "npx opencode-ai@latest", `/path/with"quotes`, nil)
+		expected := `npx opencode-ai@latest "/path/with"quotes"`
 		if result != expected {
 			t.Errorf("got %q, want %q", result, expected)
 		}
@@ -93,8 +93,8 @@ func TestBuildAILaunchCmd(t *testing.T) {
 	})
 
 	t.Run("handles project path with unicode (opencode)", func(t *testing.T) {
-		result := util.BuildAILaunchCmd("opencode", "/usr/bin/opencode", "/path/\u00e9moji/\U0001F47B", nil)
-		expected := "/usr/bin/opencode \"/path/\u00e9moji/\U0001F47B\""
+		result := util.BuildAILaunchCmd("opencode", "npx opencode-ai@latest", "/path/\u00e9moji/\U0001F47B", nil)
+		expected := "npx opencode-ai@latest \"/path/\u00e9moji/\U0001F47B\""
 		if result != expected {
 			t.Errorf("got %q, want %q", result, expected)
 		}
@@ -111,8 +111,8 @@ func TestBuildAILaunchCmd(t *testing.T) {
 
 	t.Run("handles very long project path (opencode)", func(t *testing.T) {
 		longPath := strings.Repeat("/very/long/path", 50)
-		result := util.BuildAILaunchCmd("opencode", "/usr/bin/opencode", longPath, nil)
-		expected := `/usr/bin/opencode "` + longPath + `"`
+		result := util.BuildAILaunchCmd("opencode", "npx opencode-ai@latest", longPath, nil)
+		expected := `npx opencode-ai@latest "` + longPath + `"`
 		if result != expected {
 			t.Errorf("got %q, want %q", result, expected)
 		}
@@ -163,8 +163,8 @@ func TestBuildAILaunchCmd(t *testing.T) {
 	})
 
 	t.Run("handles empty project path (opencode)", func(t *testing.T) {
-		result := util.BuildAILaunchCmd("opencode", "/usr/bin/opencode", "", nil)
-		expected := `/usr/bin/opencode ""`
+		result := util.BuildAILaunchCmd("opencode", "npx opencode-ai@latest", "", nil)
+		expected := `npx opencode-ai@latest ""`
 		if result != expected {
 			t.Errorf("got %q, want %q", result, expected)
 		}
@@ -304,9 +304,9 @@ func TestBuildAILaunchCmdTable(t *testing.T) {
 		{
 			name:       "opencode basic",
 			tool:       "opencode",
-			command:    "/usr/bin/opencode",
+			command:    "npx opencode-ai@latest",
 			projectDir: "/my/project",
-			expected:   `/usr/bin/opencode "/my/project"`,
+			expected:   `npx opencode-ai@latest "/my/project"`,
 		},
 		{
 			name:       "codex spaces in path",
@@ -318,9 +318,9 @@ func TestBuildAILaunchCmdTable(t *testing.T) {
 		{
 			name:       "opencode spaces in path",
 			tool:       "opencode",
-			command:    "/usr/bin/opencode",
+			command:    "npx opencode-ai@latest",
 			projectDir: "/path/with spaces",
-			expected:   `/usr/bin/opencode "/path/with spaces"`,
+			expected:   `npx opencode-ai@latest "/path/with spaces"`,
 		},
 		{
 			name:       "codex single quotes in path",
@@ -339,9 +339,9 @@ func TestBuildAILaunchCmdTable(t *testing.T) {
 		{
 			name:       "opencode double quotes in path",
 			tool:       "opencode",
-			command:    "/usr/bin/opencode",
+			command:    "npx opencode-ai@latest",
 			projectDir: `/path/with"quotes`,
-			expected:   `/usr/bin/opencode "/path/with"quotes"`,
+			expected:   `npx opencode-ai@latest "/path/with"quotes"`,
 		},
 		{
 			name:       "codex unicode",
@@ -353,9 +353,9 @@ func TestBuildAILaunchCmdTable(t *testing.T) {
 		{
 			name:       "opencode unicode",
 			tool:       "opencode",
-			command:    "/usr/bin/opencode",
+			command:    "npx opencode-ai@latest",
 			projectDir: "/path/\u00e9moji/\U0001F47B",
-			expected:   "/usr/bin/opencode \"/path/\u00e9moji/\U0001F47B\"",
+			expected:   "npx opencode-ai@latest \"/path/\u00e9moji/\U0001F47B\"",
 		},
 		{
 			name:       "codex long path",
@@ -367,9 +367,9 @@ func TestBuildAILaunchCmdTable(t *testing.T) {
 		{
 			name:       "opencode long path",
 			tool:       "opencode",
-			command:    "/usr/bin/opencode",
+			command:    "npx opencode-ai@latest",
 			projectDir: longPath,
-			expected:   `/usr/bin/opencode "` + longPath + `"`,
+			expected:   `npx opencode-ai@latest "` + longPath + `"`,
 		},
 		{
 			name:       "codex backslash",
@@ -402,9 +402,9 @@ func TestBuildAILaunchCmdTable(t *testing.T) {
 		{
 			name:       "opencode empty path",
 			tool:       "opencode",
-			command:    "/usr/bin/opencode",
+			command:    "npx opencode-ai@latest",
 			projectDir: "",
-			expected:   `/usr/bin/opencode ""`,
+			expected:   `npx opencode-ai@latest ""`,
 		},
 		{
 			name:       "codex tilde path",
