@@ -15,12 +15,14 @@ notify_if_update_available() {
 }
 
 # Run a background check against the npm registry.
+# Throttled: only checks at most once every 24 hours.
 # If a newer version exists, writes a flag file for notify_if_update_available.
 # Args: install_dir (where .version marker lives)
 check_for_update() {
   local install_dir="$1"
   local config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
   local flag="${config_home}/ghost-tab/update-available"
+  local ts_file="${config_home}/ghost-tab/last-update-check"
 
   # Need npm and a local version to compare
   command -v npm &>/dev/null || return 0
@@ -28,13 +30,25 @@ check_for_update() {
   local_version="$(cat "$install_dir/.version" 2>/dev/null | tr -d '[:space:]')"
   [ -n "$local_version" ] || return 0
 
+  # Throttle: skip if checked within the last 24 hours
+  if [ -f "$ts_file" ]; then
+    local last_check now elapsed
+    last_check="$(cat "$ts_file" 2>/dev/null | tr -d '[:space:]')"
+    now="$(date +%s)"
+    elapsed=$(( now - last_check ))
+    [ "$elapsed" -lt 86400 ] && return 0
+  fi
+
   (
     local remote_version
     remote_version="$(npm view ghost-tab version 2>/dev/null | tr -d '[:space:]')" || return
     [ -n "$remote_version" ] || return
-    [ "$local_version" = "$remote_version" ] && return
 
     mkdir -p "${config_home}/ghost-tab"
+    # Always update the timestamp (even when up to date) so we throttle correctly
+    date +%s > "$ts_file"
+
+    [ "$local_version" = "$remote_version" ] && return
     echo "$remote_version" > "$flag"
   ) &
   disown
