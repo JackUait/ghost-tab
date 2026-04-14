@@ -31,12 +31,16 @@ check_for_update() {
   [ -n "$local_version" ] || return 0
 
   # Throttle: skip if checked within the last 24 hours
+  # Treat future timestamps (negative elapsed) as expired so a clock correction
+  # cannot permanently suppress the check.
   if [ -f "$ts_file" ]; then
     local last_check now elapsed
     last_check="$(cat "$ts_file" 2>/dev/null | tr -d '[:space:]')"
     now="$(date +%s)"
     elapsed=$(( now - last_check ))
-    [ "$elapsed" -lt 86400 ] && return 0
+    if [ "$elapsed" -ge 0 ] && [ "$elapsed" -lt 86400 ]; then
+      return 0
+    fi
   fi
 
   (

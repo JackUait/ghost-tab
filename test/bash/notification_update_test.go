@@ -965,6 +965,48 @@ sleep 0.3
 	}
 }
 
+func TestUpdate_check_for_update_runs_when_timestamp_is_in_future(t *testing.T) {
+	dir := t.TempDir()
+	installDir := filepath.Join(dir, "install")
+	os.MkdirAll(installDir, 0755)
+	writeTempFile(t, installDir, ".version", "2.6.0")
+
+	// Write a last-update-check timestamp that is 1 hour IN THE FUTURE
+	configDir := filepath.Join(dir, "config", "ghost-tab")
+	os.MkdirAll(configDir, 0755)
+	futureTs := fmt.Sprintf("%d", time.Now().Unix()+3600) // 1 hour from now
+	writeTempFile(t, configDir, "last-update-check", futureTs)
+
+	// Mock npm to return a newer version — it MUST be called (future ts should not throttle)
+	npmBody := `
+if [ "$1" = "view" ] && [ "$2" = "ghost-tab" ] && [ "$3" = "version" ]; then
+  echo "2.7.0"
+  exit 0
+fi
+exit 1
+`
+	binDir := mockCommand(t, dir, "npm", npmBody)
+	env := buildEnv(t, []string{binDir},
+		"XDG_CONFIG_HOME="+filepath.Join(dir, "config"))
+
+	snippet := updateSnippet(t, fmt.Sprintf(`
+check_for_update %q
+sleep 0.3
+`, installDir))
+	_, code := runBashSnippet(t, snippet, env)
+	assertExitCode(t, code, 0)
+
+	// Flag MUST be written — future timestamp should not suppress the check
+	flagFile := filepath.Join(dir, "config", "ghost-tab", "update-available")
+	data, err := os.ReadFile(flagFile)
+	if err != nil {
+		t.Fatalf("expected flag file when future timestamp was present: %v", err)
+	}
+	if strings.TrimSpace(string(data)) != "2.7.0" {
+		t.Errorf("expected flag content '2.7.0', got %q", strings.TrimSpace(string(data)))
+	}
+}
+
 func TestUpdate_check_for_update_writes_timestamp_after_check(t *testing.T) {
 	dir := t.TempDir()
 	installDir := filepath.Join(dir, "install")
