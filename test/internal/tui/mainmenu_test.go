@@ -4442,6 +4442,66 @@ func TestRemoveWorktree_IsDirtyError(t *testing.T) {
 	}
 }
 
+func TestRemoveWorktree_IsLockedError(t *testing.T) {
+	dir := t.TempDir()
+	if out, err := exec.Command("git", "-C", dir, "init").CombinedOutput(); err != nil {
+		t.Skipf("git init failed: %v: %s", err, out)
+	}
+	exec.Command("git", "-C", dir, "config", "user.email", "test@test.com").Run()
+	exec.Command("git", "-C", dir, "config", "user.name", "Test").Run()
+	exec.Command("git", "-C", dir, "commit", "--allow-empty", "-m", "init").Run()
+
+	exec.Command("git", "-C", dir, "branch", "feat").Run()
+	wtPath := filepath.Join(t.TempDir(), "feat")
+	if out, err := exec.Command("git", "-C", dir, "worktree", "add", wtPath, "feat").CombinedOutput(); err != nil {
+		t.Skipf("git worktree add failed: %v: %s", err, out)
+	}
+
+	// Lock the worktree (simulates stale agent lock)
+	if out, err := exec.Command("git", "-C", dir, "worktree", "lock", "--reason", "stale agent", wtPath).CombinedOutput(); err != nil {
+		t.Skipf("git worktree lock failed: %v: %s", err, out)
+	}
+
+	// Removing without force should fail with a locked error, not dirty
+	err := models.RemoveWorktree(dir, wtPath, false)
+	if err == nil {
+		t.Fatal("RemoveWorktree locked: expected error but got nil")
+	}
+	if models.IsWorktreeDirtyError(err) {
+		t.Errorf("RemoveWorktree locked: should not be classified as dirty, err=%v", err)
+	}
+	if !models.IsWorktreeLockedError(err) {
+		t.Errorf("RemoveWorktree locked: expected IsWorktreeLockedError to be true, err=%v", err)
+	}
+}
+
+func TestRemoveWorktree_ForceRemovesLocked(t *testing.T) {
+	dir := t.TempDir()
+	if out, err := exec.Command("git", "-C", dir, "init").CombinedOutput(); err != nil {
+		t.Skipf("git init failed: %v: %s", err, out)
+	}
+	exec.Command("git", "-C", dir, "config", "user.email", "test@test.com").Run()
+	exec.Command("git", "-C", dir, "config", "user.name", "Test").Run()
+	exec.Command("git", "-C", dir, "commit", "--allow-empty", "-m", "init").Run()
+
+	exec.Command("git", "-C", dir, "branch", "feat").Run()
+	wtPath := filepath.Join(t.TempDir(), "feat")
+	if out, err := exec.Command("git", "-C", dir, "worktree", "add", wtPath, "feat").CombinedOutput(); err != nil {
+		t.Skipf("git worktree add failed: %v: %s", err, out)
+	}
+	if out, err := exec.Command("git", "-C", dir, "worktree", "lock", "--reason", "stale agent", wtPath).CombinedOutput(); err != nil {
+		t.Skipf("git worktree lock failed: %v: %s", err, out)
+	}
+
+	// Force removal must override the lock
+	if err := models.RemoveWorktree(dir, wtPath, true); err != nil {
+		t.Fatalf("RemoveWorktree locked force: unexpected error: %v", err)
+	}
+	if _, statErr := os.Stat(wtPath); !os.IsNotExist(statErr) {
+		t.Error("worktree path should not exist after force removal of locked worktree")
+	}
+}
+
 func TestDeleteMode_ConfirmDelete_WorktreeTarget_Success(t *testing.T) {
 	// Set up a real git repo with a worktree so removal can succeed
 	dir := t.TempDir()
@@ -4551,6 +4611,67 @@ func TestDeleteMode_ConfirmDelete_WorktreeTarget_Dirty(t *testing.T) {
 	view2 := mm5.View()
 	if !strings.Contains(view2, "Removed") && !strings.Contains(view2, "feat") {
 		t.Errorf("expected success feedback after force removal, got: %s", view2)
+	}
+}
+
+func TestDeleteMode_ConfirmDelete_WorktreeTarget_Locked(t *testing.T) {
+	// A locked worktree (e.g. stale claude agent lock) must behave like dirty:
+	// first Enter shows a Y-to-force prompt; Y force-removes it.
+	dir := t.TempDir()
+	if out, err := exec.Command("git", "-C", dir, "init").CombinedOutput(); err != nil {
+		t.Skipf("git init: %v: %s", err, out)
+	}
+	exec.Command("git", "-C", dir, "config", "user.email", "test@test.com").Run()
+	exec.Command("git", "-C", dir, "config", "user.name", "Test").Run()
+	exec.Command("git", "-C", dir, "commit", "--allow-empty", "-m", "init").Run()
+	exec.Command("git", "-C", dir, "branch", "feat").Run()
+	wtPath := filepath.Join(t.TempDir(), "feat")
+	if out, err := exec.Command("git", "-C", dir, "worktree", "add", wtPath, "feat").CombinedOutput(); err != nil {
+		t.Skipf("git worktree add: %v: %s", err, out)
+	}
+	if out, err := exec.Command("git", "-C", dir, "worktree", "lock", "--reason", "stale agent", wtPath).CombinedOutput(); err != nil {
+		t.Skipf("git worktree lock: %v: %s", err, out)
+	}
+
+	projects := []models.Project{
+		{Name: "myproj", Path: dir, Worktrees: []models.Worktree{
+			{Path: wtPath, Branch: "feat"},
+		}},
+	}
+	m := tui.NewMainMenu(projects, []string{"claude"}, "claude", "none")
+	m.SetSize(80, 30)
+	m.SetProjectsFile(filepath.Join(dir, "projects"))
+
+	newModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'w'}})
+	mm := newModel.(*tui.MainMenuModel)
+	newModel2, _ := mm.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	mm2 := newModel2.(*tui.MainMenuModel)
+	newModel3, _ := mm2.Update(tea.KeyMsg{Type: tea.KeyDown})
+	mm3 := newModel3.(*tui.MainMenuModel)
+
+	newModel4, _ := mm3.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	mm4 := newModel4.(*tui.MainMenuModel)
+
+	if !mm4.InDeleteMode() {
+		t.Error("should remain in delete mode when worktree is locked")
+	}
+	view := mm4.View()
+	if !strings.Contains(view, "Y") && !strings.Contains(view, "force") && !strings.Contains(view, "locked") {
+		t.Errorf("expected locked-worktree prompt in view, got: %s", view)
+	}
+
+	newModel5, _ := mm4.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'Y'}})
+	mm5 := newModel5.(*tui.MainMenuModel)
+
+	if !mm5.InDeleteMode() {
+		t.Error("should remain in delete mode after force removal of locked worktree")
+	}
+	view2 := mm5.View()
+	if !strings.Contains(view2, "Removed") && !strings.Contains(view2, "feat") {
+		t.Errorf("expected success feedback after force removal, got: %s", view2)
+	}
+	if _, statErr := os.Stat(wtPath); !os.IsNotExist(statErr) {
+		t.Error("locked worktree path should not exist after force removal")
 	}
 }
 

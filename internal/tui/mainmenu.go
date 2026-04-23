@@ -1975,6 +1975,11 @@ func (m *MainMenuModel) confirmDeleteWorktree(projectIdx, wtIdx int) (tea.Model,
 			m.setFeedback("Worktree has changes — press Y to force remove", "error")
 			return m, nil
 		}
+		if models.IsWorktreeLockedError(err) {
+			m.pendingForceDeleteWT = &pendingWorktreeDelete{projectIdx: projectIdx, wtIdx: wtIdx}
+			m.setFeedback("Worktree is locked — press Y to force remove", "error")
+			return m, nil
+		}
 		m.setFeedback("Failed to remove worktree", "error")
 		m.exitDeleteMode()
 		return m, nil

@@ -207,13 +207,33 @@ func IsWorktreeDirtyError(err error) bool {
 	return errors.As(err, &e)
 }
 
-// RemoveWorktree runs `git -C projectPath worktree remove [--force] wtPath`.
+// WorktreeLockedError is returned by RemoveWorktree when the worktree is
+// locked (e.g. by a stale agent process) and force=false.
+type WorktreeLockedError struct {
+	Stderr string
+}
+
+func (e *WorktreeLockedError) Error() string {
+	return "worktree is locked: " + e.Stderr
+}
+
+// IsWorktreeLockedError reports whether err is a WorktreeLockedError.
+func IsWorktreeLockedError(err error) bool {
+	var e *WorktreeLockedError
+	return errors.As(err, &e)
+}
+
+// RemoveWorktree runs `git -C projectPath worktree remove [--force [--force]] wtPath`.
+// When force is true, `--force` is passed twice so that locked worktrees are
+// also removed (git requires -f -f to override a lock).
 // If force is false and the worktree has uncommitted changes, a *WorktreeDirtyError
-// is returned. Other failures return a plain error with stderr.
+// is returned. If it is locked, a *WorktreeLockedError is returned. Other
+// failures return a plain error with stderr.
 func RemoveWorktree(projectPath, wtPath string, force bool) error {
 	args := []string{"-C", projectPath, "worktree", "remove"}
 	if force {
-		args = append(args, "--force")
+		// Two --force flags override both "dirty" and "locked" refusal.
+		args = append(args, "--force", "--force")
 	}
 	args = append(args, wtPath)
 	cmd := exec.Command("git", args...)
@@ -223,6 +243,9 @@ func RemoveWorktree(projectPath, wtPath string, force bool) error {
 	}
 	stderr := strings.TrimSpace(string(out))
 	lower := strings.ToLower(stderr)
+	if strings.Contains(lower, "locked") {
+		return &WorktreeLockedError{Stderr: stderr}
+	}
 	if strings.Contains(lower, "modified") || strings.Contains(lower, "untracked") ||
 		strings.Contains(lower, "dirty") || strings.Contains(lower, "changes") {
 		return &WorktreeDirtyError{Stderr: stderr}
