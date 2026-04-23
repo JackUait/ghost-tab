@@ -2708,7 +2708,173 @@ func (m *MainMenuModel) renderMenuBox() string {
 	// Bottom border
 	lines = append(lines, bottomBorder)
 
+	// Scroll clipping when menu is taller than the available terminal height.
+	headerEnd := 4
+	if m.updateVersion != "" {
+		headerEnd = 5
+	}
+	footerStart := len(lines) - 3
+	avail := m.availableMenuHeight()
+	if avail > 0 && len(lines) > avail && headerEnd < footerStart {
+		lines = m.applyMenuScroll(lines, headerEnd, footerStart, avail)
+	}
+
 	return strings.Join(lines, "\n")
+}
+
+// availableMenuHeight returns the vertical budget the menu box has inside the
+// terminal, accounting for any room the ghost illustration consumes above the
+// menu (in the "above" layout the ghost + a 1-row gap eat 16 rows).
+func (m *MainMenuModel) availableMenuHeight() int {
+	if m.height <= 0 {
+		return 0
+	}
+	layout := m.CalculateLayout(m.width, m.height)
+	if layout.GhostPosition == "above" && m.ghostDisplay != "none" {
+		// Ghost (15) + gap (1) = 16. Animated ghost adds a bob row.
+		// Sleeping stacks a 3-row Zzz frame above the ghost.
+		reserve := 16
+		if m.ghostDisplay == "animated" {
+			reserve = 17
+		}
+		if m.ghostSleeping && m.zzz != nil {
+			reserve += 3
+		}
+		h := m.height - reserve
+		if h < 5 {
+			h = 5
+		}
+		return h
+	}
+	return m.height
+}
+
+// applyMenuScroll clips the body region of the menu box to a visible window so
+// that the total row count fits within the given height budget. Overflow is
+// indicated with ▲/▼ markers at the edges of the window.
+func (m *MainMenuModel) applyMenuScroll(lines []string, headerEnd, footerStart, avail int) []string {
+	header := lines[:headerEnd]
+	body := lines[headerEnd:footerStart]
+	footer := lines[footerStart:]
+
+	availBody := avail - len(header) - len(footer)
+	if availBody < 1 {
+		availBody = 1
+	}
+	if availBody >= len(body) {
+		return lines
+	}
+
+	cursorRow := m.cursorBodyRow()
+	// Clamp cursor to body bounds in case upstream state is stale.
+	if cursorRow < 0 {
+		cursorRow = 0
+	}
+	if cursorRow >= len(body) {
+		cursorRow = len(body) - 1
+	}
+
+	offset := cursorRow - availBody/2
+	if offset < 0 {
+		offset = 0
+	}
+	if offset+availBody > len(body) {
+		offset = len(body) - availBody
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	// Guarantee cursor lies within the window, then re-clamp to body bounds.
+	if cursorRow < offset {
+		offset = cursorRow
+	}
+	if cursorRow >= offset+availBody {
+		offset = cursorRow - availBody + 1
+	}
+	if offset+availBody > len(body) {
+		offset = len(body) - availBody
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	topIndicator := offset > 0
+	bottomIndicator := offset+availBody < len(body)
+
+	window := make([]string, availBody)
+	for i := 0; i < availBody; i++ {
+		window[i] = body[offset+i]
+	}
+	// Drop indicators that would land on the cursor's row (happens when
+	// availBody is too small to both show an indicator and the cursor).
+	cursorWinIdx := cursorRow - offset
+	if topIndicator && cursorWinIdx != 0 {
+		window[0] = m.scrollIndicatorRow("▲")
+	}
+	if bottomIndicator && cursorWinIdx != len(window)-1 {
+		window[len(window)-1] = m.scrollIndicatorRow("▼")
+	}
+
+	out := make([]string, 0, len(header)+availBody+len(footer))
+	out = append(out, header...)
+	out = append(out, window...)
+	out = append(out, footer...)
+	return out
+}
+
+// scrollIndicatorRow renders a menu-box row containing a centered overflow
+// indicator (▲ or ▼).
+func (m *MainMenuModel) scrollIndicatorRow(symbol string) string {
+	dimStyle := lipgloss.NewStyle().Foreground(m.theme.Dim)
+	leftBorder := dimStyle.Render("│")
+	rightBorder := strings.Repeat(" ", menuPadding) + dimStyle.Render("│")
+	ind := dimStyle.Render(symbol + " " + symbol + " " + symbol)
+	indWidth := lipgloss.Width(ind)
+	padLeft := (menuInnerWidth - indWidth) / 2
+	if padLeft < 0 {
+		padLeft = 0
+	}
+	padRight := menuInnerWidth - indWidth - padLeft - menuPadding
+	if padRight < 0 {
+		padRight = 0
+	}
+	return leftBorder + strings.Repeat(" ", padLeft) + ind + strings.Repeat(" ", padRight) + rightBorder
+}
+
+// cursorBodyRow returns the 0-indexed row of the selected item within the
+// scrollable body region of the menu.
+func (m *MainMenuModel) cursorBodyRow() int {
+	cursor := m.selectedItem
+	if m.deleteMode {
+		cursor = m.deleteSelected
+	}
+	itemType, projectIdx, worktreeIdx := m.ResolveItem(cursor)
+	baseProjectRow := func(upto int) int {
+		row := 0
+		for i := 0; i < upto && i < len(m.projects); i++ {
+			row += 2
+			if m.expandedWorktrees[i] {
+				row += 2*len(m.projects[i].Worktrees) + 1
+			}
+		}
+		return row
+	}
+	switch itemType {
+	case "project":
+		return baseProjectRow(projectIdx)
+	case "worktree":
+		return baseProjectRow(projectIdx) + 2 + 2*worktreeIdx
+	case "add-worktree":
+		return baseProjectRow(projectIdx) + 2 + 2*len(m.projects[projectIdx].Worktrees)
+	case "action":
+		row := baseProjectRow(len(m.projects))
+		if len(m.projects) > 0 {
+			row++ // separator between projects and actions
+		}
+		return row + projectIdx
+	}
+	return 0
 }
 
 // renderInputBox builds the input mode box string (add-project or open-once).

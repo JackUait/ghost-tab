@@ -734,6 +734,224 @@ func TestDeleteBox_UsesRoundedCorners(t *testing.T) {
 	}
 }
 
+// scrollTestProjects builds n projects for scroll-behaviour tests.
+func scrollTestProjects(n int) []models.Project {
+	projects := make([]models.Project, n)
+	for i := 0; i < n; i++ {
+		projects[i] = models.Project{
+			Name: "proj-" + string(rune('a'+(i%26))) + string(rune('0'+(i/26))),
+			Path: "/tmp/proj-" + string(rune('a'+(i%26))) + string(rune('0'+(i/26))),
+		}
+	}
+	return projects
+}
+
+func TestMenuBox_FitsWithinTerminalHeight(t *testing.T) {
+	// 30 projects = 60 item rows + ~8 chrome rows = ~68 lines.
+	// Terminal height is 24, menu box must not exceed it.
+	m := NewMainMenu(scrollTestProjects(30), []string{"claude"}, "claude", "animated")
+	m.width = 100
+	m.height = 24
+	box := m.renderMenuBox()
+	lines := strings.Split(box, "\n")
+	if len(lines) > m.height {
+		t.Errorf("menu box exceeds terminal height: %d lines > height %d", len(lines), m.height)
+	}
+}
+
+func TestMenuBox_CursorVisibleAfterScrollDown(t *testing.T) {
+	// Cursor on project 25 (flat idx 24) must appear in the rendered output
+	// even though it sits far below the viewport.
+	m := NewMainMenu(scrollTestProjects(30), []string{"claude"}, "claude", "animated")
+	m.width = 100
+	m.height = 24
+	m.selectedItem = 24 // 25th project
+	box := m.renderMenuBox()
+	raw := stripAnsi(box)
+	// The selected project's name should appear; also the cursor marker ▎ must be present.
+	if !strings.Contains(raw, m.projects[24].Name) {
+		t.Errorf("selected project %q not visible in scrolled view:\n%s", m.projects[24].Name, raw)
+	}
+	if !strings.Contains(raw, "▎") {
+		t.Errorf("cursor marker ▎ missing in scrolled view:\n%s", raw)
+	}
+}
+
+func TestMenuBox_ShowsScrollIndicatorWhenOverflowing(t *testing.T) {
+	// With cursor near the bottom, the view should indicate that content exists above.
+	m := NewMainMenu(scrollTestProjects(30), []string{"claude"}, "claude", "animated")
+	m.width = 100
+	m.height = 24
+	m.selectedItem = 29 // last project
+	box := m.renderMenuBox()
+	raw := stripAnsi(box)
+	// Expect an overflow indicator showing content extends beyond viewport.
+	// We use ▲ (U+25B2) and ▼ (U+25BC) so they don't collide with the Shift+↑↓
+	// text in the help row.
+	if !strings.ContainsAny(raw, "▲▼") {
+		t.Errorf("expected overflow indicator (▲ or ▼) when content is clipped, got:\n%s", raw)
+	}
+}
+
+func TestMenuBox_NoScrollClipWhenFits(t *testing.T) {
+	// When everything fits, menu must render all projects & actions.
+	m := NewMainMenu(scrollTestProjects(3), []string{"claude"}, "claude", "animated")
+	m.width = 100
+	m.height = 60
+	box := m.renderMenuBox()
+	raw := stripAnsi(box)
+	for _, p := range m.projects {
+		if !strings.Contains(raw, p.Name) {
+			t.Errorf("project %q missing when content fits:\n%s", p.Name, raw)
+		}
+	}
+	if !strings.Contains(raw, "Add new project") {
+		t.Errorf("actions missing when content fits:\n%s", raw)
+	}
+	// No scroll indicators when everything fits.
+	if strings.ContainsAny(raw, "▲▼") {
+		t.Errorf("unexpected scroll indicator when content fits:\n%s", raw)
+	}
+}
+
+func TestAvailableMenuHeight_AboveGhostAnimationReserve(t *testing.T) {
+	// 30 projects ⇒ natural menuHeight = 73. Above layout is chosen when
+	// height ≥ menuHeight+17 and width < 92.
+	m := NewMainMenu(scrollTestProjects(30), []string{"claude"}, "claude", "animated")
+	m.width = 70
+	m.height = 90
+
+	if got := m.availableMenuHeight(); got != 73 {
+		t.Errorf("animated above should reserve 17 rows (ghost 15 + gap 1 + bob 1), got avail=%d (want 73)", got)
+	}
+
+	m.ghostDisplay = "static"
+	if got := m.availableMenuHeight(); got != 74 {
+		t.Errorf("static above should reserve 16 rows (ghost 15 + gap 1), got avail=%d (want 74)", got)
+	}
+
+	m.ghostDisplay = "none"
+	if got := m.availableMenuHeight(); got != m.height {
+		t.Errorf("ghost=none should not reserve rows, got avail=%d (want %d)", got, m.height)
+	}
+}
+
+func TestMenuBox_CursorVisibleAtVerySmallHeight(t *testing.T) {
+	// Very short terminal: availBody is 1 or 2. Indicators must not overwrite
+	// the cursor row.
+	m := NewMainMenu(scrollTestProjects(10), []string{"claude"}, "claude", "animated")
+	m.width = 100
+	m.height = 9 // 4 header + 3 footer + 2 body
+	m.selectedItem = 4 // 5th project, middle of list
+	box := m.renderMenuBox()
+	raw := stripAnsi(box)
+	if !strings.Contains(raw, m.projects[4].Name) {
+		t.Errorf("selected project %q hidden under scroll indicator in small viewport:\n%s",
+			m.projects[4].Name, raw)
+	}
+}
+
+func TestMenuBox_CursorVisibleAtMinimalHeight(t *testing.T) {
+	// Height below header+footer+1: availBody clamped to 1. Must still show cursor.
+	m := NewMainMenu(scrollTestProjects(10), []string{"claude"}, "claude", "animated")
+	m.width = 100
+	m.height = 8 // 4 header + 3 footer + 1 body
+	m.selectedItem = 4
+	box := m.renderMenuBox()
+	raw := stripAnsi(box)
+	if !strings.Contains(raw, m.projects[4].Name) {
+		t.Errorf("selected project %q hidden at minimal height:\n%s",
+			m.projects[4].Name, raw)
+	}
+}
+
+func TestMenuBox_NoPanicWhenCursorPastBody(t *testing.T) {
+	// Defensive: if cursorBodyRow ever yields a value beyond len(body)
+	// (stale state after a reorder, off-by-one, etc.), applyMenuScroll must
+	// not slice out of bounds.
+	m := NewMainMenu(scrollTestProjects(10), []string{"claude"}, "claude", "animated")
+	m.width = 100
+	m.height = 12
+	// Force selectedItem far past any valid flat index so ResolveItem's
+	// action branch computes a cursor row well beyond len(body).
+	m.selectedItem = 9999
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("applyMenuScroll panicked with out-of-range cursor: %v", r)
+		}
+	}()
+	_ = m.renderMenuBox()
+}
+
+func TestMenuBox_FitsWhenGhostAboveAndHeightTight(t *testing.T) {
+	// With ghost-above active, the menu must not draw past m.height even
+	// when the reserved budget would force availBody below the header+footer
+	// sum. The floor in availableMenuHeight must keep the full box ≤ m.height.
+	m := NewMainMenu(scrollTestProjects(20), []string{"claude"}, "claude", "animated")
+	m.width = 70 // < 82, forces non-side layout
+	m.height = 20
+	box := m.renderMenuBox()
+	lines := strings.Split(box, "\n")
+	if len(lines) > m.height {
+		t.Errorf("rendered menu exceeds terminal height: %d > %d", len(lines), m.height)
+	}
+}
+
+func TestAvailableMenuHeight_SleepingReservesZzzRows(t *testing.T) {
+	// Sleeping ghost stacks Zzz frames above the ghost in "above" layout.
+	// The reserve must account for them so the menu doesn't overflow.
+	m := NewMainMenu(scrollTestProjects(30), []string{"claude"}, "claude", "animated")
+	m.width = 70
+	m.height = 100
+	m.ghostSleeping = true
+	if m.zzz == nil {
+		t.Fatal("zzz animation unexpectedly nil")
+	}
+	got := m.availableMenuHeight()
+	// Animated above = 17. Zzz adds at least 3 extra rows; require strictly
+	// less avail than the awake case.
+	awake := m.height - 17
+	if got >= awake {
+		t.Errorf("sleeping avail should be less than awake (%d); got %d", awake, got)
+	}
+}
+
+func TestMenuBox_ScrollsWithExpandedWorktrees(t *testing.T) {
+	// Recreate the screenshot scenario: one project expanded with 12 worktrees
+	// plus other projects. Must fit in a shortish terminal.
+	wts := make([]models.Worktree, 12)
+	for i := range wts {
+		wts[i] = models.Worktree{
+			Branch: "feat/branch-" + string(rune('a'+i)),
+			Path:   "/tmp/kb/wt-" + string(rune('a'+i)),
+		}
+	}
+	projects := []models.Project{
+		{Name: "blok", Path: "/tmp/blok"},
+		{Name: "elen", Path: "/tmp/elen"},
+		{Name: "knowledgebase", Path: "/tmp/knowledgebase", Worktrees: wts},
+		{Name: "ghost-tab", Path: "/tmp/ghost-tab"},
+		{Name: "agent-desk", Path: "/tmp/agent-desk"},
+	}
+	m := NewMainMenu(projects, []string{"claude"}, "claude", "animated")
+	m.width = 100
+	m.height = 30
+	m.expandedWorktrees[2] = true
+	m.selectedItem = 2 // knowledgebase project row
+	box := m.renderMenuBox()
+	lines := strings.Split(box, "\n")
+	if len(lines) > m.height {
+		t.Errorf("expected menu to fit in %d rows, got %d", m.height, len(lines))
+	}
+	raw := stripAnsi(box)
+	if !strings.Contains(raw, "knowledgebase") {
+		t.Errorf("selected project missing:\n%s", raw)
+	}
+	if !strings.Contains(raw, "▼") {
+		t.Errorf("expected ▼ indicator for content below:\n%s", raw)
+	}
+}
+
 // stripAnsi removes ANSI escape sequences from a string.
 func stripAnsi(s string) string {
 	var result strings.Builder
