@@ -35,6 +35,81 @@ func TestCurrentBootId_empty_when_sysctl_fails(t *testing.T) {
 var _ = filepath.Join
 var _ = os.Environ
 
+// Helper: run maybe_restore_session with a stub launch_restore_window that
+// records every call (one line per spawn) to recFile.
+func runMaybeRestore(t *testing.T, configDir, curBoot, recFile string) (string, int) {
+	t.Helper()
+	root := projectRoot(t)
+	mod := filepath.Join(root, "lib", "session-restore.sh")
+	script := `
+source ` + quote(mod) + `
+launch_restore_window() { echo "$1|$2|$3|$4" >> ` + quote(recFile) + `; }
+maybe_restore_session ` + quote(configDir) + ` ` + quote(curBoot) + ` "/w/wrapper.sh"
+`
+	return runBashSnippet(t, script, nil)
+}
+
+func TestMaybeRestore_spawns_prior_boot_lines_and_writes_marker(t *testing.T) {
+	dir := t.TempDir()
+	writeTempFile(t, dir, "last-session",
+		"111|app|/p/app|claude|ghostty\n111|web|/p/web|codex|ghostty\n")
+	rec := filepath.Join(dir, "rec")
+	_, code := runMaybeRestore(t, dir, "222", rec)
+	assertExitCode(t, code, 0)
+
+	data, err := os.ReadFile(rec)
+	if err != nil {
+		t.Fatalf("no spawns recorded: %v", err)
+	}
+	got := strings.TrimSpace(string(data))
+	want := "ghostty|/w/wrapper.sh|/p/app|claude\nghostty|/w/wrapper.sh|/p/web|codex"
+	if got != want {
+		t.Errorf("spawns:\n got %q\nwant %q", got, want)
+	}
+	marker, _ := os.ReadFile(filepath.Join(dir, "last-restore-boot"))
+	if strings.TrimSpace(string(marker)) != "222" {
+		t.Errorf("marker = %q, want 222", string(marker))
+	}
+}
+
+func TestMaybeRestore_noop_when_already_restored_this_boot(t *testing.T) {
+	dir := t.TempDir()
+	writeTempFile(t, dir, "last-session", "111|app|/p/app|claude|ghostty\n")
+	writeTempFile(t, dir, "last-restore-boot", "222\n")
+	rec := filepath.Join(dir, "rec")
+	_, code := runMaybeRestore(t, dir, "222", rec)
+	assertExitCode(t, code, 0)
+	if _, err := os.Stat(rec); err == nil {
+		t.Error("expected no spawns when boot already restored")
+	}
+}
+
+func TestMaybeRestore_noop_when_no_snapshot(t *testing.T) {
+	dir := t.TempDir()
+	rec := filepath.Join(dir, "rec")
+	_, code := runMaybeRestore(t, dir, "222", rec)
+	assertExitCode(t, code, 0)
+	if _, err := os.Stat(rec); err == nil {
+		t.Error("expected no spawns when snapshot missing")
+	}
+}
+
+func TestMaybeRestore_skips_current_boot_lines(t *testing.T) {
+	dir := t.TempDir()
+	// All lines are from the current boot -> nothing to restore.
+	writeTempFile(t, dir, "last-session", "222|app|/p/app|claude|ghostty\n")
+	rec := filepath.Join(dir, "rec")
+	_, code := runMaybeRestore(t, dir, "222", rec)
+	assertExitCode(t, code, 0)
+	if _, err := os.Stat(rec); err == nil {
+		t.Error("expected no spawns when all lines are current-boot")
+	}
+	// marker must NOT be written when nothing was restored
+	if _, err := os.Stat(filepath.Join(dir, "last-restore-boot")); err == nil {
+		t.Error("marker should not be written when nothing restored")
+	}
+}
+
 func TestWriteSessionSnapshot_writes_ghost_sessions_only(t *testing.T) {
 	dir := t.TempDir()
 	// Mock tmux: list two sessions; only dev-app-1 carries GHOST_TAB=1.

@@ -42,3 +42,34 @@ launch_restore_window() {
   load_terminal_adapter "$terminal" || return 1
   terminal_launch_restore "$wrapper" "$path" "$tool"
 }
+
+# Once-per-boot restore gate. Call only on interactive launch, before the
+# picker, and never in --restore mode.
+# Usage: maybe_restore_session <config_dir> <current_boot_id> <wrapper_path>
+# Spawns one window per snapshot line whose boot_id predates this boot, then
+# stamps last-restore-boot. No-op if already restored this boot, snapshot
+# missing, or no prior-boot lines exist.
+maybe_restore_session() {
+  local config_dir="$1" cur_boot="$2" wrapper="$3"
+  local snap="$config_dir/last-session"
+  local marker="$config_dir/last-restore-boot"
+
+  [ -n "$cur_boot" ] || return 0
+  [ -f "$snap" ] || return 0
+
+  local last_boot=""
+  [ -f "$marker" ] && last_boot="$(tr -d '[:space:]' < "$marker" 2>/dev/null)"
+  [ "$cur_boot" = "$last_boot" ] && return 0
+
+  local restored=0 b proj path tool term
+  while IFS='|' read -r b proj path tool term; do
+    [ -n "$b" ] || continue
+    [ "$b" = "$cur_boot" ] && continue
+    if [ "$restored" -eq 0 ]; then
+      echo "$cur_boot" > "$marker"
+      restored=1
+    fi
+    launch_restore_window "$term" "$wrapper" "$path" "$tool"
+  done < "$snap"
+  return 0
+}
