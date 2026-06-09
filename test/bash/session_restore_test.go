@@ -66,6 +66,30 @@ esac
 	}
 }
 
+func TestLaunchRestoreWindow_loads_adapter_and_calls_hook(t *testing.T) {
+	// Stub load_terminal_adapter + terminal_launch_restore so we can record args.
+	root := projectRoot(t)
+	mod := filepath.Join(root, "lib", "session-restore.sh")
+	rec := filepath.Join(t.TempDir(), "rec")
+	script := `
+source ` + quote(mod) + `
+load_terminal_adapter() { :; }                 # stub: pretend adapter loaded
+terminal_launch_restore() { echo "$1|$2|$3" > ` + quote(rec) + `; }
+launch_restore_window "ghostty" "/w/wrapper.sh" "/p/app" "claude"
+`
+	_, code := runBashSnippet(t, script, nil)
+	assertExitCode(t, code, 0)
+	data, err := os.ReadFile(rec)
+	if err != nil {
+		t.Fatalf("hook not called: %v", err)
+	}
+	got := strings.TrimSpace(string(data))
+	want := "/w/wrapper.sh|/p/app|claude"
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
 func TestWriteSessionSnapshot_empty_when_no_ghost_sessions(t *testing.T) {
 	dir := t.TempDir()
 	tmuxBody := `

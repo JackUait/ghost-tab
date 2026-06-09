@@ -32,3 +32,13 @@ write_session_snapshot() {
   done
   mv "$tmp" "$snap_file"
 }
+
+# Load the adapter for <terminal> and open a window restoring <path>/<tool>.
+# Usage: launch_restore_window <terminal> <wrapper_path> <project_path> <ai_tool>
+# Relies on load_terminal_adapter + terminal_launch_restore being available
+# (sourced by the caller, e.g. wrapper.sh).
+launch_restore_window() {
+  local terminal="$1" wrapper="$2" path="$3" tool="$4"
+  load_terminal_adapter "$terminal" || return 1
+  terminal_launch_restore "$wrapper" "$path" "$tool"
+}
