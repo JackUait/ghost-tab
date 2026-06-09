@@ -18,6 +18,10 @@ current_boot_id() {
 # Field delimiter is '|' — project paths containing '|' are not supported.
 write_session_snapshot() {
   local tmux_cmd="$1" snap_file="$2"
+  local sessions
+  # If the tmux server is unreachable (e.g. just after a reboot), do NOT
+  # overwrite the snapshot — leaving it frozen is what enables restore.
+  sessions="$("$tmux_cmd" list-sessions -F '#{session_name}' 2>/dev/null)" || return 0
   local tmp="${snap_file}.tmp.$$"
   : > "$tmp"
   local s env boot proj path tool term
@@ -31,7 +35,7 @@ write_session_snapshot() {
     tool="$(echo "$env" | sed -n 's/^GHOST_TAB_TOOL=//p')"
     term="$(echo "$env" | sed -n 's/^GHOST_TAB_TERMINAL=//p')"
     echo "${boot}|${proj}|${path}|${tool}|${term}" >> "$tmp"
-  done < <("$tmux_cmd" list-sessions -F '#{session_name}' 2>/dev/null)
+  done <<< "$sessions"
   mv "$tmp" "$snap_file"
 }
 
@@ -79,7 +83,7 @@ maybe_restore_session() {
 # If args start with --restore, echo "path|tool"; otherwise echo nothing.
 # Usage: parse_restore_flag "$@"
 parse_restore_flag() {
-  if [ "$1" = "--restore" ]; then
+  if [ "$1" = "--restore" ] && [ -n "$2" ] && [ -n "$3" ]; then
     echo "$2|$3"
   fi
 }

@@ -141,6 +141,40 @@ esac
 	}
 }
 
+func TestWriteSessionSnapshot_preserves_file_when_tmux_dead(t *testing.T) {
+	dir := t.TempDir()
+	snap := writeTempFile(t, dir, "last-session", "111|app|/p/app|claude|ghostty\n")
+	// tmux server is dead: list-sessions exits 1.
+	tmuxBody := `
+case "$1" in
+  list-sessions) exit 1 ;;
+esac
+`
+	binDir := mockCommand(t, dir, "tmux", tmuxBody)
+	env := buildEnv(t, []string{binDir})
+	_, code := runBashFunc(t, "lib/session-restore.sh", "write_session_snapshot",
+		[]string{"tmux", snap}, env)
+	assertExitCode(t, code, 0)
+	data, err := os.ReadFile(snap)
+	if err != nil {
+		t.Fatalf("snapshot disappeared: %v", err)
+	}
+	got := strings.TrimSpace(string(data))
+	want := "111|app|/p/app|claude|ghostty"
+	if got != want {
+		t.Errorf("snapshot was wiped when tmux dead: got %q, want %q", got, want)
+	}
+}
+
+func TestParseRestoreFlag_empty_when_missing_args(t *testing.T) {
+	out, code := runBashFunc(t, "lib/session-restore.sh", "parse_restore_flag",
+		[]string{"--restore", "/p/app"}, nil)
+	assertExitCode(t, code, 0)
+	if strings.TrimSpace(out) != "" {
+		t.Errorf("expected empty when tool missing, got %q", strings.TrimSpace(out))
+	}
+}
+
 func TestParseRestoreFlag_emits_path_and_tool(t *testing.T) {
 	out, code := runBashFunc(t, "lib/session-restore.sh", "parse_restore_flag",
 		[]string{"--restore", "/p/app", "claude"}, nil)
