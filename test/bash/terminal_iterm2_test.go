@@ -230,6 +230,47 @@ func TestIterm2Adapter_setup_config_no_extra_files_in_profiles_dir(t *testing.T)
 	}
 }
 
+func TestIterm2Adapter_launch_restore(t *testing.T) {
+	dir := t.TempDir()
+	rec := filepath.Join(dir, "rec")
+	binDir := mockCommand(t, dir, "osascript", `printf '%s\n' "$*" > `+fmt.Sprintf("%q", rec))
+	env := buildEnv(t, []string{binDir})
+	snippet := iterm2AdapterSnippet(t,
+		`terminal_launch_restore "/w/wrapper.sh" "/p/app" "claude"`)
+	_, code := runBashSnippet(t, snippet, env)
+	assertExitCode(t, code, 0)
+	data, err := os.ReadFile(rec)
+	if err != nil {
+		t.Fatalf("osascript not invoked: %v", err)
+	}
+	got := strings.TrimSpace(string(data))
+	want := `-e tell application "iTerm" to create window with default profile command "/bin/bash -l '/w/wrapper.sh' --restore '/p/app' 'claude'"`
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestIterm2Adapter_launch_restore_path_with_spaces(t *testing.T) {
+	dir := t.TempDir()
+	rec := filepath.Join(dir, "rec")
+	binDir := mockCommand(t, dir, "osascript", `printf '%s\n' "$*" > `+fmt.Sprintf("%q", rec))
+	env := buildEnv(t, []string{binDir})
+	snippet := iterm2AdapterSnippet(t,
+		`terminal_launch_restore "/w/wrapper.sh" "/p/my app" "claude"`)
+	_, code := runBashSnippet(t, snippet, env)
+	assertExitCode(t, code, 0)
+	data, err := os.ReadFile(rec)
+	if err != nil {
+		t.Fatalf("osascript not invoked: %v", err)
+	}
+	got := strings.TrimSpace(string(data))
+	// Path with space must arrive as single token — single-quoted inside the AppleScript command string.
+	want := `-e tell application "iTerm" to create window with default profile command "/bin/bash -l '/w/wrapper.sh' --restore '/p/my app' 'claude'"`
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
 func TestIterm2Adapter_cleanup_config_removes_json(t *testing.T) {
 	tmpDir := t.TempDir()
 	profilePath := filepath.Join(tmpDir, "ghost-tab.json")
