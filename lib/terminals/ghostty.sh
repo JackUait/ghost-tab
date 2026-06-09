@@ -62,3 +62,10 @@ terminal_cleanup_config() {
     sed -i '' '/^command[[:space:]]*=/d' "$config_path"
   fi
 }
+
+# Open a new Ghostty window running the wrapper in restore mode.
+# Args: wrapper_path project_path ai_tool
+terminal_launch_restore() {
+  local wrapper="$1" path="$2" tool="$3"
+  open -na Ghostty --args -e /bin/bash -l "$wrapper" --restore "$path" "$tool"
+}

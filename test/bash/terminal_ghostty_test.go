@@ -201,6 +201,26 @@ echo "AFTER"
 	assertContains(t, out, "AFTER")
 }
 
+func TestGhosttyAdapter_launch_restore(t *testing.T) {
+	dir := t.TempDir()
+	rec := filepath.Join(dir, "rec")
+	binDir := mockCommand(t, dir, "open", `echo "$@" > `+fmt.Sprintf("%q", rec))
+	env := buildEnv(t, []string{binDir})
+	snippet := ghosttyAdapterSnippet(t,
+		`terminal_launch_restore "/w/wrapper.sh" "/p/app" "claude"`)
+	_, code := runBashSnippet(t, snippet, env)
+	assertExitCode(t, code, 0)
+	data, err := os.ReadFile(rec)
+	if err != nil {
+		t.Fatalf("open not invoked: %v", err)
+	}
+	got := strings.TrimSpace(string(data))
+	want := "-na Ghostty --args -e /bin/bash -l /w/wrapper.sh --restore /p/app claude"
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
 func TestGhosttyAdapter_terminal_install_opens_download_page_when_missing(t *testing.T) {
 	dir := t.TempDir()
 	fakeApps := filepath.Join(dir, "Applications")
