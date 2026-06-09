@@ -195,7 +195,7 @@ WATCHER_PID=$!
 
 cleanup() {
   stop_tab_title_watcher "$GHOST_TAB_MARKER_FILE"
-  [ -n "${HEARTBEAT_PID:-}" ] && kill "$HEARTBEAT_PID" 2>/dev/null || true
+  [ -n "${HEARTBEAT_PID:-}" ] && kill_tree "$HEARTBEAT_PID" TERM 2>/dev/null || true
   # Remove waiting indicator hooks if no other Ghost Tab sessions are running
   if [ "$SELECTED_AI_TOOL" = "claude" ]; then
     # Clean up orphaned markers and cooldown files from dead sessions (e.g., after SIGKILL)
