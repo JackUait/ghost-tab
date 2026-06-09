@@ -9,6 +9,17 @@ build_ai_launch_cmd() {
   shift 5
   local extra="$*"
 
+  # Resume mode: relaunch into the most recent (cwd-scoped) conversation.
+  if [ "${GHOST_TAB_RESUME:-0}" = "1" ]; then
+    case "$tool" in
+      codex)    echo "$codex_cmd resume --last" ;;
+      copilot)  echo "$copilot_cmd --continue" ;;
+      opencode) echo "$opencode_cmd --continue" ;;
+      *)        echo "$claude_cmd -c" ;;
+    esac
+    return 0
+  fi
+
   case "$tool" in
     codex)
       echo "$codex_cmd --cd \"$extra\""
