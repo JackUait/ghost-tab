@@ -7,6 +7,7 @@ source "$(dirname "$0")/../lib/statusline.sh" 2>/dev/null \
 input=$(cat)
 git_info=$(echo "$input" | bash ~/.claude/statusline-command.sh)
 context_pct=$(echo "$input" | npx ccstatusline 2>/dev/null)
+model_name=$(echo "$input" | sed -n 's/.*"display_name":"\([^"]*\)".*/\1/p')
 
 # Find parent Claude Code process and get total tree memory usage
 pid=$PPID
@@ -33,8 +34,11 @@ while [ -n "$pid" ] && [ "$pid" != "1" ]; do
   pid=$(ps -o ppid= -p "$pid" 2>/dev/null | tr -d ' ')
 done
 
+line=$(printf '%s | %s' "$git_info" "$context_pct")
 if [ -n "$mem_label" ]; then
-  printf '%s | %s | \033[01;35m%s\033[00m' "$git_info" "$context_pct" "$mem_label"
-else
-  printf '%s | %s' "$git_info" "$context_pct"
+  line="$line$(printf ' | \033[01;35m%s\033[00m' "$mem_label")"
 fi
+if [ -n "$model_name" ]; then
+  line="$line$(printf ' | \033[01;34m%s\033[00m' "$model_name")"
+fi
+printf '%s' "$line"

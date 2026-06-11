@@ -330,6 +330,57 @@ func TestStatusline_statusline_command_non_git_directory_shows_just_dirname(t *t
 	assertNotContains(t, out, "/ -")
 }
 
+// --- statusline-wrapper.sh: model segment ---
+
+// setupWrapperTest creates a fake home with a mock statusline-command.sh and
+// mock npx/ps commands so the wrapper can run hermetically.
+// Returns the env to run the wrapper with.
+func setupWrapperTest(t *testing.T) []string {
+	t.Helper()
+	dir := t.TempDir()
+
+	fakeHome := filepath.Join(dir, "home")
+	writeTempFile(t, fakeHome, ".claude/statusline-command.sh", `echo "GITINFO"`)
+
+	// npx ccstatusline -> context percentage
+	mockCommand(t, dir, "npx", `echo "12.3%"`)
+	// ps: comm= -> non-claude name, ppid= -> 1 (terminates parent walk)
+	mockCommand(t, dir, "ps", `
+if [[ "$*" == *"comm="* ]]; then echo "sh"; else echo "1"; fi
+`)
+
+	binDir := filepath.Join(dir, "bin")
+	return buildEnv(t, []string{binDir}, "HOME="+fakeHome)
+}
+
+func TestStatusline_wrapper_shows_model_display_name(t *testing.T) {
+	env := setupWrapperTest(t)
+
+	root := projectRoot(t)
+	wrapperPath := filepath.Join(root, "templates", "statusline-wrapper.sh")
+	stdinData := `{"model":{"id":"claude-fable-5","display_name":"Fable 5"},"workspace":{"current_dir":"/tmp"}}`
+	script := fmt.Sprintf(`echo '%s' | bash '%s'`, stdinData, wrapperPath)
+
+	out, code := runBashSnippet(t, script, env)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "Fable 5")
+}
+
+func TestStatusline_wrapper_omits_model_segment_when_model_missing(t *testing.T) {
+	env := setupWrapperTest(t)
+
+	root := projectRoot(t)
+	wrapperPath := filepath.Join(root, "templates", "statusline-wrapper.sh")
+	stdinData := `{"workspace":{"current_dir":"/tmp"}}`
+	script := fmt.Sprintf(`echo '%s' | bash '%s'`, stdinData, wrapperPath)
+
+	out, code := runBashSnippet(t, script, env)
+	assertExitCode(t, code, 0)
+	if strings.TrimSpace(out) != "GITINFO | 12.3%" {
+		t.Errorf("expected output without model segment, got %q", strings.TrimSpace(out))
+	}
+}
+
 // ============================================================
 // statusline-setup.sh tests (TestStatuslineSetup_*)
 // ============================================================
