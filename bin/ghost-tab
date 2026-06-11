@@ -48,9 +48,10 @@ run_terminal_setup() {
     fi
     local selected_terminal="$_selected_terminal"
 
-    # Save preference
+    # Save preference (cleaning up the previous terminal's config on switch)
     local pref_dir="${XDG_CONFIG_HOME:-$HOME/.config}/ghost-tab"
     mkdir -p "$pref_dir"
+    cleanup_previous_terminal "$pref_dir/terminal" "$selected_terminal"
     save_terminal_preference "$selected_terminal" "$pref_dir/terminal"
 
     echo ""
@@ -201,9 +202,10 @@ if select_terminal_interactive; then
   fi
   SELECTED_TERMINAL="$_selected_terminal"
 
-  # Save preference
+  # Save preference (cleaning up the previous terminal's config on switch)
   TERMINAL_PREF_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/ghost-tab"
   mkdir -p "$TERMINAL_PREF_DIR"
+  cleanup_previous_terminal "$TERMINAL_PREF_DIR/terminal" "$SELECTED_TERMINAL"
   save_terminal_preference "$SELECTED_TERMINAL" "$TERMINAL_PREF_DIR/terminal"
 
   echo ""
