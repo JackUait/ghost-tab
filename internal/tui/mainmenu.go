@@ -110,6 +110,7 @@ var actionLabels = []struct {
 	{"O", "Open once"},
 	{"P", "Plain terminal"},
 	{"S", "Settings"},
+	{"T", "Stats"},
 }
 
 // aiToolDisplayNames maps tool names to their display names.
@@ -1418,6 +1419,8 @@ func (m *MainMenuModel) handleRune(r rune) (tea.Model, tea.Cmd) {
 		m.settingsMode = true
 		m.settingsSelected = 0
 		return m, nil
+	case 't', 'T':
+		return m, func() tea.Msg { return PushScreenMsg{Model: NewStatsModel()} }
 	case '1', '2', '3', '4', '5', '6', '7', '8', '9':
 		n := int(r - '0')
 		if n > len(m.projects) {
