@@ -480,7 +480,7 @@ func TestStatuslineSetup_reports_already_installed(t *testing.T) {
 	snippet := statuslineSetupSnippet(t, fmt.Sprintf(`
 _has_npm() { return 0; }
 npm() {
-  if [[ "$1" == "list" ]]; then return 0; fi
+  if [[ "$1" == "list" ]]; then echo "└── ccstatusline@2.2.21"; return 0; fi
   return 0
 }
 setup_statusline %q %q %q
@@ -488,7 +488,7 @@ setup_statusline %q %q %q
 
 	out, code := runBashSnippet(t, snippet, nil)
 	assertExitCode(t, code, 0)
-	assertContains(t, out, "already installed")
+	assertContains(t, out, "up to date")
 }
 
 func TestStatuslineSetup_warns_and_skips_when_npm_install_fails(t *testing.T) {
@@ -518,22 +518,21 @@ setup_statusline %q %q %q
 
 func TestStatuslineSetup_installs_ccstatusline_and_copies_files_on_fresh_install(t *testing.T) {
 	shareDir, fakeHome := setupStatuslineTestDirs(t)
+	marker := filepath.Join(t.TempDir(), "installed")
 
-	// First npm list call returns 1 (not installed), subsequent calls return 0
+	// Not installed until install runs; install drops a marker that list keys off.
 	snippet := statuslineSetupSnippet(t, fmt.Sprintf(`
 _has_npm() { return 0; }
-_npm_list_call_count=0
 npm() {
   if [[ "$1" == "list" ]]; then
-    _npm_list_call_count=$((_npm_list_call_count + 1))
-    if [[ "$_npm_list_call_count" -eq 1 ]]; then return 1; fi
-    return 0
+    if [[ -f %q ]]; then echo "└── ccstatusline@2.2.21"; return 0; fi
+    return 1
   fi
-  if [[ "$1" == "install" ]]; then return 0; fi
+  if [[ "$1" == "install" ]]; then touch %q; return 0; fi
   return 0
 }
 setup_statusline %q %q %q
-`, shareDir, filepath.Join(fakeHome, ".claude", "settings.json"), fakeHome))
+`, marker, marker, shareDir, filepath.Join(fakeHome, ".claude", "settings.json"), fakeHome))
 
 	out, code := runBashSnippet(t, snippet, nil)
 	assertExitCode(t, code, 0)
@@ -549,6 +548,130 @@ setup_statusline %q %q %q
 			t.Errorf("expected file to exist: %s", path)
 		}
 	}
+}
+
+// --- version pinning (per-model context window accuracy) ---
+
+func TestStatuslineSetup_upgrades_stale_ccstatusline_to_pinned_version(t *testing.T) {
+	shareDir, fakeHome := setupStatuslineTestDirs(t)
+	argsFile := filepath.Join(t.TempDir(), "install-args")
+
+	// ccstatusline 2.1.0 is installed (pre per-model-window fix). Capture install args.
+	snippet := statuslineSetupSnippet(t, fmt.Sprintf(`
+_has_npm() { return 0; }
+npm() {
+  if [[ "$1" == "list" ]]; then echo "/usr/local/lib"; echo "└── ccstatusline@2.1.0"; return 0; fi
+  if [[ "$1" == "install" ]]; then echo "$*" >> %q; return 0; fi
+  return 0
+}
+setup_statusline %q %q %q
+`, argsFile, shareDir, filepath.Join(fakeHome, ".claude", "settings.json"), fakeHome))
+
+	_, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+
+	data, err := os.ReadFile(argsFile)
+	if err != nil {
+		t.Fatalf("install was never called: %v", err)
+	}
+	assertContains(t, string(data), "ccstatusline@2.2.21")
+}
+
+func TestStatuslineSetup_leaves_newer_ccstatusline_untouched(t *testing.T) {
+	shareDir, fakeHome := setupStatuslineTestDirs(t)
+	argsFile := filepath.Join(t.TempDir(), "install-args")
+
+	// A newer version than pinned must NOT be downgraded.
+	snippet := statuslineSetupSnippet(t, fmt.Sprintf(`
+_has_npm() { return 0; }
+npm() {
+  if [[ "$1" == "list" ]]; then echo "└── ccstatusline@2.3.0"; return 0; fi
+  if [[ "$1" == "install" ]]; then echo "$*" >> %q; return 0; fi
+  return 0
+}
+setup_statusline %q %q %q
+`, argsFile, shareDir, filepath.Join(fakeHome, ".claude", "settings.json"), fakeHome))
+
+	out, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "up to date")
+
+	if data, err := os.ReadFile(argsFile); err == nil && strings.TrimSpace(string(data)) != "" {
+		t.Errorf("install should NOT run for a newer version, but ran with: %q", data)
+	}
+}
+
+func TestStatuslineSetup_upgrades_when_older_than_minimum(t *testing.T) {
+	shareDir, fakeHome := setupStatuslineTestDirs(t)
+	argsFile := filepath.Join(t.TempDir(), "install-args")
+
+	// Older version must be upgraded to the pinned minimum.
+	snippet := statuslineSetupSnippet(t, fmt.Sprintf(`
+_has_npm() { return 0; }
+npm() {
+  if [[ "$1" == "list" ]]; then echo "└── ccstatusline@2.2.9"; return 0; fi
+  if [[ "$1" == "install" ]]; then echo "$*" >> %q; return 0; fi
+  return 0
+}
+setup_statusline %q %q %q
+`, argsFile, shareDir, filepath.Join(fakeHome, ".claude", "settings.json"), fakeHome))
+
+	_, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+
+	data, err := os.ReadFile(argsFile)
+	if err != nil {
+		t.Fatalf("install was never called for older version: %v", err)
+	}
+	assertContains(t, string(data), "ccstatusline@2.2.21")
+}
+
+func TestStatuslineSetup_skips_install_when_already_at_pinned_version(t *testing.T) {
+	shareDir, fakeHome := setupStatuslineTestDirs(t)
+	argsFile := filepath.Join(t.TempDir(), "install-args")
+
+	snippet := statuslineSetupSnippet(t, fmt.Sprintf(`
+_has_npm() { return 0; }
+npm() {
+  if [[ "$1" == "list" ]]; then echo "└── ccstatusline@2.2.21"; return 0; fi
+  if [[ "$1" == "install" ]]; then echo "$*" >> %q; return 0; fi
+  return 0
+}
+setup_statusline %q %q %q
+`, argsFile, shareDir, filepath.Join(fakeHome, ".claude", "settings.json"), fakeHome))
+
+	out, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "up to date")
+
+	if data, err := os.ReadFile(argsFile); err == nil && strings.TrimSpace(string(data)) != "" {
+		t.Errorf("install should NOT run when already at pinned version, but ran with: %q", data)
+	}
+}
+
+func TestStatuslineSetup_pins_exact_version_on_fresh_install(t *testing.T) {
+	shareDir, fakeHome := setupStatuslineTestDirs(t)
+	argsFile := filepath.Join(t.TempDir(), "install-args")
+
+	// Not installed: list yields no ccstatusline@ line.
+	snippet := statuslineSetupSnippet(t, fmt.Sprintf(`
+_has_npm() { return 0; }
+npm() {
+  if [[ "$1" == "list" ]]; then echo "(empty)"; return 1; fi
+  if [[ "$1" == "install" ]]; then echo "$*" >> %q; return 0; fi
+  return 0
+}
+setup_statusline %q %q %q
+`, argsFile, shareDir, filepath.Join(fakeHome, ".claude", "settings.json"), fakeHome))
+
+	_, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+
+	data, err := os.ReadFile(argsFile)
+	if err != nil {
+		t.Fatalf("install was never called: %v", err)
+	}
+	assertContains(t, string(data), "ccstatusline@2.2.21")
 }
 
 func TestStatuslineSetup_calls_merge_claude_settings_after_file_copy(t *testing.T) {
@@ -788,7 +911,8 @@ setup_statusline %q %q %q
 
 	out, code := runBashSnippet(t, snippet, nil)
 	assertExitCode(t, code, 0)
-	assertContains(t, out, "already installed")
+	// Unparseable version -> safe (re)install rather than trusting a bad string.
+	assertContains(t, out, "ccstatusline installed")
 }
 
 func TestStatuslineSetup_handles_npm_list_command_hanging(t *testing.T) {
