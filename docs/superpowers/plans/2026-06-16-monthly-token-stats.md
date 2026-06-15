@@ -1119,7 +1119,7 @@ import (
 )
 
 func TestMainMenu_TKeyPushesStatsScreen(t *testing.T) {
-	m := NewMainMenuModel(nil) // adjust constructor call to match existing signature
+	m := NewMainMenu(nil, []string{"claude"}, "claude", "") // *MainMenuModel
 	updated, cmd := m.handleRune('t')
 	_ = updated
 	if cmd == nil {
@@ -1147,7 +1147,7 @@ func TestMainMenu_hasStatsActionLabel(t *testing.T) {
 }
 ```
 
-> Before running, open `mainmenu.go` and confirm the exact `NewMainMenuModel` constructor signature; adjust the test's construction call to match (the assertion logic stays).
+> Constructor confirmed: `NewMainMenu(projects []models.Project, aiTools []string, currentAI string, ghostDisplay string) *MainMenuModel` (`mainmenu.go:235`). `handleRune` is a `*MainMenuModel` method.
 
 - [ ] **Step 2: Run test to verify it fails**
 
