@@ -1,0 +1,33 @@
+package tui
+
+import (
+	"testing"
+)
+
+func TestMainMenu_TKeyPushesStatsScreen(t *testing.T) {
+	m := NewMainMenu(nil, []string{"claude"}, "claude", "") // *MainMenuModel
+	updated, cmd := m.handleRune('t')
+	_ = updated
+	if cmd == nil {
+		t.Fatal("'t' returned nil cmd, want PushScreenMsg{StatsModel}")
+	}
+	push, ok := cmd().(PushScreenMsg)
+	if !ok {
+		t.Fatalf("'t' cmd = %T, want PushScreenMsg", cmd())
+	}
+	if _, ok := push.Model.(StatsModel); !ok {
+		t.Errorf("pushed model = %T, want StatsModel", push.Model)
+	}
+}
+
+func TestMainMenu_hasStatsActionLabel(t *testing.T) {
+	found := false
+	for _, a := range actionLabels {
+		if a.shortcut == "T" && a.label == "Stats" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("actionLabels missing {T, Stats}: %+v", actionLabels)
+	}
+}

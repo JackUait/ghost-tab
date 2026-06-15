@@ -4,9 +4,9 @@
 
 **Goal:** Add a `T`-key Stats screen to the Ghost Tab TUI showing per-month token usage (input/output/cache-write/cache-read + total) parsed from Claude Code transcripts, with a table + bar chart, incremental caching, all-time scroll.
 
-**Architecture:** A pure `internal/usage` package parses `~/.claude/projects/**/*.jsonl`, aggregates by month, and caches per-file results to `~/.config/ghost-tab/usage-cache.json` so only changed files are re-parsed. A Bubbletea `StatsModel` (`internal/tui/stats.go`) loads it async with a spinner and renders a scrollable table + bars. `mainmenu.go` pushes the screen on `T`.
+**Architecture:** A pure `internal/usage` package parses `~/.claude/projects/**/*.jsonl`, aggregates by month, and caches per-file results to `~/.config/ghost-tab/usage-cache.json` so only changed files are re-parsed. A Bubbletea `StatsModel` (`internal/tui/stats.go`) loads it async (plain "Crunching…" text while loading) and renders a scrollable table + bars. `mainmenu.go` pushes the screen on `T`.
 
-**Tech Stack:** Go 1.25, Bubbletea v1.3.10, Bubbles v1.0.0 (spinner), Lipgloss v1.1.0, Cobra v1.10.2.
+**Tech Stack:** Go 1.25, Bubbletea v1.3.10, Lipgloss v1.1.0, Cobra v1.10.2.
 
 **Parallelization:** Tasks 1–3 (`internal/usage`) and Tasks 4–6 (`internal/tui/stats.go`) are independent and can run as two parallel subagents against the `usage.MonthlyUsage` contract defined in Task 1. Tasks 7–8 (wiring) depend on both and run after. Task 9 is final integration.
 
