@@ -94,6 +94,52 @@ func TestStatsView_showsShareOfAllPercent(t *testing.T) {
 	}
 }
 
+func TestDollarFmt(t *testing.T) {
+	cases := []struct {
+		in   float64
+		want string
+	}{
+		{0.42, "$0.42"},
+		{312, "$312"},
+		{1234, "$1,234"},
+		{12345, "$12.3K"},
+		{4_600_000, "$4.6M"},
+	}
+	for _, c := range cases {
+		if got := dollarFmt(c.in); got != c.want {
+			t.Errorf("dollarFmt(%v) = %q, want %q", c.in, got, c.want)
+		}
+	}
+}
+
+func TestStatsView_showsModelRowsAndCost(t *testing.T) {
+	months := []usage.MonthlyUsage{{
+		Month: "2026-06", Input: 2_000_000, Output: 1_000_000,
+		Models: []usage.ModelUsage{
+			{Model: "claude-opus-4-7", Input: 2_000_000, Output: 1_000_000}, // $10 + $25 = $35
+		},
+	}}
+	view := NewStatsModelWithData(months).View()
+	if !strings.Contains(view, "opus-4-7") {
+		t.Errorf("missing per-model row:\n%s", view)
+	}
+	if !strings.Contains(view, "$35") {
+		t.Errorf("missing $35 cost (model/bar/total):\n%s", view)
+	}
+}
+
+func TestStatsView_unpricedModelShowsDash(t *testing.T) {
+	months := []usage.MonthlyUsage{{
+		Month: "2026-06", Input: 100, Models: []usage.ModelUsage{
+			{Model: "mystery-model", Input: 100},
+		},
+	}}
+	view := NewStatsModelWithData(months).View()
+	if !strings.Contains(view, "—") {
+		t.Errorf("unpriced model should render — for cost:\n%s", view)
+	}
+}
+
 func TestStatsView_emptyShowsFriendlyMessage(t *testing.T) {
 	m := NewStatsModelWithData([]usage.MonthlyUsage{})
 	if !strings.Contains(m.View(), "No usage data") {

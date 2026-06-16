@@ -57,6 +57,29 @@ func NewStatsModelWithData(months []usage.MonthlyUsage) StatsModel {
 	return StatsModel{months: months, loading: false}
 }
 
+// dollarFmt renders a USD estimate: cents under $1, comma-grouped whole dollars
+// under $10K, then $1.2K / $4.6M for larger figures.
+func dollarFmt(usd float64) string {
+	switch {
+	case usd < 1:
+		return fmt.Sprintf("$%.2f", usd)
+	case usd < 10000:
+		s := strconv.FormatInt(int64(usd+0.5), 10)
+		var out []byte
+		for i := 0; i < len(s); i++ {
+			if i > 0 && (len(s)-i)%3 == 0 {
+				out = append(out, ',')
+			}
+			out = append(out, s[i])
+		}
+		return "$" + string(out)
+	case usd < 1_000_000:
+		return fmt.Sprintf("$%.1fK", usd/1000)
+	default:
+		return fmt.Sprintf("$%.1fM", usd/1_000_000)
+	}
+}
+
 // statsGrandTotal sums every month into one MonthlyUsage labelled "Total".
 func statsGrandTotal(months []usage.MonthlyUsage) usage.MonthlyUsage {
 	g := usage.MonthlyUsage{Month: "Total"}
@@ -182,6 +205,8 @@ func (m StatsModel) View() string {
 	body = append(body, statsBoxLine(
 		statsCols("Month", "Input", "Output", "Cache W", "Cache R", "Total", header, header, header), border))
 	body = append(body, statsSep(border))
+	var grandCost float64
+	grandAllPriced := true
 	for _, mu := range m.months[m.offset:end] {
 		row := statsCols(mu.Month,
 			humanizeTokens(mu.Input), humanizeTokens(mu.Output),
@@ -189,10 +214,36 @@ func (m StatsModel) View() string {
 			humanizeTokens(mu.Total()), num, num, primaryBold)
 		frac := float64(mu.Total()) / float64(grandTotal)
 		pct := int(frac*100 + 0.5)
+		monthCost, allPriced := mu.CostUSD()
+		costLabel := dollarFmt(monthCost)
+		if !allPriced {
+			costLabel = "~" + costLabel
+		}
 		barRow := "  " + primary.Render(statsBar(frac)) + " " +
-			faint.Render(fmt.Sprintf("%d%% of all", pct))
+			primaryBold.Render(costLabel) + faint.Render(fmt.Sprintf(" · %d%%", pct))
 		body = append(body, statsBoxLine(row, border))
 		body = append(body, statsBoxLine(barRow, border))
+		// Per-model breakdown for this month.
+		for _, md := range mu.Models {
+			label := strings.TrimPrefix(md.Model, "claude-")
+			usd, priced := usage.ModelCostUSD(md)
+			cost := "—"
+			if priced {
+				cost = dollarFmt(usd)
+			}
+			mrow := "    " + muted.Render(fmt.Sprintf("%-16s", label)) + " " +
+				muted.Render(fmt.Sprintf("%8s", humanizeTokens(md.Total()))) + "  " +
+				primary.Render(fmt.Sprintf("%8s", cost))
+			body = append(body, statsBoxLine(mrow, border))
+		}
+	}
+	// Grand total cost spans every month (not just the visible window).
+	for _, mu := range m.months {
+		c, ap := mu.CostUSD()
+		grandCost += c
+		if !ap {
+			grandAllPriced = false
+		}
 	}
 	body = append(body, statsSep(border))
 	g := statsGrandTotal(m.months)
@@ -200,6 +251,17 @@ func (m StatsModel) View() string {
 		humanizeTokens(g.Input), humanizeTokens(g.Output),
 		humanizeTokens(g.CacheWrite), humanizeTokens(g.CacheRead),
 		humanizeTokens(g.Total()), primaryBold, primaryBold, primaryBold), border))
+	grandCostStr := dollarFmt(grandCost)
+	if !grandAllPriced {
+		grandCostStr = "~" + grandCostStr
+	}
+	costLeft := "  " + header.Render("Total est. cost")
+	costStr := primaryBold.Render(grandCostStr)
+	costPad := (statsInner - 5) - lipgloss.Width(costLeft) - lipgloss.Width(costStr)
+	if costPad < 1 {
+		costPad = 1
+	}
+	body = append(body, statsBoxLine(costLeft+strings.Repeat(" ", costPad)+costStr, border))
 	body = append(body, statsBoxLine("", border))
 	body = append(body, statsBoxLine("  "+hint, border))
 	return m.center(statsFrame(body))
