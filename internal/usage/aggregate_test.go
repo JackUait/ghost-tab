@@ -124,6 +124,35 @@ func TestAggregate_dropsDeletedFileFromCache(t *testing.T) {
 	}
 }
 
+func TestAddModelRows_accumulatesByModel(t *testing.T) {
+	dst := map[string]*ModelUsage{}
+	addModelRows(dst, []ModelUsage{
+		{Model: "claude-opus-4-7", Input: 10, Output: 1},
+		{Model: "claude-opus-4-7", Input: 5, CacheRead: 2},
+		{Model: "claude-fable-5", Input: 3},
+	})
+	if dst["claude-opus-4-7"].Input != 15 || dst["claude-opus-4-7"].Output != 1 ||
+		dst["claude-opus-4-7"].CacheRead != 2 {
+		t.Errorf("opus row = %+v, want input 15 output 1 cacheRead 2", dst["claude-opus-4-7"])
+	}
+	if dst["claude-fable-5"].Input != 3 {
+		t.Errorf("fable row = %+v, want input 3", dst["claude-fable-5"])
+	}
+}
+
+func TestFoldMonths_accumulatesByMonthAndModel(t *testing.T) {
+	acc := map[string]map[string]*ModelUsage{}
+	foldMonths(acc, map[string]*MonthlyUsage{
+		"2026-05": {Month: "2026-05", Models: []ModelUsage{{Model: "m", Input: 4}}},
+	})
+	foldMonths(acc, map[string]*MonthlyUsage{
+		"2026-05": {Month: "2026-05", Models: []ModelUsage{{Model: "m", Input: 6}}},
+	})
+	if acc["2026-05"]["m"].Input != 10 {
+		t.Errorf("acc = %+v, want 2026-05/m input 10", acc)
+	}
+}
+
 func TestAggregate_mergesModelsAcrossFiles(t *testing.T) {
 	dir := t.TempDir()
 	cachePath := filepath.Join(t.TempDir(), "cache.json")

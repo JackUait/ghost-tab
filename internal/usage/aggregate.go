@@ -7,6 +7,68 @@ import (
 	"strings"
 )
 
+// addRow accumulates one model's tokens into dst (model id -> running total).
+func addRow(dst map[string]*ModelUsage, m ModelUsage) {
+	a := dst[m.Model]
+	if a == nil {
+		a = &ModelUsage{Model: m.Model}
+		dst[m.Model] = a
+	}
+	a.Input += m.Input
+	a.Output += m.Output
+	a.CacheWrite += m.CacheWrite
+	a.CacheRead += m.CacheRead
+}
+
+// addModelRows accumulates per-model rows into dst (model id -> running total).
+func addModelRows(dst map[string]*ModelUsage, rows []ModelUsage) {
+	for _, m := range rows {
+		addRow(dst, m)
+	}
+}
+
+// foldMonths accumulates a file's per-month, per-model usage into acc
+// (month -> model -> running total).
+func foldMonths(acc map[string]map[string]*ModelUsage, months map[string]*MonthlyUsage) {
+	for month, mu := range months {
+		bucket := acc[month]
+		if bucket == nil {
+			bucket = map[string]*ModelUsage{}
+			acc[month] = bucket
+		}
+		addModelRows(bucket, mu.Models)
+	}
+}
+
+// foldArchive accumulates an archive (month -> model -> total) into acc.
+func foldArchive(acc map[string]map[string]*ModelUsage, archive map[string]map[string]*ModelUsage) {
+	for month, byModel := range archive {
+		bucket := acc[month]
+		if bucket == nil {
+			bucket = map[string]*ModelUsage{}
+			acc[month] = bucket
+		}
+		for _, m := range byModel {
+			addRow(bucket, *m)
+		}
+	}
+}
+
+// cloneArchive deep-copies an archive so callers can fold into the copy without
+// mutating the loaded cache's pointers.
+func cloneArchive(src map[string]map[string]*ModelUsage) map[string]map[string]*ModelUsage {
+	dst := map[string]map[string]*ModelUsage{}
+	for month, byModel := range src {
+		bucket := map[string]*ModelUsage{}
+		for id, mu := range byModel {
+			cp := *mu
+			bucket[id] = &cp
+		}
+		dst[month] = bucket
+	}
+	return dst
+}
+
 // Aggregate walks claudeDir for *.jsonl transcripts and returns per-month token
 // usage sorted newest-first. It reuses cachePath entries for files whose size and
 // mtime are unchanged, re-parses changed files, drops entries for deleted files,
