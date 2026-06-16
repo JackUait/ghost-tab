@@ -6,10 +6,11 @@ import (
 	"path/filepath"
 )
 
-// cacheVersion is 3 because the cache now carries a durable per-month Archive of
-// totals sealed from deleted transcripts plus the Sealed set of folded paths.
-// LoadCache rejects a mismatched version, so older caches rebuild on upgrade.
-const cacheVersion = 3
+// cacheVersion is 5: ParseFile now attributes each billed iteration of a turn to
+// its own model (model-fallback rounds were previously dropped), so v4 caches must
+// rebuild from on-disk transcripts to capture them. LoadCache rejects a mismatched
+// version.
+const cacheVersion = 5
 
 // fileCacheEntry stores one transcript file's identity and its parsed months.
 type fileCacheEntry struct {

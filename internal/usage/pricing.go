@@ -16,13 +16,21 @@ var modelRates = map[string]modelRate{
 	"claude-haiku-4-5":  {1, 5},
 	"claude-fable-5":    {10, 50},
 	"claude-mythos-5":   {10, 50},
+
+	// Bare aliases recorded by Claude Code in some transcripts. They carry real
+	// tokens, so they must be priced at the current-generation rate rather than
+	// dropped as $0. Listed after the full ids; the matched-prefix lookup never
+	// confuses them (a full id like "claude-opus-4-8" does not start with "opus").
+	"opus":   {5, 25},
+	"sonnet": {3, 15},
+	"haiku":  {1, 5},
 }
 
 const (
-	// cacheWriteMult prices cache creation relative to the input rate. Our data
-	// only has the combined cache_creation total, so it is charged at the 5-minute
-	// TTL rate (1.25x) — a documented approximation that ignores any 1h-TTL writes.
+	// cacheWriteMult prices 5-minute-TTL cache creation relative to the input rate.
 	cacheWriteMult = 1.25
+	// cacheWrite1hMult prices 1-hour-TTL cache creation relative to the input rate.
+	cacheWrite1hMult = 2.0
 	// cacheReadMult prices cache reads relative to the input rate.
 	cacheReadMult = 0.10
 )
@@ -40,15 +48,29 @@ func rateFor(model string) (modelRate, bool) {
 // model had a pricing entry. Input and output use the model's rates; cache-write
 // is 1.25x the input rate and cache-read is 0.1x.
 func ModelCostUSD(m ModelUsage) (float64, bool) {
+	// A row with no tokens (e.g. Claude Code's "<synthetic>" model) costs nothing
+	// regardless of rate, so treat it as priced to avoid flagging a month as an
+	// approximate estimate over a $0 row.
+	if m.Total() == 0 {
+		return 0, true
+	}
 	r, ok := rateFor(m.Model)
 	if !ok {
 		return 0, false
 	}
 	inRate := r.inPerMTok / 1_000_000
 	outRate := r.outPerMTok / 1_000_000
+	// CacheWrite is the total; CacheWrite1h is its 1-hour-TTL subset (2x), the rest
+	// is 5-minute-TTL (1.25x). Guard against a malformed subset exceeding the total.
+	cw1h := m.CacheWrite1h
+	if cw1h > m.CacheWrite {
+		cw1h = m.CacheWrite
+	}
+	cw5m := m.CacheWrite - cw1h
 	usd := float64(m.Input)*inRate +
 		float64(m.Output)*outRate +
-		float64(m.CacheWrite)*cacheWriteMult*inRate +
+		float64(cw5m)*cacheWriteMult*inRate +
+		float64(cw1h)*cacheWrite1hMult*inRate +
 		float64(m.CacheRead)*cacheReadMult*inRate
 	return usd, true
 }

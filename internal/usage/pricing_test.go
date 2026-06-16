@@ -42,6 +42,21 @@ func TestModelCostUSD_cacheMultipliers(t *testing.T) {
 	}
 }
 
+func TestModelCostUSD_cacheTTLSplit(t *testing.T) {
+	// opus input $5/MTok. 1M cache-write total, 400k of it at the 1-hour TTL:
+	//   5m: 600k * 1.25 * $5/MTok = $3.75
+	//   1h: 400k * 2.00 * $5/MTok = $4.00  -> total $7.75
+	usd, _ := ModelCostUSD(ModelUsage{Model: "claude-opus-4-7", CacheWrite: 1_000_000, CacheWrite1h: 400_000})
+	if !approx(usd, 7.75) {
+		t.Errorf("ttl split = %v, want 7.75", usd)
+	}
+	// All-5m (CacheWrite1h=0) keeps the legacy 1.25x behavior.
+	usd, _ = ModelCostUSD(ModelUsage{Model: "claude-opus-4-7", CacheWrite: 1_000_000})
+	if !approx(usd, 6.25) {
+		t.Errorf("all-5m = %v, want 6.25", usd)
+	}
+}
+
 func TestModelCostUSD_prefixMatchAndUnknown(t *testing.T) {
 	usd, priced := ModelCostUSD(ModelUsage{Model: "claude-haiku-4-5-20251001", Input: 1_000_000})
 	if !priced || !approx(usd, 1) {
@@ -49,6 +64,35 @@ func TestModelCostUSD_prefixMatchAndUnknown(t *testing.T) {
 	}
 	if _, priced := ModelCostUSD(ModelUsage{Model: "gpt-4o", Input: 1_000_000}); priced {
 		t.Errorf("unknown model should be unpriced")
+	}
+}
+
+func TestModelCostUSD_bareAliases(t *testing.T) {
+	// Claude Code transcripts sometimes record bare aliases ("opus"/"sonnet"/
+	// "haiku") instead of full ids. They carry real tokens and must be priced at
+	// the current-generation rate, not dropped as $0.
+	cases := []struct {
+		model string
+		want  float64 // 1M input + 1M output
+	}{
+		{"opus", 30},   // $5 + $25
+		{"sonnet", 18}, // $3 + $15
+		{"haiku", 6},   // $1 + $5
+	}
+	for _, c := range cases {
+		usd, priced := ModelCostUSD(ModelUsage{Model: c.model, Input: 1_000_000, Output: 1_000_000})
+		if !priced || !approx(usd, c.want) {
+			t.Errorf("%s = %v priced=%v, want %v/true", c.model, usd, priced, c.want)
+		}
+	}
+}
+
+func TestModelCostUSD_zeroTokensPricedFree(t *testing.T) {
+	// Zero-token rows (e.g. "<synthetic>") cost nothing regardless of model, so
+	// they must report priced=true and must not flag a month as approximate.
+	usd, priced := ModelCostUSD(ModelUsage{Model: "<synthetic>"})
+	if !priced || !approx(usd, 0) {
+		t.Errorf("synthetic = %v priced=%v, want 0/true", usd, priced)
 	}
 }
 

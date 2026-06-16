@@ -22,6 +22,71 @@ func TestTotal_sumsAllColumns(t *testing.T) {
 	}
 }
 
+func TestParseFile_cacheCreationTTLSplit(t *testing.T) {
+	dir := t.TempDir()
+	// Record A carries the nested 5m/1h breakdown: it is authoritative, so the flat
+	// cache_creation_input_tokens (999) is ignored in favor of 1000+500=1500.
+	// Record B has only the flat field (older transcript): all of it counts as 5m.
+	content := `{"type":"assistant","timestamp":"2026-05-01T10:00:00Z","message":{"id":"a","model":"claude-opus-4-7","usage":{"input_tokens":0,"output_tokens":0,"cache_read_input_tokens":0,"cache_creation_input_tokens":999,"cache_creation":{"ephemeral_5m_input_tokens":1000,"ephemeral_1h_input_tokens":500}}}}
+{"type":"assistant","timestamp":"2026-05-02T10:00:00Z","message":{"id":"b","model":"claude-opus-4-7","usage":{"input_tokens":0,"output_tokens":0,"cache_read_input_tokens":0,"cache_creation_input_tokens":700}}}
+`
+	p := writeFixture(t, dir, "ttl.jsonl", content)
+	months, _, err := ParseFile(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := months["2026-05"]
+	if m == nil {
+		t.Fatal("no May usage")
+	}
+	// total cache write = 1500 (nested) + 700 (flat) = 2200; 1h subset = 500
+	if m.Models[0].CacheWrite != 2200 || m.Models[0].CacheWrite1h != 500 {
+		t.Errorf("got cacheWrite=%d cacheWrite1h=%d, want 2200/500", m.Models[0].CacheWrite, m.Models[0].CacheWrite1h)
+	}
+}
+
+func TestParseFile_iterationsAttributedPerModel(t *testing.T) {
+	dir := t.TempDir()
+	// A multi-round assistant turn: the first iteration ran on fable-5 and was
+	// refused, the second is the opus-4-8 fallback. Each iteration is a separately
+	// billed API call at its OWN model's rate. The top-level usage equals only the
+	// LAST iteration, so reading it alone drops the fable-5 round entirely.
+	content := `{"type":"assistant","timestamp":"2026-05-01T10:00:00Z","message":{"id":"a","model":"claude-opus-4-8","usage":{"input_tokens":792,"output_tokens":524,"cache_read_input_tokens":23837,"cache_creation_input_tokens":6018,"cache_creation":{"ephemeral_5m_input_tokens":6018,"ephemeral_1h_input_tokens":0},"iterations":[{"model":"claude-fable-5","input_tokens":792,"output_tokens":130,"cache_read_input_tokens":18088,"cache_creation_input_tokens":11809,"cache_creation":{"ephemeral_5m_input_tokens":9809,"ephemeral_1h_input_tokens":2000}},{"model":"claude-opus-4-8","input_tokens":792,"output_tokens":524,"cache_read_input_tokens":23837,"cache_creation_input_tokens":6018,"cache_creation":{"ephemeral_5m_input_tokens":6018,"ephemeral_1h_input_tokens":0}}]}}}
+`
+	p := writeFixture(t, dir, "iter.jsonl", content)
+	months, _, err := ParseFile(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	may := months["2026-05"]
+	if may == nil {
+		t.Fatal("no May usage")
+	}
+	if len(may.Models) != 2 {
+		t.Fatalf("models = %d, want 2 (fable + opus)", len(may.Models))
+	}
+	byModel := map[string]ModelUsage{}
+	for _, m := range may.Models {
+		byModel[m.Model] = m
+	}
+	fable, ok := byModel["claude-fable-5"]
+	if !ok {
+		t.Fatalf("fable-5 iteration dropped: %+v", may.Models)
+	}
+	if fable.Input != 792 || fable.Output != 130 || fable.CacheRead != 18088 ||
+		fable.CacheWrite != 11809 || fable.CacheWrite1h != 2000 {
+		t.Errorf("fable = %+v, want in792 out130 cr18088 cw11809 cw1h2000", fable)
+	}
+	opus, ok := byModel["claude-opus-4-8"]
+	if !ok {
+		t.Fatalf("opus-4-8 iteration missing: %+v", may.Models)
+	}
+	if opus.Input != 792 || opus.Output != 524 || opus.CacheRead != 23837 ||
+		opus.CacheWrite != 6018 || opus.CacheWrite1h != 0 {
+		t.Errorf("opus = %+v, want in792 out524 cr23837 cw6018 cw1h0", opus)
+	}
+}
+
 func TestParseFile_groupsByMonthAndSumsTypes(t *testing.T) {
 	dir := t.TempDir()
 	content := `{"type":"assistant","timestamp":"2026-05-01T10:00:00.000Z","message":{"id":"a","usage":{"input_tokens":10,"output_tokens":20,"cache_creation_input_tokens":5,"cache_read_input_tokens":1}}}
