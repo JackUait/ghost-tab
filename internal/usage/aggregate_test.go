@@ -57,9 +57,14 @@ func TestAggregate_reusesCacheForUnchangedFiles(t *testing.T) {
 	// reuses the cache (file unchanged), the tampered value must survive.
 	c := LoadCache(cachePath)
 	info, _ := os.Stat(p)
+	// Output is rebuilt from per-model rows, so tamper a model row (not the flat
+	// field) — it must survive if the unchanged file is served from cache.
 	c.Files[p] = fileCacheEntry{
-		Meta:   FileMeta{ModTime: info.ModTime(), Size: info.Size()},
-		Months: map[string]*MonthlyUsage{"2026-05": {Month: "2026-05", Input: 999}},
+		Meta: FileMeta{ModTime: info.ModTime(), Size: info.Size()},
+		Months: map[string]*MonthlyUsage{"2026-05": {
+			Month: "2026-05", Input: 999,
+			Models: []ModelUsage{{Model: "unknown", Input: 999}},
+		}},
 	}
 	if err := c.Save(cachePath); err != nil {
 		t.Fatal(err)
@@ -116,5 +121,19 @@ func TestAggregate_dropsDeletedFileFromCache(t *testing.T) {
 	}
 	if _, ok := LoadCache(cachePath).Files[p]; ok {
 		t.Errorf("deleted file still present in cache")
+	}
+}
+
+func TestAggregate_mergesModelsAcrossFiles(t *testing.T) {
+	dir := t.TempDir()
+	cachePath := filepath.Join(t.TempDir(), "cache.json")
+	writeFixture(t, dir, "a.jsonl", `{"type":"assistant","timestamp":"2026-05-01T10:00:00Z","message":{"id":"a","model":"claude-opus-4-7","usage":{"input_tokens":10,"output_tokens":0,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}}`+"\n")
+	writeFixture(t, dir, "b.jsonl", `{"type":"assistant","timestamp":"2026-05-02T10:00:00Z","message":{"id":"b","model":"claude-opus-4-7","usage":{"input_tokens":5,"output_tokens":0,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}}`+"\n")
+	out, err := Aggregate(dir, cachePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(out) != 1 || len(out[0].Models) != 1 || out[0].Models[0].Input != 15 {
+		t.Errorf("merged models = %+v, want one opus row input 15", out)
 	}
 }

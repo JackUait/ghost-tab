@@ -6,7 +6,9 @@ import (
 	"path/filepath"
 )
 
-const cacheVersion = 1
+// cacheVersion is 2 because cached month entries now carry per-model breakdowns;
+// LoadCache rejects a mismatched version, so existing v1 caches rebuild on upgrade.
+const cacheVersion = 2
 
 // fileCacheEntry stores one transcript file's identity and its parsed months.
 type fileCacheEntry struct {

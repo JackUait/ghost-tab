@@ -46,26 +46,35 @@ func Aggregate(claudeDir, cachePath string) ([]MonthlyUsage, error) {
 	// NOT dedup across files: a global dedup would require parsing every file
 	// together, which defeats the incremental cache. Cross-file duplicate ids are
 	// rare (~0.02% in practice) and intentionally tolerated. Do not "fix" this.
-	merged := map[string]*MonthlyUsage{}
+	// month -> model -> accumulator. Merge each file's per-model rows so a model
+	// used across many files becomes one row per month.
+	acc := map[string]map[string]*ModelUsage{}
 	for _, entry := range next.Files {
 		for month, mu := range entry.Months {
-			agg := merged[month]
-			if agg == nil {
-				agg = &MonthlyUsage{Month: month}
-				merged[month] = agg
+			byModel := acc[month]
+			if byModel == nil {
+				byModel = map[string]*ModelUsage{}
+				acc[month] = byModel
 			}
-			agg.Input += mu.Input
-			agg.Output += mu.Output
-			agg.CacheWrite += mu.CacheWrite
-			agg.CacheRead += mu.CacheRead
+			for _, m := range mu.Models {
+				a := byModel[m.Model]
+				if a == nil {
+					a = &ModelUsage{Model: m.Model}
+					byModel[m.Model] = a
+				}
+				a.Input += m.Input
+				a.Output += m.Output
+				a.CacheWrite += m.CacheWrite
+				a.CacheRead += m.CacheRead
+			}
 		}
 	}
 
 	_ = next.Save(cachePath) // best-effort; a save failure must not break the view
 
-	out := make([]MonthlyUsage, 0, len(merged))
-	for _, mu := range merged {
-		out = append(out, *mu)
+	out := make([]MonthlyUsage, 0, len(acc))
+	for month, byModel := range acc {
+		out = append(out, *buildMonthly(month, byModel))
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Month > out[j].Month })
 	return out, nil

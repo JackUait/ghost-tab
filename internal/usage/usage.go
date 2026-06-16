@@ -4,12 +4,13 @@ import (
 	"bufio"
 	"encoding/json"
 	"os"
+	"sort"
 	"time"
 )
 
-// MonthlyUsage holds token counts for a single YYYY-MM bucket.
-type MonthlyUsage struct {
-	Month      string `json:"month"`
+// ModelUsage holds token counts for a single model within a month.
+type ModelUsage struct {
+	Model      string `json:"model"`
 	Input      int64  `json:"input"`
 	Output     int64  `json:"output"`
 	CacheWrite int64  `json:"cache_write"`
@@ -17,8 +18,44 @@ type MonthlyUsage struct {
 }
 
 // Total returns the sum of all token columns.
+func (m ModelUsage) Total() int64 {
+	return m.Input + m.Output + m.CacheWrite + m.CacheRead
+}
+
+// MonthlyUsage holds token counts for a single YYYY-MM bucket. The flat fields are
+// the sum across Models; Models is the per-model breakdown sorted by Total() desc.
+type MonthlyUsage struct {
+	Month      string       `json:"month"`
+	Input      int64        `json:"input"`
+	Output     int64        `json:"output"`
+	CacheWrite int64        `json:"cache_write"`
+	CacheRead  int64        `json:"cache_read"`
+	Models     []ModelUsage `json:"models"`
+}
+
+// Total returns the sum of all token columns.
 func (m MonthlyUsage) Total() int64 {
 	return m.Input + m.Output + m.CacheWrite + m.CacheRead
+}
+
+// buildMonthly assembles a MonthlyUsage from per-model accumulators: it sums the
+// flat fields and returns Models sorted by Total() desc (tie-break by model id).
+func buildMonthly(month string, models map[string]*ModelUsage) *MonthlyUsage {
+	mu := &MonthlyUsage{Month: month}
+	for _, m := range models {
+		mu.Input += m.Input
+		mu.Output += m.Output
+		mu.CacheWrite += m.CacheWrite
+		mu.CacheRead += m.CacheRead
+		mu.Models = append(mu.Models, *m)
+	}
+	sort.Slice(mu.Models, func(i, j int) bool {
+		if ti, tj := mu.Models[i].Total(), mu.Models[j].Total(); ti != tj {
+			return ti > tj
+		}
+		return mu.Models[i].Model < mu.Models[j].Model
+	})
+	return mu
 }
 
 // FileMeta captures the on-disk identity used for incremental caching.
@@ -35,6 +72,7 @@ type transcriptRecord struct {
 	Timestamp string `json:"timestamp"`
 	Message   struct {
 		ID    string `json:"id"`
+		Model string `json:"model"`
 		Usage *struct {
 			Input      int64 `json:"input_tokens"`
 			Output     int64 `json:"output_tokens"`
@@ -44,9 +82,10 @@ type transcriptRecord struct {
 	} `json:"message"`
 }
 
-// ParseFile reads a single .jsonl transcript and aggregates token usage by month.
-// Non-assistant records, records without usage, and malformed lines are skipped.
-// Assistant records are deduped by message.id within this file.
+// ParseFile reads a single .jsonl transcript and aggregates token usage by month
+// and by model. Non-assistant records, records without usage, and malformed lines
+// are skipped. Assistant records are deduped by message.id within this file. A
+// record with no model id is attributed to "unknown".
 func ParseFile(path string) (map[string]*MonthlyUsage, FileMeta, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -60,7 +99,8 @@ func ParseFile(path string) (map[string]*MonthlyUsage, FileMeta, error) {
 	}
 	meta := FileMeta{ModTime: info.ModTime(), Size: info.Size()}
 
-	months := map[string]*MonthlyUsage{}
+	// month -> model -> accumulator
+	acc := map[string]map[string]*ModelUsage{}
 	seen := map[string]bool{}
 
 	sc := bufio.NewScanner(f)
@@ -84,10 +124,19 @@ func ParseFile(path string) (map[string]*MonthlyUsage, FileMeta, error) {
 			seen[id] = true
 		}
 		month := rec.Timestamp[:7]
-		mu := months[month]
+		model := rec.Message.Model
+		if model == "" {
+			model = "unknown"
+		}
+		byModel := acc[month]
+		if byModel == nil {
+			byModel = map[string]*ModelUsage{}
+			acc[month] = byModel
+		}
+		mu := byModel[model]
 		if mu == nil {
-			mu = &MonthlyUsage{Month: month}
-			months[month] = mu
+			mu = &ModelUsage{Model: model}
+			byModel[model] = mu
 		}
 		u := rec.Message.Usage
 		mu.Input += u.Input
@@ -97,6 +146,11 @@ func ParseFile(path string) (map[string]*MonthlyUsage, FileMeta, error) {
 	}
 	if err := sc.Err(); err != nil {
 		return nil, meta, err
+	}
+
+	months := make(map[string]*MonthlyUsage, len(acc))
+	for month, byModel := range acc {
+		months[month] = buildMonthly(month, byModel)
 	}
 	return months, meta, nil
 }

@@ -88,3 +88,42 @@ func TestParseFile_emptyFile(t *testing.T) {
 		t.Errorf("months = %+v, want empty", months)
 	}
 }
+
+func TestParseFile_groupsByModel(t *testing.T) {
+	dir := t.TempDir()
+	content := `{"type":"assistant","timestamp":"2026-05-01T10:00:00Z","message":{"id":"a","model":"claude-opus-4-7","usage":{"input_tokens":10,"output_tokens":1,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}}
+{"type":"assistant","timestamp":"2026-05-02T10:00:00Z","message":{"id":"b","model":"claude-sonnet-4-6","usage":{"input_tokens":5,"output_tokens":2,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}}
+{"type":"assistant","timestamp":"2026-05-03T10:00:00Z","message":{"id":"c","model":"claude-opus-4-7","usage":{"input_tokens":1,"output_tokens":1,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}}
+`
+	p := writeFixture(t, dir, "s.jsonl", content)
+	months, _, err := ParseFile(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	may := months["2026-05"]
+	if may == nil {
+		t.Fatal("no May")
+	}
+	if len(may.Models) != 2 {
+		t.Fatalf("models = %d, want 2", len(may.Models))
+	}
+	if may.Models[0].Model != "claude-opus-4-7" || may.Models[0].Input != 11 {
+		t.Errorf("models[0] = %+v, want opus input 11", may.Models[0])
+	}
+	if may.Models[1].Model != "claude-sonnet-4-6" {
+		t.Errorf("models[1] = %+v, want sonnet", may.Models[1])
+	}
+	if may.Input != 16 {
+		t.Errorf("month input = %d, want 16 (sum)", may.Input)
+	}
+}
+
+func TestParseFile_missingModelIsUnknown(t *testing.T) {
+	dir := t.TempDir()
+	content := `{"type":"assistant","timestamp":"2026-05-01T10:00:00Z","message":{"id":"a","usage":{"input_tokens":10,"output_tokens":0,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}}` + "\n"
+	p := writeFixture(t, dir, "s.jsonl", content)
+	months, _, _ := ParseFile(p)
+	if months["2026-05"].Models[0].Model != "unknown" {
+		t.Errorf("missing model = %q, want unknown", months["2026-05"].Models[0].Model)
+	}
+}
