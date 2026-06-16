@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/jackuait/ghost-tab/internal/usage"
 )
 
@@ -171,6 +172,26 @@ func TestStatsView_showsModelRowsAndCost(t *testing.T) {
 	}
 	if !strings.Contains(view, "$35") {
 		t.Errorf("missing $35 cost (model/bar/total):\n%s", view)
+	}
+}
+
+func TestStatsView_modelRowFitsBoxWidth(t *testing.T) {
+	// A pathologically long model id must be truncated, not overflow the box and
+	// shove the right border / money column out of alignment.
+	months := []usage.MonthlyUsage{{
+		Month: "2026-06", Input: 1000,
+		Models: []usage.ModelUsage{
+			{Model: "claude-some-absurdly-long-experimental-model-id-2026-xyz", Input: 1000},
+		},
+	}}
+	view := NewStatsModelWithData(months).View()
+	for _, line := range strings.Split(view, "\n") {
+		if !strings.Contains(line, "│") {
+			continue
+		}
+		if w := lipgloss.Width(line); w != statsInner+2 {
+			t.Errorf("box line width = %d, want %d (inner+2 borders): %q", w, statsInner+2, line)
+		}
 	}
 }
 

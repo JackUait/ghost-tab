@@ -253,6 +253,9 @@ func (m StatsModel) View() string {
 				connector = "└─ "
 			}
 			label := strings.TrimPrefix(md.Model, "claude-")
+			if len(label) > 31 {
+				label = label[:30] + "…" // keep the row inside the box
+			}
 			usd, priced := usage.ModelCostUSD(md)
 			cost := "—"
 			if priced {
