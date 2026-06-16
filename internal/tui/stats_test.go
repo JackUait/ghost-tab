@@ -94,6 +94,52 @@ func TestStatsView_showsShareOfAllPercent(t *testing.T) {
 	}
 }
 
+func TestStatsView_gaugeHasTrack(t *testing.T) {
+	// Months below 100% of all tokens render an empty track so the gauge reads as
+	// a meter (filled portion + remaining track) rather than a loose bar.
+	view := NewStatsModelWithData(twoMonths()).View()
+	if !strings.Contains(view, "░") {
+		t.Errorf("gauge should render an empty track glyph for sub-100%% months:\n%s", view)
+	}
+}
+
+func TestStatsView_modelRowsUseTreeConnector(t *testing.T) {
+	months := []usage.MonthlyUsage{{
+		Month: "2026-06", Input: 2_000_000,
+		Models: []usage.ModelUsage{
+			{Model: "claude-opus-4-7", Input: 1_000_000},
+			{Model: "claude-sonnet-4-6", Input: 1_000_000},
+		},
+	}}
+	view := NewStatsModelWithData(months).View()
+	if !strings.Contains(view, "├") {
+		t.Errorf("intermediate model rows should use a ├ connector:\n%s", view)
+	}
+	if !strings.Contains(view, "└") {
+		t.Errorf("the last model row should use a └ connector:\n%s", view)
+	}
+}
+
+func TestStatsView_blankLineSeparatesMonths(t *testing.T) {
+	// Each month block is set off by a blank spacer line so blocks don't cluster.
+	view := NewStatsModelWithData(twoMonths()).View()
+	lines := strings.Split(view, "\n")
+	idx := -1
+	for i, l := range lines {
+		if strings.Contains(l, "2026-05") {
+			idx = i
+			break
+		}
+	}
+	if idx <= 0 {
+		t.Fatalf("could not find 2026-05 row:\n%s", view)
+	}
+	inner := strings.ReplaceAll(lines[idx-1], "│", "")
+	if strings.TrimSpace(inner) != "" {
+		t.Errorf("expected a blank spacer line before the second month, got %q", lines[idx-1])
+	}
+}
+
 func TestDollarFmt(t *testing.T) {
 	cases := []struct {
 		in   float64

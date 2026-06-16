@@ -13,7 +13,8 @@ import (
 
 const (
 	statsInner  = 60 // inner content width between the box borders
-	statsBarMax = 40 // bar length (columns) for a month that is 100% of all tokens
+	statsGaugeW = 26 // gauge length (columns) for a month that is 100% of all tokens
+	statsColEnd = 55 // right edge of the Total column; money/totals align here
 	statsWindow = 8  // months visible at once before scrolling
 )
 
@@ -92,25 +93,30 @@ func statsGrandTotal(months []usage.MonthlyUsage) usage.MonthlyUsage {
 	return g
 }
 
-// statsBar renders a proportional bar of fractional block glyphs (eighths for
-// sub-cell resolution), padded to statsBarMax columns so trailing labels align.
-func statsBar(frac float64) string {
+// statsGauge renders a proportional meter: a filled portion (fractional eighths
+// for sub-cell resolution) styled with fill, followed by an empty ░ track styled
+// with track, always statsGaugeW columns wide so it reads as a gauge.
+func statsGauge(frac float64, fill, track lipgloss.Style) string {
 	if frac < 0 {
 		frac = 0
 	}
 	if frac > 1 {
 		frac = 1
 	}
-	units := frac * float64(statsBarMax)
+	units := frac * float64(statsGaugeW)
 	full := int(units)
 	bar := strings.Repeat("█", full)
-	if full < statsBarMax {
+	if full < statsGaugeW {
 		eighths := []string{"", "▏", "▎", "▍", "▌", "▋", "▊", "▉"}
 		if i := int((units - float64(full)) * 8); i > 0 {
 			bar += eighths[i]
 		}
 	}
-	return bar + strings.Repeat(" ", statsBarMax-lipgloss.Width(bar))
+	rest := statsGaugeW - lipgloss.Width(bar)
+	if rest < 0 {
+		rest = 0
+	}
+	return fill.Render(bar) + track.Render(strings.Repeat("░", rest))
 }
 
 // statsCols formats the six aligned columns: month left-justified, the four
@@ -207,7 +213,21 @@ func (m StatsModel) View() string {
 	body = append(body, statsSep(border))
 	var grandCost float64
 	grandAllPriced := true
-	for _, mu := range m.months[m.offset:end] {
+	// rightAlign places a left chunk and a right chunk on one inner row with the
+	// right chunk's edge landing on statsColEnd (under the Total column), so every
+	// gauge cost, model cost and grand total stacks into one clean money column.
+	rightAlign := func(left, right string) string {
+		pad := statsColEnd - lipgloss.Width(left) - lipgloss.Width(right)
+		if pad < 1 {
+			pad = 1
+		}
+		return left + strings.Repeat(" ", pad) + right
+	}
+	for idx, mu := range m.months[m.offset:end] {
+		if idx > 0 {
+			// Blank spacer sets each month block apart so they don't cluster.
+			body = append(body, statsBoxLine("", border))
+		}
 		row := statsCols(mu.Month,
 			humanizeTokens(mu.Input), humanizeTokens(mu.Output),
 			humanizeTokens(mu.CacheWrite), humanizeTokens(mu.CacheRead),
@@ -219,21 +239,29 @@ func (m StatsModel) View() string {
 		if !allPriced {
 			costLabel = "~" + costLabel
 		}
-		barRow := "  " + primary.Render(statsBar(frac)) + " " +
-			primaryBold.Render(costLabel) + faint.Render(fmt.Sprintf(" · %d%%", pct))
+		// Gauge + inline percent on the left, the month's cost aligned right.
+		gaugeLeft := "  " + statsGauge(frac, primary, border) + " " +
+			faint.Render(fmt.Sprintf("%3d%%", pct))
+		barRow := rightAlign(gaugeLeft, primaryBold.Render(costLabel))
 		body = append(body, statsBoxLine(row, border))
 		body = append(body, statsBoxLine(barRow, border))
-		// Per-model breakdown for this month.
-		for _, md := range mu.Models {
+		// Per-model breakdown, drawn as a tree. Tokens align under Cache R and cost
+		// under Total so the breakdown reads as columns, not a clump.
+		for i, md := range mu.Models {
+			connector := "├─ "
+			if i == len(mu.Models)-1 {
+				connector = "└─ "
+			}
 			label := strings.TrimPrefix(md.Model, "claude-")
 			usd, priced := usage.ModelCostUSD(md)
 			cost := "—"
 			if priced {
 				cost = dollarFmt(usd)
 			}
-			mrow := "    " + muted.Render(fmt.Sprintf("%-16s", label)) + " " +
-				muted.Render(fmt.Sprintf("%8s", humanizeTokens(md.Total()))) + "  " +
-				primary.Render(fmt.Sprintf("%8s", cost))
+			mrow := "   " + muted.Render(connector) +
+				muted.Render(fmt.Sprintf("%-31s", label)) +
+				muted.Render(fmt.Sprintf("%8s", humanizeTokens(md.Total()))) + " " +
+				primary.Render(fmt.Sprintf("%9s", cost))
 			body = append(body, statsBoxLine(mrow, border))
 		}
 	}
@@ -256,12 +284,7 @@ func (m StatsModel) View() string {
 		grandCostStr = "~" + grandCostStr
 	}
 	costLeft := "  " + header.Render("Total est. cost")
-	costStr := primaryBold.Render(grandCostStr)
-	costPad := (statsInner - 5) - lipgloss.Width(costLeft) - lipgloss.Width(costStr)
-	if costPad < 1 {
-		costPad = 1
-	}
-	body = append(body, statsBoxLine(costLeft+strings.Repeat(" ", costPad)+costStr, border))
+	body = append(body, statsBoxLine(rightAlign(costLeft, primaryBold.Render(grandCostStr)), border))
 	body = append(body, statsBoxLine("", border))
 	body = append(body, statsBoxLine("  "+hint, border))
 	return m.center(statsFrame(body))
