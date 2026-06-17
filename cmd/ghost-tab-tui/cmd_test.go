@@ -44,6 +44,7 @@ func TestRootCmd_SubcommandRegistered(t *testing.T) {
 		"multi-select-ai-tool",
 		"select-branch",
 		"select-terminal",
+		"claude-config-menu",
 	}
 
 	for _, name := range subcommands {
@@ -390,5 +391,22 @@ func TestSelectProjectCmd_ProjectsFileFlagRequired(t *testing.T) {
 	required, ok := annotations[cobra.BashCompOneRequiredFlag]
 	if !ok || len(required) == 0 || required[0] != "true" {
 		t.Error("Expected --projects-file to be marked as required")
+	}
+}
+
+func TestClaudeConfigMenuCmd_Registered(t *testing.T) {
+	cmd, _, err := rootCmd.Find([]string{"claude-config-menu"})
+	if err != nil {
+		t.Fatalf("subcommand not found: %v", err)
+	}
+	if cmd.Name() != "claude-config-menu" {
+		t.Fatalf("got %q", cmd.Name())
+	}
+}
+
+func TestClaudeConfigMenuCmd_HasConfigsListFlag(t *testing.T) {
+	cmd, _, _ := rootCmd.Find([]string{"claude-config-menu"})
+	if cmd.Flags().Lookup("configs-list") == nil {
+		t.Fatal("expected --configs-list flag")
 	}
 }
