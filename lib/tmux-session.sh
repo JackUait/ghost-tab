@@ -9,13 +9,19 @@ build_ai_launch_cmd() {
   shift 5
   local extra="$*"
 
+  # Claude-only: append --settings when a config is active.
+  local claude_settings=""
+  if [ -n "${GHOST_TAB_CLAUDE_SETTINGS:-}" ]; then
+    claude_settings=" --settings \"${GHOST_TAB_CLAUDE_SETTINGS}\""
+  fi
+
   # Resume mode: relaunch into the most recent (cwd-scoped) conversation.
   if [ "${GHOST_TAB_RESUME:-0}" = "1" ]; then
     case "$tool" in
       codex)    echo "$codex_cmd resume --last" ;;
       copilot)  echo "$copilot_cmd --continue" ;;
       opencode) echo "$opencode_cmd --continue" ;;
-      *)        echo "$claude_cmd -c" ;;
+      *)        echo "$claude_cmd -c${claude_settings}" ;;
     esac
     return 0
   fi
@@ -32,9 +38,9 @@ build_ai_launch_cmd() {
       ;;
     *)
       if [ -n "$extra" ]; then
-        echo "$claude_cmd $extra"
+        echo "$claude_cmd $extra${claude_settings}"
       else
-        echo "$claude_cmd"
+        echo "$claude_cmd${claude_settings}"
       fi
       ;;
   esac
