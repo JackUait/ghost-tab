@@ -97,6 +97,12 @@ type MenuLayout struct {
 	FirstItemRow  int    // Row offset of first item within menu box
 }
 
+// ClaudeConfig is one selectable Claude settings file (display name + filename).
+type ClaudeConfig struct {
+	Name string
+	File string
+}
+
 // actionNames maps action item offsets to their action strings.
 var actionNames = []string{"add-project", "delete-project", "open-once", "plain-terminal"}
 
@@ -219,6 +225,11 @@ type MainMenuModel struct {
 
 	// File path for sound features persistence ({tool}-features.json)
 	soundFile string
+
+	// Claude config selection state
+	claudeConfigs    []ClaudeConfig // Standard is implicit index 0, not stored here
+	selectedConfig   int            // 0 = Standard, 1.. = claudeConfigs[i-1]
+	claudeConfigFile string         // pointer file path for persistence
 
 	// Worktree expand/collapse state (project index -> expanded)
 	expandedWorktrees map[int]bool
@@ -718,6 +729,70 @@ func (m *MainMenuModel) persistSound() {
 	_ = os.WriteFile(m.soundFile, append(data, '\n'), 0644)
 }
 
+// SetClaudeConfigFile sets the pointer file path used to persist the active config.
+func (m *MainMenuModel) SetClaudeConfigFile(path string) { m.claudeConfigFile = path }
+
+// SetClaudeConfigs stores the managed config list (excluding the implicit Standard).
+func (m *MainMenuModel) SetClaudeConfigs(configs []ClaudeConfig) { m.claudeConfigs = configs }
+
+// SetActiveClaudeConfig selects the entry matching filename ("" or no match = Standard).
+func (m *MainMenuModel) SetActiveClaudeConfig(file string) {
+	m.selectedConfig = 0
+	if file == "" {
+		return
+	}
+	for i, c := range m.claudeConfigs {
+		if c.File == file {
+			m.selectedConfig = i + 1
+			return
+		}
+	}
+}
+
+// CurrentClaudeConfigName returns the active config's display name.
+func (m *MainMenuModel) CurrentClaudeConfigName() string {
+	if m.selectedConfig <= 0 || m.selectedConfig > len(m.claudeConfigs) {
+		return "Standard Claude"
+	}
+	return m.claudeConfigs[m.selectedConfig-1].Name
+}
+
+// CurrentClaudeConfigFile returns the active config's filename ("" for Standard).
+func (m *MainMenuModel) CurrentClaudeConfigFile() string {
+	if m.selectedConfig <= 0 || m.selectedConfig > len(m.claudeConfigs) {
+		return ""
+	}
+	return m.claudeConfigs[m.selectedConfig-1].File
+}
+
+// ClaudeConfigVisible reports whether the config control should be shown.
+func (m *MainMenuModel) ClaudeConfigVisible() bool { return m.CurrentAITool() == "claude" }
+
+// CycleClaudeConfig moves through [Standard, configs...] and persists the choice.
+func (m *MainMenuModel) CycleClaudeConfig(direction string) {
+	n := len(m.claudeConfigs) + 1 // +1 for Standard
+	if direction == "prev" {
+		m.selectedConfig = (m.selectedConfig - 1 + n) % n
+	} else {
+		m.selectedConfig = (m.selectedConfig + 1) % n
+	}
+	m.persistClaudeConfig()
+}
+
+// persistClaudeConfig writes the active filename ("" clears) to the pointer file.
+func (m *MainMenuModel) persistClaudeConfig() {
+	if m.claudeConfigFile == "" {
+		return
+	}
+	file := m.CurrentClaudeConfigFile()
+	if file == "" {
+		_ = os.Remove(m.claudeConfigFile)
+		return
+	}
+	_ = os.MkdirAll(filepath.Dir(m.claudeConfigFile), 0755)
+	_ = os.WriteFile(m.claudeConfigFile, []byte(file+"\n"), 0644)
+}
+
 // soundNameForResult returns a pointer to the sound name if changed, nil if unchanged.
 func (m *MainMenuModel) soundNameForResult() *string {
 	if m.soundNameChanged {
@@ -740,6 +815,49 @@ func (m *MainMenuModel) EnterSettings() {
 // ExitSettings returns from settings mode to the main menu.
 func (m *MainMenuModel) ExitSettings() {
 	m.settingsMode = false
+}
+
+// settingsItemCount returns the number of settings rows (5 when the Claude
+// config row is visible, otherwise 4).
+func (m *MainMenuModel) settingsItemCount() int {
+	if m.ClaudeConfigVisible() {
+		return 5
+	}
+	return 4
+}
+
+// LoadClaudeConfigsList parses a name:file list file into ClaudeConfig entries.
+func LoadClaudeConfigsList(path string) []ClaudeConfig {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	var out []ClaudeConfig
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		i := strings.Index(line, ":")
+		if i < 0 {
+			continue
+		}
+		out = append(out, ClaudeConfig{Name: line[:i], File: line[i+1:]})
+	}
+	return out
+}
+
+// ReadActiveClaudeConfig returns the active filename from the pointer file ("" if none/standard).
+func ReadActiveClaudeConfig(path string) string {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	v := strings.TrimSpace(string(data))
+	if v == "standard" {
+		return ""
+	}
+	return v
 }
 
 // CycleGhostDisplay cycles through ghost display modes: animated -> static -> none -> animated.
@@ -1470,14 +1588,16 @@ func (m *MainMenuModel) updateSettings(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.settingsInput = si
 			m.settingsInputErr = nil
 			return m, textinput.Blink
+		case 4:
+			m.CycleClaudeConfig("next")
 		}
 		return m, nil
 	case tea.KeyUp:
-		const n = 4
+		n := m.settingsItemCount()
 		m.settingsSelected = (m.settingsSelected - 1 + n) % n
 		return m, nil
 	case tea.KeyDown:
-		const n = 4
+		n := m.settingsItemCount()
 		m.settingsSelected = (m.settingsSelected + 1) % n
 		return m, nil
 	case tea.KeyRight:
@@ -1488,6 +1608,8 @@ func (m *MainMenuModel) updateSettings(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.CycleTabTitle()
 		case 2:
 			m.CycleSoundName()
+		case 4:
+			m.CycleClaudeConfig("next")
 		}
 		return m, nil
 	case tea.KeyLeft:
@@ -1498,6 +1620,8 @@ func (m *MainMenuModel) updateSettings(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.CycleTabTitle()
 		case 2:
 			m.CycleSoundNameReverse()
+		case 4:
+			m.CycleClaudeConfig("prev")
 		}
 		return m, nil
 	case tea.KeyRunes:
@@ -1505,10 +1629,10 @@ func (m *MainMenuModel) updateSettings(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			r := TranslateRune(msg.Runes[0])
 			switch r {
 			case 'j':
-				m.settingsSelected = (m.settingsSelected + 1) % 4
+				m.settingsSelected = (m.settingsSelected + 1) % m.settingsItemCount()
 				return m, nil
 			case 'k':
-				const n = 4
+				n := m.settingsItemCount()
 				m.settingsSelected = (m.settingsSelected - 1 + n) % n
 				return m, nil
 			}
@@ -2259,6 +2383,19 @@ func (m *MainMenuModel) renderSettingsBox() string {
 		}
 	} else {
 		lines = append(lines, m.renderSettingsItem(3, "Default projects dir", rootState, rootStyle, primaryBoldStyle, leftBorder, rightBorder))
+	}
+
+	// Claude Config item (only for the claude tool)
+	if m.ClaudeConfigVisible() {
+		cfgName := m.CurrentClaudeConfigName()
+		var cfgColor lipgloss.Color
+		if m.CurrentClaudeConfigFile() != "" {
+			cfgColor = lipgloss.Color("114") // green when a config is active
+		} else {
+			cfgColor = lipgloss.Color("241") // gray for Standard
+		}
+		cfgStyle := lipgloss.NewStyle().Foreground(cfgColor)
+		lines = append(lines, m.renderSettingsItem(4, "Claude Config", "["+cfgName+"]", cfgStyle, primaryBoldStyle, leftBorder, rightBorder))
 	}
 
 	// Empty row

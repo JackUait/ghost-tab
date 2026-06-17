@@ -1513,7 +1513,7 @@ func TestMainMenu_SettingsNavigationKeys(t *testing.T) {
 }
 
 func TestMainMenu_SettingsNavigationWraps(t *testing.T) {
-	const numItems = 4
+	const numItems = 5 // claude tool has 5 settings items (includes Claude Config row)
 
 	t.Run("down wraps from last to first", func(t *testing.T) {
 		m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
@@ -5020,8 +5020,22 @@ func TestSettings_ProjectsRootItem_ShowsCurrentValue(t *testing.T) {
 	}
 }
 
-func TestSettings_NavWrapsWithFourItems(t *testing.T) {
+func TestSettings_NavWrapsWithFiveItems(t *testing.T) {
+	// claude tool shows 5 settings items (Ghost Display, Tab Title, Sound, Default projects dir, Claude Config)
 	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
+	m.EnterSettings()
+	// Navigate down 5 times — should wrap back to 0
+	for i := 0; i < 5; i++ {
+		m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	}
+	if m.SettingsSelected() != 0 {
+		t.Errorf("expected settingsSelected=0 after wrapping past 5 items, got %d", m.SettingsSelected())
+	}
+}
+
+func TestSettings_NavWrapsWithFourItems_NonClaude(t *testing.T) {
+	// non-claude tool shows 4 settings items (no Claude Config row)
+	m := tui.NewMainMenu(nil, []string{"codex"}, "codex", "animated")
 	m.EnterSettings()
 	// Navigate down 4 times — should wrap back to 0
 	for i := 0; i < 4; i++ {
