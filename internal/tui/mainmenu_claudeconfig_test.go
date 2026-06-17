@@ -76,3 +76,42 @@ func TestClaudeConfig_visibility_follows_tool(t *testing.T) {
 		t.Fatal("should hide for non-claude")
 	}
 }
+
+func TestSettings_shows_config_row_for_claude(t *testing.T) {
+	m, _ := newClaudeMenu(t)
+	m.OpenSettings()
+	view := m.renderSettingsForTest()
+	if !strings.Contains(view, "Claude Config") {
+		t.Fatalf("settings should show Claude Config row:\n%s", view)
+	}
+	if !strings.Contains(view, "Standard Claude") {
+		t.Fatalf("should show current config name")
+	}
+}
+
+func TestSettings_hides_config_row_for_non_claude(t *testing.T) {
+	m, _ := newClaudeMenu(t)
+	m.CycleAITool("next") // codex
+	m.OpenSettings()
+	view := m.renderSettingsForTest()
+	if strings.Contains(view, "Claude Config") {
+		t.Fatalf("config row must be hidden for non-claude:\n%s", view)
+	}
+}
+
+func TestSettings_nav_count_includes_config_when_visible(t *testing.T) {
+	m, _ := newClaudeMenu(t)
+	if got := m.settingsItemCount(); got != 5 {
+		t.Fatalf("claude should have 5 settings items, got %d", got)
+	}
+	m.CycleAITool("next")
+	if got := m.settingsItemCount(); got != 4 {
+		t.Fatalf("non-claude should have 4 settings items, got %d", got)
+	}
+}
+
+// renderSettingsForTest is a test-only accessor for the settings box render.
+func (m *MainMenuModel) renderSettingsForTest() string { return m.renderSettingsBox() }
+
+// OpenSettings is a test/utility entry point that enters settings mode.
+func (m *MainMenuModel) OpenSettings() { m.settingsMode = true; m.settingsSelected = 0 }

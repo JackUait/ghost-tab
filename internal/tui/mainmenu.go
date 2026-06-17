@@ -817,6 +817,49 @@ func (m *MainMenuModel) ExitSettings() {
 	m.settingsMode = false
 }
 
+// settingsItemCount returns the number of settings rows (5 when the Claude
+// config row is visible, otherwise 4).
+func (m *MainMenuModel) settingsItemCount() int {
+	if m.ClaudeConfigVisible() {
+		return 5
+	}
+	return 4
+}
+
+// LoadClaudeConfigsList parses a name:file list file into ClaudeConfig entries.
+func LoadClaudeConfigsList(path string) []ClaudeConfig {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	var out []ClaudeConfig
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		i := strings.Index(line, ":")
+		if i < 0 {
+			continue
+		}
+		out = append(out, ClaudeConfig{Name: line[:i], File: line[i+1:]})
+	}
+	return out
+}
+
+// ReadActiveClaudeConfig returns the active filename from the pointer file ("" if none/standard).
+func ReadActiveClaudeConfig(path string) string {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	v := strings.TrimSpace(string(data))
+	if v == "standard" {
+		return ""
+	}
+	return v
+}
+
 // CycleGhostDisplay cycles through ghost display modes: animated -> static -> none -> animated.
 func (m *MainMenuModel) CycleGhostDisplay() {
 	switch m.ghostDisplay {
@@ -1545,14 +1588,16 @@ func (m *MainMenuModel) updateSettings(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.settingsInput = si
 			m.settingsInputErr = nil
 			return m, textinput.Blink
+		case 4:
+			m.CycleClaudeConfig("next")
 		}
 		return m, nil
 	case tea.KeyUp:
-		const n = 4
+		n := m.settingsItemCount()
 		m.settingsSelected = (m.settingsSelected - 1 + n) % n
 		return m, nil
 	case tea.KeyDown:
-		const n = 4
+		n := m.settingsItemCount()
 		m.settingsSelected = (m.settingsSelected + 1) % n
 		return m, nil
 	case tea.KeyRight:
@@ -1563,6 +1608,8 @@ func (m *MainMenuModel) updateSettings(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.CycleTabTitle()
 		case 2:
 			m.CycleSoundName()
+		case 4:
+			m.CycleClaudeConfig("next")
 		}
 		return m, nil
 	case tea.KeyLeft:
@@ -1573,6 +1620,8 @@ func (m *MainMenuModel) updateSettings(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.CycleTabTitle()
 		case 2:
 			m.CycleSoundNameReverse()
+		case 4:
+			m.CycleClaudeConfig("prev")
 		}
 		return m, nil
 	case tea.KeyRunes:
@@ -1580,10 +1629,10 @@ func (m *MainMenuModel) updateSettings(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			r := TranslateRune(msg.Runes[0])
 			switch r {
 			case 'j':
-				m.settingsSelected = (m.settingsSelected + 1) % 4
+				m.settingsSelected = (m.settingsSelected + 1) % m.settingsItemCount()
 				return m, nil
 			case 'k':
-				const n = 4
+				n := m.settingsItemCount()
 				m.settingsSelected = (m.settingsSelected - 1 + n) % n
 				return m, nil
 			}
@@ -2334,6 +2383,19 @@ func (m *MainMenuModel) renderSettingsBox() string {
 		}
 	} else {
 		lines = append(lines, m.renderSettingsItem(3, "Default projects dir", rootState, rootStyle, primaryBoldStyle, leftBorder, rightBorder))
+	}
+
+	// Claude Config item (only for the claude tool)
+	if m.ClaudeConfigVisible() {
+		cfgName := m.CurrentClaudeConfigName()
+		var cfgColor lipgloss.Color
+		if m.CurrentClaudeConfigFile() != "" {
+			cfgColor = lipgloss.Color("114") // green when a config is active
+		} else {
+			cfgColor = lipgloss.Color("241") // gray for Standard
+		}
+		cfgStyle := lipgloss.NewStyle().Foreground(cfgColor)
+		lines = append(lines, m.renderSettingsItem(4, "Claude Config", "["+cfgName+"]", cfgStyle, primaryBoldStyle, leftBorder, rightBorder))
 	}
 
 	// Empty row

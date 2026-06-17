@@ -57,6 +57,8 @@ select_project_interactive() {
   if [[ -n "$sound_name" ]]; then
     cmd_args+=("--sound-name" "$sound_name")
   fi
+  cmd_args+=("--claude-config-file" "$gt_config_dir/claude-config")
+  cmd_args+=("--claude-configs-list" "$gt_config_dir/claude-configs.list")
   if [ -n "${_update_version:-}" ]; then
     cmd_args+=("--update-version" "$_update_version")
   fi
