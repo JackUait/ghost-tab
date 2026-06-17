@@ -111,3 +111,50 @@ func TestRenameClaudeConfig_changes_name_only(t *testing.T) {
 	assertContains(t, string(listData), "Day Job:work.json")
 	assertNotContains(t, string(listData), "Work:work.json")
 }
+
+func TestAddClaudeConfig_resolves_collisions(t *testing.T) {
+	dir := t.TempDir()
+	cfgDir := filepath.Join(dir, "claude-configs")
+	list := filepath.Join(dir, "list")
+
+	// First add
+	out1, code1 := runBashFunc(t, "lib/claude-configs.sh", "add_claude_config",
+		[]string{list, cfgDir, "My Work"}, nil)
+	assertExitCode(t, code1, 0)
+	if strings.TrimSpace(out1) != "my-work.json" {
+		t.Fatalf("first add: got %q, want my-work.json", strings.TrimSpace(out1))
+	}
+
+	// Second add — same name, collision
+	out2, code2 := runBashFunc(t, "lib/claude-configs.sh", "add_claude_config",
+		[]string{list, cfgDir, "My Work"}, nil)
+	assertExitCode(t, code2, 0)
+	if strings.TrimSpace(out2) != "my-work-2.json" {
+		t.Fatalf("second add: got %q, want my-work-2.json", strings.TrimSpace(out2))
+	}
+
+	// Both files must exist
+	if _, err := os.Stat(filepath.Join(cfgDir, "my-work.json")); err != nil {
+		t.Fatal("my-work.json missing")
+	}
+	if _, err := os.Stat(filepath.Join(cfgDir, "my-work-2.json")); err != nil {
+		t.Fatal("my-work-2.json missing")
+	}
+}
+
+func TestRenameClaudeConfig_missing_file_returns_error(t *testing.T) {
+	dir := t.TempDir()
+	list := filepath.Join(dir, "list")
+	writeTempFile(t, dir, "list", "Work:work.json\n")
+
+	_, code := runBashFunc(t, "lib/claude-configs.sh", "rename_claude_config",
+		[]string{list, "nonexistent.json", "New Name"}, nil)
+	if code == 0 {
+		t.Fatal("expected non-zero exit for missing file, got 0")
+	}
+
+	// List unchanged
+	listData, _ := os.ReadFile(list)
+	assertContains(t, string(listData), "Work:work.json")
+	assertNotContains(t, string(listData), "New Name")
+}

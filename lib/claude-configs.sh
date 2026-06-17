@@ -77,19 +77,25 @@ add_claude_config() {
 }
 
 # rename_claude_config <list_file> <file> <new_name> — rewrites the matching line's name.
+# Returns 1 if no line in the list matches <file>.
 rename_claude_config() {
-  local list_file="$1" file="$2" new_name="$3" line name f tmp
+  local list_file="$1" file="$2" new_name="$3" line f tmp found
   [ -f "$list_file" ] || return 0
+  found=0
   tmp="$(mktemp)"
   while IFS= read -r line; do
-    name="${line%%:*}"
     f="${line#*:}"
     if [ "$f" = "$file" ]; then
+      found=1
       printf '%s:%s\n' "$new_name" "$file" >> "$tmp"
     else
       printf '%s\n' "$line" >> "$tmp"
     fi
   done < "$list_file"
+  if [ "$found" -eq 0 ]; then
+    rm -f "$tmp"
+    return 1
+  fi
   mv "$tmp" "$list_file"
 }
 
@@ -105,7 +111,10 @@ delete_claude_config() {
       [ "$f" = "$file" ] && continue
       printf '%s\n' "$line" >> "$tmp"
     done < "$list_file"
-    mv "$tmp" "$list_file"
+    if ! mv "$tmp" "$list_file"; then
+      rm -f "$tmp"
+      return 1
+    fi
   fi
   active="$(get_active_claude_config "$pointer_file")"
   [ "$active" = "$file" ] && set_active_claude_config "$pointer_file" ""
