@@ -97,6 +97,12 @@ type MenuLayout struct {
 	FirstItemRow  int    // Row offset of first item within menu box
 }
 
+// ClaudeConfig is one selectable Claude settings file (display name + filename).
+type ClaudeConfig struct {
+	Name string
+	File string
+}
+
 // actionNames maps action item offsets to their action strings.
 var actionNames = []string{"add-project", "delete-project", "open-once", "plain-terminal"}
 
@@ -219,6 +225,11 @@ type MainMenuModel struct {
 
 	// File path for sound features persistence ({tool}-features.json)
 	soundFile string
+
+	// Claude config selection state
+	claudeConfigs    []ClaudeConfig // Standard is implicit index 0, not stored here
+	selectedConfig   int            // 0 = Standard, 1.. = claudeConfigs[i-1]
+	claudeConfigFile string         // pointer file path for persistence
 
 	// Worktree expand/collapse state (project index -> expanded)
 	expandedWorktrees map[int]bool
@@ -716,6 +727,70 @@ func (m *MainMenuModel) persistSound() {
 
 	data, _ := json.Marshal(existing)
 	_ = os.WriteFile(m.soundFile, append(data, '\n'), 0644)
+}
+
+// SetClaudeConfigFile sets the pointer file path used to persist the active config.
+func (m *MainMenuModel) SetClaudeConfigFile(path string) { m.claudeConfigFile = path }
+
+// SetClaudeConfigs stores the managed config list (excluding the implicit Standard).
+func (m *MainMenuModel) SetClaudeConfigs(configs []ClaudeConfig) { m.claudeConfigs = configs }
+
+// SetActiveClaudeConfig selects the entry matching filename ("" or no match = Standard).
+func (m *MainMenuModel) SetActiveClaudeConfig(file string) {
+	m.selectedConfig = 0
+	if file == "" {
+		return
+	}
+	for i, c := range m.claudeConfigs {
+		if c.File == file {
+			m.selectedConfig = i + 1
+			return
+		}
+	}
+}
+
+// CurrentClaudeConfigName returns the active config's display name.
+func (m *MainMenuModel) CurrentClaudeConfigName() string {
+	if m.selectedConfig <= 0 || m.selectedConfig > len(m.claudeConfigs) {
+		return "Standard Claude"
+	}
+	return m.claudeConfigs[m.selectedConfig-1].Name
+}
+
+// CurrentClaudeConfigFile returns the active config's filename ("" for Standard).
+func (m *MainMenuModel) CurrentClaudeConfigFile() string {
+	if m.selectedConfig <= 0 || m.selectedConfig > len(m.claudeConfigs) {
+		return ""
+	}
+	return m.claudeConfigs[m.selectedConfig-1].File
+}
+
+// ClaudeConfigVisible reports whether the config control should be shown.
+func (m *MainMenuModel) ClaudeConfigVisible() bool { return m.CurrentAITool() == "claude" }
+
+// CycleClaudeConfig moves through [Standard, configs...] and persists the choice.
+func (m *MainMenuModel) CycleClaudeConfig(direction string) {
+	n := len(m.claudeConfigs) + 1 // +1 for Standard
+	if direction == "prev" {
+		m.selectedConfig = (m.selectedConfig - 1 + n) % n
+	} else {
+		m.selectedConfig = (m.selectedConfig + 1) % n
+	}
+	m.persistClaudeConfig()
+}
+
+// persistClaudeConfig writes the active filename ("" clears) to the pointer file.
+func (m *MainMenuModel) persistClaudeConfig() {
+	if m.claudeConfigFile == "" {
+		return
+	}
+	file := m.CurrentClaudeConfigFile()
+	if file == "" {
+		_ = os.Remove(m.claudeConfigFile)
+		return
+	}
+	_ = os.MkdirAll(filepath.Dir(m.claudeConfigFile), 0755)
+	_ = os.WriteFile(m.claudeConfigFile, []byte(file+"\n"), 0644)
 }
 
 // soundNameForResult returns a pointer to the sound name if changed, nil if unchanged.
