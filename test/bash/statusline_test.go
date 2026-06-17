@@ -161,11 +161,12 @@ func getBaselineSHA(t *testing.T, repoDir string) string {
 	return strings.TrimSpace(string(out))
 }
 
-func TestStatusline_statusline_command_shows_additions_green_and_deletions_red(t *testing.T) {
+func TestStatusline_statusline_command_omits_diff_counts_even_with_baseline_set(t *testing.T) {
 	repoDir := statuslineCmdSetupGitRepo(t)
 	baselineSHA := getBaselineSHA(t, repoDir)
+	repoBasename := filepath.Base(repoDir)
 
-	// Add 3 lines
+	// Change the working tree so a diff would exist if counts were rendered.
 	f, err := os.OpenFile(filepath.Join(repoDir, "file.txt"), os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
 		t.Fatalf("open file: %v", err)
@@ -188,96 +189,9 @@ func TestStatusline_statusline_command_shows_additions_green_and_deletions_red(t
 	env := buildEnv(t, nil, "GHOST_TAB_BASELINE_FILE="+baselineFile)
 	out, code := runBashSnippet(t, script, env)
 	assertExitCode(t, code, 0)
-	assertContains(t, out, "+3")
-	assertContains(t, out, "-0")
-}
-
-func TestStatusline_statusline_command_shows_deletions_in_red(t *testing.T) {
-	repoDir := statuslineCmdSetupGitRepo(t)
-	baselineSHA := getBaselineSHA(t, repoDir)
-
-	// Delete the file content (1 line removed)
-	if err := os.WriteFile(filepath.Join(repoDir, "file.txt"), []byte(""), 0644); err != nil {
-		t.Fatalf("truncate file: %v", err)
-	}
-
-	baselineFile := filepath.Join(t.TempDir(), "baseline")
-	if err := os.WriteFile(baselineFile, []byte(baselineSHA+"\n"), 0644); err != nil {
-		t.Fatalf("write baseline: %v", err)
-	}
-
-	root := projectRoot(t)
-	cmdPath := filepath.Join(root, "templates", "statusline-command.sh")
-	stdinData := fmt.Sprintf(`{"current_dir":"%s"}`, repoDir)
-	script := fmt.Sprintf(`echo '%s' | bash '%s'`, stdinData, cmdPath)
-
-	env := buildEnv(t, nil, "GHOST_TAB_BASELINE_FILE="+baselineFile)
-	out, code := runBashSnippet(t, script, env)
-	assertExitCode(t, code, 0)
-	assertContains(t, out, "+0")
-	assertContains(t, out, "-1")
-}
-
-func TestStatusline_statusline_command_tracks_committed_changes_since_baseline(t *testing.T) {
-	repoDir := statuslineCmdSetupGitRepo(t)
-	baselineSHA := getBaselineSHA(t, repoDir)
-
-	// Make a committed change: add 2 lines
-	f, err := os.OpenFile(filepath.Join(repoDir, "file.txt"), os.O_APPEND|os.O_WRONLY, 0644)
-	if err != nil {
-		t.Fatalf("open file: %v", err)
-	}
-	if _, err := f.WriteString("new1\nnew2\n"); err != nil {
-		t.Fatalf("write file: %v", err)
-	}
-	f.Close()
-
-	for _, c := range [][]string{
-		{"git", "-C", repoDir, "add", "file.txt"},
-		{"git", "-C", repoDir, "commit", "-q", "-m", "add lines"},
-	} {
-		cmd := exec.Command(c[0], c[1:]...)
-		if out, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("git commit failed: %v\n%s", err, out)
-		}
-	}
-
-	baselineFile := filepath.Join(t.TempDir(), "baseline")
-	if err := os.WriteFile(baselineFile, []byte(baselineSHA+"\n"), 0644); err != nil {
-		t.Fatalf("write baseline: %v", err)
-	}
-
-	root := projectRoot(t)
-	cmdPath := filepath.Join(root, "templates", "statusline-command.sh")
-	stdinData := fmt.Sprintf(`{"current_dir":"%s"}`, repoDir)
-	script := fmt.Sprintf(`echo '%s' | bash '%s'`, stdinData, cmdPath)
-
-	env := buildEnv(t, nil, "GHOST_TAB_BASELINE_FILE="+baselineFile)
-	out, code := runBashSnippet(t, script, env)
-	assertExitCode(t, code, 0)
-	assertContains(t, out, "+2")
-	assertContains(t, out, "-0")
-}
-
-func TestStatusline_statusline_command_shows_zero_diff_when_no_changes(t *testing.T) {
-	repoDir := statuslineCmdSetupGitRepo(t)
-	baselineSHA := getBaselineSHA(t, repoDir)
-
-	baselineFile := filepath.Join(t.TempDir(), "baseline")
-	if err := os.WriteFile(baselineFile, []byte(baselineSHA+"\n"), 0644); err != nil {
-		t.Fatalf("write baseline: %v", err)
-	}
-
-	root := projectRoot(t)
-	cmdPath := filepath.Join(root, "templates", "statusline-command.sh")
-	stdinData := fmt.Sprintf(`{"current_dir":"%s"}`, repoDir)
-	script := fmt.Sprintf(`echo '%s' | bash '%s'`, stdinData, cmdPath)
-
-	env := buildEnv(t, nil, "GHOST_TAB_BASELINE_FILE="+baselineFile)
-	out, code := runBashSnippet(t, script, env)
-	assertExitCode(t, code, 0)
-	assertContains(t, out, "+0")
-	assertContains(t, out, "-0")
+	assertContains(t, out, repoBasename)
+	assertNotContains(t, out, "+3")
+	assertNotContains(t, out, "/ -")
 }
 
 func TestStatusline_statusline_command_falls_back_to_repo_branch_only_without_baseline(t *testing.T) {

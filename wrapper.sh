@@ -151,12 +151,6 @@ export PROJECT_DIR
 export PROJECT_NAME="${PROJECT_NAME:-$(basename "$PROJECT_DIR")}"
 SESSION_NAME="dev-${PROJECT_NAME}-$$"
 
-# Capture session baseline for line diff tracking
-GHOST_TAB_BASELINE_FILE="/tmp/ghost-tab-baseline-${SESSION_NAME}"
-if git rev-parse --git-dir > /dev/null 2>&1; then
-  git rev-parse HEAD > "$GHOST_TAB_BASELINE_FILE" 2>/dev/null
-fi
-
 # Set terminal/tab title based on tab_title setting
 _tab_title_setting="full"
 _settings_file="${XDG_CONFIG_HOME:-$HOME/.config}/ghost-tab/settings"
@@ -214,7 +208,6 @@ cleanup() {
     fi
   fi
   cleanup_tmux_session "$SESSION_NAME" "$WATCHER_PID" "$TMUX_CMD"
-  rm -f "$GHOST_TAB_BASELINE_FILE"
 }
 trap cleanup EXIT HUP TERM INT
 
@@ -248,7 +241,7 @@ GHOST_TAB_SNAPSHOT="$SHARE_DIR/last-session"
 ) &
 HEARTBEAT_PID=$!
 
-"$TMUX_CMD" new-session -s "$SESSION_NAME" -e "PATH=$PATH" -e "GHOST_TAB_BASELINE_FILE=$GHOST_TAB_BASELINE_FILE" -e "GHOST_TAB_MARKER_FILE=$GHOST_TAB_MARKER_FILE" -e "GHOST_TAB=1" -e "GHOST_TAB_BOOT=$GHOST_TAB_BOOT_ID" -e "GHOST_TAB_PROJECT=$PROJECT_NAME" -e "GHOST_TAB_PATH=$PROJECT_DIR" -e "GHOST_TAB_TOOL=$SELECTED_AI_TOOL" -e "GHOST_TAB_TERMINAL=$GHOST_TAB_TERMINAL" -c "$PROJECT_DIR" \
+"$TMUX_CMD" new-session -s "$SESSION_NAME" -e "PATH=$PATH" -e "GHOST_TAB_MARKER_FILE=$GHOST_TAB_MARKER_FILE" -e "GHOST_TAB=1" -e "GHOST_TAB_BOOT=$GHOST_TAB_BOOT_ID" -e "GHOST_TAB_PROJECT=$PROJECT_NAME" -e "GHOST_TAB_PATH=$PROJECT_DIR" -e "GHOST_TAB_TOOL=$SELECTED_AI_TOOL" -e "GHOST_TAB_TERMINAL=$GHOST_TAB_TERMINAL" -c "$PROJECT_DIR" \
   "$LAZYGIT_CMD; exec bash" \; \
   set-option status-left " ⬡ ${PROJECT_NAME} " \; \
   set-option status-left-style "fg=white,bg=colour236,bold" \; \
