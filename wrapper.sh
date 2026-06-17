@@ -39,7 +39,7 @@ if [ ! -d "$_WRAPPER_DIR/lib" ]; then
   exit 1
 fi
 
-_gt_libs=(ai-tools projects process input tui menu-tui project-actions tmux-session settings-json notification-setup tab-title-watcher terminals/registry terminals/adapter session-restore)
+_gt_libs=(ai-tools projects process input tui menu-tui project-actions tmux-session settings-json notification-setup tab-title-watcher terminals/registry terminals/adapter session-restore claude-configs)
 for _gt_lib in "${_gt_libs[@]}"; do
   if [ ! -f "$_WRAPPER_DIR/lib/${_gt_lib}.sh" ]; then
     printf '\033[31mError:\033[0m Missing library %s/lib/%s.sh\n' "$_WRAPPER_DIR" "$_gt_lib" >&2
@@ -214,6 +214,14 @@ trap cleanup EXIT HUP TERM INT
 if [ "$RESTORE_MODE" -eq 1 ]; then
   export GHOST_TAB_RESUME=1
 fi
+
+# Resolve active Claude config (settings file) and export for build_ai_launch_cmd.
+GHOST_TAB_CLAUDE_SETTINGS=""
+if [ "$SELECTED_AI_TOOL" = "claude" ]; then
+  _gt_cfg_root="${XDG_CONFIG_HOME:-$HOME/.config}/ghost-tab"
+  GHOST_TAB_CLAUDE_SETTINGS="$(resolve_claude_config_path "$_gt_cfg_root/claude-configs" "$_gt_cfg_root/claude-config")"
+fi
+export GHOST_TAB_CLAUDE_SETTINGS
 
 # Build the AI tool launch command
 case "$SELECTED_AI_TOOL" in
