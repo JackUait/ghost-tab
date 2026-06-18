@@ -20,8 +20,8 @@ func TestGhostForTool_AllTools(t *testing.T) {
 
 		t.Run(tool+"_sleeping", func(t *testing.T) {
 			lines := tui.GhostForTool(tool, true)
-			if len(lines) != 15 {
-				t.Errorf("GhostForTool(%q, true): expected 15 lines, got %d", tool, len(lines))
+			if len(lines) != 16 {
+				t.Errorf("GhostForTool(%q, true): expected 16 lines (with blush), got %d", tool, len(lines))
 			}
 		})
 	}

@@ -39,7 +39,7 @@ if [ ! -d "$_WRAPPER_DIR/lib" ]; then
   exit 1
 fi
 
-_gt_libs=(ai-tools projects process input tui menu-tui project-actions tmux-session settings-json notification-setup tab-title-watcher terminals/registry terminals/adapter session-restore claude-configs)
+_gt_libs=(ai-tools projects process input tui menu-tui project-actions tmux-session settings-json notification-setup tab-title-watcher terminals/registry terminals/adapter session-restore claude-configs compact-view)
 for _gt_lib in "${_gt_libs[@]}"; do
   if [ ! -f "$_WRAPPER_DIR/lib/${_gt_lib}.sh" ]; then
     printf '\033[31mError:\033[0m Missing library %s/lib/%s.sh\n' "$_WRAPPER_DIR" "$_gt_lib" >&2
@@ -149,13 +149,24 @@ export PROJECT_DIR
 export PROJECT_NAME="${PROJECT_NAME:-$(basename "$PROJECT_DIR")}"
 SESSION_NAME="dev-${PROJECT_NAME}-$$"
 
+# Read settings
+_settings_file="${XDG_CONFIG_HOME:-$HOME/.config}/ghost-tab/settings"
+
 # Set terminal/tab title based on tab_title setting
 _tab_title_setting="full"
-_settings_file="${XDG_CONFIG_HOME:-$HOME/.config}/ghost-tab/settings"
 if [ -f "$_settings_file" ]; then
   _saved_tab_title=$(grep '^tab_title=' "$_settings_file" 2>/dev/null | cut -d= -f2)
   if [ -n "$_saved_tab_title" ]; then
     _tab_title_setting="$_saved_tab_title"
+  fi
+fi
+
+# Read panel mode setting
+_panel_mode="lazygit"
+if [ -f "$_settings_file" ]; then
+  _saved_panel_mode=$(grep '^panel_mode=' "$_settings_file" 2>/dev/null | cut -d= -f2)
+  if [ -n "$_saved_panel_mode" ]; then
+    _panel_mode="$_saved_panel_mode"
   fi
 fi
 if [ "$_tab_title_setting" = "full" ]; then
@@ -247,15 +258,24 @@ GHOST_TAB_SNAPSHOT="$SHARE_DIR/last-session"
 ) &
 HEARTBEAT_PID=$!
 
+# Build pane 0 command: lazygit or compact view
+if [ "$_panel_mode" = "compact" ]; then
+  _pane0_cmd="source \"$_WRAPPER_DIR/lib/compact-view.sh\" && compact_view \"$PROJECT_DIR\"; exec bash"
+  _pane0_pct=75
+else
+  _pane0_cmd="$LAZYGIT_CMD; exec bash"
+  _pane0_pct=50
+fi
+
 "$TMUX_CMD" new-session -s "$SESSION_NAME" -e "PATH=$PATH" -e "GHOST_TAB_MARKER_FILE=$GHOST_TAB_MARKER_FILE" -e "GHOST_TAB=1" -e "GHOST_TAB_BOOT=$GHOST_TAB_BOOT_ID" -e "GHOST_TAB_PROJECT=$PROJECT_NAME" -e "GHOST_TAB_PATH=$PROJECT_DIR" -e "GHOST_TAB_TOOL=$SELECTED_AI_TOOL" -e "GHOST_TAB_TERMINAL=$GHOST_TAB_TERMINAL" -c "$PROJECT_DIR" \
-  "$LAZYGIT_CMD; exec bash" \; \
+  "$_pane0_cmd" \; \
   set-option status-left " ⬡ ${PROJECT_NAME} " \; \
   set-option status-left-style "fg=white,bg=colour236,bold" \; \
   set-option status-style "bg=colour235" \; \
   set-option status-right "" \; \
   set-option set-titles off \; \
   set-option exit-unattached on \; \
-  split-window -h -p 50 -c "$PROJECT_DIR" \
+  split-window -h -p "$_pane0_pct" -c "$PROJECT_DIR" \
   "$AI_LAUNCH_CMD; exec bash" \; \
   select-pane -t 0 \; \
   split-window -v -p 30 -c "$PROJECT_DIR" \; \

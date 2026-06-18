@@ -89,6 +89,7 @@ type MainMenuResult struct {
 	GhostDisplay string  `json:"ghost_display,omitempty"`
 	TabTitle     string  `json:"tab_title,omitempty"`
 	SoundName    *string `json:"sound_name,omitempty"`
+	PanelMode    string  `json:"panel_mode,omitempty"`
 }
 
 // MenuTab identifies which top-level tab is active.
@@ -198,6 +199,9 @@ type MainMenuModel struct {
 	soundName           string // "" means Off
 	initialSoundName    string
 	soundNameChanged    bool
+	panelMode           string // "lazygit" or "compact"
+	initialPanelMode    string
+	panelModeChanged    bool
 	zzz                 *ZzzAnimation
 	centerOffsetY       int
 
@@ -307,6 +311,8 @@ func NewMainMenu(projects []models.Project, aiTools []string, currentAI string, 
 		selectedItem:              0,
 		ghostDisplay:              ghostDisplay,
 		initialGhostDisplay:       ghostDisplay,
+		panelMode:                 "lazygit",
+		initialPanelMode:          "lazygit",
 		theme:                     ThemeForTool(currentAI),
 		zzz:                       NewZzzAnimation(),
 		expandedWorktrees:         make(map[int]bool),
@@ -668,6 +674,33 @@ func (m *MainMenuModel) SetTabTitle(mode string) {
 	m.initialTabTitle = mode
 }
 
+// PanelMode returns the panel mode ("lazygit" or "compact").
+func (m *MainMenuModel) PanelMode() string {
+	return m.panelMode
+}
+
+// SetPanelMode sets the panel mode and records the initial value.
+func (m *MainMenuModel) SetPanelMode(mode string) {
+	m.panelMode = mode
+	m.initialPanelMode = mode
+}
+
+// CyclePanelMode cycles panel mode: lazygit -> compact -> lazygit.
+func (m *MainMenuModel) CyclePanelMode() {
+	if m.panelMode == "lazygit" {
+		m.panelMode = "compact"
+	} else {
+		m.panelMode = "lazygit"
+	}
+	m.panelModeChanged = m.panelMode != m.initialPanelMode
+	m.persistSetting("panel_mode", m.panelMode)
+}
+
+// CyclePanelModeReverse cycles panel mode in reverse: lazygit -> compact -> lazygit.
+func (m *MainMenuModel) CyclePanelModeReverse() {
+	m.CyclePanelMode() // binary toggle — same either direction
+}
+
 // CycleTabTitle cycles between "full" and "project".
 func (m *MainMenuModel) CycleTabTitle() {
 	if m.tabTitle == "full" {
@@ -943,13 +976,13 @@ func (m *MainMenuModel) CycleTab(direction string) {
 	}
 }
 
-// settingsItemCount returns the number of settings rows (5 when the Claude
-// config row is visible, otherwise 4).
+// settingsItemCount returns the number of settings rows (6 when the Claude
+// config row is visible, otherwise 5).
 func (m *MainMenuModel) settingsItemCount() int {
 	if m.ClaudeConfigVisible() {
-		return 5
+		return 6
 	}
-	return 4
+	return 5
 }
 
 // LoadClaudeConfigsList parses a name:file list file into ClaudeConfig entries.
@@ -1332,6 +1365,15 @@ func (m *MainMenuModel) tabTitleForResult() string {
 	return ""
 }
 
+// panelModeForResult returns the panel mode value to include in the result,
+// or empty string if unchanged.
+func (m *MainMenuModel) panelModeForResult() string {
+	if m.panelModeChanged {
+		return m.panelMode
+	}
+	return ""
+}
+
 // selectCurrent produces a result for the currently selected item.
 // Returns a tea.Cmd if the item requires a navigation action (e.g. push a screen).
 func (m *MainMenuModel) selectCurrent() tea.Cmd {
@@ -1351,6 +1393,7 @@ func (m *MainMenuModel) selectCurrent() tea.Cmd {
 			GhostDisplay: m.ghostDisplayForResult(),
 			TabTitle:     m.tabTitleForResult(),
 			SoundName:    m.soundNameForResult(),
+			PanelMode:    m.panelModeForResult(),
 		}
 	case "worktree":
 		m.result = &MainMenuResult{
@@ -1361,6 +1404,7 @@ func (m *MainMenuModel) selectCurrent() tea.Cmd {
 			GhostDisplay: m.ghostDisplayForResult(),
 			TabTitle:     m.tabTitleForResult(),
 			SoundName:    m.soundNameForResult(),
+			PanelMode:    m.panelModeForResult(),
 		}
 	case "add-worktree":
 		// Store the project index so BranchPickerDoneMsg can reference it.
@@ -1392,6 +1436,7 @@ func (m *MainMenuModel) setActionResult(action string) {
 		GhostDisplay: m.ghostDisplayForResult(),
 		TabTitle:     m.tabTitleForResult(),
 		SoundName:    m.soundNameForResult(),
+		PanelMode:    m.panelModeForResult(),
 	}
 	m.quitting = true
 }
@@ -1926,6 +1971,8 @@ func (m *MainMenuModel) settingsEnter() (tea.Model, tea.Cmd) {
 	case 2:
 		m.CycleSoundName()
 	case 3:
+		m.CyclePanelMode()
+	case 4:
 		// Open text input for projects root
 		m.settingsInputMode = true
 		si := textinput.New()
@@ -1936,7 +1983,7 @@ func (m *MainMenuModel) settingsEnter() (tea.Model, tea.Cmd) {
 		m.settingsInput = si
 		m.settingsInputErr = nil
 		return m, textinput.Blink
-	case 4:
+	case 5:
 		if m.selectedConfig > 0 {
 			m.openModelMap()
 		}
@@ -1953,7 +2000,9 @@ func (m *MainMenuModel) settingsValueRight() {
 		m.CycleTabTitle()
 	case 2:
 		m.CycleSoundName()
-	case 4:
+	case 3:
+		m.CyclePanelMode()
+	case 5:
 		m.CycleClaudeConfig("next")
 	}
 }
@@ -1967,7 +2016,9 @@ func (m *MainMenuModel) settingsValueLeft() {
 		m.CycleTabTitle()
 	case 2:
 		m.CycleSoundNameReverse()
-	case 4:
+	case 3:
+		m.CyclePanelModeReverse()
+	case 5:
 		m.CycleClaudeConfig("prev")
 	}
 }
@@ -2243,6 +2294,7 @@ func (m *MainMenuModel) submitInputMode() (tea.Model, tea.Cmd) {
 			GhostDisplay: m.ghostDisplayForResult(),
 			TabTitle:     m.tabTitleForResult(),
 			SoundName:    m.soundNameForResult(),
+			PanelMode:    m.panelModeForResult(),
 		}
 		m.quitting = true
 		return m, tea.Quit
@@ -2583,6 +2635,18 @@ func tabTitleLabel(mode string) string {
 	}
 }
 
+// panelModeLabel returns a capitalized display label for the panel mode.
+func panelModeLabel(mode string) string {
+	switch mode {
+	case "lazygit":
+		return "lazygit"
+	case "compact":
+		return "Compact"
+	default:
+		return mode
+	}
+}
+
 
 const menuInnerWidth = 56
 const menuPadding = 2
@@ -2619,9 +2683,12 @@ func (m *MainMenuModel) availableMenuHeight() int {
 	}
 	layout := m.CalculateLayout(m.width, m.height)
 	if layout.GhostPosition == "above" && m.ghostDisplay != "none" {
-		// Ghost (15) + gap (1) = 16. Animated ghost adds a bob row.
+		// Ghost (15 awake, 16 sleeping) + gap (1). Animated ghost adds a bob row.
 		// Sleeping stacks a 3-row Zzz frame above the ghost.
 		reserve := 16
+		if m.ghostSleeping {
+			reserve = 17 // 16 ghost lines + 1 gap
+		}
 		if m.ghostDisplay == "animated" {
 			reserve = 17
 		}

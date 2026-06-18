@@ -36,13 +36,14 @@ func ghostClaude(theme AIToolTheme) []string {
 	}
 }
 
-// ghostClaudeSleeping returns the sleeping Claude ghost (dimmed colors, closed eyes).
+// ghostClaudeSleeping returns the sleeping Claude ghost (dimmed colors, closed eyes, rosy cheeks).
 func ghostClaudeSleeping(theme AIToolTheme) []string {
 	O := AnsiFromThemeColor(theme.SleepPrimary)  // dimmed orange
-	D := AnsiFromThemeColor(theme.SleepDim)      // dimmed deeper
+	D := AnsiFromThemeColor(theme.SleepDim)      // darker lower body
 	B := AnsiFromThemeColor(theme.SleepDarkFeet) // dimmed dark
 	L := AnsiFromThemeColor(theme.SleepCap)      // dimmed peach
 	K := AnsiFromThemeColor(theme.EyePupil)      // black
+	P := AnsiFromThemeColor(theme.SleepBlush)    // rosy cheeks
 
 	return []string{
 		r + "       " + L + "\u2584\u2584\u2584\u2584\u2584\u2584\u2584\u2584\u2584\u2584\u2584\u2584\u2584\u2584" + r + "       ",
@@ -51,6 +52,7 @@ func ghostClaudeSleeping(theme AIToolTheme) []string {
 		r + "   " + O + "\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588" + r + "   ",
 		r + "  " + O + "\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588" + r + "  ",
 		r + "  " + D + "\u2588\u2588\u2588\u2588" + K + "\u25ac\u25ac\u25ac\u25ac\u25ac" + D + "\u2588\u2588\u2588\u2588\u2588\u2588" + K + "\u25ac\u25ac\u25ac\u25ac\u25ac" + D + "\u2588\u2588\u2588\u2588" + r + "  ",
+		r + "  " + D + "\u2588\u2588\u2588\u2588" + P + "\u2588\u2588" + D + "\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588" + P + "\u2588\u2588" + D + "\u2588\u2588\u2588\u2588" + r + "  ",
 		r + "  " + D + "\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588" + r + "  ",
 		r + "  " + D + "\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588" + r + "  ",
 		r + "  " + D + "\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588" + r + "  ",
@@ -92,13 +94,14 @@ func ghostCodex(theme AIToolTheme) []string {
 	}
 }
 
-// ghostCodexSleeping returns the sleeping Codex ghost (dimmed, closed eyes).
+// ghostCodexSleeping returns the sleeping Codex ghost (dimmed, closed eyes, rosy cheeks).
 func ghostCodexSleeping(theme AIToolTheme) []string {
 	G := AnsiFromThemeColor(theme.SleepPrimary)  // dimmed green
 	Y := AnsiFromThemeColor(theme.SleepDim)      // dimmed yellow-green
 	D := AnsiFromThemeColor(theme.SleepDarkFeet) // dimmed dark
 	L := AnsiFromThemeColor(theme.SleepCap)      // dimmed light
 	K := AnsiFromThemeColor(theme.EyePupil)      // black
+	P := AnsiFromThemeColor(theme.SleepBlush)    // rosy cheeks
 
 	return []string{
 		r + "       " + L + "\u2584\u2584\u2584\u2584\u2584\u2584\u2584\u2584\u2584\u2584\u2584\u2584\u2584\u2584" + r + "       ",
@@ -107,6 +110,7 @@ func ghostCodexSleeping(theme AIToolTheme) []string {
 		r + "   " + G + "\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588" + r + "   ",
 		r + "  " + G + "\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588" + r + "  ",
 		r + "  " + Y + "\u2588\u2588\u2588\u2588" + K + "\u25ac\u25ac\u25ac\u25ac\u25ac" + Y + "\u2588\u2588\u2588\u2588\u2588\u2588" + K + "\u25ac\u25ac\u25ac\u25ac\u25ac" + Y + "\u2588\u2588\u2588\u2588" + r + "  ",
+		r + "  " + Y + "\u2588\u2588\u2588\u2588" + P + "\u2588\u2588" + Y + "\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588" + P + "\u2588\u2588" + Y + "\u2588\u2588\u2588\u2588" + r + "  ",
 		r + "  " + Y + "\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588" + r + "  ",
 		r + "  " + Y + "\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588" + r + "  ",
 		r + "  " + Y + "\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588" + r + "  ",
@@ -149,7 +153,7 @@ func ghostOpencode(theme AIToolTheme) []string {
 	}
 }
 
-// ghostOpencodeSleeping returns the sleeping OpenCode ghost (dimmed, closed eyes).
+// ghostOpencodeSleeping returns the sleeping OpenCode ghost (dimmed, closed eyes, rosy cheeks).
 func ghostOpencodeSleeping(theme AIToolTheme) []string {
 	W := AnsiFromThemeColor(theme.SleepPrimary)  // dimmed white
 	VL := AnsiFromThemeColor(theme.SleepCap)     // dimmed very light
@@ -158,6 +162,7 @@ func ghostOpencodeSleeping(theme AIToolTheme) []string {
 	MD := AnsiFromThemeColor(theme.SleepAccent)  // dimmed medium dark
 	D := AnsiFromThemeColor(theme.SleepDarkFeet) // dimmed dark
 	K := AnsiFromThemeColor(theme.EyePupil)      // black
+	P := AnsiFromThemeColor(theme.SleepBlush)    // rosy cheeks
 
 	return []string{
 		r + "       " + VL + "\u2584\u2584\u2584\u2584\u2584\u2584\u2584\u2584\u2584\u2584\u2584\u2584\u2584\u2584" + r + "       ",
@@ -166,6 +171,7 @@ func ghostOpencodeSleeping(theme AIToolTheme) []string {
 		r + "   " + W + "\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588" + r + "   ",
 		r + "  " + W + "\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588" + r + "  ",
 		r + "  " + ML + "\u2588\u2588\u2588\u2588" + K + "\u25ac\u25ac\u25ac\u25ac\u25ac" + ML + "\u2588\u2588\u2588\u2588\u2588\u2588" + K + "\u25ac\u25ac\u25ac\u25ac\u25ac" + ML + "\u2588\u2588\u2588\u2588" + r + "  ",
+		r + "  " + ML + "\u2588\u2588\u2588\u2588" + P + "\u2588\u2588" + ML + "\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588" + P + "\u2588\u2588" + ML + "\u2588\u2588\u2588\u2588" + r + "  ",
 		r + "  " + ML + "\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588" + r + "  ",
 		r + "  " + M + "\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588" + r + "  ",
 		r + "  " + M + "\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588" + r + "  ",

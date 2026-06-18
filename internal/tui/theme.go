@@ -19,6 +19,7 @@ type AIToolTheme struct {
 	EyePupil      lipgloss.Color
 	SleepPrimary  lipgloss.Color
 	SleepAccent   lipgloss.Color
+	SleepBlush    lipgloss.Color
 	SleepDim      lipgloss.Color
 	SleepDarkFeet lipgloss.Color
 	SleepCap      lipgloss.Color
@@ -38,7 +39,8 @@ var themes = map[string]AIToolTheme{
 		EyePupil:      lipgloss.Color("232"),
 		SleepPrimary:  lipgloss.Color("166"),
 		SleepAccent:   lipgloss.Color("178"),
-		SleepDim:      lipgloss.Color("166"),
+		SleepBlush:    lipgloss.Color("168"),
+		SleepDim:      lipgloss.Color("130"),
 		SleepDarkFeet: lipgloss.Color("94"),
 		SleepCap:      lipgloss.Color("180"),
 		Text:          lipgloss.Color("223"),
@@ -55,7 +57,8 @@ var themes = map[string]AIToolTheme{
 		EyePupil:      lipgloss.Color("232"),
 		SleepPrimary:  lipgloss.Color("71"),
 		SleepAccent:   lipgloss.Color("65"),
-		SleepDim:      lipgloss.Color("71"),
+		SleepBlush:    lipgloss.Color("66"),
+		SleepDim:      lipgloss.Color("60"),
 		SleepDarkFeet: lipgloss.Color("58"),
 		SleepCap:      lipgloss.Color("114"),
 		Text:          lipgloss.Color("157"),
@@ -72,7 +75,8 @@ var themes = map[string]AIToolTheme{
 		EyePupil:      lipgloss.Color("238"),
 		SleepPrimary:  lipgloss.Color("244"),
 		SleepAccent:   lipgloss.Color("234"),
-		SleepDim:      lipgloss.Color("236"),
+		SleepBlush:    lipgloss.Color("139"),
+		SleepDim:      lipgloss.Color("238"),
 		SleepDarkFeet: lipgloss.Color("232"),
 		SleepCap:      lipgloss.Color("242"),
 		Text:          lipgloss.Color("252"),

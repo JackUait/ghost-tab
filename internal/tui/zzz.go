@@ -9,7 +9,8 @@ type ZzzAnimation struct {
 	frames []string
 }
 
-// NewZzzAnimation creates a new Zzz animation with 4 frames.
+// NewZzzAnimation creates a new Zzz animation with 6 frames.
+// Characters float upward with increasing size (z → Z → Z) and fade out at the top.
 func NewZzzAnimation() *ZzzAnimation {
 	dim := "\033[2m"
 	reset := "\033[0m"
@@ -24,9 +25,15 @@ func NewZzzAnimation() *ZzzAnimation {
 		dim + "      z" + reset + "\n" +
 			dim + "    Z" + reset + "\n" +
 			"  Z",
-		dim + "       z" + reset + "\n" +
-			dim + "     Z" + reset + "\n" +
-			"   Z",
+		dim + "     z" + reset + "\n" +
+			dim + "   Z" + reset + "\n" +
+			" Z",
+		dim + "    z" + reset + "\n" +
+			dim + "  Z" + reset + "\n" +
+			"Z",
+		dim + "   z" + reset + "\n" +
+			dim + " Z" + reset + "\n" +
+			"  Z",
 	}
 
 	return &ZzzAnimation{

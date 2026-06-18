@@ -93,6 +93,18 @@ func (m *MainMenuModel) renderSettingsBox() string {
 	}
 	lines = append(lines, m.renderSettingsItem(2, soundLabel, soundState, soundStyle, primaryBoldStyle, leftBorder, rightBorder))
 
+	// Panel item
+	var panelColor lipgloss.Color
+	if m.panelMode == "lazygit" {
+		panelColor = lipgloss.Color("114") // green (default)
+	} else {
+		panelColor = lipgloss.Color("220") // yellow (non-default)
+	}
+	panelStyle := lipgloss.NewStyle().Foreground(panelColor)
+	panelLabel := "Panel"
+	panelState := "[" + panelModeLabel(m.panelMode) + "]"
+	lines = append(lines, m.renderSettingsItem(3, panelLabel, panelState, panelStyle, primaryBoldStyle, leftBorder, rightBorder))
+
 	// Default projects dir item
 	var rootState string
 	if m.projectsRoot == "" {
@@ -105,7 +117,7 @@ func (m *MainMenuModel) renderSettingsBox() string {
 		rootColor = lipgloss.Color("114") // green when set
 	}
 	rootStyle := lipgloss.NewStyle().Foreground(rootColor)
-	if m.settingsInputMode && m.settingsSelected == 3 {
+	if m.settingsInputMode && m.settingsSelected == 4 {
 		// Render inline text input
 		inputView := m.settingsInput.View()
 		inputWidth := lipgloss.Width(inputView)
@@ -125,7 +137,7 @@ func (m *MainMenuModel) renderSettingsBox() string {
 			lines = append(lines, errRow)
 		}
 	} else {
-		lines = append(lines, m.renderSettingsItem(3, "Default projects dir", rootState, rootStyle, primaryBoldStyle, leftBorder, rightBorder))
+		lines = append(lines, m.renderSettingsItem(4, "Default projects dir", rootState, rootStyle, primaryBoldStyle, leftBorder, rightBorder))
 	}
 
 	// Claude Config item (only for the claude tool)
@@ -145,7 +157,7 @@ func (m *MainMenuModel) renderSettingsBox() string {
 			dimIndicator := lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Render(" " + indicator)
 			state = state + dimIndicator
 		}
-		lines = append(lines, m.renderSettingsItem(4, "Subscription", state, cfgStyle, primaryBoldStyle, leftBorder, rightBorder))
+		lines = append(lines, m.renderSettingsItem(5, "Subscription", state, cfgStyle, primaryBoldStyle, leftBorder, rightBorder))
 	}
 
 	// Empty row
@@ -158,9 +170,9 @@ func (m *MainMenuModel) renderSettingsBox() string {
 	sep := dimStyle.Render(" · ")
 	var cycleOrEdit string
 	switch m.settingsSelected {
-	case 3:
-		cycleOrEdit = helpStyle.Render("⏎ edit")
 	case 4:
+		cycleOrEdit = helpStyle.Render("⏎ edit")
+	case 5:
 		if m.selectedConfig > 0 {
 			cycleOrEdit = helpStyle.Render("←→ cycle") + sep + helpStyle.Render("⏎ map models")
 		} else {

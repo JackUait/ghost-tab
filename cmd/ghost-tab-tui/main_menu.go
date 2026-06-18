@@ -27,6 +27,7 @@ var (
 	mainMenuAITools          string
 	mainMenuAIToolFile       string
 	mainMenuGhostDisplay     string
+	mainMenuPanelMode        string
 	mainMenuTabTitle         string
 	mainMenuUpdateVer        string
 	mainMenuSoundName        string
@@ -45,6 +46,7 @@ func init() {
 	mainMenuCmd.Flags().StringVar(&mainMenuAITools, "ai-tools", "claude", "Comma-separated available tool names")
 	mainMenuCmd.Flags().StringVar(&mainMenuAIToolFile, "ai-tool-file", "", "Path to AI tool preference file for persistence")
 	mainMenuCmd.Flags().StringVar(&mainMenuGhostDisplay, "ghost-display", "animated", "Ghost display mode (animated, static, none)")
+	mainMenuCmd.Flags().StringVar(&mainMenuPanelMode, "panel-mode", "lazygit", "Panel mode (lazygit, compact)")
 	mainMenuCmd.Flags().StringVar(&mainMenuTabTitle, "tab-title", "full", "Tab title mode (full, project)")
 	mainMenuCmd.Flags().StringVar(&mainMenuUpdateVer, "update-version", "", "Optional update notification version")
 	mainMenuCmd.Flags().StringVar(&mainMenuSoundName, "sound-name", "", "Sound name for notifications (empty = off)")
@@ -74,6 +76,7 @@ func runMainMenu(cmd *cobra.Command, args []string) error {
 	}
 
 	model := tui.NewMainMenu(projects, aiTools, mainMenuAITool, mainMenuGhostDisplay)
+	model.SetPanelMode(mainMenuPanelMode)
 	model.SetTabTitle(mainMenuTabTitle)
 	model.SetSoundName(mainMenuSoundName)
 	model.SetProjectsFile(mainMenuProjectsFile)

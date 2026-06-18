@@ -101,12 +101,12 @@ func TestSettings_hides_config_row_for_non_claude(t *testing.T) {
 
 func TestSettings_nav_count_includes_config_when_visible(t *testing.T) {
 	m, _ := newClaudeMenu(t)
-	if got := m.settingsItemCount(); got != 5 {
-		t.Fatalf("claude should have 5 settings items, got %d", got)
+	if got := m.settingsItemCount(); got != 6 {
+		t.Fatalf("claude should have 6 settings items, got %d", got)
 	}
 	m.CycleAITool("next")
-	if got := m.settingsItemCount(); got != 4 {
-		t.Fatalf("non-claude should have 4 settings items, got %d", got)
+	if got := m.settingsItemCount(); got != 5 {
+		t.Fatalf("non-claude should have 5 settings items, got %d", got)
 	}
 }
 

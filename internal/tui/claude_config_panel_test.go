@@ -30,7 +30,7 @@ func newPanelMenu(t *testing.T) (*MainMenuModel, string, string) {
 	m.SetClaudeConfigs(LoadClaudeConfigsList(list))
 	m.SetActiveClaudeConfig("")
 	m.EnterSettings()
-	m.settingsSelected = 4
+	m.settingsSelected = 5
 	return m, list, ptr
 }
 
@@ -158,7 +158,7 @@ func TestModelMap_ShowsMappedIndicator(t *testing.T) {
 	m.SetClaudeConfigs(LoadClaudeConfigsList(list))
 	m.SetActiveClaudeConfig("work.json")
 	m.EnterSettings()
-	m.settingsSelected = 4
+	m.settingsSelected = 5
 
 	view := m.View()
 	if !strings.Contains(view, "1 mapped") {
@@ -169,7 +169,7 @@ func TestModelMap_ShowsMappedIndicator(t *testing.T) {
 func TestModelMap_ShowsUnmappedIndicator(t *testing.T) {
 	m, _, _ := newPanelMenu(t)
 	m.SetActiveClaudeConfig("work.json")
-	m.settingsSelected = 4
+	m.settingsSelected = 5
 	view := m.View()
 	if !strings.Contains(view, "unmapped") {
 		t.Fatalf("config row should show 'unmapped' indicator:\n%s", view)
@@ -262,7 +262,7 @@ func TestModelMap_APIKeyInput_ShowsInPanel(t *testing.T) {
 	m.SetClaudeConfigs(LoadClaudeConfigsList(list))
 	m.SetActiveClaudeConfig("work.json")
 	m.EnterSettings()
-	m.settingsSelected = 4
+	m.settingsSelected = 5
 	m = key(t, m, tea.KeyMsg{Type: tea.KeyEnter})
 	view := m.View()
 	if !strings.Contains(view, "API Key") {

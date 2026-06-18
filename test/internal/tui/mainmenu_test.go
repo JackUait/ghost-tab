@@ -1488,7 +1488,7 @@ func TestMainMenu_SettingsNavigationKeys(t *testing.T) {
 }
 
 func TestMainMenu_SettingsNavigationWraps(t *testing.T) {
-	const numItems = 5 // claude tool has 5 settings items (includes Claude Config row)
+	const numItems = 6 // claude tool has 6 settings items (includes Panel and Claude Config rows)
 
 	jKey := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}}
 	kKey := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}}
@@ -5004,8 +5004,21 @@ func TestSettings_ProjectsRootItem_ShowsCurrentValue(t *testing.T) {
 }
 
 func TestSettings_NavWrapsWithFiveItems(t *testing.T) {
-	// claude tool shows 5 settings items (Ghost Display, Tab Title, Sound, Default projects dir, Claude Config)
+	// claude tool shows 6 settings items (Ghost Display, Tab Title, Sound, Panel, Default projects dir, Claude Config)
 	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
+	m.EnterSettings()
+	// j 6 times — wraps back to 0 (vim accelerator wraps within the list)
+	for i := 0; i < 6; i++ {
+		m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	}
+	if m.SettingsSelected() != 0 {
+		t.Errorf("expected settingsSelected=0 after wrapping past 6 items, got %d", m.SettingsSelected())
+	}
+}
+
+func TestSettings_NavWrapsWithFourItems_NonClaude(t *testing.T) {
+	// non-claude tool shows 5 settings items (no Claude Config row)
+	m := tui.NewMainMenu(nil, []string{"codex"}, "codex", "animated")
 	m.EnterSettings()
 	// j 5 times — wraps back to 0 (vim accelerator wraps within the list)
 	for i := 0; i < 5; i++ {
@@ -5013,19 +5026,6 @@ func TestSettings_NavWrapsWithFiveItems(t *testing.T) {
 	}
 	if m.SettingsSelected() != 0 {
 		t.Errorf("expected settingsSelected=0 after wrapping past 5 items, got %d", m.SettingsSelected())
-	}
-}
-
-func TestSettings_NavWrapsWithFourItems_NonClaude(t *testing.T) {
-	// non-claude tool shows 4 settings items (no Claude Config row)
-	m := tui.NewMainMenu(nil, []string{"codex"}, "codex", "animated")
-	m.EnterSettings()
-	// j 4 times — wraps back to 0 (vim accelerator wraps within the list)
-	for i := 0; i < 4; i++ {
-		m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
-	}
-	if m.SettingsSelected() != 0 {
-		t.Errorf("expected settingsSelected=0 after wrapping past 4 items, got %d", m.SettingsSelected())
 	}
 }
 
