@@ -171,7 +171,6 @@ type MainMenuModel struct {
 	result              *MainMenuResult
 	updateVersion       string
 	activeTab           MenuTab
-	settingsMode        bool
 	settingsSelected    int
 	initialGhostDisplay string
 	ghostDisplayChanged bool
@@ -835,20 +834,13 @@ func (m *MainMenuModel) soundNameForResult() *string {
 }
 
 // InSettingsMode returns true if the menu is currently showing the settings panel.
-func (m *MainMenuModel) InSettingsMode() bool {
-	return m.settingsMode
-}
+func (m *MainMenuModel) InSettingsMode() bool { return m.activeTab == TabSettings }
 
 // EnterSettings switches the menu to settings mode.
-func (m *MainMenuModel) EnterSettings() {
-	m.settingsMode = true
-	m.settingsSelected = 0
-}
+func (m *MainMenuModel) EnterSettings() { m.activeTab = TabSettings; m.settingsSelected = 0 }
 
 // ExitSettings returns from settings mode to the main menu.
-func (m *MainMenuModel) ExitSettings() {
-	m.settingsMode = false
-}
+func (m *MainMenuModel) ExitSettings() { m.activeTab = TabProjects }
 
 // ActiveTab returns the currently selected top-level tab.
 func (m *MainMenuModel) ActiveTab() MenuTab { return m.activeTab }
@@ -986,14 +978,20 @@ func (m *MainMenuModel) InInputMode() bool { return m.inputMode != "" }
 func (m *MainMenuModel) InDeleteMode() bool { return m.deleteMode }
 
 // WantsEsc implements EscInterceptor. It returns true when the menu is in a
-// sub-mode (settings, input, or delete) where Esc should navigate back within
+// sub-mode (settings, stats, input, or delete) where Esc should navigate back within
 // the menu rather than triggering the AppModel double-Esc quit flow.
 func (m *MainMenuModel) WantsEsc() bool {
-	return m.settingsMode || m.inputMode != "" || m.deleteMode || m.settingsInputMode
+	return m.activeTab != TabProjects || m.inputMode != "" || m.deleteMode || m.settingsInputMode
 }
 
 // SetSettingsMode directly sets settings mode — intended for tests only.
-func (m *MainMenuModel) SetSettingsMode(v bool) { m.settingsMode = v }
+func (m *MainMenuModel) SetSettingsMode(v bool) {
+	if v {
+		m.activeTab = TabSettings
+	} else {
+		m.activeTab = TabProjects
+	}
+}
 
 // SetShowEscHint tells the model to display the "Press Esc again to quit"
 // hint inside the help row instead of the normal key hints.
@@ -1447,9 +1445,13 @@ func (m *MainMenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Reset sleep state on any keypress
 		m.Wake()
 
-		// Settings mode intercepts all key handling
-		if m.settingsMode {
+		// Settings tab intercepts all key handling
+		if m.activeTab == TabSettings {
 			return m.updateSettings(msg)
+		}
+		// Stats tab: Tab/Shift+Tab/S/T navigate; Esc returns to Projects.
+		if m.activeTab == TabStats {
+			return m.updateStatsTab(msg)
 		}
 
 		// Input mode intercepts all key handling
@@ -1498,6 +1500,12 @@ func (m *MainMenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case tea.KeyShiftDown:
 			m.MoveProjectDown()
+			return m, nil
+		case tea.KeyTab:
+			m.CycleTab("next")
+			return m, nil
+		case tea.KeyShiftTab:
+			m.CycleTab("prev")
 			return m, nil
 		case tea.KeyLeft:
 			m.CycleAITool("prev")
@@ -1568,13 +1576,12 @@ func (m *MainMenuModel) handleRune(r rune) (tea.Model, tea.Cmd) {
 		m.ToggleWorktreesAtCursor()
 		return m, nil
 	case 's', 'S':
-		m.settingsMode = true
+		m.SetActiveTab(TabSettings)
 		m.settingsSelected = 0
 		return m, nil
 	case 't', 'T':
-		stats := NewStatsModel()
-		stats.SetSize(m.width, m.height)
-		return m, func() tea.Msg { return PushScreenMsg{Model: stats} }
+		m.SetActiveTab(TabStats)
+		return m, nil
 	case '1', '2', '3', '4', '5', '6', '7', '8', '9':
 		n := int(r - '0')
 		if n > len(m.projects) {
@@ -1599,12 +1606,17 @@ func (m *MainMenuModel) updateSettings(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	switch msg.Type {
 	case tea.KeyEsc:
-		m.settingsMode = false
+		m.SetActiveTab(TabProjects)
 		return m, nil
 	case tea.KeyCtrlC:
-		m.settingsMode = false
 		m.setActionResult("quit")
 		return m, tea.Quit
+	case tea.KeyTab:
+		m.CycleTab("next")
+		return m, nil
+	case tea.KeyShiftTab:
+		m.CycleTab("prev")
+		return m, nil
 	case tea.KeyEnter:
 		// Activate current settings item
 		switch m.settingsSelected {
@@ -1673,6 +1685,36 @@ func (m *MainMenuModel) updateSettings(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			case 'k':
 				n := m.settingsItemCount()
 				m.settingsSelected = (m.settingsSelected - 1 + n) % n
+				return m, nil
+			}
+		}
+	}
+	return m, nil
+}
+
+// updateStatsTab handles key events while the Stats tab is active.
+func (m *MainMenuModel) updateStatsTab(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.Type {
+	case tea.KeyTab:
+		m.CycleTab("next")
+		return m, nil
+	case tea.KeyShiftTab:
+		m.CycleTab("prev")
+		return m, nil
+	case tea.KeyEsc:
+		m.SetActiveTab(TabProjects)
+		return m, nil
+	case tea.KeyCtrlC:
+		m.setActionResult("quit")
+		return m, tea.Quit
+	case tea.KeyRunes:
+		if len(msg.Runes) == 1 {
+			switch TranslateRune(msg.Runes[0]) {
+			case 's', 'S':
+				m.SetActiveTab(TabSettings)
+				return m, nil
+			case 't', 'T':
+				m.SetActiveTab(TabProjects) // 't' from Stats toggles back
 				return m, nil
 			}
 		}
@@ -2309,6 +2351,14 @@ func tabTitleLabel(mode string) string {
 	default:
 		return mode
 	}
+}
+
+// renderStatsBox renders the Stats tab body. Replaced with the in-box
+// version in Task 6; for now it reuses the standalone stats view.
+func (m *MainMenuModel) renderStatsBox() string {
+	s := NewStatsModel()
+	s.SetSize(m.width, m.height)
+	return s.View()
 }
 
 // renderSettingsBox builds the settings panel box string.
@@ -3213,15 +3263,18 @@ func (m *MainMenuModel) View() string {
 	}
 
 	var menuBox string
-	if m.settingsMode {
+	switch {
+	case m.inputMode != "":
+		menuBox = m.renderInputBox()
+	case m.activeTab == TabSettings:
 		if m.modelMapOpen {
 			menuBox = m.renderSettingsBox() + "\n" + m.renderModelMapPanel()
 		} else {
 			menuBox = m.renderSettingsBox()
 		}
-	} else if m.inputMode != "" {
-		menuBox = m.renderInputBox()
-	} else {
+	case m.activeTab == TabStats:
+		menuBox = m.renderStatsBox()
+	default:
 		menuBox = m.renderMenuBox()
 	}
 

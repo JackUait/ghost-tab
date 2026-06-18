@@ -114,4 +114,4 @@ func TestSettings_nav_count_includes_config_when_visible(t *testing.T) {
 func (m *MainMenuModel) renderSettingsForTest() string { return m.renderSettingsBox() }
 
 // OpenSettings is a test/utility entry point that enters settings mode.
-func (m *MainMenuModel) OpenSettings() { m.settingsMode = true; m.settingsSelected = 0 }
+func (m *MainMenuModel) OpenSettings() { m.activeTab = TabSettings; m.settingsSelected = 0 }

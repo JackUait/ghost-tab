@@ -157,7 +157,7 @@ func TestMenuBox_HelpTextPresent(t *testing.T) {
 
 func TestSettingsBox_StateRightAligned(t *testing.T) {
 	m := newTestMenu()
-	m.settingsMode = true
+	m.SetActiveTab(TabSettings)
 	m.tabTitle = "full"
 	box := m.renderSettingsBox()
 	raw := stripAnsi(box)
@@ -673,7 +673,7 @@ func TestMenuBox_UsesRoundedCorners(t *testing.T) {
 
 func TestSettingsBox_UsesRoundedCorners(t *testing.T) {
 	m := newTestMenu()
-	m.settingsMode = true
+	m.SetActiveTab(TabSettings)
 	box := m.renderSettingsBox()
 	raw := stripAnsi(box)
 	lines := strings.Split(raw, "\n")

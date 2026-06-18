@@ -1,6 +1,10 @@
 package tui
 
-import "testing"
+import (
+	"testing"
+
+	tea "github.com/charmbracelet/bubbletea"
+)
 
 func TestActiveTab_defaultsToProjects(t *testing.T) {
 	m := NewMainMenu(nil, []string{"claude"}, "claude", "none")
@@ -31,5 +35,36 @@ func TestCycleTab_wraps(t *testing.T) {
 	m.CycleTab("prev") // Projects -> Stats (wrap back)
 	if m.ActiveTab() != TabStats {
 		t.Fatalf("prev from Projects = %v, want Stats (wrap)", m.ActiveTab())
+	}
+}
+
+func TestHandleRune_sSwitchesToSettingsTab(t *testing.T) {
+	m := NewMainMenu(nil, []string{"claude"}, "claude", "none")
+	m.handleRune('s')
+	if m.ActiveTab() != TabSettings {
+		t.Errorf("after 's' tab = %v, want Settings", m.ActiveTab())
+	}
+}
+
+func TestHandleRune_tSwitchesToStatsTab(t *testing.T) {
+	m := NewMainMenu(nil, []string{"claude"}, "claude", "none")
+	_, cmd := m.handleRune('t')
+	if m.ActiveTab() != TabStats {
+		t.Errorf("after 't' tab = %v, want Stats", m.ActiveTab())
+	}
+	if cmd != nil {
+		t.Errorf("'t' should not emit a navigation cmd (no pushed screen), got %v", cmd)
+	}
+}
+
+func TestUpdate_tabKeyCycles(t *testing.T) {
+	m := NewMainMenu(nil, []string{"claude"}, "claude", "none")
+	m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	if m.ActiveTab() != TabSettings {
+		t.Errorf("Tab from Projects = %v, want Settings", m.ActiveTab())
+	}
+	m.Update(tea.KeyMsg{Type: tea.KeyShiftTab})
+	if m.ActiveTab() != TabProjects {
+		t.Errorf("Shift+Tab back = %v, want Projects", m.ActiveTab())
 	}
 }
