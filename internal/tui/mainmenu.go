@@ -90,6 +90,17 @@ type MainMenuResult struct {
 	SoundName    *string `json:"sound_name,omitempty"`
 }
 
+// MenuTab identifies which top-level tab is active.
+type MenuTab int
+
+const (
+	TabProjects MenuTab = iota
+	TabSettings
+	TabStats
+)
+
+const menuTabCount = 3
+
 // MenuLayout describes how the ghost and menu are arranged at a given terminal size.
 type MenuLayout struct {
 	GhostPosition string // "side", "above", "hidden"
@@ -159,6 +170,7 @@ type MainMenuModel struct {
 	quitting            bool
 	result              *MainMenuResult
 	updateVersion       string
+	activeTab           MenuTab
 	settingsMode        bool
 	settingsSelected    int
 	initialGhostDisplay string
@@ -836,6 +848,21 @@ func (m *MainMenuModel) EnterSettings() {
 // ExitSettings returns from settings mode to the main menu.
 func (m *MainMenuModel) ExitSettings() {
 	m.settingsMode = false
+}
+
+// ActiveTab returns the currently selected top-level tab.
+func (m *MainMenuModel) ActiveTab() MenuTab { return m.activeTab }
+
+// SetActiveTab switches to the given tab.
+func (m *MainMenuModel) SetActiveTab(t MenuTab) { m.activeTab = t }
+
+// CycleTab moves to the next/prev tab, wrapping across all tabs.
+func (m *MainMenuModel) CycleTab(direction string) {
+	if direction == "prev" {
+		m.activeTab = (m.activeTab - 1 + menuTabCount) % menuTabCount
+	} else {
+		m.activeTab = (m.activeTab + 1) % menuTabCount
+	}
 }
 
 // settingsItemCount returns the number of settings rows (5 when the Claude
