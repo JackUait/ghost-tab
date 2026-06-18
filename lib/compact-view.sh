@@ -27,52 +27,24 @@ compact_view() {
   local reset="\033[0m"
   local dimline="\033[2m"
 
-  # Truncate path in middle: "a/b/c/d/file.go" → "a/…/d/file.go" if too long
-  # Usage: truncate_path <path> <max_width>
-  truncate_path() {
+  # Show parent_dir/filename, truncating parent dir if needed.
+  # Usage: format_file <path> <max_width>
+  format_file() {
     local p="$1" max="$2"
-    if [ ${#p} -le "$max" ]; then
-      printf '%s' "$p"
-      return
-    fi
     local fname="${p##*/}"
-    local dirs="${p%/*}"
-    # Filename alone exceeds max — truncate from right
-    if [ ${#fname} -ge "$max" ]; then
+    local dir="${p%/*}"
+    # Get just the immediate parent directory name
+    local parent="${dir##*/}"
+    local short="${parent}/${fname}"
+    if [ ${#short} -le "$max" ]; then
+      printf '%s' "$short"
+    elif [ ${#fname} -ge "$max" ]; then
+      # Filename alone exceeds max
       printf '%.*s…' "$((max - 1))" "$fname"
-      return
-    fi
-    # If filename is within 3 chars of max, no room for meaningful dir prefix
-    local avail=$((max - ${#fname}))
-    if [ "$avail" -le 3 ]; then
-      printf '%s' "$fname"
-      return
-    fi
-    # Build prefix: take dir segments from left, checking total width
-    local keep=$((max - ${#fname} - 3))  # 3 for "/…/"
-    local prefix=""
-    local remaining="$dirs"
-    while [ -n "$remaining" ]; do
-      local seg="${remaining%%/*}"
-      local candidate
-      if [ -z "$prefix" ]; then
-        candidate="$seg"
-      else
-        candidate="${prefix}/${seg}"
-      fi
-      if [ ${#candidate} -gt "$keep" ]; then
-        break
-      fi
-      prefix="$candidate"
-      if [ "$remaining" = "$seg" ]; then
-        break
-      fi
-      remaining="${remaining#*/}"
-    done
-    if [ -z "$prefix" ]; then
-      printf '%s' "$fname"
     else
-      printf '%s/…/%s' "$prefix" "$fname"
+      # Truncate parent dir to fit
+      local keep=$((max - ${#fname} - 1))  # 1 for "/"
+      printf '%.*s/%s' "$keep" "$parent" "$fname"
     fi
   }
 
@@ -143,7 +115,7 @@ compact_view() {
         while IFS=$'\t' read -r added deleted file; do
           has_content=1
           local display
-          display=$(truncate_path "$file" "$file_width")
+          display=$(format_file "$file" "$file_width")
           printf "   ${green}%4s${reset} ${dim}-${reset}${red}%4s${reset}  %s\n" "+${added}" "${deleted}" "$display"
         done <<< "$staged"
         printf "\n"
@@ -155,7 +127,7 @@ compact_view() {
         while IFS=$'\t' read -r added deleted file; do
           has_content=1
           local display
-          display=$(truncate_path "$file" "$file_width")
+          display=$(format_file "$file" "$file_width")
           printf "   ${green}%4s${reset} ${dim}-${reset}${red}%4s${reset}  %s\n" "+${added}" "${deleted}" "$display"
         done <<< "$unstaged"
         printf "\n"
@@ -167,7 +139,7 @@ compact_view() {
         while IFS= read -r file; do
           has_content=1
           local display
-          display=$(truncate_path "$file" "$file_width")
+          display=$(format_file "$file" "$file_width")
           printf "   ${dim}%s${reset}\n" "$display"
         done <<< "$untracked"
         printf "\n"
