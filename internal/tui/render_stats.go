@@ -8,18 +8,25 @@ import (
 )
 
 // renderStatsRows renders the stats content as box rows using leftBorder/rightBorder,
-// mirroring renderSettingsItem's label-left/value-right layout.
+// reading cached stats fields from MainMenuModel instead of calling NewStatsModel().
 func (m *MainMenuModel) renderStatsRows(leftBorder, rightBorder string) []string {
 	primaryBoldStyle := lipgloss.NewStyle().Foreground(m.theme.Primary).Bold(true)
 	dimStyle := lipgloss.NewStyle().Foreground(m.theme.Dim)
 	numStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
 	muted := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
 	faint := lipgloss.NewStyle().Faint(true)
-
-	// Fetch data from the stats model (loading state — we render what we have).
-	s := NewStatsModel()
+	errStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("203"))
 
 	emptyRow := leftBorder + strings.Repeat(" ", menuContentWidth) + rightBorder
+
+	// Helper: render a single padded text row inside the box.
+	textRow := func(s string) string {
+		gap := menuContentWidth - lipgloss.Width(s) - 2
+		if gap < 0 {
+			gap = 0
+		}
+		return leftBorder + "  " + s + strings.Repeat(" ", gap) + rightBorder
+	}
 
 	// Helper: render a label-left / value-right row inside the box.
 	itemRow := func(label, value string, labelStyle, valStyle lipgloss.Style) string {
@@ -36,50 +43,27 @@ func (m *MainMenuModel) renderStatsRows(leftBorder, rightBorder string) []string
 	var rows []string
 	rows = append(rows, emptyRow)
 
-	if s.loading {
-		loadingText := primaryBoldStyle.Render("Loading token usage…")
-		gap := menuContentWidth - lipgloss.Width(loadingText) - 2
-		if gap < 0 {
-			gap = 0
-		}
-		rows = append(rows, leftBorder+"  "+loadingText+strings.Repeat(" ", gap)+rightBorder)
+	// Loading state.
+	if m.statsLoading {
+		rows = append(rows, textRow(primaryBoldStyle.Render("Crunching token usage…")))
 		rows = append(rows, emptyRow)
-		hintText := faint.Render("Usage data is read from ~/.claude/usage/")
-		hintGap := menuContentWidth - lipgloss.Width(hintText) - 2
-		if hintGap < 0 {
-			hintGap = 0
-		}
-		rows = append(rows, leftBorder+"  "+hintText+strings.Repeat(" ", hintGap)+rightBorder)
+		rows = append(rows, textRow(faint.Render("Usage data is read from ~/.claude/usage/")))
 		rows = append(rows, emptyRow)
 		return rows
 	}
 
-	if s.err != nil {
-		errStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("203"))
-		errText := errStyle.Render("Error: " + s.err.Error())
-		gap := menuContentWidth - lipgloss.Width(errText) - 2
-		if gap < 0 {
-			gap = 0
-		}
-		rows = append(rows, leftBorder+"  "+errText+strings.Repeat(" ", gap)+rightBorder)
+	// Error state.
+	if m.statsErr != nil {
+		rows = append(rows, textRow(errStyle.Render("Failed to load usage: "+m.statsErr.Error())))
 		rows = append(rows, emptyRow)
 		return rows
 	}
 
-	if len(s.months) == 0 {
-		noDataText := muted.Render("No usage data found yet.")
-		gap := menuContentWidth - lipgloss.Width(noDataText) - 2
-		if gap < 0 {
-			gap = 0
-		}
-		rows = append(rows, leftBorder+"  "+noDataText+strings.Repeat(" ", gap)+rightBorder)
+	// Empty state (loaded but no data).
+	if len(m.statsMonths) == 0 {
+		rows = append(rows, textRow(muted.Render("No usage data found yet.")))
 		rows = append(rows, emptyRow)
-		hintText := faint.Render("Usage data is read from ~/.claude/usage/")
-		hintGap := menuContentWidth - lipgloss.Width(hintText) - 2
-		if hintGap < 0 {
-			hintGap = 0
-		}
-		rows = append(rows, leftBorder+"  "+hintText+strings.Repeat(" ", hintGap)+rightBorder)
+		rows = append(rows, textRow(faint.Render("Usage data is read from ~/.claude/usage/")))
 		rows = append(rows, emptyRow)
 		return rows
 	}
@@ -98,13 +82,20 @@ func (m *MainMenuModel) renderStatsRows(leftBorder, rightBorder string) []string
 	sepRow := leftBorder + strings.Repeat(" ", menuContentWidth) + rightBorder
 	rows = append(rows, sepRow)
 
-	// Month rows (all months, not windowed — this is a summary panel not a scroller).
-	grandTotal := statsGrandTotal(s.months)
+	// Visible window of months.
+	end := m.statsOffset + statsWindow
+	if end > len(m.statsMonths) {
+		end = len(m.statsMonths)
+	}
+	visibleMonths := m.statsMonths[m.statsOffset:end]
+
+	grandTotal := statsGrandTotal(m.statsMonths)
 	allTotal := grandTotal.Total()
 	if allTotal < 1 {
 		allTotal = 1
 	}
-	for _, mu := range s.months {
+
+	for _, mu := range visibleMonths {
 		frac := float64(mu.Total()) / float64(allTotal)
 		pct := int(frac*100 + 0.5)
 		monthCost, allPriced := mu.CostUSD()
@@ -142,7 +133,7 @@ func (m *MainMenuModel) renderStatsRows(leftBorder, rightBorder string) []string
 	g := grandTotal
 	grandCost := 0.0
 	grandAllPriced := true
-	for _, mu := range s.months {
+	for _, mu := range m.statsMonths {
 		c, ap := mu.CostUSD()
 		grandCost += c
 		if !ap {

@@ -15,6 +15,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/jackuait/ghost-tab/internal/claudeconfig"
 	"github.com/jackuait/ghost-tab/internal/models"
+	"github.com/jackuait/ghost-tab/internal/usage"
 	"github.com/jackuait/ghost-tab/internal/util"
 )
 
@@ -263,6 +264,13 @@ type MainMenuModel struct {
 	// staleConfirmIdx holds the index of the stale project awaiting launch
 	// confirmation. -1 means no confirmation is active.
 	staleConfirmIdx int
+
+	// Cached stats data for the embedded Stats tab.
+	statsLoaded  bool
+	statsLoading bool
+	statsMonths  []usage.MonthlyUsage
+	statsErr     error
+	statsOffset  int
 }
 
 // NewMainMenu creates a new main menu model.
@@ -1303,6 +1311,24 @@ func (m *MainMenuModel) setActionResult(action string) {
 	m.quitting = true
 }
 
+// ensureStatsLoad kicks off the async usage aggregation the first time the
+// Stats tab is shown. Returns nil if already loaded or loading.
+func (m *MainMenuModel) ensureStatsLoad() tea.Cmd {
+	if m.statsLoaded || m.statsLoading {
+		return nil
+	}
+	m.statsLoading = true
+	home, _ := os.UserHomeDir()
+	claudeDir, cachePath := usage.DefaultPaths(home)
+	return func() tea.Msg {
+		months, err := usage.Aggregate(claudeDir, cachePath)
+		if err != nil {
+			return statsErrMsg{err: err}
+		}
+		return statsLoadedMsg{months: months}
+	}
+}
+
 // bobTickCmd returns a command that sends a bobTickMsg at ~60fps.
 func (m *MainMenuModel) bobTickCmd() tea.Cmd {
 	return tea.Tick(bobTickInterval, func(t time.Time) tea.Msg {
@@ -1407,6 +1433,18 @@ func (m *MainMenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		models.PopulateWorktrees(m.projects)
 		return m, nil
 
+	case statsLoadedMsg:
+		m.statsMonths = msg.months
+		m.statsLoading = false
+		m.statsLoaded = true
+		return m, nil
+
+	case statsErrMsg:
+		m.statsErr = msg.err
+		m.statsLoading = false
+		m.statsLoaded = true
+		return m, nil
+
 	case tea.MouseMsg:
 		// Reset sleep state on any mouse activity
 		m.Wake()
@@ -1488,9 +1526,15 @@ func (m *MainMenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case tea.KeyTab:
 			m.CycleTab("next")
+			if m.activeTab == TabStats {
+				return m, m.ensureStatsLoad()
+			}
 			return m, nil
 		case tea.KeyShiftTab:
 			m.CycleTab("prev")
+			if m.activeTab == TabStats {
+				return m, m.ensureStatsLoad()
+			}
 			return m, nil
 		case tea.KeyLeft:
 			m.CycleAITool("prev")
@@ -1564,7 +1608,7 @@ func (m *MainMenuModel) handleRune(r rune) (tea.Model, tea.Cmd) {
 		return m, nil
 	case 't', 'T':
 		m.SetActiveTab(TabStats)
-		return m, nil
+		return m, m.ensureStatsLoad()
 	case '1', '2', '3', '4', '5', '6', '7', '8', '9':
 		n := int(r - '0')
 		if n > len(m.projects) {
@@ -1596,9 +1640,15 @@ func (m *MainMenuModel) updateSettings(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	case tea.KeyTab:
 		m.CycleTab("next")
+		if m.activeTab == TabStats {
+			return m, m.ensureStatsLoad()
+		}
 		return m, nil
 	case tea.KeyShiftTab:
 		m.CycleTab("prev")
+		if m.activeTab == TabStats {
+			return m, m.ensureStatsLoad()
+		}
 		return m, nil
 	case tea.KeyEnter:
 		// Activate current settings item
@@ -1680,9 +1730,15 @@ func (m *MainMenuModel) updateStatsTab(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.Type {
 	case tea.KeyTab:
 		m.CycleTab("next")
+		if m.activeTab == TabStats {
+			return m, m.ensureStatsLoad()
+		}
 		return m, nil
 	case tea.KeyShiftTab:
 		m.CycleTab("prev")
+		if m.activeTab == TabStats {
+			return m, m.ensureStatsLoad()
+		}
 		return m, nil
 	case tea.KeyEsc:
 		m.SetActiveTab(TabProjects)
@@ -1690,9 +1746,37 @@ func (m *MainMenuModel) updateStatsTab(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case tea.KeyCtrlC:
 		m.setActionResult("quit")
 		return m, tea.Quit
+	case tea.KeyUp:
+		if m.statsOffset > 0 {
+			m.statsOffset--
+		}
+		return m, nil
+	case tea.KeyDown:
+		max := len(m.statsMonths) - statsWindow
+		if max < 0 {
+			max = 0
+		}
+		if m.statsOffset < max {
+			m.statsOffset++
+		}
+		return m, nil
 	case tea.KeyRunes:
 		if len(msg.Runes) == 1 {
 			switch TranslateRune(msg.Runes[0]) {
+			case 'k':
+				if m.statsOffset > 0 {
+					m.statsOffset--
+				}
+				return m, nil
+			case 'j':
+				max := len(m.statsMonths) - statsWindow
+				if max < 0 {
+					max = 0
+				}
+				if m.statsOffset < max {
+					m.statsOffset++
+				}
+				return m, nil
 			case 's', 'S':
 				m.SetActiveTab(TabSettings)
 				return m, nil

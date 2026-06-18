@@ -52,8 +52,12 @@ func TestHandleRune_tSwitchesToStatsTab(t *testing.T) {
 	if m.ActiveTab() != TabStats {
 		t.Errorf("after 't' tab = %v, want Stats", m.ActiveTab())
 	}
+	// 't' may return a load cmd but must not push a new screen.
 	if cmd != nil {
-		t.Errorf("'t' should not emit a navigation cmd (no pushed screen), got %v", cmd)
+		msg := cmd()
+		if _, ok := msg.(PushScreenMsg); ok {
+			t.Errorf("'t' should not emit a PushScreenMsg, got %T", msg)
+		}
 	}
 }
 

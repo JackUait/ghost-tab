@@ -3,6 +3,8 @@ package tui
 import (
 	"strings"
 	"testing"
+
+	"github.com/jackuait/ghost-tab/internal/usage"
 )
 
 func TestRenderStatsBox_hasTabBar(t *testing.T) {
@@ -73,8 +75,58 @@ func TestRenderStatsBox_containsStatsRows(t *testing.T) {
 	out := m.renderStatsBox()
 	// The stats rows section must be present (loading or data row).
 	// At minimum "Token" or "usage" or loading text appears.
-	if !strings.Contains(out, "Token") && !strings.Contains(out, "usage") && !strings.Contains(out, "Loading") && !strings.Contains(out, "No usage") {
+	if !strings.Contains(out, "Token") && !strings.Contains(out, "usage") && !strings.Contains(out, "Loading") && !strings.Contains(out, "No usage") && !strings.Contains(out, "Crunching") {
 		t.Errorf("stats box missing stats content:\n%s", out)
+	}
+}
+
+// TestRenderStatsBox_LoadingState verifies a fresh model shows the loading text
+// when statsLoading is set but no data is cached yet.
+func TestRenderStatsBox_LoadingState(t *testing.T) {
+	m := NewMainMenu(nil, []string{"claude"}, "claude", "none")
+	m.statsLoading = true
+	m.SetActiveTab(TabStats)
+	out := m.renderStatsBox()
+	if !strings.Contains(out, "Crunching") {
+		t.Errorf("loading state should render 'Crunching', got:\n%s", out)
+	}
+}
+
+// TestRenderStatsBox_DataState verifies that after statsLoadedMsg is applied the
+// stats box renders humanized token figures and the "Total est. cost" footer.
+func TestRenderStatsBox_DataState(t *testing.T) {
+	m := NewMainMenu(nil, []string{"claude"}, "claude", "none")
+	m.SetActiveTab(TabStats)
+
+	// Simulate a successful load by sending the msg through Update.
+	months := []usage.MonthlyUsage{
+		{Month: "2026-06", Input: 2_000_000, Output: 500_000},
+	}
+	updated, _ := m.Update(statsLoadedMsg{months: months})
+	mm := updated.(*MainMenuModel)
+
+	out := mm.renderStatsBox()
+	if !strings.Contains(out, "2.0M") && !strings.Contains(out, "2026-06") {
+		t.Errorf("data state should render humanized tokens or month label:\n%s", out)
+	}
+	if !strings.Contains(out, "Est. cost") && !strings.Contains(out, "Total") {
+		t.Errorf("data state should render 'Total' or 'Est. cost' footer:\n%s", out)
+	}
+}
+
+// TestHandleRune_TReturnsNonNilCmdAndSetsLoading verifies that pressing 't'
+// kicks off the async load (returns a non-nil cmd) and sets statsLoading true.
+func TestHandleRune_TReturnsNonNilCmdAndSetsLoading(t *testing.T) {
+	m := NewMainMenu(nil, []string{"claude"}, "claude", "none")
+	_, cmd := m.handleRune('t')
+	if m.ActiveTab() != TabStats {
+		t.Errorf("after 't' activeTab = %v, want TabStats", m.ActiveTab())
+	}
+	if !m.statsLoading {
+		t.Error("after 't' statsLoading should be true")
+	}
+	if cmd == nil {
+		t.Error("after 't' cmd should be non-nil (async load triggered)")
 	}
 }
 

@@ -7,8 +7,12 @@ import (
 func TestMainMenu_TKeySwitchesToStatsTab(t *testing.T) {
 	m := NewMainMenu(nil, []string{"claude"}, "claude", "") // *MainMenuModel
 	_, cmd := m.handleRune('t')
+	// 't' should not push a new screen (no PushScreenMsg), but may return a load cmd.
 	if cmd != nil {
-		t.Errorf("'t' should not emit a navigation cmd (switches tab, no PushScreenMsg), got %v", cmd)
+		msg := cmd()
+		if _, ok := msg.(PushScreenMsg); ok {
+			t.Errorf("'t' should not emit a PushScreenMsg, got %T", msg)
+		}
 	}
 	if m.ActiveTab() != TabStats {
 		t.Errorf("after 't' tab = %v, want TabStats", m.ActiveTab())
