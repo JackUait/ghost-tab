@@ -824,10 +824,55 @@ func (m *MainMenuModel) CurrentClaudeConfigFile() string {
 func (m *MainMenuModel) ClaudeConfigVisible() bool { return m.CurrentAITool() == "claude" }
 
 // subscriptionFocusable reports whether the main-page subscription line is a
-// reachable focus stop: it must be visible (Claude) and have at least one
-// custom config to switch to (Standard alone has nothing to cycle).
+// reachable focus stop: it must be visible (Claude) and offer something to
+// switch to beyond Standard — i.e. at least one custom config with an API key.
 func (m *MainMenuModel) subscriptionFocusable() bool {
-	return m.ClaudeConfigVisible() && len(m.claudeConfigs) > 0
+	return m.ClaudeConfigVisible() && len(m.mainSubscriptionRing()) > 1
+}
+
+// configHasKey reports whether the custom config file carries an API key.
+func (m *MainMenuModel) configHasKey(file string) bool {
+	return claudeconfig.ReadAPIKey(m.claudeConfigsDir, file) != ""
+}
+
+// mainSubscriptionRing returns the selectedConfig values the main page lets the
+// user switch between, in order: Standard (0) plus each custom config that has
+// an API key. Keyless configs are hidden from the main page — they are finished
+// in Settings first.
+func (m *MainMenuModel) mainSubscriptionRing() []int {
+	ring := []int{0} // Standard is always available
+	for i, c := range m.claudeConfigs {
+		if m.configHasKey(c.File) {
+			ring = append(ring, i+1)
+		}
+	}
+	return ring
+}
+
+// CycleMainSubscription moves the active subscription through the main-page ring
+// (Standard + keyed configs only) and persists the choice. Keyless configs are
+// skipped. If the active config is not on the ring (e.g. a keyless config picked
+// in Settings), cycling resumes from Standard.
+func (m *MainMenuModel) CycleMainSubscription(direction string) {
+	ring := m.mainSubscriptionRing()
+	if len(ring) <= 1 {
+		return
+	}
+	pos := 0
+	for i, v := range ring {
+		if v == m.selectedConfig {
+			pos = i
+			break
+		}
+	}
+	n := len(ring)
+	if direction == "prev" {
+		pos = (pos - 1 + n) % n
+	} else {
+		pos = (pos + 1) % n
+	}
+	m.selectedConfig = ring[pos]
+	m.persistClaudeConfig()
 }
 
 // CycleClaudeConfig moves through [Standard, configs...] and persists the choice.
@@ -1682,7 +1727,7 @@ func (m *MainMenuModel) focusLeft() tea.Cmd {
 	case FocusAI:
 		m.CycleAITool("prev")
 	case FocusSubscription:
-		m.CycleClaudeConfig("prev")
+		m.CycleMainSubscription("prev")
 	case FocusTabs:
 		m.CycleTab("prev")
 		if m.activeTab == TabStats {
@@ -1702,7 +1747,7 @@ func (m *MainMenuModel) focusRight() tea.Cmd {
 	case FocusAI:
 		m.CycleAITool("next")
 	case FocusSubscription:
-		m.CycleClaudeConfig("next")
+		m.CycleMainSubscription("next")
 	case FocusTabs:
 		m.CycleTab("next")
 		if m.activeTab == TabStats {

@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -8,8 +10,27 @@ import (
 	"github.com/jackuait/ghost-tab/internal/models"
 )
 
-// subFocusMenu builds a Claude menu with one custom subscription so the
-// subscription focus stop is reachable.
+// writeKeyedConfig writes a config JSON containing an API key so the config
+// counts as "keyed" for main-page filtering.
+func writeKeyedConfig(t *testing.T, dir, file string) {
+	t.Helper()
+	content := `{"env":{"ANTHROPIC_AUTH_TOKEN":"sk-test"}}`
+	if err := os.WriteFile(filepath.Join(dir, file), []byte(content), 0600); err != nil {
+		t.Fatalf("write keyed config: %v", err)
+	}
+}
+
+// writeKeylessConfig writes a config JSON with no API key.
+func writeKeylessConfig(t *testing.T, dir, file string) {
+	t.Helper()
+	content := `{"env":{}}`
+	if err := os.WriteFile(filepath.Join(dir, file), []byte(content), 0600); err != nil {
+		t.Fatalf("write keyless config: %v", err)
+	}
+}
+
+// subFocusMenu builds a Claude menu with one custom subscription that has an
+// API key, so the subscription focus stop is reachable.
 func subFocusMenu(t *testing.T, tool string, withConfigs bool) *MainMenuModel {
 	t.Helper()
 	projects := []models.Project{
@@ -19,6 +40,9 @@ func subFocusMenu(t *testing.T, tool string, withConfigs bool) *MainMenuModel {
 	m := NewMainMenu(projects, []string{"claude", "codex"}, tool, "animated")
 	m.SetSize(100, 40)
 	if withConfigs {
+		dir := t.TempDir()
+		writeKeyedConfig(t, dir, "work.json")
+		m.SetClaudeConfigPaths(filepath.Join(dir, "list"), dir)
 		m.SetClaudeConfigs([]ClaudeConfig{{Name: "Work", File: "work.json"}})
 	}
 	return m
@@ -136,5 +160,70 @@ func TestSubFocus_helpHintMentionsSubscription(t *testing.T) {
 	hint := m.focusHint()
 	if !strings.Contains(strings.ToLower(hint), "subscription") {
 		t.Errorf("focus hint for subscription = %q, want it to mention subscription", hint)
+	}
+}
+
+// --- Key-filtering on the main page ---
+
+// A custom config without an API key is not a reachable main-page focus stop.
+func TestMainSub_keylessConfigNotFocusable(t *testing.T) {
+	projects := []models.Project{{Name: "a", Path: "/a"}}
+	m := NewMainMenu(projects, []string{"claude", "codex"}, "claude", "animated")
+	m.SetSize(100, 40)
+	dir := t.TempDir()
+	writeKeylessConfig(t, dir, "nokey.json")
+	m.SetClaudeConfigPaths(filepath.Join(dir, "list"), dir)
+	m.SetClaudeConfigs([]ClaudeConfig{{Name: "NoKey", File: "nokey.json"}})
+
+	m.SetFocus(FocusAI)
+	m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	if m.Focus() != FocusTabs {
+		t.Errorf("Down from AI with only a keyless config = %v, want FocusTabs (not focusable)", m.Focus())
+	}
+}
+
+// The main-page cycle skips keyless configs and only visits Standard + keyed.
+func TestMainSub_cycleSkipsKeylessConfig(t *testing.T) {
+	projects := []models.Project{{Name: "a", Path: "/a"}}
+	m := NewMainMenu(projects, []string{"claude", "codex"}, "claude", "animated")
+	m.SetSize(100, 40)
+	dir := t.TempDir()
+	writeKeyedConfig(t, dir, "work.json")
+	writeKeylessConfig(t, dir, "nokey.json")
+	m.SetClaudeConfigPaths(filepath.Join(dir, "list"), dir)
+	// Work (keyed, index 1) then NoKey (keyless, index 2).
+	m.SetClaudeConfigs([]ClaudeConfig{
+		{Name: "Work", File: "work.json"},
+		{Name: "NoKey", File: "nokey.json"},
+	})
+	m.SetFocus(FocusSubscription)
+
+	// Standard -> Work, then Work -> wrap to Standard (keyless NoKey skipped).
+	m.Update(tea.KeyMsg{Type: tea.KeyRight})
+	if m.CurrentClaudeConfigName() != "Work" {
+		t.Fatalf("first Right = %q, want Work", m.CurrentClaudeConfigName())
+	}
+	m.Update(tea.KeyMsg{Type: tea.KeyRight})
+	if m.CurrentClaudeConfigName() != "Standard Claude" {
+		t.Errorf("second Right = %q, want Standard Claude (keyless NoKey skipped)", m.CurrentClaudeConfigName())
+	}
+}
+
+// Focus is reachable as long as at least one keyed config exists, even when
+// other keyless configs are present.
+func TestMainSub_focusableWhenAnyKeyedConfigExists(t *testing.T) {
+	projects := []models.Project{{Name: "a", Path: "/a"}}
+	m := NewMainMenu(projects, []string{"claude", "codex"}, "claude", "animated")
+	m.SetSize(100, 40)
+	dir := t.TempDir()
+	writeKeyedConfig(t, dir, "work.json")
+	writeKeylessConfig(t, dir, "nokey.json")
+	m.SetClaudeConfigPaths(filepath.Join(dir, "list"), dir)
+	m.SetClaudeConfigs([]ClaudeConfig{
+		{Name: "NoKey", File: "nokey.json"},
+		{Name: "Work", File: "work.json"},
+	})
+	if !m.subscriptionFocusable() {
+		t.Errorf("subscription should be focusable when at least one keyed config exists")
 	}
 }
