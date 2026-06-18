@@ -1,8 +1,13 @@
 package bash_test
 
 import (
+	"context"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // format_file now shows the file BASENAME only (no parent path), truncating
@@ -75,5 +80,59 @@ func TestSumNumstat_empty_is_zero(t *testing.T) {
 	assertExitCode(t, code, 0)
 	if got := strings.TrimSpace(out); got != "0 0" {
 		t.Errorf("got %q, want %q", got, "0 0")
+	}
+}
+
+// Regression: the refresh loop must not leak the `w` (pane width) variable to
+// stdout. The pane runs the script under zsh, where `local NAME` with no
+// assignment on an already-set variable acts as a *display* command and prints
+// "NAME=value". With `local w` re-declared each loop iteration that flashed
+// "w=141" on screen until the next refresh.
+func TestCompactView_does_not_leak_width_variable_under_zsh(t *testing.T) {
+	zsh, err := exec.LookPath("zsh")
+	if err != nil {
+		t.Skip("zsh not available")
+	}
+	root := projectRoot(t)
+	module := filepath.Join(root, "lib", "compact-view.sh")
+
+	// A git repo with a modified tracked file so the view has content to render.
+	dir := t.TempDir()
+	git := func(args ...string) {
+		t.Helper()
+		c := exec.Command("git", append([]string{"-C", dir}, args...)...)
+		c.Env = append(os.Environ(),
+			"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t",
+			"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@t")
+		if out, err := c.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	git("init", "-q")
+	writeTempFile(t, dir, "app.txt", "one\n")
+	git("add", "app.txt")
+	git("commit", "-q", "-m", "init")
+	writeTempFile(t, dir, "app.txt", "one\ntwo\nthree\n")
+
+	// Run the real loop under zsh with a fast refresh so several iterations
+	// (and thus the second+ `local w`) happen quickly, then kill it.
+	ctx, cancel := context.WithTimeout(context.Background(), 1500*time.Millisecond)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, zsh, "-c",
+		"source "+module+" && compact_view "+dir)
+	// Drop TMUX so width comes from `tput cols`; keeps the test deterministic
+	// and independent of any attached tmux client.
+	env := []string{}
+	for _, e := range os.Environ() {
+		if strings.HasPrefix(e, "TMUX=") {
+			continue
+		}
+		env = append(env, e)
+	}
+	cmd.Env = append(env, "COMPACT_VIEW_INTERVAL=0.1", "TERM=xterm")
+	out, _ := cmd.CombinedOutput()
+
+	if strings.Contains(string(out), "w=") {
+		t.Errorf("width variable leaked to output (saw \"w=\"):\n%q", string(out))
 	}
 }

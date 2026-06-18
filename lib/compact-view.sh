@@ -77,10 +77,14 @@ compact_view() {
     printf "\n"
   }
 
+  # NOTE: declare loop-locals ONCE, before the loop. The pane runs this script
+  # under zsh, where `local NAME` (no assignment) on an already-set variable is
+  # a *display* command that prints "NAME=value" to stdout. Re-declaring `local
+  # w` each iteration flashed "w=141" on screen until the next refresh.
+  local w
   while true; do
     # Capture pane width outside subshell.
     # tput cols may return wrong value in tmux; query tmux directly.
-    local w
     if [ -n "${TMUX:-}" ] && command -v tmux &>/dev/null; then
       w=$(tmux display-message -p '#{pane_width}' 2>/dev/null || tput cols 2>/dev/null || echo 80)
     else
@@ -184,20 +188,9 @@ compact_view() {
       if [ "$has_content" -eq 0 ]; then
         printf " ${dim}no changes${reset}\n\n"
       fi
-
-      # ── Summary bar ──
-      printf " ${dimline}"
-      printf '%.*s' "$iw" '─'
-      printf "${reset}\n"
-      printf " "
-      [ "$n_staged" -gt 0 ] && printf " ${green}${n_staged} staged${reset}"
-      [ "$n_unstaged" -gt 0 ] && printf " ${yellow}${n_unstaged} mod${reset}"
-      [ "$n_untracked" -gt 0 ] && printf " ${dim}${n_untracked} new${reset}"
-      [ "$has_content" -eq 0 ] && printf " ${dim}clean${reset}"
-      printf "\n"
     )
 
     printf "%s" "$output"
-    sleep 2
+    sleep "${COMPACT_VIEW_INTERVAL:-2}"
   done
 }
