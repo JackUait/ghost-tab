@@ -7,14 +7,21 @@ import (
 )
 
 // boxBorders returns the rounded-box border strings shared by every tab body.
+// When a focus region is active the outer border brightens to Primary so the
+// user can see which box "owns" the keyboard at a glance.
 func (m *MainMenuModel) boxBorders() (top, separator, bottom, leftBorder, rightBorder string) {
+	borderColor := m.theme.Dim
+	if m.focus != FocusBody {
+		borderColor = m.theme.Primary
+	}
+	borderStyle := lipgloss.NewStyle().Foreground(borderColor)
 	dimStyle := lipgloss.NewStyle().Foreground(m.theme.Dim)
 	hLine := strings.Repeat("─", menuInnerWidth)
-	top = dimStyle.Render("╭" + hLine + "╮")
+	top = borderStyle.Render("╭" + hLine + "╮")
 	separator = dimStyle.Render("├" + hLine + "┤")
-	bottom = dimStyle.Render("╰" + hLine + "╯")
-	leftBorder = dimStyle.Render("│")
-	rightBorder = strings.Repeat(" ", menuPadding) + dimStyle.Render("│")
+	bottom = borderStyle.Render("╰" + hLine + "╯")
+	leftBorder = borderStyle.Render("│")
+	rightBorder = strings.Repeat(" ", menuPadding) + borderStyle.Render("│")
 	return
 }
 

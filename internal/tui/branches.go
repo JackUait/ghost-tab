@@ -409,14 +409,15 @@ func (m BranchPickerModel) renderSelectBox() string {
 
 			var row string
 			if selected {
-				marker := primaryBoldStyle.Render("\u258e")
+				selectedBgStyle := lipgloss.NewStyle().Background(lipgloss.Color("236"))
+				marker := primaryBoldStyle.Render("\u258c")
 				branchText := primaryBoldStyle.Render(truncBranch)
-				content := "  " + marker + " " + branchText
+				content := " " + marker + branchText
 				padding := menuContentWidth - lipgloss.Width(content)
 				if padding < 0 {
 					padding = 0
 				}
-				row = leftBorder + content + strings.Repeat(" ", padding) + rightBorder
+				row = leftBorder + selectedBgStyle.Render(content+strings.Repeat(" ", padding)) + rightBorder
 			} else {
 				branchText := primaryStyle.Render(truncBranch)
 				content := "    " + branchText

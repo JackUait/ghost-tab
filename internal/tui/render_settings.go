@@ -9,15 +9,16 @@ import (
 // renderSettingsItem renders a single settings item row with state right-aligned.
 func (m *MainMenuModel) renderSettingsItem(index int, label, stateText string, stateStyle, brightBoldStyle lipgloss.Style, leftBorder, rightBorder string) string {
 	stateRendered := stateStyle.Render(stateText)
+	selectedBgStyle := lipgloss.NewStyle().Background(lipgloss.Color("236"))
 	if m.settingsSelected == index {
-		marker := brightBoldStyle.Render("▎")
+		marker := brightBoldStyle.Render("▌")
 		labelText := brightBoldStyle.Render(label)
-		prefix := "  " + marker + " " + labelText
+		prefix := " " + marker + labelText
 		gap := menuContentWidth - lipgloss.Width(prefix) - lipgloss.Width(stateRendered) - 1
 		if gap < 1 {
 			gap = 1
 		}
-		return leftBorder + prefix + strings.Repeat(" ", gap) + stateRendered + " " + rightBorder
+		return leftBorder + selectedBgStyle.Render(prefix+strings.Repeat(" ", gap)+stateRendered+" ") + rightBorder
 	}
 	prefix := "    " + label
 	gap := menuContentWidth - lipgloss.Width(prefix) - lipgloss.Width(stateRendered) - 1

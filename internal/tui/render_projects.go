@@ -134,6 +134,7 @@ func (m *MainMenuModel) renderProjectRows(leftBorder, rightBorder string) []stri
 	deleteStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Bold(true)
 	staleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("220"))
 	deleteDimStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
+	selectedBgStyle := lipgloss.NewStyle().Background(lipgloss.Color("236"))
 
 	var rows []string
 
@@ -187,26 +188,28 @@ func (m *MainMenuModel) renderProjectRows(leftBorder, rightBorder string) []stri
 			// Delete mode: red styles. Normal mode: primary or flash.
 			selNameStyle := primaryBoldStyle
 			selPathStyle := primaryStyle
+			markerChar := "▌"
 			if m.deleteMode {
 				selNameStyle = deleteStyle
 				selPathStyle = deleteDimStyle
+				markerChar = "█" // full block for delete cursor, distinct from normal ▌ and tab bar ▐
 			} else if flashing {
 				selNameStyle = moveFlashStyle
 				selPathStyle = moveFlashStyle
 			}
 
-			marker := selNameStyle.Render("▎")
-			truncName := TruncateMiddle(proj.Name, menuContentWidth-7-len(num))
+			marker := selNameStyle.Render(markerChar)
+			truncName := TruncateMiddle(proj.Name, menuContentWidth-8-len(num))
 			nameText := selNameStyle.Render(num + "  " + truncName)
-			// "  ▎ 1  name" -> 2 spaces + marker + space + num + 2 spaces + name
-			// For stale projects, replace the first 2 spaces with "⚠ " marker.
+			// " ▌1  name" -> space + marker + num + 2 spaces + name
+			// For stale projects, replace the leading space with "⚠ " marker.
 			var namePrefix string
 			if proj.Stale && !m.deleteMode {
-				namePrefix = staleStyle.Render("⚠") + " "
+				namePrefix = staleStyle.Render("⚠")
 			} else {
-				namePrefix = "  "
+				namePrefix = " "
 			}
-			nameContent := namePrefix + marker + " " + nameText
+			nameContent := namePrefix + marker + nameText
 
 			if wtIndicator != "" {
 				wtStyled := dimStyle.Render(wtIndicator)
@@ -214,21 +217,33 @@ func (m *MainMenuModel) renderProjectRows(leftBorder, rightBorder string) []stri
 				if gap < 1 {
 					gap = 1
 				}
-				nameLine = leftBorder + nameContent + strings.Repeat(" ", gap) + wtStyled + rightBorder
+				if m.deleteMode {
+					nameLine = leftBorder + nameContent + strings.Repeat(" ", gap) + wtStyled + rightBorder
+				} else {
+					nameLine = leftBorder + selectedBgStyle.Render(nameContent+strings.Repeat(" ", gap)) + wtStyled + rightBorder
+				}
 			} else {
 				namePadding := menuContentWidth - lipgloss.Width(nameContent)
 				if namePadding < 0 {
 					namePadding = 0
 				}
-				nameLine = leftBorder + nameContent + strings.Repeat(" ", namePadding) + rightBorder
+				if m.deleteMode {
+					nameLine = leftBorder + nameContent + strings.Repeat(" ", namePadding) + rightBorder
+				} else {
+					nameLine = leftBorder + selectedBgStyle.Render(nameContent+strings.Repeat(" ", namePadding)) + rightBorder
+				}
 			}
 
-			pathContent := "       " + selPathStyle.Render(shortPath)
+			pathContent := "      " + selPathStyle.Render(shortPath)
 			pathPadding := menuContentWidth - lipgloss.Width(pathContent)
 			if pathPadding < 0 {
 				pathPadding = 0
 			}
-			pathLine = leftBorder + pathContent + strings.Repeat(" ", pathPadding) + rightBorder
+			if m.deleteMode {
+				pathLine = leftBorder + pathContent + strings.Repeat(" ", pathPadding) + rightBorder
+			} else {
+				pathLine = leftBorder + selectedBgStyle.Render(pathContent+strings.Repeat(" ", pathPadding)) + rightBorder
+			}
 		} else {
 			// Choose style: amber flash when recently moved, neutral otherwise.
 			rowNameStyle := neutralTextStyle
@@ -289,7 +304,7 @@ func (m *MainMenuModel) renderProjectRows(leftBorder, rightBorder string) []stri
 				shortWtPath := TruncateMiddle(shortenHomePath(wt.Path), menuContentWidth-11)
 
 				if wtDeleteSelected {
-					marker := deleteStyle.Render("▎")
+					marker := deleteStyle.Render("█")
 					connStyled := deleteStyle.Render(connector)
 					branchText := deleteStyle.Render(branchDisplay)
 					content := "     " + marker + " " + connStyled + " " + branchText
@@ -306,22 +321,22 @@ func (m *MainMenuModel) renderProjectRows(leftBorder, rightBorder string) []stri
 					}
 					wtPathLine = leftBorder + pathContent + strings.Repeat(" ", pathPadding) + rightBorder
 				} else if wtSelected {
-					marker := primaryBoldStyle.Render("▎")
+					marker := primaryBoldStyle.Render("▌")
 					connStyled := primaryBoldStyle.Render(connector)
 					branchText := primaryBoldStyle.Render(branchDisplay)
-					content := "     " + marker + " " + connStyled + " " + branchText
+					content := "    " + marker + connStyled + " " + branchText
 					padding := menuContentWidth - lipgloss.Width(content)
 					if padding < 0 {
 						padding = 0
 					}
-					wtBranchLine = leftBorder + content + strings.Repeat(" ", padding) + rightBorder
+					wtBranchLine = leftBorder + selectedBgStyle.Render(content+strings.Repeat(" ", padding)) + rightBorder
 
-					pathContent := "          " + primaryStyle.Render(shortWtPath)
+					pathContent := "         " + primaryStyle.Render(shortWtPath)
 					pathPadding := menuContentWidth - lipgloss.Width(pathContent)
 					if pathPadding < 0 {
 						pathPadding = 0
 					}
-					wtPathLine = leftBorder + pathContent + strings.Repeat(" ", pathPadding) + rightBorder
+					wtPathLine = leftBorder + selectedBgStyle.Render(pathContent+strings.Repeat(" ", pathPadding)) + rightBorder
 				} else {
 					connStyled := neutralDimStyle.Render(connector)
 					branchText := neutralTextStyle.Render(branchDisplay)
@@ -349,15 +364,15 @@ func (m *MainMenuModel) renderProjectRows(leftBorder, rightBorder string) []stri
 			addConnector := "└─"
 			var addWtLine string
 			if addWtSelected {
-				marker := primaryBoldStyle.Render("▎")
+				marker := primaryBoldStyle.Render("▌")
 				connStyled := primaryBoldStyle.Render(addConnector)
 				addLabel := primaryBoldStyle.Render("+ Add worktree")
-				content := "     " + marker + " " + connStyled + " " + addLabel
+				content := "    " + marker + connStyled + " " + addLabel
 				padding := menuContentWidth - lipgloss.Width(content)
 				if padding < 0 {
 					padding = 0
 				}
-				addWtLine = leftBorder + content + strings.Repeat(" ", padding) + rightBorder
+				addWtLine = leftBorder + selectedBgStyle.Render(content+strings.Repeat(" ", padding)) + rightBorder
 			} else {
 				connStyled := neutralDimStyle.Render(addConnector)
 				addLabel := neutralDimStyle.Render("+ Add worktree")
@@ -380,8 +395,12 @@ func (m *MainMenuModel) renderProjectRows(leftBorder, rightBorder string) []stri
 	addSel := lipgloss.NewStyle().Foreground(m.theme.Primary).Bold(true)
 	label := "+  Add project"
 	var prefix string
-	if itemType, _, _ := m.ResolveItem(m.selectedItem); itemType == "add-project" && !m.deleteMode {
-		prefix = "  " + addSel.Render("▎") + " " + addSel.Render(label)
+	addSelected := func() bool {
+		t, _, _ := m.ResolveItem(m.selectedItem)
+		return t == "add-project" && !m.deleteMode
+	}()
+	if addSelected {
+		prefix = " " + addSel.Render("▌") + addSel.Render(label)
 	} else {
 		prefix = "   " + addStyle.Render(label)
 	}
@@ -389,7 +408,11 @@ func (m *MainMenuModel) renderProjectRows(leftBorder, rightBorder string) []stri
 	if gap < 0 {
 		gap = 0
 	}
-	rows = append(rows, leftBorder+prefix+strings.Repeat(" ", gap)+rightBorder)
+	if addSelected {
+		rows = append(rows, leftBorder+selectedBgStyle.Render(prefix+strings.Repeat(" ", gap))+rightBorder)
+	} else {
+		rows = append(rows, leftBorder+prefix+strings.Repeat(" ", gap)+rightBorder)
+	}
 
 	return rows
 }

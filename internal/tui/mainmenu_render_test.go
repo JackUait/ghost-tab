@@ -761,12 +761,12 @@ func TestMenuBox_CursorVisibleAfterScrollDown(t *testing.T) {
 	m.selectedItem = 24 // 25th project
 	box := m.renderMenuBox()
 	raw := stripAnsi(box)
-	// The selected project's name should appear; also the cursor marker ▎ must be present.
+	// The selected project's name should appear with the cursor marker ▌.
 	if !strings.Contains(raw, m.projects[24].Name) {
 		t.Errorf("selected project %q not visible in scrolled view:\n%s", m.projects[24].Name, raw)
 	}
-	if !strings.Contains(raw, "▎") {
-		t.Errorf("cursor marker ▎ missing in scrolled view:\n%s", raw)
+	if !strings.Contains(raw, "▌25  "+m.projects[24].Name) {
+		t.Errorf("cursor marker ▌ missing on selected project in scrolled view:\n%s", raw)
 	}
 }
 
@@ -965,9 +965,9 @@ func TestMenuBox_AddProjectRowVisibleWhenOverflow(t *testing.T) {
 	box := m.renderMenuBox()
 	raw := stripAnsi(box)
 
-	// (a) add-project row must be visible with its selection marker.
-	if !strings.Contains(raw, "▎") {
-		t.Errorf("add-project row missing selection marker ▎ in scrolled view:\n%s", raw)
+	// (a) add-project row must be visible with its selection marker ▌.
+	if !strings.Contains(raw, "▌+  Add project") {
+		t.Errorf("add-project row with cursor marker ▌ missing in scrolled view:\n%s", raw)
 	}
 	if !strings.Contains(raw, "Add project") {
 		t.Errorf("add-project row text missing in scrolled view:\n%s", raw)

@@ -166,7 +166,7 @@ func (m *MainMenuModel) renderModelMapPanel() string {
 	for i, alias := range claudeconfig.AnthropicAliases {
 		var prefix string
 		if i == m.modelMapCursor {
-			prefix = "  " + primaryBoldStyle.Render("▎") + " "
+			prefix = " " + primaryBoldStyle.Render("▌")
 		} else {
 			prefix = "    "
 		}

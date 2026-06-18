@@ -773,9 +773,17 @@ func TestMainMenu_ViewSelectedMarker(t *testing.T) {
 	m := tui.NewMainMenu(projects, []string{"claude"}, "claude", "animated")
 	m.SetSize(80, 30)
 	view := m.View()
-	// Selected item (first) should have marker
-	if !strings.Contains(view, "\u258e") {
-		t.Error("view should contain selection marker \u258e")
+	// Selected item (first) should have cursor marker \u258c on its line
+	lines := strings.Split(view, "\n")
+	found := false
+	for _, line := range lines {
+		if strings.Contains(line, "p1") && strings.Contains(line, "\u258c") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("view should contain selection marker \u258c on the selected project line")
 	}
 }
 
@@ -3091,9 +3099,9 @@ func TestMainMenu_View_DeleteMode_SelectedItemUsesMarker(t *testing.T) {
 
 	view := mm.View()
 
-	// Selected item (index 0, "ghost-tab") should have the ▎ marker
-	if !strings.Contains(view, "▎") {
-		t.Error("Delete mode selected item should contain the ▎ marker")
+	// Selected item (index 0, "ghost-tab") should have the █ delete cursor marker
+	if !strings.Contains(view, "█") {
+		t.Error("Delete mode selected item should contain the █ delete cursor marker")
 	}
 }
 
@@ -3173,10 +3181,11 @@ func TestMainMenu_View_DeleteMode_NoActionItemSelected(t *testing.T) {
 
 	view := mm.View()
 
-	// Count occurrences of ▎ — only one should appear (the delete-selected project)
-	count := strings.Count(view, "▎")
+	// Count occurrences of █ — only one should appear (the delete-selected project).
+	// █ is the delete-mode cursor marker, distinct from ▌ used in normal mode.
+	count := strings.Count(view, "█")
 	if count != 1 {
-		t.Errorf("Delete mode view should have exactly 1 ▎ marker (delete-selected project), got %d", count)
+		t.Errorf("Delete mode view should have exactly 1 █ marker (delete-selected project), got %d", count)
 	}
 }
 
@@ -4344,27 +4353,27 @@ func TestDeleteMode_RenderWorktreeMarker(t *testing.T) {
 
 	view := mm3.View()
 
-	// The worktree row for "feat" must contain the ▎ marker
+	// The worktree row for "feat" must contain the █ delete cursor marker
 	lines := strings.Split(view, "\n")
 	markerOnFeatLine := false
 	for _, line := range lines {
-		if strings.Contains(line, "feat") && strings.Contains(line, "▎") {
+		if strings.Contains(line, "feat") && strings.Contains(line, "█") {
 			markerOnFeatLine = true
 		}
 	}
 	if !markerOnFeatLine {
-		t.Error("delete mode should show ▎ marker on the targeted worktree row (feat)")
+		t.Error("delete mode should show █ marker on the targeted worktree row (feat)")
 	}
 
-	// The project row "proj1" must NOT have the ▎ marker
+	// The project row "proj1" must NOT have the █ delete cursor marker
 	markerOnProj1 := false
 	for _, line := range lines {
-		if strings.Contains(line, "proj1") && strings.Contains(line, "▎") {
+		if strings.Contains(line, "proj1") && strings.Contains(line, "█") {
 			markerOnProj1 = true
 		}
 	}
 	if markerOnProj1 {
-		t.Error("delete mode should not show ▎ marker on the project row when a worktree is targeted")
+		t.Error("delete mode should not show █ marker on the project row when a worktree is targeted")
 	}
 }
 
