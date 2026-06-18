@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Changeset — feature/compact-view</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --paper:        #f4efe6;
+    --paper-edge:   #ece4d6;
+    --ink:          #1c1a17;
+    --ink-soft:     #6a635a;
+    --ink-faint:    #a89f91;
+    --rule:         #d9cfbe;
+    --rule-strong:  #c4b8a3;
+    --add:          #3f7d3a;
+    --add-bar:      #6aa05f;
+    --del:          #b23a32;
+    --del-bar:      #cf6c5f;
+    --stamp:        #b23a32;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+
+  body {
+    min-height: 100vh;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "JetBrains Mono", monospace;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: clamp(1.5rem, 6vw, 5rem) 1.25rem;
+    /* subtle paper grain + vignette */
+    background-image:
+      radial-gradient(120% 80% at 50% -10%, rgba(255,255,255,.5), transparent 60%),
+      radial-gradient(100% 120% at 50% 120%, rgba(120,100,70,.07), transparent 55%);
+  }
+
+  /* fine paper noise overlay */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    opacity: .035;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+    mix-blend-mode: multiply;
+  }
+
+  .ledger {
+    width: min(640px, 100%);
+    background:
+      linear-gradient(var(--paper), var(--paper)) padding-box,
+      linear-gradient(180deg, var(--rule-strong), var(--rule)) border-box;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    box-shadow:
+      0 1px 0 rgba(255,255,255,.7) inset,
+      0 18px 40px -24px rgba(60,45,20,.45),
+      0 2px 6px -2px rgba(60,45,20,.2);
+    padding: clamp(1.75rem, 5vw, 2.75rem) clamp(1.5rem, 5vw, 2.75rem);
+    position: relative;
+  }
+
+  /* ───────── header ───────── */
+  .head { position: relative; }
+
+  .eyebrow {
+    font-size: .68rem;
+    letter-spacing: .32em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    display: flex;
+    align-items: center;
+    gap: .7rem;
+  }
+  .eyebrow::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: repeating-linear-gradient(90deg, var(--rule) 0 4px, transparent 4px 8px);
+  }
+
+  .branch {
+    font-family: "Fraunces", serif;
+    font-weight: 500;
+    font-size: clamp(2.1rem, 7vw, 3.25rem);
+    line-height: 1.02;
+    letter-spacing: -.015em;
+    margin: .55rem 0 .15rem;
+    display: flex;
+    align-items: baseline;
+    gap: .55rem;
+    flex-wrap: wrap;
+  }
+  .branch .slash { color: var(--ink-faint); font-style: italic; }
+  .branch .leaf  { font-style: italic; }
+
+  .meta {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    font-size: .72rem;
+    color: var(--ink-soft);
+    letter-spacing: .04em;
+    margin-top: .35rem;
+  }
+  .meta .dot { width: 4px; height: 4px; border-radius: 50%; background: var(--ink-faint); }
+
+  /* totals stamp, top-right */
+  .totals {
+    position: absolute;
+    top: .1rem;
+    right: 0;
+    text-align: right;
+    font-size: .72rem;
+    letter-spacing: .04em;
+  }
+  .totals .figs { display: flex; gap: .65rem; justify-content: flex-end; font-weight: 700; }
+  .totals .plus  { color: var(--add); }
+  .totals .minus { color: var(--del); }
+  .totals .label { color: var(--ink-faint); font-size: .6rem; letter-spacing: .22em; text-transform: uppercase; margin-top: .25rem; }
+
+  /* ───────── rule under header ───────── */
+  .divider {
+    height: 2px;
+    margin: 1.5rem 0 .35rem;
+    background:
+      linear-gradient(90deg, var(--ink) 0 38px, transparent 38px),
+      var(--rule);
+  }
+
+  /* ───────── file rows ───────── */
+  .rows { list-style: none; }
+
+  .row {
+    display: grid;
+    grid-template-columns: 1.4rem 1fr auto;
+    align-items: center;
+    gap: .85rem;
+    padding: .72rem 0;
+    border-bottom: 1px solid var(--rule);
+    position: relative;
+    opacity: 0;
+    transform: translateY(6px);
+    animation: rise .5s cubic-bezier(.2,.7,.3,1) forwards;
+  }
+  .row:last-child { border-bottom: none; }
+
+  .row:hover .name { color: #000; }
+  .row:hover { background: linear-gradient(90deg, rgba(120,90,40,.05), transparent 70%); }
+
+  /* status glyph */
+  .glyph {
+    font-size: .7rem;
+    font-weight: 700;
+    width: 1.4rem;
+    height: 1.4rem;
+    display: grid;
+    place-items: center;
+    border-radius: 2px;
+    border: 1px solid currentColor;
+    line-height: 1;
+  }
+  .g-mod { color: #9a7b22; }
+  .g-add { color: var(--add); }
+  .g-del { color: var(--del); }
+  .g-ren { color: var(--ink-soft); }
+
+  .file { display: flex; flex-direction: column; gap: .12rem; min-width: 0; }
+  .name {
+    font-size: .95rem;
+    font-weight: 500;
+    color: var(--ink);
+    letter-spacing: -.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: color .15s ease;
+  }
+  .dir {
+    font-size: .62rem;
+    color: var(--ink-faint);
+    letter-spacing: .03em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* counts + barcode */
+  .counts { display: flex; align-items: center; gap: .85rem; }
+  .nums { display: flex; gap: .55rem; font-size: .78rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .nums .add { color: var(--add); }
+  .nums .del { color: var(--del); }
+  .nums .add::before { content: "+"; opacity: .65; font-weight: 400; }
+  .nums .del::before { content: "−"; opacity: .65; font-weight: 400; }
+  .nums .zero { color: var(--ink-faint); opacity: .5; }
+
+  .bars { display: flex; gap: 2px; width: 56px; justify-content: flex-end; }
+  .bars span { width: 5px; height: 11px; border-radius: 1px; background: var(--rule-strong); }
+  .bars span.a { background: var(--add-bar); }
+  .bars span.d { background: var(--del-bar); }
+
+  /* ───────── footer ───────── */
+  .foot {
+    margin-top: 1.6rem;
+    padding-top: 1rem;
+    border-top: 2px solid var(--ink);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: .66rem;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+  .foot .seal {
+    font-family: "Fraunces", serif;
+    font-style: italic;
+    text-transform: none;
+    letter-spacing: 0;
+    font-size: .82rem;
+    color: var(--ink-faint);
+  }
+
+  @keyframes rise { to { opacity: 1; transform: translateY(0); } }
+
+  @media (max-width: 460px) {
+    .totals { position: static; text-align: left; margin-top: .8rem; }
+    .totals .figs { justify-content: flex-start; }
+    .bars { display: none; }
+  }
+</style>
+</head>
+<body>
+  <main class="ledger">
+    <header class="head">
+      <p class="eyebrow">Working Changeset · 7 files</p>
+
+      <h1 class="branch">
+        feat<span class="slash">/</span><span class="leaf">compact-view</span>
+      </h1>
+
+      <div class="meta">
+        <span>from main</span>
+        <span class="dot"></span>
+        <span>3 commits ahead</span>
+        <span class="dot"></span>
+        <span>updated 2m ago</span>
+      </div>
+
+      <div class="totals">
+        <div class="figs"><span class="plus">+418</span><span class="minus">−126</span></div>
+        <div class="label">Net Lines</div>
+      </div>
+    </header>
+
+    <div class="divider"></div>
+
+    <ul class="rows">
+      <li class="row" style="animation-delay:.05s">
+        <span class="glyph g-mod">M</span>
+        <span class="file">
+          <span class="name">compact-view.go</span>
+          <span class="dir">internal/tui</span>
+        </span>
+        <span class="counts">
+          <span class="nums"><span class="add">142</span><span class="del">38</span></span>
+          <span class="bars"><span class="a"></span><span class="a"></span><span class="a"></span><span class="a"></span><span class="d"></span></span>
+        </span>
+      </li>
+
+      <li class="row" style="animation-delay:.11s">
+        <span class="glyph g-add">A</span>
+        <span class="file">
+          <span class="name">truncate.go</span>
+          <span class="dir">internal/util</span>
+        </span>
+        <span class="counts">
+          <span class="nums"><span class="add">96</span><span class="del zero">0</span></span>
+          <span class="bars"><span class="a"></span><span class="a"></span><span class="a"></span><span class="a"></span><span class="a"></span></span>
+        </span>
+      </li>
+
+      <li class="row" style="animation-delay:.17s">
+        <span class="glyph g-mod">M</span>
+        <span class="file">
+          <span class="name">tmux-session.sh</span>
+          <span class="dir">lib</span>
+        </span>
+        <span class="counts">
+          <span class="nums"><span class="add">54</span><span class="del">29</span></span>
+          <span class="bars"><span class="a"></span><span class="a"></span><span class="a"></span><span class="d"></span><span class="d"></span></span>
+        </span>
+      </li>
+
+      <li class="row" style="animation-delay:.23s">
+        <span class="glyph g-ren">R</span>
+        <span class="file">
+          <span class="name">styles.go</span>
+          <span class="dir">internal/tui · renamed from theme.go</span>
+        </span>
+        <span class="counts">
+          <span class="nums"><span class="add">61</span><span class="del">41</span></span>
+          <span class="bars"><span class="a"></span><span class="a"></span><span class="a"></span><span class="d"></span><span class="d"></span></span>
+        </span>
+      </li>
+
+      <li class="row" style="animation-delay:.29s">
+        <span class="glyph g-mod">M</span>
+        <span class="file">
+          <span class="name">compact-view_test.go</span>
+          <span class="dir">test/internal</span>
+        </span>
+        <span class="counts">
+          <span class="nums"><span class="add">48</span><span class="del">6</span></span>
+          <span class="bars"><span class="a"></span><span class="a"></span><span class="a"></span><span class="a"></span><span class="d"></span></span>
+        </span>
+      </li>
+
+      <li class="row" style="animation-delay:.35s">
+        <span class="glyph g-del">D</span>
+        <span class="file">
+          <span class="name">legacy-panel.sh</span>
+          <span class="dir">lib</span>
+        </span>
+        <span class="counts">
+          <span class="nums"><span class="add zero">0</span><span class="del">12</span></span>
+          <span class="bars"><span class="d"></span><span class="d"></span><span class="d"></span><span class="d"></span><span class="d"></span></span>
+        </span>
+      </li>
+
+      <li class="row" style="animation-delay:.41s">
+        <span class="glyph g-mod">M</span>
+        <span class="file">
+          <span class="name">CHANGELOG.md</span>
+          <span class="dir">root</span>
+        </span>
+        <span class="counts">
+          <span class="nums"><span class="add">17</span><span class="del zero">0</span></span>
+          <span class="bars"><span class="a"></span><span class="a"></span><span class="a"></span><span class="a"></span><span class="a"></span></span>
+        </span>
+      </li>
+    </ul>
+
+    <footer class="foot">
+      <span>Reviewed · ready to push</span>
+      <span class="seal">git ledger №&nbsp;0xD7B</span>
+    </footer>
+  </main>
+</body>
+</html>
