@@ -1039,7 +1039,7 @@ func TestMainMenu_MapRowToItem_AddProjectRow(t *testing.T) {
 	if m.MapRowToItem(8) != 1 {
 		t.Errorf("click at add-project row should map to item 1, got %d", m.MapRowToItem(8))
 	}
-	if m.MapRowToItem(1) != m.TotalItems()-1 && m.MapRowToItem(8) != m.TotalItems()-1 {
+	if m.MapRowToItem(8) != m.TotalItems()-1 {
 		t.Errorf("add-project row should be the final selectable item (%d), got %d", m.TotalItems()-1, m.MapRowToItem(8))
 	}
 	// Rows past the add-project row are not selectable items.

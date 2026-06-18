@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"os"
 	"regexp"
 	"strings"
@@ -939,6 +940,40 @@ func TestMenuBox_ScrollsWithExpandedWorktrees(t *testing.T) {
 	}
 	if !strings.Contains(raw, "▼") {
 		t.Errorf("expected ▼ indicator for content below:\n%s", raw)
+	}
+}
+
+func TestMenuBox_AddProjectRowVisibleWhenOverflow(t *testing.T) {
+	// Regression: cursorBodyRow had stale "action" case that returned 0 when
+	// cursor is on add-project row, pinning viewport to top and hiding the row.
+	// Build a list large enough to overflow a short terminal.
+	projects := make([]models.Project, 30)
+	for i := range projects {
+		projects[i] = models.Project{
+			Name: fmt.Sprintf("project-%02d", i),
+			Path: fmt.Sprintf("/tmp/p%02d", i),
+		}
+	}
+	m := NewMainMenu(projects, []string{"claude"}, "claude", "none")
+	m.width = 100
+	m.height = 24 // short enough to trigger scroll with 30 projects
+	// Move cursor to add-project (last selectable item).
+	m.selectedItem = m.TotalItems() - 1
+
+	box := m.renderMenuBox()
+	raw := stripAnsi(box)
+
+	// (a) add-project row must be visible with its selection marker.
+	if !strings.Contains(raw, "▎") {
+		t.Errorf("add-project row missing selection marker ▎ in scrolled view:\n%s", raw)
+	}
+	if !strings.Contains(raw, "Add project") {
+		t.Errorf("add-project row text missing in scrolled view:\n%s", raw)
+	}
+
+	// (b) scroll indicator ▲ must appear (there is content above the viewport).
+	if !strings.Contains(raw, "▲") {
+		t.Errorf("expected ▲ scroll indicator (content above cursor), got:\n%s", raw)
 	}
 }
 

@@ -11,7 +11,7 @@ import (
 func actionBarFor(itemType string) string {
 	switch itemType {
 	case "project":
-		return "▸ Open    ⟕ Worktrees    ✕ Delete"
+		return "▸ Open    ◆ Worktrees    ✕ Delete"
 	case "worktree":
 		return "▸ Open    ✕ Delete"
 	case "add-project":

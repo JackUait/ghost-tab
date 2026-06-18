@@ -89,7 +89,7 @@ not an incremental tweak.
 │                                                    │
 │   +  Add project                                    │  always-last inline "new" row
 ├────────────────────────────────────────────────────┤
-│  ▸ Open      ⟕ Worktrees      ✕ Delete              │  contextual to selected row
+│  ▸ Open      ◆ Worktrees      ✕ Delete              │  contextual to selected row
 ╰────────────────────────────────────────────────────╯
   ↑↓ move · ⇧↑↓ reorder · ←→ AI · ↵ open · O once · P plain
 ```

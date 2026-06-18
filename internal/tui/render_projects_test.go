@@ -61,6 +61,9 @@ func TestRenderMenuBox_emptyState(t *testing.T) {
 	if !strings.Contains(out, "No projects yet") {
 		t.Errorf("empty state missing prompt: %q", out)
 	}
+	if !strings.Contains(out, "press A to add") {
+		t.Errorf("empty state missing 'press A to add' suffix: %q", out)
+	}
 	if !strings.Contains(out, "Add project") {
 		t.Errorf("empty state should still offer add row")
 	}

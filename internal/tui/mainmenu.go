@@ -855,6 +855,7 @@ func (m *MainMenuModel) ActiveTab() MenuTab { return m.activeTab }
 func (m *MainMenuModel) SetActiveTab(t MenuTab) { m.activeTab = t }
 
 // CycleTab moves to the next/prev tab, wrapping across all tabs.
+// Any direction other than "prev" is treated as "next".
 func (m *MainMenuModel) CycleTab(direction string) {
 	if direction == "prev" {
 		m.activeTab = (m.activeTab - 1 + menuTabCount) % menuTabCount
@@ -1546,7 +1547,7 @@ func (m *MainMenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.CycleAITool("next")
 			return m, nil
 		case tea.KeyEnter:
-			itemType, projectIdx, _ := m.ResolveItem(m.selectedItem)
+			itemType, _, _ := m.ResolveItem(m.selectedItem)
 			switch itemType {
 			case "add-project":
 				return m.enterInputMode("add-project")
@@ -1556,7 +1557,6 @@ func (m *MainMenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				return m, nil
 			}
-			_ = projectIdx
 			if cmd := m.selectCurrent(); cmd != nil {
 				return m, cmd
 			}
@@ -2575,12 +2575,9 @@ func (m *MainMenuModel) cursorBodyRow() int {
 		return baseProjectRow(projectIdx) + 2 + 2*worktreeIdx
 	case "add-worktree":
 		return baseProjectRow(projectIdx) + 2 + 2*len(m.projects[projectIdx].Worktrees)
-	case "action":
-		row := baseProjectRow(len(m.projects))
-		if len(m.projects) > 0 {
-			row++ // separator between projects and actions
-		}
-		return row + projectIdx
+	case "add-project":
+		// add-project row = all project rows + blank spacer row.
+		return baseProjectRow(len(m.projects)) + 1
 	}
 	return 0
 }
