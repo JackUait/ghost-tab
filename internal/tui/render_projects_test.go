@@ -55,6 +55,37 @@ func TestAddProjectRow_isSelectable(t *testing.T) {
 // TestMapRowToItem_matchesRenderedLayout verifies that click-row → item mapping
 // stays in sync with the redesigned projects body: an extra tab-bar row near
 // the top, no action rows, and the add-project row mapped to its flat index.
+func TestRenderMenuBox_emptyState(t *testing.T) {
+	m := NewMainMenu(nil, []string{"claude"}, "claude", "none")
+	out := m.renderMenuBox()
+	if !strings.Contains(out, "No projects yet") {
+		t.Errorf("empty state missing prompt: %q", out)
+	}
+	if !strings.Contains(out, "Add project") {
+		t.Errorf("empty state should still offer add row")
+	}
+}
+
+func TestCalculateLayout_accountsForTabBar(t *testing.T) {
+	projects := []models.Project{{Name: "a", Path: "/tmp/a"}}
+	m := NewMainMenu(projects, []string{"claude"}, "claude", "none")
+	layout := m.CalculateLayout(120, 40)
+	// Rendered line count for 1 project = 13 (box 12 + help 1).
+	// MenuHeight must equal that; old formula (+4 action rows) gives 14.
+	if layout.MenuHeight != 13 {
+		t.Errorf("MenuHeight = %d, want 13 (must match rendered lines)", layout.MenuHeight)
+	}
+}
+
+func TestCalculateLayout_emptyStateAddsRow(t *testing.T) {
+	// 0 projects: renderMenuBox emits empty-state row → 12 total lines.
+	m := NewMainMenu(nil, []string{"claude"}, "claude", "none")
+	layout := m.CalculateLayout(120, 40)
+	if layout.MenuHeight != 12 {
+		t.Errorf("MenuHeight (0 proj) = %d, want 12", layout.MenuHeight)
+	}
+}
+
 func TestMapRowToItem_matchesRenderedLayout(t *testing.T) {
 	projects := []models.Project{
 		{Name: "alpha", Path: "/tmp/a"},

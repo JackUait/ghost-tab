@@ -1135,12 +1135,8 @@ func (m *MainMenuModel) StaleConfirmIdx() int { return m.staleConfirmIdx }
 // CalculateLayout determines how the ghost and menu should be arranged.
 func (m *MainMenuModel) CalculateLayout(width, height int) MenuLayout {
 	numProjects := len(m.projects)
-	numSeparators := 0
-	if numProjects > 0 {
-		numSeparators = 1
-	}
 	// Projects = 2 rows each, worktrees = 2 rows each (branch + path),
-	// add-worktree = 1 row each, actions = 1 row each
+	// add-worktree = 1 row each.
 	projectRows := numProjects * 2
 	expandedProjectCount := 0
 	for idx := range m.expandedWorktrees {
@@ -1151,8 +1147,15 @@ func (m *MainMenuModel) CalculateLayout(width, height int) MenuLayout {
 	wtEntryCount := m.expandedWorktreeCount() - expandedProjectCount // actual worktrees only
 	worktreeRows := wtEntryCount * 2                                 // worktrees are 2 rows each
 	addWorktreeRows := expandedProjectCount                          // add-worktree is 1 row each
-	actionRows := len(actionNames)
-	menuHeight := 7 + projectRows + worktreeRows + addWorktreeRows + actionRows + numSeparators
+	// emptyStateRow: renderProjectRows emits one extra centered-prompt row when
+	// there are no projects.
+	emptyStateRow := 0
+	if numProjects == 0 {
+		emptyStateRow = 1
+	}
+	// 11 fixed chrome lines: top + title + tab-bar + sep + leading-blank +
+	// spacer-before-add + add-project + sep-before-action + action-bar + bottom + help.
+	menuHeight := 11 + projectRows + worktreeRows + addWorktreeRows + emptyStateRow
 	menuWidth := 58
 
 	ghostPosition := "hidden"

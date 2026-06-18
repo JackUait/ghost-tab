@@ -87,6 +87,21 @@ func (m *MainMenuModel) renderProjectRows(leftBorder, rightBorder string) []stri
 	emptyRow := leftBorder + strings.Repeat(" ", menuContentWidth) + rightBorder
 	rows = append(rows, emptyRow)
 
+	// Empty-state prompt when no projects exist.
+	if len(m.projects) == 0 {
+		msg := lipgloss.NewStyle().Foreground(m.theme.Dim).
+			Render("No projects yet · press A to add")
+		pad := (menuContentWidth - lipgloss.Width(msg)) / 2
+		if pad < 0 {
+			pad = 0
+		}
+		gap := menuContentWidth - pad - lipgloss.Width(msg)
+		if gap < 0 {
+			gap = 0
+		}
+		rows = append(rows, leftBorder+strings.Repeat(" ", pad)+msg+strings.Repeat(" ", gap)+rightBorder)
+	}
+
 	// Project items
 	for i, proj := range m.projects {
 		selected := func() bool {
@@ -435,7 +450,10 @@ func (m *MainMenuModel) renderMenuBox() string {
 	if m.updateVersion != "" {
 		headerEnd = 6
 	}
-	footerStart := len(lines) - 3
+	// Footer = separator-before-action + action-bar + bottom + help (4 lines).
+	// Keeping the separator in the footer ensures the action bar never renders
+	// detached when the body is clipped at tiny terminal heights.
+	footerStart := len(lines) - 4
 	avail := m.availableMenuHeight()
 	if avail > 0 && len(lines) > avail && headerEnd < footerStart {
 		lines = m.applyMenuScroll(lines, headerEnd, footerStart, avail)

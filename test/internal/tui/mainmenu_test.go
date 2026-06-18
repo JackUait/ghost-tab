@@ -255,22 +255,23 @@ func TestMainMenu_LayoutCalculation(t *testing.T) {
 }
 
 func TestMainMenu_LayoutCalculation_MenuHeight(t *testing.T) {
-	// 3 projects (2 rows each) + 4 actions (1 row each) + 1 separator
+	// 3 projects (2 rows each). Chrome = 11 fixed lines (tab-bar + action-bar
+	// now included in the constant; old 4 action-item rows removed).
 	projects := testProjects()
 	m := tui.NewMainMenu(projects, testAITools(), "claude", "animated")
 	layout := m.CalculateLayout(100, 40)
 
-	// MenuHeight = 7 (chrome) + 3*2 (projects) + 4 (actions) + 1 (separator) = 18
-	expectedHeight := 7 + (3 * 2) + 4 + 1
+	// MenuHeight = 11 (chrome) + 3*2 (projects) = 17
+	expectedHeight := 11 + (3 * 2)
 	if layout.MenuHeight != expectedHeight {
 		t.Errorf("MenuHeight with 3 projects: expected %d, got %d", expectedHeight, layout.MenuHeight)
 	}
 
-	// 0 projects + 4 actions (1 row each), 0 separators (no projects means no separator)
+	// 0 projects: empty-state row adds 1 line.
+	// MenuHeight = 11 (chrome) + 1 (empty-state row) = 12
 	m2 := tui.NewMainMenu(nil, testAITools(), "claude", "animated")
 	layout2 := m2.CalculateLayout(100, 40)
-	// MenuHeight = 7 (chrome) + 0 (projects) + 4 (actions) + 0 (separator) = 11
-	expectedHeight2 := 7 + 0 + 4 + 0
+	expectedHeight2 := 11 + 1
 	if layout2.MenuHeight != expectedHeight2 {
 		t.Errorf("MenuHeight with 0 projects: expected %d, got %d", expectedHeight2, layout2.MenuHeight)
 	}
@@ -3867,10 +3868,8 @@ func TestMainMenu_CalculateLayoutWithWorktrees(t *testing.T) {
 
 	layout1 := m.CalculateLayout(100, 40)
 
-	// Collapsed: 3 projects * 2 rows + 4 actions * 1 row + 7 (chrome) + 1 (separator) = 18
-	// 7 = top border + title + separator + empty + separator-before-help + help + bottom border
-	// Total = 7 + 6 + 4 + 1 = 18
-	expectedCollapsed := 7 + (3 * 2) + 4 + 1
+	// Collapsed: 11 (chrome) + 3*2 (projects) = 17
+	expectedCollapsed := 11 + (3 * 2)
 	if layout1.MenuHeight != expectedCollapsed {
 		t.Errorf("collapsed height: got %d, want %d", layout1.MenuHeight, expectedCollapsed)
 	}
@@ -3879,8 +3878,8 @@ func TestMainMenu_CalculateLayoutWithWorktrees(t *testing.T) {
 	m.ToggleWorktrees(0)
 	layout2 := m.CalculateLayout(100, 40)
 
-	// Expanded: 3 projects * 2 rows + 2 worktrees * 2 rows + 1 add-worktree * 1 row + 4 actions * 1 row + 7 + 1 = 23
-	expectedExpanded := 7 + (3 * 2) + (2 * 2) + 1 + 4 + 1
+	// Expanded: 11 (chrome) + 3*2 (projects) + 2*2 (worktrees) + 1 (add-worktree) = 22
+	expectedExpanded := 11 + (3 * 2) + (2 * 2) + 1
 	if layout2.MenuHeight != expectedExpanded {
 		t.Errorf("expanded height: got %d, want %d", layout2.MenuHeight, expectedExpanded)
 	}
@@ -4058,10 +4057,9 @@ func TestMainMenu_CalculateLayoutWithAddWorktree(t *testing.T) {
 	m.ToggleWorktrees(2)
 
 	layout := m.CalculateLayout(100, 60)
-	// 7 (chrome) + 3*2 (projects) + 3*2 (worktrees) + 2*1 (add-worktree) + 4 (actions) + 1 (separator)
-	// = 7 + 6 + 6 + 2 + 4 + 1 = 26
-	if layout.MenuHeight != 26 {
-		t.Errorf("menu height: got %d, want 26", layout.MenuHeight)
+	// 11 (chrome) + 3*2 (projects) + 3*2 (worktrees) + 2*1 (add-worktree) = 25
+	if layout.MenuHeight != 25 {
+		t.Errorf("menu height: got %d, want 25", layout.MenuHeight)
 	}
 }
 
