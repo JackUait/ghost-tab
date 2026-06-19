@@ -11,14 +11,25 @@ func (m *MainMenuModel) renderSettingsItem(index int, label, stateText string, s
 	stateRendered := stateStyle.Render(stateText)
 	selectedBgStyle := lipgloss.NewStyle().Background(lipgloss.Color("236"))
 	if m.settingsSelected == index {
-		marker := brightBoldStyle.Render("▌")
-		labelText := brightBoldStyle.Render(label)
+		// Loud selection only when the body holds focus; off-focus the row drops
+		// to a faint neutral cursor marker with no wash, so the nav pill is the
+		// only thing reading as "selected" (matches the Projects list).
+		markerStyle := brightBoldStyle
+		labelStyle := brightBoldStyle
+		washStyle := selectedBgStyle
+		if m.focus != FocusBody {
+			markerStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
+			labelStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
+			washStyle = lipgloss.NewStyle()
+		}
+		marker := markerStyle.Render("▌")
+		labelText := labelStyle.Render(label)
 		prefix := " " + marker + labelText
 		gap := menuContentWidth - lipgloss.Width(prefix) - lipgloss.Width(stateRendered) - 1
 		if gap < 1 {
 			gap = 1
 		}
-		return leftBorder + selectedBgStyle.Render(prefix+strings.Repeat(" ", gap)+stateRendered+" ") + rightBorder
+		return leftBorder + washStyle.Render(prefix+strings.Repeat(" ", gap)+stateRendered+" ") + rightBorder
 	}
 	prefix := "    " + label
 	gap := menuContentWidth - lipgloss.Width(prefix) - lipgloss.Width(stateRendered) - 1

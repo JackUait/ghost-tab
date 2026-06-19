@@ -192,6 +192,46 @@ func TestSelectedRow_keepsWashWhenBodyFocused(t *testing.T) {
 	}
 }
 
+// The Settings body follows the same focus-mute rule as the Projects list:
+// with the nav focused, the selected setting row must not show its wash.
+func TestSettingsRow_mutedWhenNavFocused(t *testing.T) {
+	prev := lipgloss.ColorProfile()
+	lipgloss.SetColorProfile(termenv.TrueColor)
+	defer lipgloss.SetColorProfile(prev)
+
+	m := NewMainMenu(nil, []string{"claude"}, "claude", "none")
+	m.SetActiveTab(TabSettings)
+	m.SetFocus(FocusTabs) // navigation focused
+	box := m.renderSettingsBox()
+
+	line := findLineContaining(box, "Ghost Display")
+	if line == "" {
+		t.Fatalf("could not find Ghost Display row in:\n%s", box)
+	}
+	if strings.Contains(line, "48;5;236") {
+		t.Errorf("selected settings row must not show the wash when nav is focused: %q", line)
+	}
+}
+
+// Contrast: with the body focused, the selected setting row keeps its wash.
+func TestSettingsRow_keepsWashWhenBodyFocused(t *testing.T) {
+	prev := lipgloss.ColorProfile()
+	lipgloss.SetColorProfile(termenv.TrueColor)
+	defer lipgloss.SetColorProfile(prev)
+
+	m := NewMainMenu(nil, []string{"claude"}, "claude", "none")
+	m.SetActiveTab(TabSettings) // focus stays on the body
+	box := m.renderSettingsBox()
+
+	line := findLineContaining(box, "Ghost Display")
+	if line == "" {
+		t.Fatalf("could not find Ghost Display row in:\n%s", box)
+	}
+	if !strings.Contains(line, "48;5;236") {
+		t.Errorf("selected settings row should show the wash when body is focused: %q", line)
+	}
+}
+
 // The subscription picker gets a tiny PLAN label mirroring the AGENT label.
 func TestRenderSubscriptionRow_hasPlanLabel(t *testing.T) {
 	m := subFocusMenu(t, "claude", true)
