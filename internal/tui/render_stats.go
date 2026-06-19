@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/jackuait/ghost-tab/internal/usage"
 )
 
 // renderStatsRows renders the stats content as box rows using leftBorder/rightBorder,
@@ -126,6 +127,26 @@ func (m *MainMenuModel) renderStatsRows(leftBorder, rightBorder string) []string
 		}
 		barRow := leftBorder + barLine + strings.Repeat(" ", costPad) + primaryBoldStyle.Render(costStr) + " " + rightBorder
 		rows = append(rows, barRow)
+
+		// Per-model breakdown: which models drove the month's spend. Sub-indented
+		// and muted so the rows read as a list under the month, not new months.
+		for _, md := range mu.Models {
+			label := strings.TrimPrefix(md.Model, "claude-")
+			if len(label) > 18 {
+				label = label[:17] + "…"
+			}
+			usd, priced := usage.ModelCostUSD(md)
+			modelCost := "—"
+			if priced {
+				modelCost = dollarFmt(usd)
+			}
+			modelLine := "      " + muted.Render(fmt.Sprintf("%-18s %8s", label, humanizeTokens(md.Total())))
+			modelPad := menuContentWidth - lipgloss.Width(modelLine) - lipgloss.Width(modelCost) - 1
+			if modelPad < 1 {
+				modelPad = 1
+			}
+			rows = append(rows, leftBorder+modelLine+strings.Repeat(" ", modelPad)+dimStyle.Render(modelCost)+" "+rightBorder)
+		}
 	}
 
 	// Grand total row.

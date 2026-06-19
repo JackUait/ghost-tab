@@ -81,8 +81,15 @@ func TestRenderStatsBox_dataRowsFitBoxWidth(t *testing.T) {
 	m.SetActiveTab(TabStats)
 
 	months := []usage.MonthlyUsage{
-		{Month: "2026-06", Input: 34_400_000, Output: 30_800_000, CacheWrite: 252_300_000, CacheRead: 6_000_000_000},
-		{Month: "2026-05", Input: 7_000_000, Output: 12_600_000, CacheWrite: 90_300_000, CacheRead: 2_000_000_000},
+		{Month: "2026-06", Input: 34_400_000, Output: 30_800_000, CacheWrite: 252_300_000, CacheRead: 6_000_000_000,
+			Models: []usage.ModelUsage{
+				{Model: "claude-opus-4-8", Input: 30_000_000, Output: 28_000_000, CacheWrite: 200_000_000, CacheRead: 5_000_000_000},
+				{Model: "claude-haiku-4-5", Input: 4_400_000, Output: 2_800_000, CacheWrite: 52_300_000, CacheRead: 1_000_000_000},
+			}},
+		{Month: "2026-05", Input: 7_000_000, Output: 12_600_000, CacheWrite: 90_300_000, CacheRead: 2_000_000_000,
+			Models: []usage.ModelUsage{
+				{Model: "claude-sonnet-4-6", Input: 7_000_000, Output: 12_600_000, CacheWrite: 90_300_000, CacheRead: 2_000_000_000},
+			}},
 	}
 	updated, _ := m.Update(statsLoadedMsg{months: months})
 	out := updated.(*MainMenuModel).renderStatsBox()
@@ -99,6 +106,35 @@ func TestRenderStatsBox_dataRowsFitBoxWidth(t *testing.T) {
 	// Sanity: the wide header actually rendered (otherwise the test proves nothing).
 	if !strings.Contains(out, "Cache R") {
 		t.Fatalf("expected the Cache R column header to render:\n%s", out)
+	}
+}
+
+// TestRenderStatsBox_showsPerModelBreakdown verifies the per-model rows that the
+// old stats screen printed under each month survived the move into the tabbed UI:
+// each month lists its models (claude- prefix stripped) so you can see which model
+// drove the spend, not just the monthly aggregate.
+func TestRenderStatsBox_showsPerModelBreakdown(t *testing.T) {
+	m := NewMainMenu(nil, []string{"claude"}, "claude", "none")
+	m.SetActiveTab(TabStats)
+
+	months := []usage.MonthlyUsage{
+		{Month: "2026-06", Input: 1_000_000, Output: 500_000,
+			Models: []usage.ModelUsage{
+				{Model: "claude-opus-4-8", Input: 800_000, Output: 400_000},
+				{Model: "claude-haiku-4-5", Input: 200_000, Output: 100_000},
+			}},
+	}
+	updated, _ := m.Update(statsLoadedMsg{months: months})
+	out := stripANSI(updated.(*MainMenuModel).renderStatsBox())
+
+	for _, want := range []string{"opus-4-8", "haiku-4-5"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("stats box missing per-model row %q:\n%s", want, out)
+		}
+	}
+	// The raw claude- prefix should be stripped for compactness.
+	if strings.Contains(out, "claude-opus-4-8") {
+		t.Errorf("per-model row should strip the claude- prefix:\n%s", out)
 	}
 }
 
