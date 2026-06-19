@@ -270,8 +270,12 @@ fi
 # Drag-dropping a screenshot onto a specific tmux pane is unreliable: tmux
 # delivers the paste to the *active* pane, not the pane under the cursor (an
 # external file drag never produces a tmux mouse event, so tmux can't know the
-# target). Bind prefix+i to inject the most recent screenshot straight into the
-# AI pane instead. See lib/screenshot.sh.
+# target). Two mitigations below:
+#   1. The AI pane is left as the *active* pane (select-pane -R, and a distinct
+#      pane-active-border so focus is visible) -- so a screenshot dropped while
+#      the AI pane is focused lands in the AI tool.
+#   2. prefix+i injects the most recent screenshot straight into the AI pane
+#      regardless of which pane is active. See lib/screenshot.sh.
 _screenshot_bind="bash -c 'source \"$_WRAPPER_DIR/lib/screenshot.sh\" && gt_paste_latest_screenshot'"
 
 "$TMUX_CMD" new-session -s "$SESSION_NAME" -e "PATH=$PATH" -e "GHOST_TAB_MARKER_FILE=$GHOST_TAB_MARKER_FILE" -e "GHOST_TAB=1" -e "GHOST_TAB_BOOT=$GHOST_TAB_BOOT_ID" -e "GHOST_TAB_PROJECT=$PROJECT_NAME" -e "GHOST_TAB_PATH=$PROJECT_DIR" -e "GHOST_TAB_TOOL=$SELECTED_AI_TOOL" -e "GHOST_TAB_TERMINAL=$GHOST_TAB_TERMINAL" -c "$PROJECT_DIR" \
@@ -282,10 +286,12 @@ _screenshot_bind="bash -c 'source \"$_WRAPPER_DIR/lib/screenshot.sh\" && gt_past
   set-option status-right "" \; \
   set-option set-titles off \; \
   set-option exit-unattached on \; \
+  set-option pane-border-style "fg=colour238" \; \
+  set-option pane-active-border-style "fg=colour209" \; \
   bind-key i run-shell "$_screenshot_bind" \; \
   split-window -h -p "$_pane0_pct" -c "$PROJECT_DIR" \
   "$AI_LAUNCH_CMD; exec bash" \; \
   set-option -p @gt_ai 1 \; \
-  select-pane -t 0 \; \
+  select-pane -L \; \
   split-window -v -p 45 -c "$PROJECT_DIR" \; \
-  select-pane -t 2
+  select-pane -R

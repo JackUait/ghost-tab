@@ -50,3 +50,79 @@ func TestWrapper_terminal_pane_is_45_percent(t *testing.T) {
 		t.Errorf("terminal pane should be split at 45%%; got tmux args:\n%s", got)
 	}
 }
+
+// recordWrapperNewSession runs wrapper.sh with a tmux mock that records the
+// whole "new-session ... \; ..." chain (one invocation, captured via $*) and
+// returns that recorded argument string.
+func recordWrapperNewSession(t *testing.T) string {
+	t.Helper()
+	home := t.TempDir()
+	binDir := filepath.Join(home, ".local", "bin")
+	if err := os.MkdirAll(binDir, 0755); err != nil {
+		t.Fatalf("mkdir bin: %v", err)
+	}
+	recPath := filepath.Join(home, "rec")
+	mocks := map[string]string{
+		"tmux":          "#!/bin/bash\nif [ \"$1\" = \"new-session\" ]; then printf '%s\\n' \"$*\" > \"$GT_REC\"; exit 0; fi\nexit 0\n",
+		"claude":        "#!/bin/bash\nexit 0\n",
+		"lazygit":       "#!/bin/bash\nexit 0\n",
+		"ghost-tab-tui": "#!/bin/bash\nexit 0\n",
+	}
+	for name, body := range mocks {
+		p := filepath.Join(binDir, name)
+		if err := os.WriteFile(p, []byte(body), 0755); err != nil {
+			t.Fatalf("write mock %s: %v", name, err)
+		}
+	}
+	projDir := filepath.Join(home, "proj")
+	if err := os.MkdirAll(projDir, 0755); err != nil {
+		t.Fatalf("mkdir proj: %v", err)
+	}
+	env := buildEnv(t, nil, "HOME="+home, "GT_REC="+recPath)
+	_, code := runBashScript(t, "wrapper.sh", []string{"--restore", projDir, "claude"}, env)
+	assertExitCode(t, code, 0)
+	data, err := os.ReadFile(recPath)
+	if err != nil {
+		t.Fatalf("new-session was never invoked (no record): %v", err)
+	}
+	return string(data)
+}
+
+// TestWrapper_selects_ai_pane_geometrically verifies the wrapper focuses panes
+// by direction (-L / -R) instead of fixed indices. tmux routes external
+// drag-drops (e.g. a screenshot) to the ACTIVE pane, so the AI pane must end up
+// active for a dropped screenshot to land in the AI tool. Fixed indices
+// (select-pane -t 0 / -t 2) silently target the wrong pane under a non-zero
+// pane-base-index; directional selection is robust to any base-index.
+func TestWrapper_selects_ai_pane_geometrically(t *testing.T) {
+	got := recordWrapperNewSession(t)
+	if !strings.Contains(got, "select-pane -L") {
+		t.Errorf("expected directional 'select-pane -L' to focus the left column; got:\n%s", got)
+	}
+	if !strings.Contains(got, "select-pane -R") {
+		t.Errorf("expected directional 'select-pane -R' to leave the AI (right) pane active; got:\n%s", got)
+	}
+	if strings.Contains(got, "select-pane -t 0") || strings.Contains(got, "select-pane -t 2") {
+		t.Errorf("fixed-index select-pane breaks under non-zero pane-base-index; use directional selection. got:\n%s", got)
+	}
+}
+
+// TestWrapper_marks_ai_pane locks in the @gt_ai marker on the AI pane, which
+// lib/screenshot.sh uses to resolve the AI pane for prefix+i injection.
+func TestWrapper_marks_ai_pane(t *testing.T) {
+	got := recordWrapperNewSession(t)
+	if !strings.Contains(got, "set-option -p @gt_ai 1") {
+		t.Errorf("expected the AI pane to be marked with '@gt_ai 1'; got:\n%s", got)
+	}
+}
+
+// TestWrapper_active_pane_border_is_visible verifies the active pane has a
+// distinct border. Without this, the active and inactive borders look
+// identical, so a user can't tell which pane is focused -- and a screenshot
+// dropped onto a non-AI active pane silently fails to reach the AI tool.
+func TestWrapper_active_pane_border_is_visible(t *testing.T) {
+	got := recordWrapperNewSession(t)
+	if !strings.Contains(got, "pane-active-border-style") {
+		t.Errorf("expected new-session to set a distinct pane-active-border-style; got:\n%s", got)
+	}
+}
