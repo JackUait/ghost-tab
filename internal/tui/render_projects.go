@@ -193,20 +193,38 @@ func (m *MainMenuModel) renderProjectRows(leftBorder, rightBorder string) []stri
 		}
 
 		if selected {
-			// Delete mode: red styles. Normal mode: primary or flash.
+			// Loud selection (Primary + wash) only when the body actually holds
+			// focus. When focus is on the nav/AI/subscription, the row drops to a
+			// faint neutral cursor marker with no wash, so it never competes with
+			// the focused control for "selected" — but it still shows where the
+			// cursor will resume.
+			bodyFocus := m.focus == FocusBody
 			selNameStyle := primaryBoldStyle
 			selPathStyle := primaryStyle
+			markerStyle := primaryBoldStyle
+			wtStyle := primaryStyle
+			washStyle := selectedBgStyle
 			markerChar := "▌"
 			if m.deleteMode {
 				selNameStyle = deleteStyle
 				selPathStyle = deleteDimStyle
+				markerStyle = deleteStyle
+				wtStyle = deleteStyle
 				markerChar = "█" // full block for delete cursor, distinct from normal ▌ and tab bar ▐
 			} else if flashing {
 				selNameStyle = moveFlashStyle
 				selPathStyle = moveFlashStyle
+				markerStyle = moveFlashStyle
+				wtStyle = moveFlashStyle
+			} else if !bodyFocus {
+				selNameStyle = neutralTextStyle
+				selPathStyle = neutralDimStyle
+				markerStyle = neutralDimStyle
+				wtStyle = neutralDimStyle
+				washStyle = lipgloss.NewStyle() // no background highlight off-focus
 			}
 
-			marker := selNameStyle.Render(markerChar)
+			marker := markerStyle.Render(markerChar)
 			truncName := TruncateMiddle(proj.Name, menuContentWidth-8-len(num))
 			nameText := selNameStyle.Render(num + "  " + truncName)
 			// " ▌1  name" -> space + marker + num + 2 spaces + name
@@ -220,9 +238,9 @@ func (m *MainMenuModel) renderProjectRows(leftBorder, rightBorder string) []stri
 			nameContent := namePrefix + marker + nameText
 
 			if wtIndicator != "" {
-				// On the selected (accent) row the badge joins the row's Primary,
-				// keeping the whole row a single warm color instead of a muddy Dim.
-				wtStyled := primaryStyle.Render(wtIndicator)
+				// On the loud (body-focused) selection the badge joins the row's
+				// Primary; off-focus it goes neutral with the rest of the row.
+				wtStyled := wtStyle.Render(wtIndicator)
 				gap := menuContentWidth - lipgloss.Width(nameContent) - lipgloss.Width(wtStyled)
 				if gap < 1 {
 					gap = 1
@@ -230,7 +248,7 @@ func (m *MainMenuModel) renderProjectRows(leftBorder, rightBorder string) []stri
 				if m.deleteMode {
 					nameLine = leftBorder + nameContent + strings.Repeat(" ", gap) + wtStyled + rightBorder
 				} else {
-					nameLine = leftBorder + selectedBgStyle.Render(nameContent+strings.Repeat(" ", gap)) + wtStyled + rightBorder
+					nameLine = leftBorder + washStyle.Render(nameContent+strings.Repeat(" ", gap)) + wtStyled + rightBorder
 				}
 			} else {
 				namePadding := menuContentWidth - lipgloss.Width(nameContent)
@@ -240,7 +258,7 @@ func (m *MainMenuModel) renderProjectRows(leftBorder, rightBorder string) []stri
 				if m.deleteMode {
 					nameLine = leftBorder + nameContent + strings.Repeat(" ", namePadding) + rightBorder
 				} else {
-					nameLine = leftBorder + selectedBgStyle.Render(nameContent+strings.Repeat(" ", namePadding)) + rightBorder
+					nameLine = leftBorder + washStyle.Render(nameContent+strings.Repeat(" ", namePadding)) + rightBorder
 				}
 			}
 
@@ -252,7 +270,7 @@ func (m *MainMenuModel) renderProjectRows(leftBorder, rightBorder string) []stri
 			if m.deleteMode {
 				pathLine = leftBorder + pathContent + strings.Repeat(" ", pathPadding) + rightBorder
 			} else {
-				pathLine = leftBorder + selectedBgStyle.Render(pathContent+strings.Repeat(" ", pathPadding)) + rightBorder
+				pathLine = leftBorder + washStyle.Render(pathContent+strings.Repeat(" ", pathPadding)) + rightBorder
 			}
 		} else {
 			// Choose style: amber flash when recently moved, neutral otherwise.

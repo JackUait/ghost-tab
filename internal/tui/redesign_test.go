@@ -150,6 +150,48 @@ func TestSelectedRow_worktreeBadgeUsesPrimaryNotDim(t *testing.T) {
 	}
 }
 
+// When focus is on the section nav (not the body), the selected project row
+// must NOT look selected: no selection wash, so the filled nav pill is the only
+// thing reading as "selected". A faint neutral cursor marker still remains.
+func TestSelectedRow_mutedWhenNavFocused(t *testing.T) {
+	prev := lipgloss.ColorProfile()
+	lipgloss.SetColorProfile(termenv.TrueColor)
+	defer lipgloss.SetColorProfile(prev)
+
+	projects := []models.Project{{Name: "blok", Path: "/tmp/blok"}}
+	m := NewMainMenu(projects, []string{"claude"}, "claude", "none")
+	m.SetFocus(FocusTabs) // navigation focused
+	box := m.renderMenuBox()
+
+	line := findLineContaining(box, "1  blok")
+	if line == "" {
+		t.Fatalf("could not find blok name line in:\n%s", box)
+	}
+	if strings.Contains(line, "48;5;236") {
+		t.Errorf("selected row must not show the selection wash when nav is focused: %q", line)
+	}
+}
+
+// Contrast: when the body holds focus, the selected row keeps its wash so the
+// cursor is unmistakable. (Locks the focus-follows behavior in both directions.)
+func TestSelectedRow_keepsWashWhenBodyFocused(t *testing.T) {
+	prev := lipgloss.ColorProfile()
+	lipgloss.SetColorProfile(termenv.TrueColor)
+	defer lipgloss.SetColorProfile(prev)
+
+	projects := []models.Project{{Name: "blok", Path: "/tmp/blok"}}
+	m := NewMainMenu(projects, []string{"claude"}, "claude", "none") // focus defaults to body
+	box := m.renderMenuBox()
+
+	line := findLineContaining(box, "1  blok")
+	if line == "" {
+		t.Fatalf("could not find blok name line in:\n%s", box)
+	}
+	if !strings.Contains(line, "48;5;236") {
+		t.Errorf("selected row should show the wash when body is focused: %q", line)
+	}
+}
+
 // The subscription picker gets a tiny PLAN label mirroring the AGENT label.
 func TestRenderSubscriptionRow_hasPlanLabel(t *testing.T) {
 	m := subFocusMenu(t, "claude", true)
@@ -171,4 +213,16 @@ func TestFocusHint_projectsBodyExpandsAbbreviations(t *testing.T) {
 	if strings.Contains(hint, "O once") {
 		t.Errorf("footer should expand the cryptic 'O once': %q", hint)
 	}
+}
+
+// findLineContaining returns the first line of box whose ANSI-stripped form
+// contains sub, or "" if none. Used to locate a specific rendered row while
+// keeping its raw ANSI codes for color assertions.
+func findLineContaining(box, sub string) string {
+	for _, l := range strings.Split(box, "\n") {
+		if strings.Contains(stripAnsi(l), sub) {
+			return l
+		}
+	}
+	return ""
 }
