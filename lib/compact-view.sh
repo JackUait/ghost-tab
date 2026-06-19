@@ -102,10 +102,19 @@ compact_view() {
   local interactive=0
   [ -t 0 ] && interactive=1
 
+  # Put the tty in no-echo, char-at-a-time mode. Without this, scroll events that
+  # arrive while the script is mid-render (between read_key calls) get echoed by
+  # the line discipline as literal "[<65;40;18M" mouse-report text on screen.
+  local saved_stty=""
+  if [ "$interactive" = 1 ]; then
+    saved_stty=$(stty -g 2>/dev/null || true)
+    stty -echo -icanon 2>/dev/null || true
+  fi
+
   # Switch into the alternate screen (no scrollback -> the wheel can't scroll
   # the list past its clamped viewport), hide the cursor, enable SGR mouse
-  # reporting. The trap restores the user's shell view on Ctrl-C / kill.
-  trap 'exit_ui_mode "$interactive"; exit 0' INT TERM
+  # reporting. The trap restores the tty + the user's shell view on Ctrl-C / kill.
+  trap 'exit_ui_mode "$interactive"; [ -n "$saved_stty" ] && stty "$saved_stty" 2>/dev/null; exit 0' INT TERM
   enter_ui_mode "$interactive"
 
   # read_key reads ONE keystroke into the global KEY within <timeout> seconds,
