@@ -169,6 +169,19 @@ if [ -f "$_settings_file" ]; then
     _panel_mode="$_saved_panel_mode"
   fi
 fi
+
+# Auto-screenshot: when on, a background watcher auto-injects a just-taken
+# screenshot into the AI pane (no drag, no hotkey). Off by default — it's
+# opinionated to grab every screenshot. The OS drag itself can't be made
+# reliable (it hands the AI tool a path to a temp file macOS deletes moments
+# later), so injecting a stable copy at capture time is the robust fix.
+_auto_screenshot="off"
+if [ -f "$_settings_file" ]; then
+  _saved_auto_screenshot=$(grep '^auto_screenshot=' "$_settings_file" 2>/dev/null | cut -d= -f2)
+  if [ -n "$_saved_auto_screenshot" ]; then
+    _auto_screenshot="$_saved_auto_screenshot"
+  fi
+fi
 if [ "$_tab_title_setting" = "full" ]; then
   set_tab_title "$PROJECT_NAME" "$SELECTED_AI_TOOL"
 else
@@ -188,9 +201,17 @@ fi
 gt_focus_ai_pane_when_ready "$TMUX_CMD" "$SESSION_NAME" &
 WATCHER_PID=$!
 
+# Background watcher: auto-inject newly-taken screenshots into the AI pane,
+# scoped to the most-recently-active ghost-tab session. Opt-in via settings.
+if [ "$_auto_screenshot" = "on" ]; then
+  gt_watch_and_inject_screenshots "$TMUX_CMD" "$SESSION_NAME" &
+  SHOTWATCHER_PID=$!
+fi
+
 cleanup() {
   stop_tab_title_watcher "$GHOST_TAB_MARKER_FILE"
   [ -n "${HEARTBEAT_PID:-}" ] && kill_tree "$HEARTBEAT_PID" TERM 2>/dev/null || true
+  [ -n "${SHOTWATCHER_PID:-}" ] && kill_tree "$SHOTWATCHER_PID" TERM 2>/dev/null || true
   # Remove waiting indicator hooks if no other Ghost Tab sessions are running
   if [ "$SELECTED_AI_TOOL" = "claude" ]; then
     # Clean up orphaned markers and cooldown files from dead sessions (e.g., after SIGKILL)
