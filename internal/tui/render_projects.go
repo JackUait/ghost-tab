@@ -9,11 +9,13 @@ import (
 
 // actionBarFor returns the contextual action label text for a selected row type.
 func actionBarFor(itemType string) string {
+	// Labels double as a keymap: the leading glyph/letter is the real keybinding
+	// (Enter opens, W toggles worktrees, D deletes — see handleRune).
 	switch itemType {
 	case "project":
-		return "▸ Open    ◆ Worktrees    ✕ Delete"
+		return "⏎ Open    W Worktrees    D Delete"
 	case "worktree":
-		return "▸ Open    ✕ Delete"
+		return "⏎ Open    D Delete"
 	case "add-project":
 		return "+ Add project"
 	default:
@@ -36,27 +38,30 @@ func (m *MainMenuModel) renderActionBar(leftBorder, rightBorder string) string {
 
 // renderTitleRow renders the "Ghost Tab" + right-aligned AI tool chooser row.
 func (m *MainMenuModel) renderTitleRow(leftBorder, rightBorder string) string {
-	dimStyle := lipgloss.NewStyle().Foreground(m.theme.Dim)
 	primaryStyle := lipgloss.NewStyle().Foreground(m.theme.Primary)
 	primaryBoldStyle := lipgloss.NewStyle().Foreground(m.theme.Primary).Bold(true)
+	labelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245")) // tiny neutral caption
 
 	title := primaryBoldStyle.Render("Ghost Tab")
 	aiDisplay := AIToolDisplayName(m.CurrentAITool())
-	// When the AI switcher holds focus, brighten the chevrons and name so it
-	// reads as the active focus stop driven by ←/→.
-	chevronStyle := dimStyle
+	// Idle chevrons are neutral gray so they don't read as another accent. When
+	// the AI switcher holds focus, the chevrons and name brighten so it reads as
+	// the active focus stop driven by ←/→.
+	chevronStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
 	nameStyle := primaryStyle
 	if m.focus == FocusAI {
 		chevronStyle = lipgloss.NewStyle().Foreground(m.theme.Accent)
 		nameStyle = lipgloss.NewStyle().Foreground(m.theme.Bright).Bold(true)
 	}
+	// "AGENT" caption labels the control so it reads as "this switches the agent".
+	agentLabel := labelStyle.Render("AGENT ")
 	var aiPart string
 	if len(m.aiTools) > 1 {
-		aiPart = chevronStyle.Render(" ◂ ") + nameStyle.Render(aiDisplay) + chevronStyle.Render(" ▸")
+		aiPart = agentLabel + chevronStyle.Render("◂ ") + nameStyle.Render(aiDisplay) + chevronStyle.Render(" ▸")
 	} else {
-		aiPart = " " + nameStyle.Render(aiDisplay)
+		aiPart = agentLabel + nameStyle.Render(aiDisplay)
 	}
-	// Right-align AI tool chooser: "⬡ Ghost Tab" left, "◂ Claude Code ▸" right
+	// Right-align the labelled chooser: "Ghost Tab" left, "AGENT ◂ Claude Code ▸" right
 	aiPadding := menuContentWidth - lipgloss.Width(title) - lipgloss.Width(aiPart) - 1 // -1 for leading space
 	if aiPadding < 1 {
 		aiPadding = 1
@@ -91,16 +96,20 @@ func (m *MainMenuModel) renderSubscriptionRow(leftBorder, rightBorder string) st
 		nameStyle = lipgloss.NewStyle().Foreground(m.theme.Bright).Bold(true)
 	}
 
-	// Show cycle chevrons only when there is something to switch to.
+	// "PLAN" caption mirrors the AGENT label above it.
+	labelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
+	planLabel := labelStyle.Render("PLAN ")
+	// Show cycle chevrons only when there is something to switch to. Idle chevrons
+	// are neutral gray; they brighten only when this row holds focus.
 	var content string
 	if m.subscriptionFocusable() {
-		chevronStyle := lipgloss.NewStyle().Foreground(m.theme.Dim)
+		chevronStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
 		if m.focus == FocusSubscription {
 			chevronStyle = lipgloss.NewStyle().Foreground(m.theme.Accent)
 		}
-		content = chevronStyle.Render("◂ ") + nameStyle.Render(name) + chevronStyle.Render(" ▸")
+		content = planLabel + chevronStyle.Render("◂ ") + nameStyle.Render(name) + chevronStyle.Render(" ▸")
 	} else {
-		content = nameStyle.Render(name)
+		content = planLabel + nameStyle.Render(name)
 	}
 
 	pad := menuContentWidth - lipgloss.Width(content) - 1 // -1 for leading space
@@ -125,7 +134,6 @@ func (m *MainMenuModel) renderUpdateRow(leftBorder, rightBorder string) string {
 // renderProjectRows renders the leading blank row, every project (2 rows each)
 // with their expanded worktree entries, and the trailing "+ Add project" row.
 func (m *MainMenuModel) renderProjectRows(leftBorder, rightBorder string) []string {
-	dimStyle := lipgloss.NewStyle().Foreground(m.theme.Dim)
 	primaryStyle := lipgloss.NewStyle().Foreground(m.theme.Primary)
 	primaryBoldStyle := lipgloss.NewStyle().Foreground(m.theme.Primary).Bold(true)
 	neutralTextStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
@@ -212,7 +220,9 @@ func (m *MainMenuModel) renderProjectRows(leftBorder, rightBorder string) []stri
 			nameContent := namePrefix + marker + nameText
 
 			if wtIndicator != "" {
-				wtStyled := dimStyle.Render(wtIndicator)
+				// On the selected (accent) row the badge joins the row's Primary,
+				// keeping the whole row a single warm color instead of a muddy Dim.
+				wtStyled := primaryStyle.Render(wtIndicator)
 				gap := menuContentWidth - lipgloss.Width(nameContent) - lipgloss.Width(wtStyled)
 				if gap < 1 {
 					gap = 1
@@ -460,7 +470,7 @@ func (m *MainMenuModel) focusHint() string {
 		case TabStats:
 			return "↑↓ scroll · ↑ sections"
 		default: // projects
-			return "↑↓ move · ↵ open · ↑ sections · O once · P plain"
+			return "↑↓ move · ↵ open · ↑ sections · O open once · P plain mode"
 		}
 	}
 }

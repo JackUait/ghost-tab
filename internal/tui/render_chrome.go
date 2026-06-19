@@ -6,19 +6,26 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// boxBorders returns the rounded-box border strings shared by every tab body.
-// When a focus region is active the outer border brightens to Primary so the
-// user can see which box "owns" the keyboard at a glance.
-func (m *MainMenuModel) boxBorders() (top, separator, bottom, leftBorder, rightBorder string) {
-	borderColor := m.theme.Dim
+// boxBorderColor is the color of the outer box border. Idle, it is a neutral
+// gray so the chrome recedes and the accent is free to mark only the selected
+// row. When a focus region outside the body is active the border brightens to
+// Primary so the user can see which box "owns" the keyboard at a glance.
+func (m *MainMenuModel) boxBorderColor() lipgloss.Color {
 	if m.focus != FocusBody {
-		borderColor = m.theme.Primary
+		return m.theme.Primary
 	}
-	borderStyle := lipgloss.NewStyle().Foreground(borderColor)
-	dimStyle := lipgloss.NewStyle().Foreground(m.theme.Dim)
+	return lipgloss.Color("240") // neutral gray (matches the rest of the grays)
+}
+
+// boxBorders returns the rounded-box border strings shared by every tab body.
+func (m *MainMenuModel) boxBorders() (top, separator, bottom, leftBorder, rightBorder string) {
+	borderStyle := lipgloss.NewStyle().Foreground(m.boxBorderColor())
+	// Inner separators stay a touch dimmer than the outer border so the box
+	// reads as one frame rather than a stack of equally-weighted rules.
+	sepStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("238"))
 	hLine := strings.Repeat("─", menuInnerWidth)
 	top = borderStyle.Render("╭" + hLine + "╮")
-	separator = dimStyle.Render("├" + hLine + "┤")
+	separator = sepStyle.Render("├" + hLine + "┤")
 	bottom = borderStyle.Render("╰" + hLine + "╯")
 	leftBorder = borderStyle.Render("│")
 	rightBorder = strings.Repeat(" ", menuPadding) + borderStyle.Render("│")
@@ -37,13 +44,17 @@ func (m *MainMenuModel) renderTabBar(leftBorder, rightBorder string) string {
 	if m.focus == FocusTabs {
 		activeColor = m.theme.Bright
 	}
-	activeStyle := lipgloss.NewStyle().Foreground(activeColor).Bold(true)
-	inactiveStyle := lipgloss.NewStyle().Foreground(m.theme.Dim)
+	// Active tab: bold + underlined, so it reads as a tab rather than the old
+	// ▌label▐ block glyphs that looked like a render artifact. Inactive tabs are
+	// neutral gray and recede. Both keep the same " label " width so the row math
+	// is unchanged.
+	activeStyle := lipgloss.NewStyle().Foreground(activeColor).Bold(true).Underline(true)
+	inactiveStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
 
 	var parts []string
 	for i, label := range menuTabLabels {
 		if MenuTab(i) == m.activeTab {
-			parts = append(parts, activeStyle.Render("▌"+label+"▐"))
+			parts = append(parts, activeStyle.Render(" "+label+" "))
 		} else {
 			parts = append(parts, inactiveStyle.Render(" "+label+" "))
 		}

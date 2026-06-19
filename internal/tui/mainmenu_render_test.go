@@ -42,19 +42,20 @@ func TestMenuBox_AIToolRightAligned(t *testing.T) {
 		t.Error("title row missing 'Claude Code'")
 	}
 
-	// Verify right-alignment: there should be multiple spaces between Ghost Tab and the ◂ arrow
+	// Verify right-alignment: there should be multiple spaces between Ghost Tab and
+	// the right-aligned control cluster, which now begins with the AGENT label.
 	// Strip ANSI codes to check raw layout
 	raw := stripAnsi(titleRow)
 	ghostIdx := strings.Index(raw, "Ghost Tab")
-	arrowIdx := strings.Index(raw, "◂")
+	arrowIdx := strings.Index(raw, "AGENT")
 	if ghostIdx < 0 || arrowIdx < 0 {
-		t.Fatal("could not find Ghost Tab or ◂ in stripped title row")
+		t.Fatal("could not find Ghost Tab or AGENT in stripped title row")
 	}
 	// With right-alignment, there should be significant padding between the end of
-	// "Ghost Tab" and "◂" (more than just a single space)
+	// "Ghost Tab" and the AGENT label (more than just a single space)
 	gap := raw[ghostIdx+len("Ghost Tab") : arrowIdx]
 	if len(strings.TrimSpace(gap)) != 0 {
-		t.Errorf("expected only whitespace between Ghost Tab and ◂, got %q", gap)
+		t.Errorf("expected only whitespace between Ghost Tab and AGENT, got %q", gap)
 	}
 	if len(gap) < 5 {
 		t.Errorf("expected at least 5 chars padding for right-alignment, got %d: %q", len(gap), gap)
@@ -594,22 +595,26 @@ func TestMenuBox_UnselectedAddProjectUsesThemeText(t *testing.T) {
 	}
 }
 
-func TestMenuBox_BordersStillUseThemeDim(t *testing.T) {
+func TestMenuBox_IdleBordersUseNeutralGray(t *testing.T) {
 	// Force color output so lipgloss emits ANSI codes in tests.
 	prev := lipgloss.ColorProfile()
 	lipgloss.SetColorProfile(termenv.TrueColor)
 	defer lipgloss.SetColorProfile(prev)
 
-	m := newTestMenu()
+	m := newTestMenu() // focus defaults to the body
 	box := m.renderMenuBox()
 	lines := strings.Split(box, "\n")
 
-	// Top border (first line) should use theme.Dim (166), not neutral gray
+	// Top border (first line) should be neutral gray (240) so the chrome recedes
+	// and the accent is reserved for the selected row — NOT the old orange Dim.
 	if len(lines) < 1 {
 		t.Fatal("no lines in rendered box")
 	}
-	if !strings.Contains(lines[0], "\x1b[38;5;166m") {
-		t.Error("expected theme dim color (166) for box border")
+	if !strings.Contains(lines[0], "\x1b[38;5;240m") {
+		t.Errorf("expected neutral gray (240) for idle box border, got: %q", lines[0])
+	}
+	if strings.Contains(lines[0], "\x1b[38;5;166m") {
+		t.Errorf("idle box border must not use orange theme Dim (166): %q", lines[0])
 	}
 }
 

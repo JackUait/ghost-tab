@@ -3,6 +3,8 @@ package tui
 import (
 	"strings"
 	"testing"
+
+	"github.com/charmbracelet/lipgloss"
 )
 
 func TestRenderSettingsBox_hasTabBar(t *testing.T) {
@@ -12,18 +14,16 @@ func TestRenderSettingsBox_hasTabBar(t *testing.T) {
 	if !strings.Contains(out, "Settings") || !strings.Contains(out, "Projects") {
 		t.Errorf("settings box missing tab bar: %q", out)
 	}
-	if !strings.Contains(out, "▌") {
-		t.Errorf("settings tab should be accented as active")
-	}
 }
 
 func TestRenderSettingsBox_settingsTabAccented(t *testing.T) {
 	m := NewMainMenu(nil, []string{"claude"}, "claude", "none")
 	m.SetActiveTab(TabSettings)
 	out := m.renderSettingsBox()
-	// Active tab renders as ▌Settings▐
-	if !strings.Contains(out, "▌Settings▐") {
-		t.Errorf("active Settings tab should render as ▌Settings▐, got:\n%s", out)
+	// Active tab renders bold + underlined (no ▌Settings▐ glyph artifact).
+	want := lipgloss.NewStyle().Foreground(m.theme.Primary).Bold(true).Underline(true).Render(" Settings ")
+	if !strings.Contains(out, want) {
+		t.Errorf("active Settings tab should be bold+underlined, got:\n%s", out)
 	}
 }
 

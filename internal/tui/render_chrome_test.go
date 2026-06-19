@@ -3,6 +3,8 @@ package tui
 import (
 	"strings"
 	"testing"
+
+	"github.com/charmbracelet/lipgloss"
 )
 
 func TestRenderTabBar_showsAllTabs(t *testing.T) {
@@ -21,8 +23,9 @@ func TestRenderTabBar_activeTabAccented(t *testing.T) {
 	m.SetActiveTab(TabSettings)
 	_, _, _, lb, rb := m.boxBorders()
 	bar := m.renderTabBar(lb, rb)
-	// The active tab is wrapped with the block accent glyph U+258C.
-	if !strings.Contains(bar, "▌") {
-		t.Errorf("active tab bar missing block accent: %q", bar)
+	// The active tab is bold + underlined (no block-glyph artifacts).
+	want := lipgloss.NewStyle().Foreground(m.theme.Primary).Bold(true).Underline(true).Render(" Settings ")
+	if !strings.Contains(bar, want) {
+		t.Errorf("active tab bar missing bold+underline accent: %q", bar)
 	}
 }

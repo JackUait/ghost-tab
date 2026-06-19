@@ -1,0 +1,140 @@
+package tui
+
+import (
+	"strings"
+	"testing"
+
+	"github.com/charmbracelet/lipgloss"
+	"github.com/jackuait/ghost-tab/internal/models"
+	"github.com/muesli/termenv"
+)
+
+// The main-menu redesign trades monochrome-orange chrome for neutral grays so
+// the accent only ever marks the selected/focused thing. These tests pin the
+// behavior that delivers that hierarchy. Direction mockup: design/main-menu.html.
+
+// Idle box borders should be neutral gray, not the orange theme Dim, so the
+// chrome stops competing with the selected row for attention. (Colors are
+// asserted via the helper because lipgloss strips ANSI when stdout is not a TTY.)
+func TestBoxBorderColor_neutralWhenBodyFocused(t *testing.T) {
+	m := NewMainMenu(nil, []string{"claude"}, "claude", "none") // focus defaults to body
+	if got := m.boxBorderColor(); got != lipgloss.Color("240") {
+		t.Errorf("idle border color = %q, want neutral gray 240", got)
+	}
+}
+
+// When focus leaves the body, the border still brightens to Primary so you can
+// see which box owns the keyboard.
+func TestBoxBorderColor_brightensToPrimaryOffBody(t *testing.T) {
+	m := NewMainMenu(nil, []string{"claude"}, "claude", "none")
+	m.focus = FocusTabs
+	if got := m.boxBorderColor(); got != m.theme.Primary {
+		t.Errorf("focused border color = %q, want Primary %q", got, m.theme.Primary)
+	}
+}
+
+// The active tab should read as a spaced label, not the ▌label▐ glyph artifact
+// that looked like a rendering bug. (The underline itself is a visual style;
+// here we pin removal of the block-glyph artifacts and presence of all labels.)
+func TestRenderTabBar_activeTabNoBlockGlyph(t *testing.T) {
+	m := NewMainMenu(nil, []string{"claude"}, "claude", "none")
+	_, _, _, lb, rb := m.boxBorders()
+	bar := stripAnsi(m.renderTabBar(lb, rb))
+	for _, glyph := range []string{"▌", "▐"} {
+		if strings.Contains(bar, glyph) {
+			t.Errorf("tab bar should not use the %q block-glyph artifact: %q", glyph, bar)
+		}
+	}
+	for _, label := range []string{"Projects", "Settings", "Stats"} {
+		if !strings.Contains(bar, label) {
+			t.Errorf("tab bar missing %q: %q", label, bar)
+		}
+	}
+}
+
+// The contextual action bar should advertise the real key letters (W/D/⏎)
+// instead of decorative glyphs, so the labels double as a keymap.
+func TestActionBarFor_usesRealKeyLetters(t *testing.T) {
+	proj := actionBarFor("project")
+	for _, k := range []string{"⏎ Open", "W Worktrees", "D Delete"} {
+		if !strings.Contains(proj, k) {
+			t.Errorf("project action bar missing %q: %q", k, proj)
+		}
+	}
+	wt := actionBarFor("worktree")
+	if !strings.Contains(wt, "⏎ Open") || !strings.Contains(wt, "D Delete") {
+		t.Errorf("worktree action bar wrong: %q", wt)
+	}
+	for _, glyph := range []string{"◆", "✕", "▸"} {
+		if strings.Contains(proj, glyph) {
+			t.Errorf("action bar should drop decorative glyph %q: %q", glyph, proj)
+		}
+	}
+}
+
+// The agent picker gets a tiny AGENT label so the right-hand control reads as
+// "this switches the agent" rather than a cramped, unlabeled chevron cluster.
+func TestRenderTitleRow_hasAgentLabel(t *testing.T) {
+	m := NewMainMenu(nil, []string{"claude", "codex"}, "claude", "none") // 2 tools → chevrons
+	_, _, _, lb, rb := m.boxBorders()
+	row := stripAnsi(m.renderTitleRow(lb, rb))
+	if !strings.Contains(row, "AGENT") {
+		t.Errorf("title row should carry an AGENT label: %q", row)
+	}
+	if !strings.Contains(row, "Claude Code") {
+		t.Errorf("title row should still show the agent name: %q", row)
+	}
+}
+
+// The selected row's worktree badge should join the row's accent (Primary),
+// not the muddy orange theme Dim — no stray orange shades on the accent row.
+func TestSelectedRow_worktreeBadgeUsesPrimaryNotDim(t *testing.T) {
+	prev := lipgloss.ColorProfile()
+	lipgloss.SetColorProfile(termenv.TrueColor)
+	defer lipgloss.SetColorProfile(prev)
+
+	projects := []models.Project{
+		{Name: "blok", Path: "/tmp/blok", Worktrees: []models.Worktree{{Branch: "main", Path: "/tmp/wt"}}},
+	}
+	m := NewMainMenu(projects, []string{"claude"}, "claude", "none") // item 0 selected by default
+	box := m.renderMenuBox()
+	var nameLine string
+	for _, l := range strings.Split(box, "\n") {
+		if strings.Contains(stripAnsi(l), "1  blok") {
+			nameLine = l
+			break
+		}
+	}
+	if nameLine == "" {
+		t.Fatalf("could not find selected blok name line in:\n%s", box)
+	}
+	if !strings.Contains(stripAnsi(nameLine), "worktree") {
+		t.Fatalf("name line should carry the worktree badge: %q", stripAnsi(nameLine))
+	}
+	if strings.Contains(nameLine, "\x1b[38;5;166m") {
+		t.Errorf("selected worktree badge must not use orange theme Dim (166): %q", nameLine)
+	}
+}
+
+// The subscription picker gets a tiny PLAN label mirroring the AGENT label.
+func TestRenderSubscriptionRow_hasPlanLabel(t *testing.T) {
+	m := subFocusMenu(t, "claude", true)
+	row := stripAnsi(m.renderSubscriptionRow("│", "│"))
+	if !strings.Contains(row, "PLAN") {
+		t.Errorf("subscription row should carry a PLAN label: %q", row)
+	}
+}
+
+// The footer hint spells out the rare shortcuts instead of cryptic "O once".
+func TestFocusHint_projectsBodyExpandsAbbreviations(t *testing.T) {
+	m := NewMainMenu(nil, []string{"claude"}, "claude", "none") // focus body, projects tab
+	hint := m.focusHint()
+	for _, want := range []string{"open once", "plain", "sections"} {
+		if !strings.Contains(hint, want) {
+			t.Errorf("projects footer hint missing %q: %q", want, hint)
+		}
+	}
+	if strings.Contains(hint, "O once") {
+		t.Errorf("footer should expand the cryptic 'O once': %q", hint)
+	}
+}
