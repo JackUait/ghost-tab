@@ -47,16 +47,40 @@ gt_latest_screenshot() {
   printf '%s\n' "$latest"
 }
 
+# _gt_pick_marked_pane — read "<index> <flag>" lines on stdin and print the
+# index whose flag is "1" (the AI pane, marked with the @gt_ai pane option).
+# Prints nothing and returns non-zero when no pane is marked.
+_gt_pick_marked_pane() {
+  local idx flag
+  while read -r idx flag; do
+    if [ "$flag" = "1" ]; then
+      printf '%s\n' "$idx"
+      return 0
+    fi
+  done
+  return 1
+}
+
+# gt_ai_pane <tmux_cmd> <session> — print the AI pane index. Prefers the pane
+# marked with @gt_ai=1 (set by wrapper.sh at session creation), so it is robust
+# to tmux pane renumbering and non-default layouts; falls back to index 1.
+gt_ai_pane() {
+  local tmux_cmd="$1" session="$2" idx
+  idx="$("$tmux_cmd" list-panes -t "${session}:0" -F '#{pane_index} #{@gt_ai}' 2>/dev/null | _gt_pick_marked_pane)" || idx=""
+  [ -n "$idx" ] || idx=1
+  printf '%s\n' "$idx"
+}
+
 # gt_paste_latest_screenshot <session> [pane] — inject the latest screenshot's
 # path into the AI pane as a bracketed paste (so Claude attaches it as an image).
-# Defaults to pane index 1 (the AI pane in ghost-tab's layout).
+# Resolves the AI pane via the @gt_ai marker when no pane is given.
 gt_paste_latest_screenshot() {
   local tmux_cmd
   tmux_cmd="$(command -v tmux)" || return 1
-  # Default to the session the binding fired in, and the AI pane (index 1).
+  # Default to the session the binding fired in.
   local session="${1:-$("$tmux_cmd" display-message -p '#{session_name}' 2>/dev/null)}"
-  local pane="${2:-1}"
   [ -n "$session" ] || return 1
+  local pane="${2:-$(gt_ai_pane "$tmux_cmd" "$session")}"
 
   local dir latest
   dir="$(gt_screenshot_dir)"

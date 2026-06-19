@@ -285,6 +285,7 @@ _screenshot_bind="bash -c 'source \"$_WRAPPER_DIR/lib/screenshot.sh\" && gt_past
   bind-key i run-shell "$_screenshot_bind" \; \
   split-window -h -p "$_pane0_pct" -c "$PROJECT_DIR" \
   "$AI_LAUNCH_CMD; exec bash" \; \
+  set-option -p @gt_ai 1 \; \
   select-pane -t 0 \; \
   split-window -v -p 45 -c "$PROJECT_DIR" \; \
   select-pane -t 2

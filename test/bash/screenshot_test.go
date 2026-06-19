@@ -3,9 +3,28 @@ package bash_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
+
+// _gt_pick_marked_pane reads "<index> <flag>" lines and prints the marked index.
+func TestPickMarkedPane_returns_marked_index(t *testing.T) {
+	out, code := runBashFuncWithStdin(t, "lib/screenshot.sh", "_gt_pick_marked_pane",
+		nil, nil, "0 \n2 1\n1 \n")
+	assertExitCode(t, code, 0)
+	if strings.TrimSpace(out) != "2" {
+		t.Errorf("got %q, want 2", strings.TrimSpace(out))
+	}
+}
+
+func TestPickMarkedPane_none_marked_returns_error(t *testing.T) {
+	out, code := runBashFuncWithStdin(t, "lib/screenshot.sh", "_gt_pick_marked_pane",
+		nil, nil, "0 \n1 \n2 \n")
+	if code == 0 {
+		t.Errorf("expected non-zero when nothing marked, got 0; out=%q", out)
+	}
+}
 
 // gt_latest_screenshot <dir> prints the newest image file in dir.
 func TestLatestScreenshot_returns_newest_image(t *testing.T) {
