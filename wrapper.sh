@@ -39,7 +39,7 @@ if [ ! -d "$_WRAPPER_DIR/lib" ]; then
   exit 1
 fi
 
-_gt_libs=(ai-tools projects process input tui menu-tui project-actions tmux-session settings-json notification-setup tab-title-watcher terminals/registry terminals/adapter session-restore claude-configs compact-view)
+_gt_libs=(ai-tools projects process input tui menu-tui project-actions tmux-session settings-json notification-setup tab-title-watcher terminals/registry terminals/adapter session-restore claude-configs compact-view screenshot)
 for _gt_lib in "${_gt_libs[@]}"; do
   if [ ! -f "$_WRAPPER_DIR/lib/${_gt_lib}.sh" ]; then
     printf '\033[31mError:\033[0m Missing library %s/lib/%s.sh\n' "$_WRAPPER_DIR" "$_gt_lib" >&2
@@ -182,18 +182,10 @@ if [ "$SELECTED_AI_TOOL" = "claude" ]; then
   add_waiting_indicator_hooks "$_claude_settings" >/dev/null
 fi
 
-# Background watcher: switch to Claude pane once it's ready
-(
-  while true; do
-    sleep 0.5
-    content=$("$TMUX_CMD" capture-pane -t "$SESSION_NAME:0.1" -p 2>/dev/null)
-    # All three tools show a prompt character when ready
-    if echo "$content" | grep -qE '[>$❯]'; then
-      "$TMUX_CMD" select-pane -t "$SESSION_NAME:0.1"
-      break
-    fi
-  done
-) &
+# Background watcher: switch to the AI pane once it's ready. Resolves the AI
+# pane via gt_ai_pane (marker/geometry) rather than a fixed index, so it is
+# correct under any tmux pane-base-index.
+gt_focus_ai_pane_when_ready "$TMUX_CMD" "$SESSION_NAME" &
 WATCHER_PID=$!
 
 cleanup() {

@@ -80,6 +80,25 @@ gt_ai_pane() {
   printf '%s\n' "$idx"
 }
 
+# gt_focus_ai_pane_when_ready <tmux_cmd> <session> — poll the AI pane until it
+# shows a shell/AI prompt, then make it the active pane. Resolves the AI pane via
+# gt_ai_pane (marker/geometry) on every poll, so it is correct under any tmux
+# pane-base-index — a hardcoded index only matches the AI pane at base-index 0,
+# and would otherwise re-focus the wrong pane just after launch.
+gt_focus_ai_pane_when_ready() {
+  local tmux_cmd="$1" session="$2" pane content
+  while true; do
+    sleep 0.5
+    pane="$(gt_ai_pane "$tmux_cmd" "$session")"
+    content="$("$tmux_cmd" capture-pane -t "${session}:0.${pane}" -p 2>/dev/null)"
+    # All three tools show a prompt character when ready.
+    if printf '%s' "$content" | grep -qE '[>$❯]'; then
+      "$tmux_cmd" select-pane -t "${session}:0.${pane}"
+      break
+    fi
+  done
+}
+
 # gt_paste_latest_screenshot <session> [pane] — inject the latest screenshot's
 # path into the AI pane as a bracketed paste (so Claude attaches it as an image).
 # Resolves the AI pane via the @gt_ai marker when no pane is given.

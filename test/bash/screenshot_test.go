@@ -74,6 +74,49 @@ func TestAiPane_falls_back_to_full_height_right_pane(t *testing.T) {
 	}
 }
 
+// gt_focus_ai_pane_when_ready must focus the AI pane resolved via gt_ai_pane
+// (marker/geometry), NOT a hardcoded index. The startup watcher previously
+// selected ":0.1", which is the AI pane only at pane-base-index 0; under a
+// non-zero pane-base-index it focuses the wrong pane ~0.5s after launch,
+// defeating the "AI pane active by default" guarantee. Here no pane is marked
+// and pane 2 is the full-height right pane, so it must select pane 2.
+func TestFocusAiPaneWhenReady_targets_resolved_pane_not_index_1(t *testing.T) {
+	dir := t.TempDir()
+	selRec := filepath.Join(dir, "select.log")
+	body := `case "$1" in
+  list-panes)
+    case "$*" in
+      *pane_at_right*) printf '%s\n' "$GT_GEOM" ;;
+      *@gt_ai*)        printf '%s\n' "$GT_MARK" ;;
+    esac ;;
+  capture-pane) printf '%s\n' "$GT_PROMPT" ;;
+  select-pane)  printf '%s\n' "$*" >> "$GT_SEL" ;;
+esac
+exit 0`
+	binDir := mockCommand(t, dir, "tmux", body)
+	tmuxPath := filepath.Join(binDir, "tmux")
+	env := []string{
+		"GT_MARK=0 \n1 \n2 \n",                // no @gt_ai marker
+		"GT_GEOM=0 0 1 0\n1 0 0 1\n2 1 1 1\n", // pane 2 is full-height on the right
+		"GT_PROMPT=❯ ",                         // pane is "ready" on the first poll
+		"GT_SEL=" + selRec,
+	}
+	_, code := runBashFunc(t, "lib/screenshot.sh", "gt_focus_ai_pane_when_ready",
+		[]string{tmuxPath, "sess"}, env)
+	assertExitCode(t, code, 0)
+	data, err := os.ReadFile(selRec)
+	if err != nil {
+		t.Fatalf("select-pane was never called: %v", err)
+	}
+	got := string(data)
+	if !strings.Contains(got, "select-pane -t sess:0.2") {
+		t.Errorf("watcher should focus the geometry-resolved AI pane (2); select-pane calls:\n%s", got)
+	}
+	if strings.Contains(got, "sess:0.1") {
+		t.Errorf("watcher must not hardcode pane index 1; select-pane calls:\n%s", got)
+	}
+}
+
 // gt_latest_screenshot <dir> prints the newest image file in dir.
 func TestLatestScreenshot_returns_newest_image(t *testing.T) {
 	dir := t.TempDir()
