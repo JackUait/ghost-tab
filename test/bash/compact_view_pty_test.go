@@ -97,3 +97,82 @@ func TestCompactView_does_not_echo_mouse_reports(t *testing.T) {
 			len(m), m[0])
 	}
 }
+
+// Regression: Ctrl-C must actually EXIT the view under zsh — the live pane runs
+// `zsh -c '... compact_view ...'`. In zsh, an `exit` issued from a signal trap
+// that interrupted `read -t` does NOT terminate the script; the handler returns
+// and the loop keeps running forever (and, having restored echo + left the
+// alternate screen, resurrects the leak it was guarding against). The loop must
+// break on a quit flag so the process exits. Asserting the process exits within
+// a bound is the deterministic signal: the buggy build never exits, the fixed
+// build does. (The echo-leak-during-operation contract is covered separately by
+// TestCompactView_does_not_echo_mouse_reports.)
+func TestCompactView_zsh_ctrlc_exits(t *testing.T) {
+	zsh, err := exec.LookPath("zsh")
+	if err != nil {
+		t.Skip("zsh not available")
+	}
+	module := filepath.Join(projectRoot(t), "lib", "compact-view.sh")
+
+	dir := t.TempDir()
+	git := func(args ...string) {
+		t.Helper()
+		c := exec.Command("git", append([]string{"-C", dir}, args...)...)
+		c.Env = append(os.Environ(),
+			"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t",
+			"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@t")
+		if out, err := c.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	git("init", "-q")
+	writeTempFile(t, dir, "app.txt", "one\n")
+	git("add", "app.txt")
+	git("commit", "-q", "-m", "init")
+	var tall bytes.Buffer
+	for i := 0; i < 40; i++ {
+		tall.WriteString("changed line\n")
+	}
+	writeTempFile(t, dir, "app.txt", tall.String())
+
+	// Mirror the live pane exactly: zsh -c sourcing the module.
+	cmd := exec.Command(zsh, "-c", "source "+module+" && compact_view "+dir)
+	env := []string{}
+	for _, e := range os.Environ() {
+		if len(e) >= 5 && e[:5] == "TMUX=" {
+			continue
+		}
+		env = append(env, e)
+	}
+	cmd.Env = append(env, "COMPACT_VIEW_INTERVAL=1", "TERM=xterm")
+
+	ptmx, err := pty.StartWithSize(cmd, &pty.Winsize{Rows: 12, Cols: 60})
+	if err != nil {
+		t.Fatalf("start pty: %v", err)
+	}
+	defer func() { _ = ptmx.Close() }()
+
+	// Drain output so the pty never blocks on a full buffer.
+	go func() {
+		b := make([]byte, 4096)
+		for {
+			if _, err := ptmx.Read(b); err != nil {
+				return
+			}
+		}
+	}()
+
+	exited := make(chan struct{})
+	go func() { _ = cmd.Wait(); close(exited) }()
+
+	time.Sleep(700 * time.Millisecond) // first frame
+	_, _ = ptmx.Write([]byte{0x03})    // Ctrl-C once
+
+	select {
+	case <-exited:
+		// good: the process terminated on Ctrl-C
+	case <-time.After(3 * time.Second):
+		_ = cmd.Process.Kill()
+		t.Fatalf("compact_view did not exit within 3s of Ctrl-C under zsh (loop kept running)")
+	}
+}

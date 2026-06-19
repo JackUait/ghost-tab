@@ -113,8 +113,13 @@ compact_view() {
 
   # Switch into the alternate screen (no scrollback -> the wheel can't scroll
   # the list past its clamped viewport), hide the cursor, enable SGR mouse
-  # reporting. The trap restores the tty + the user's shell view on Ctrl-C / kill.
-  trap 'exit_ui_mode "$interactive"; [ -n "$saved_stty" ] && stty "$saved_stty" 2>/dev/null; exit 0' INT TERM
+  # reporting. The trap only flips a quit flag; the loop breaks on it and runs
+  # cleanup ONCE afterwards. We must not `exit` from the trap: under zsh (the
+  # pane's shell) an `exit` issued from a trap that interrupted `read -t` does
+  # not terminate the script — the loop would keep running with echo re-enabled,
+  # resurrecting the very leak this guards against.
+  local _quit=0
+  trap '_quit=1' INT TERM
   enter_ui_mode "$interactive"
 
   # read_key reads ONE keystroke into the global KEY within <timeout> seconds,
@@ -176,6 +181,7 @@ compact_view() {
   local need_build=1
   local interval="${COMPACT_VIEW_INTERVAL:-2}"
   while true; do
+    [ "$_quit" = 1 ] && break   # Ctrl-C / TERM -> leave the loop, then clean up
     # Capture pane width/height outside subshell.
     # tput may return wrong values in tmux; query tmux directly.
     if [ -n "${TMUX:-}" ] && command -v tmux &>/dev/null; then
@@ -341,4 +347,9 @@ compact_view() {
         ;;
     esac
   done
+
+  # Restore the terminal: leave the alternate screen, re-enable echo/cursor.
+  exit_ui_mode "$interactive"
+  [ -n "$saved_stty" ] && stty "$saved_stty" 2>/dev/null
+  return 0
 }
