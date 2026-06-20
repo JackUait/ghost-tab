@@ -30,7 +30,7 @@ type Subscription struct {
 
 // providerID returns the namespaced OpenCode provider id for a subscription.
 func (s Subscription) providerID() string {
-	return ProviderPrefix + claudeconfig.Slugify(s.Name)
+	return ProviderPrefix + claudeconfig.Slugify(strings.TrimSuffix(s.File, ".json"))
 }
 
 // mirrorable reports whether the subscription has everything a working OpenCode

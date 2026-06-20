@@ -18,9 +18,9 @@ func seed(t *testing.T, home string, active string) Inputs {
 	listFile := filepath.Join(cfgRoot, "claude-configs.list")
 	pointer := filepath.Join(cfgRoot, "claude-config")
 	// "Work GLM zhipu" -> base URL resolves; map opus -> glm-4.6.
-	os.WriteFile(listFile, []byte("Work GLM zhipu:work.json\n"), 0644)
+	os.WriteFile(listFile, []byte("Work GLM zhipu:work-glm-zhipu.json\n"), 0644)
 	cfg := `{"env":{"ANTHROPIC_AUTH_TOKEN":"sk-abc","ANTHROPIC_DEFAULT_OPUS_MODEL":"glm-4.6"}}`
-	os.WriteFile(filepath.Join(configsDir, "work.json"), []byte(cfg), 0644)
+	os.WriteFile(filepath.Join(configsDir, "work-glm-zhipu.json"), []byte(cfg), 0644)
 	if active != "" {
 		os.WriteFile(pointer, []byte(active+"\n"), 0644)
 	}
@@ -29,7 +29,7 @@ func seed(t *testing.T, home string, active string) Inputs {
 
 func TestSync_writes_opencode_config(t *testing.T) {
 	home := t.TempDir()
-	in := seed(t, home, "work.json")
+	in := seed(t, home, "work-glm-zhipu.json")
 	if err := Sync(in); err != nil {
 		t.Fatalf("Sync: %v", err)
 	}
@@ -57,7 +57,7 @@ func TestSync_respects_xdg_config_home(t *testing.T) {
 	home := t.TempDir()
 	xdg := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", xdg)
-	in := seed(t, home, "work.json")
+	in := seed(t, home, "work-glm-zhipu.json")
 	if err := Sync(in); err != nil {
 		t.Fatalf("Sync: %v", err)
 	}
@@ -73,7 +73,7 @@ func TestSync_preserves_existing_user_file(t *testing.T) {
 	os.MkdirAll(ocDir, 0755)
 	os.WriteFile(filepath.Join(ocDir, "opencode.json"),
 		[]byte(`{"theme":"tokyonight","provider":{"mine":{"name":"Mine"}}}`), 0644)
-	in := seed(t, home, "work.json")
+	in := seed(t, home, "work-glm-zhipu.json")
 	if err := Sync(in); err != nil {
 		t.Fatalf("Sync: %v", err)
 	}
@@ -90,7 +90,7 @@ func TestSync_preserves_existing_user_file(t *testing.T) {
 
 func TestBuildSubscriptions_marks_active_and_resolves(t *testing.T) {
 	home := t.TempDir()
-	in := seed(t, home, "work.json")
+	in := seed(t, home, "work-glm-zhipu.json")
 	subs := BuildSubscriptions(in)
 	if len(subs) != 1 {
 		t.Fatalf("got %d subs, want 1", len(subs))
