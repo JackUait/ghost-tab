@@ -66,10 +66,21 @@ func (m *MainMenuModel) renderTabBar(leftBorder, rightBorder string) string {
 	}
 	inactiveStyle := lipgloss.NewStyle().Foreground(inactiveColor)
 
+	// Render the active tab. When nav-focused the whole pill (including padding)
+	// is filled, so style the padded label. When body-focused the accent is just
+	// a bold underline, which should sit tight under the word — so style only the
+	// label and leave the surrounding padding spaces unstyled.
+	renderActive := func(label string) string {
+		if navFocused {
+			return activeStyle.Render(" " + label + " ")
+		}
+		return " " + activeStyle.Render(label) + " "
+	}
+
 	var parts []string
 	for i, label := range menuTabLabels {
 		if MenuTab(i) == m.activeTab {
-			parts = append(parts, activeStyle.Render(" "+label+" "))
+			parts = append(parts, renderActive(label))
 		} else {
 			parts = append(parts, inactiveStyle.Render(" "+label+" "))
 		}

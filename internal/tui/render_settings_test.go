@@ -20,10 +20,10 @@ func TestRenderSettingsBox_settingsTabAccented(t *testing.T) {
 	m := NewMainMenu(nil, []string{"claude"}, "claude", "none")
 	m.SetActiveTab(TabSettings)
 	out := m.renderSettingsBox()
-	// Active tab renders bold + underlined (no ▌Settings▐ glyph artifact).
-	want := lipgloss.NewStyle().Foreground(m.theme.Primary).Bold(true).Underline(true).Render(" Settings ")
+	// Active tab renders bold + underlined on the label only (padding not underlined).
+	want := lipgloss.NewStyle().Foreground(m.theme.Primary).Bold(true).Underline(true).Render("Settings")
 	if !strings.Contains(out, want) {
-		t.Errorf("active Settings tab should be bold+underlined, got:\n%s", out)
+		t.Errorf("active Settings tab should be bold+underlined on the label, got:\n%s", out)
 	}
 }
 

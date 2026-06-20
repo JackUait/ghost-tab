@@ -21,10 +21,10 @@ func TestRenderStatsBox_statsTabAccented(t *testing.T) {
 	m := NewMainMenu(nil, []string{"claude"}, "claude", "none")
 	m.SetActiveTab(TabStats)
 	out := m.renderStatsBox()
-	// Active tab renders bold + underlined (no ▌Stats▐ glyph artifact).
-	want := lipgloss.NewStyle().Foreground(m.theme.Primary).Bold(true).Underline(true).Render(" Stats ")
+	// Active tab renders bold + underlined on the label only (padding not underlined).
+	want := lipgloss.NewStyle().Foreground(m.theme.Primary).Bold(true).Underline(true).Render("Stats")
 	if !strings.Contains(out, want) {
-		t.Errorf("active Stats tab should be bold+underlined, got:\n%s", out)
+		t.Errorf("active Stats tab should be bold+underlined on the label, got:\n%s", out)
 	}
 }
 
