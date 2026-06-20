@@ -2,11 +2,29 @@ package bash_test
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 )
+
+// Regression: iTerm2 launches the wrapper as `bash --posix --login -l wrapper.sh`.
+// On macOS bash 3.2, POSIX mode DISABLES process substitution, so any `< <(...)`
+// in a sourced lib fails to PARSE and every new tab dies with a syntax error.
+// screenshot.sh must source cleanly under `bash --posix`.
+func TestScreenshot_sources_under_bash_posix(t *testing.T) {
+	root := projectRoot(t)
+	lib := filepath.Join(root, "lib", "screenshot.sh")
+	cmd := exec.Command("bash", "--posix", "-c", "source \""+lib+"\" && echo SOURCED_OK")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("screenshot.sh failed to source under bash --posix: %v\n%s", err, out)
+	}
+	if !strings.Contains(string(out), "SOURCED_OK") {
+		t.Fatalf("expected SOURCED_OK, got: %s", out)
+	}
+}
 
 // _gt_pick_marked_pane reads "<index> <flag>" lines and prints the marked index.
 func TestPickMarkedPane_returns_marked_index(t *testing.T) {

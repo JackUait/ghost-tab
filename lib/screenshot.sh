@@ -37,16 +37,15 @@ gt_latest_screenshot() {
   done
   [ ${#dirs[@]} -gt 0 ] || return 1
 
-  local latest=""
-  local line
   # Newest-first: macOS `stat -f '%m %N'` prints "<mtime-seconds> <path>".
-  while IFS= read -r line; do
-    [ -n "$line" ] || continue
-    latest="${line#* }"  # strip the leading "<mtime> "
-    break
-  done < <(find "${dirs[@]}" -maxdepth 1 -type f \
+  # Command substitution (not `< <(...)` process substitution) because iTerm2
+  # launches the wrapper under `bash --posix`, where process substitution fails
+  # to parse. We only need the single newest line, so `head -n 1` suffices.
+  local latest
+  latest="$(find "${dirs[@]}" -maxdepth 1 -type f \
             \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' \) \
-            -exec stat -f '%m %N' {} + 2>/dev/null | sort -rn)
+            -exec stat -f '%m %N' {} + 2>/dev/null | sort -rn | head -n 1)"
+  latest="${latest#* }"  # strip the leading "<mtime> "
 
   [ -n "$latest" ] || return 1
   printf '%s\n' "$latest"
@@ -134,7 +133,11 @@ gt_paste_latest_screenshot() {
   # dir) is found too.
   local dir latest line temp_dirs=()
   dir="$(gt_screenshot_dir)"
-  while IFS= read -r line; do [ -n "$line" ] && temp_dirs+=("$line"); done < <(gt_screenshot_temp_dirs)
+  # Heredoc + command substitution (not `< <(...)`) so the array is populated in
+  # this shell AND the lib still parses under `bash --posix` (iTerm2's launch).
+  while IFS= read -r line; do [ -n "$line" ] && temp_dirs+=("$line"); done <<EOF
+$(gt_screenshot_temp_dirs)
+EOF
   latest="$(gt_latest_screenshot "$dir" "${temp_dirs[@]}")" || {
     "$tmux_cmd" display-message "ghost-tab: no screenshot found in $dir" 2>/dev/null || true
     return 0
