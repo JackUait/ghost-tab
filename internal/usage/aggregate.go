@@ -2,6 +2,7 @@ package usage
 
 import (
 	"io/fs"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -69,13 +70,20 @@ func cloneArchive(src map[string]map[string]*ModelUsage) map[string]map[string]*
 	return dst
 }
 
-// Aggregate walks claudeDir for *.jsonl transcripts and returns per-month token
-// usage sorted newest-first. It reuses cachePath entries for files whose size and
-// mtime are unchanged and re-parses changed files. When a previously-cached file
-// vanishes from disk, its totals are sealed into a durable per-month Archive so
-// the history survives Claude Code's transcript pruning; sealed paths are never
-// re-counted. Best-effort saves the updated cache.
-func Aggregate(claudeDir, cachePath string) ([]MonthlyUsage, error) {
+// parseFunc reads one source file into per-month usage; ParseFile (Claude) and
+// ParseOpenCodeMessage (OpenCode) both satisfy it so the cache treats them alike.
+type parseFunc func(path string) (map[string]*MonthlyUsage, FileMeta, error)
+
+// Aggregate walks claudeDir for *.jsonl transcripts and opencodeDir for *.json
+// OpenCode message files, merging both into per-month token usage sorted
+// newest-first. Same-named models from either tool fold into a single row. It
+// reuses cachePath entries for files whose size and mtime are unchanged and
+// re-parses changed files. When a previously-cached file vanishes from disk, its
+// totals are sealed into a durable per-month Archive so the history survives the
+// tool's transcript pruning; sealed paths are never re-counted. A missing/empty
+// opencodeDir (e.g. OpenCode not installed) is simply skipped. Best-effort saves
+// the updated cache.
+func Aggregate(claudeDir, opencodeDir, cachePath string) ([]MonthlyUsage, error) {
 	cache := LoadCache(cachePath)
 	next := &Cache{
 		Version: cacheVersion,
@@ -88,37 +96,47 @@ func Aggregate(claudeDir, cachePath string) ([]MonthlyUsage, error) {
 	}
 
 	seen := map[string]bool{}
-	err := filepath.WalkDir(claudeDir, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return nil // skip unreadable dirs/files, keep going
-		}
-		if d.IsDir() || !strings.HasSuffix(path, ".jsonl") {
-			return nil
-		}
+	consider := func(path string, info fs.FileInfo, parse parseFunc) {
 		seen[path] = true
 		if next.Sealed[path] {
 			// Already folded into Archive; never re-count. A brand-new file that
-			// reuses a sealed path would be ignored, but transcript paths embed a
-			// session UUID so reuse does not happen in practice.
-			return nil
-		}
-		info, statErr := d.Info()
-		if statErr != nil {
-			return nil
+			// reuses a sealed path would be ignored, but transcript/message paths
+			// embed a session id so reuse does not happen in practice.
+			return
 		}
 		if prev, ok := cache.Files[path]; ok &&
 			prev.Meta.Size == info.Size() && prev.Meta.ModTime.Equal(info.ModTime()) {
 			next.Files[path] = prev
-			return nil
+			return
 		}
-		months, meta, parseErr := ParseFile(path)
+		months, meta, parseErr := parse(path)
 		if parseErr != nil {
-			return nil // skip unreadable file
+			return // skip unreadable file
 		}
 		next.Files[path] = fileCacheEntry{Meta: meta, Months: months}
-		return nil
-	})
-	if err != nil {
+	}
+
+	walk := func(root, suffix string, parse parseFunc) error {
+		return filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return nil // skip unreadable dirs/files, keep going
+			}
+			if d.IsDir() || !strings.HasSuffix(path, suffix) {
+				return nil
+			}
+			info, statErr := d.Info()
+			if statErr != nil {
+				return nil
+			}
+			consider(path, info, parse)
+			return nil
+		})
+	}
+
+	if err := walk(claudeDir, ".jsonl", ParseFile); err != nil {
+		return nil, err
+	}
+	if err := walk(opencodeDir, ".json", ParseOpenCodeMessage); err != nil {
 		return nil, err
 	}
 
@@ -155,8 +173,18 @@ func Aggregate(claudeDir, cachePath string) ([]MonthlyUsage, error) {
 	return out, nil
 }
 
-// DefaultPaths returns the production transcript dir and cache file path.
-func DefaultPaths(home string) (claudeDir, cachePath string) {
+// DefaultPaths returns the production Claude transcript dir, the OpenCode message
+// storage dir, and the cache file path. The OpenCode storage root honors
+// OPENCODE_DATA_DIR (which may be a comma-separated list — the first entry wins),
+// falling back to ~/.local/share/opencode; messages live under <root>/storage/message.
+func DefaultPaths(home string) (claudeDir, opencodeDir, cachePath string) {
+	dataDir := strings.TrimSpace(os.Getenv("OPENCODE_DATA_DIR"))
+	if dataDir == "" {
+		dataDir = filepath.Join(home, ".local", "share", "opencode")
+	} else if i := strings.IndexByte(dataDir, ','); i >= 0 {
+		dataDir = strings.TrimSpace(dataDir[:i])
+	}
 	return filepath.Join(home, ".claude", "projects"),
+		filepath.Join(dataDir, "storage", "message"),
 		filepath.Join(home, ".config", "ghost-tab", "usage-cache.json")
 }

@@ -8,7 +8,7 @@ import (
 )
 
 func TestAggregate_emptyDir(t *testing.T) {
-	out, err := Aggregate(t.TempDir(), filepath.Join(t.TempDir(), "cache.json"))
+	out, err := Aggregate(t.TempDir(), "", filepath.Join(t.TempDir(), "cache.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -28,7 +28,7 @@ func TestAggregate_mergesFilesAndSortsDescending(t *testing.T) {
 	writeFixture(t, sub, "b.jsonl",
 		`{"type":"assistant","timestamp":"2026-05-02T10:00:00Z","message":{"id":"b","usage":{"input_tokens":5,"output_tokens":0,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}}
 {"type":"assistant","timestamp":"2026-06-01T10:00:00Z","message":{"id":"c","usage":{"input_tokens":1,"output_tokens":0,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}}`+"\n")
-	out, err := Aggregate(dir, filepath.Join(t.TempDir(), "cache.json"))
+	out, err := Aggregate(dir, "", filepath.Join(t.TempDir(), "cache.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,7 +50,7 @@ func TestAggregate_reusesCacheForUnchangedFiles(t *testing.T) {
 		`{"type":"assistant","timestamp":"2026-05-01T10:00:00Z","message":{"id":"a","usage":{"input_tokens":10,"output_tokens":0,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}}`+"\n")
 
 	// First pass builds the cache.
-	if _, err := Aggregate(dir, cachePath); err != nil {
+	if _, err := Aggregate(dir, "", cachePath); err != nil {
 		t.Fatal(err)
 	}
 	// Tamper the cached value WITHOUT touching the file on disk. If Aggregate
@@ -69,7 +69,7 @@ func TestAggregate_reusesCacheForUnchangedFiles(t *testing.T) {
 	if err := c.Save(cachePath); err != nil {
 		t.Fatal(err)
 	}
-	out, err := Aggregate(dir, cachePath)
+	out, err := Aggregate(dir, "", cachePath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,7 +83,7 @@ func TestAggregate_reparsesChangedFile(t *testing.T) {
 	cachePath := filepath.Join(t.TempDir(), "cache.json")
 	p := writeFixture(t, dir, "a.jsonl",
 		`{"type":"assistant","timestamp":"2026-05-01T10:00:00Z","message":{"id":"a","usage":{"input_tokens":10,"output_tokens":0,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}}`+"\n")
-	if _, err := Aggregate(dir, cachePath); err != nil {
+	if _, err := Aggregate(dir, "", cachePath); err != nil {
 		t.Fatal(err)
 	}
 	// Append a new record and bump mtime so size/mtime differ from cache.
@@ -94,7 +94,7 @@ func TestAggregate_reparsesChangedFile(t *testing.T) {
 	future := time.Now().Add(2 * time.Second)
 	os.Chtimes(p, future, future)
 
-	out, err := Aggregate(dir, cachePath)
+	out, err := Aggregate(dir, "", cachePath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,11 +108,11 @@ func TestAggregate_sealsDeletedFileIntoArchive(t *testing.T) {
 	cachePath := filepath.Join(t.TempDir(), "cache.json")
 	p := writeFixture(t, dir, "a.jsonl",
 		`{"type":"assistant","timestamp":"2026-05-01T10:00:00Z","message":{"id":"a","model":"claude-opus-4-7","usage":{"input_tokens":10,"output_tokens":0,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}}`+"\n")
-	if _, err := Aggregate(dir, cachePath); err != nil {
+	if _, err := Aggregate(dir, "", cachePath); err != nil {
 		t.Fatal(err)
 	}
 	os.Remove(p)
-	out, err := Aggregate(dir, cachePath)
+	out, err := Aggregate(dir, "", cachePath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -137,15 +137,15 @@ func TestAggregate_sealedFileNotDoubleCountedOnReappear(t *testing.T) {
 	cachePath := filepath.Join(t.TempDir(), "cache.json")
 	record := `{"type":"assistant","timestamp":"2026-05-01T10:00:00Z","message":{"id":"a","model":"claude-opus-4-7","usage":{"input_tokens":10,"output_tokens":0,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}}` + "\n"
 	p := writeFixture(t, dir, "a.jsonl", record)
-	if _, err := Aggregate(dir, cachePath); err != nil {
+	if _, err := Aggregate(dir, "", cachePath); err != nil {
 		t.Fatal(err)
 	}
 	os.Remove(p)
-	if _, err := Aggregate(dir, cachePath); err != nil { // seals into archive
+	if _, err := Aggregate(dir, "", cachePath); err != nil { // seals into archive
 		t.Fatal(err)
 	}
 	writeFixture(t, dir, "a.jsonl", record) // same path reappears
-	out, err := Aggregate(dir, cachePath)
+	out, err := Aggregate(dir, "", cachePath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -163,11 +163,11 @@ func TestAggregate_mergesArchiveWithLiveMonth(t *testing.T) {
 		`{"type":"assistant","timestamp":"2026-05-01T10:00:00Z","message":{"id":"g","model":"claude-opus-4-7","usage":{"input_tokens":4,"output_tokens":0,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}}`+"\n")
 	writeFixture(t, dir, "live.jsonl",
 		`{"type":"assistant","timestamp":"2026-05-02T10:00:00Z","message":{"id":"l","model":"claude-opus-4-7","usage":{"input_tokens":6,"output_tokens":0,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}}`+"\n")
-	if _, err := Aggregate(dir, cachePath); err != nil {
+	if _, err := Aggregate(dir, "", cachePath); err != nil {
 		t.Fatal(err)
 	}
 	os.Remove(gone)
-	out, err := Aggregate(dir, cachePath)
+	out, err := Aggregate(dir, "", cachePath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -211,11 +211,83 @@ func TestAggregate_mergesModelsAcrossFiles(t *testing.T) {
 	cachePath := filepath.Join(t.TempDir(), "cache.json")
 	writeFixture(t, dir, "a.jsonl", `{"type":"assistant","timestamp":"2026-05-01T10:00:00Z","message":{"id":"a","model":"claude-opus-4-7","usage":{"input_tokens":10,"output_tokens":0,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}}`+"\n")
 	writeFixture(t, dir, "b.jsonl", `{"type":"assistant","timestamp":"2026-05-02T10:00:00Z","message":{"id":"b","model":"claude-opus-4-7","usage":{"input_tokens":5,"output_tokens":0,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}}`+"\n")
-	out, err := Aggregate(dir, cachePath)
+	out, err := Aggregate(dir, "", cachePath)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(out) != 1 || len(out[0].Models) != 1 || out[0].Models[0].Input != 15 {
 		t.Errorf("merged models = %+v, want one opus row input 15", out)
+	}
+}
+
+func TestAggregate_mergesOpenCodeWithClaude(t *testing.T) {
+	claudeDir := t.TempDir()
+	ocDir := t.TempDir()
+	cachePath := filepath.Join(t.TempDir(), "cache.json")
+
+	// Claude transcript: opus-4-8, input 10, May 2026.
+	writeFixture(t, claudeDir, "a.jsonl",
+		`{"type":"assistant","timestamp":"2026-05-01T10:00:00Z","message":{"id":"a","model":"claude-opus-4-8","usage":{"input_tokens":10,"output_tokens":0,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}}`+"\n")
+
+	// OpenCode messages live under <ocDir>/<sessionID>/msg_*.json. Same model
+	// opus-4-8 in May (must MERGE into one row with Claude), plus a gpt-5 message
+	// in June (an OpenCode-only month).
+	sess := filepath.Join(ocDir, "ses_1")
+	if err := os.MkdirAll(sess, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	may := time.Date(2026, 5, 2, 10, 0, 0, 0, time.UTC).UnixMilli()
+	jun := time.Date(2026, 6, 2, 10, 0, 0, 0, time.UTC).UnixMilli()
+	writeFixture(t, sess, "msg_a.json", ocMsg("assistant", "claude-opus-4-8", may, 5, 0, 0, 0, 0))
+	writeFixture(t, sess, "msg_b.json", ocMsg("assistant", "gpt-5", jun, 7, 0, 0, 0, 0))
+
+	out, err := Aggregate(claudeDir, ocDir, cachePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(out) != 2 {
+		t.Fatalf("len(out) = %d, want 2 (May + June)", len(out))
+	}
+	if out[0].Month != "2026-06" || out[1].Month != "2026-05" {
+		t.Fatalf("order = [%s,%s], want [2026-06,2026-05]", out[0].Month, out[1].Month)
+	}
+	may2 := out[1]
+	if len(may2.Models) != 1 || may2.Models[0].Model != "claude-opus-4-8" || may2.Models[0].Input != 15 {
+		t.Errorf("May models = %+v, want one claude-opus-4-8 row input 15 (claude 10 + opencode 5)", may2.Models)
+	}
+	if may2.Input != 15 {
+		t.Errorf("May input = %d, want 15", may2.Input)
+	}
+	jun2 := out[0]
+	if len(jun2.Models) != 1 || jun2.Models[0].Model != "gpt-5" || jun2.Models[0].Input != 7 {
+		t.Errorf("June models = %+v, want gpt-5 input 7 (opencode-only)", jun2.Models)
+	}
+}
+
+func TestDefaultPaths_opencodeMessageDir(t *testing.T) {
+	t.Setenv("OPENCODE_DATA_DIR", "")
+	_, ocDir, _ := DefaultPaths("/home/u")
+	want := filepath.Join("/home/u", ".local", "share", "opencode", "storage", "message")
+	if ocDir != want {
+		t.Errorf("opencodeDir = %q, want %q", ocDir, want)
+	}
+}
+
+func TestDefaultPaths_opencodeDataDirEnvOverride(t *testing.T) {
+	t.Setenv("OPENCODE_DATA_DIR", "/custom/oc")
+	_, ocDir, _ := DefaultPaths("/home/u")
+	want := filepath.Join("/custom/oc", "storage", "message")
+	if ocDir != want {
+		t.Errorf("opencodeDir = %q, want %q", ocDir, want)
+	}
+}
+
+func TestDefaultPaths_opencodeDataDirCommaList(t *testing.T) {
+	// OPENCODE_DATA_DIR may be a comma-separated list; we use the first entry.
+	t.Setenv("OPENCODE_DATA_DIR", "/first/oc,/second/oc")
+	_, ocDir, _ := DefaultPaths("/home/u")
+	want := filepath.Join("/first/oc", "storage", "message")
+	if ocDir != want {
+		t.Errorf("opencodeDir = %q, want %q (first of comma list)", ocDir, want)
 	}
 }

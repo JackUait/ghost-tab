@@ -34,14 +34,15 @@ func humanizeTokens(n int64) string {
 
 // StatsModel renders monthly token usage as a scrollable table + bar chart.
 type StatsModel struct {
-	months    []usage.MonthlyUsage
-	loading   bool
-	err       error
-	offset    int
-	width     int
-	height    int
-	claudeDir string
-	cachePath string
+	months      []usage.MonthlyUsage
+	loading     bool
+	err         error
+	offset      int
+	width       int
+	height      int
+	claudeDir   string
+	opencodeDir string
+	cachePath   string
 }
 
 // SetSize records the terminal dimensions so View can center the box. Callers
@@ -299,17 +300,17 @@ type statsErrMsg struct{ err error }
 // NewStatsModel builds a model that loads usage asynchronously on Init.
 func NewStatsModel() StatsModel {
 	home, _ := os.UserHomeDir()
-	claudeDir, cachePath := usage.DefaultPaths(home)
-	return StatsModel{loading: true, claudeDir: claudeDir, cachePath: cachePath}
+	claudeDir, opencodeDir, cachePath := usage.DefaultPaths(home)
+	return StatsModel{loading: true, claudeDir: claudeDir, opencodeDir: opencodeDir, cachePath: cachePath}
 }
 
 func (m StatsModel) Init() tea.Cmd {
 	if !m.loading {
 		return nil
 	}
-	claudeDir, cachePath := m.claudeDir, m.cachePath
+	claudeDir, opencodeDir, cachePath := m.claudeDir, m.opencodeDir, m.cachePath
 	return func() tea.Msg {
-		months, err := usage.Aggregate(claudeDir, cachePath)
+		months, err := usage.Aggregate(claudeDir, opencodeDir, cachePath)
 		if err != nil {
 			return statsErrMsg{err: err}
 		}
