@@ -14,6 +14,7 @@ package screenshotfilter
 import (
 	"bytes"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -96,25 +97,53 @@ func partialSuffix(b, needle []byte) int {
 	return 0
 }
 
-// RewriteScreenshotPath rewrites a bracketed paste's content when it is the path
-// to an ephemeral screencaptureui temp screenshot: it copies the file to a
-// stable location and returns that (space-free) path. Anything else — a normal
-// file path, or a temp path whose file is already gone — is returned unchanged,
+// RewriteScreenshotPath rewrites a bracketed paste's content into a path Claude
+// will attach as an image. Two drop shapes reach here:
+//   - Finder/Desktop drags deliver a percent-encoded file:// URL. Claude attaches a
+//     plain filesystem path but NEVER a file:// URL, so we decode the URL first.
+//   - Floating-thumbnail drags deliver a plain (often backslash-escaped) path.
+//
+// In both cases an ephemeral screencaptureui temp file is copied to a stable
+// location (macOS deletes it moments after the drop); a persistent file is handed
+// over as its plain path. Anything we can't resolve to a real local image — a normal
+// non-image paste, or a temp path whose file is already gone — is returned unchanged,
 // so the filter is never worse than passing the drop straight through.
 func RewriteScreenshotPath(content []byte) []byte {
-	path := unescape(string(content))
-	if !isEphemeralScreenshot(path) {
-		return content
+	if path, ok := fileURLToPath(string(content)); ok {
+		return resolveLocalImage(path, content)
 	}
+	return resolveLocalImage(unescape(string(content)), content)
+}
+
+// resolveLocalImage returns the bytes to hand Claude for a dragged image at `path`,
+// or `orig` unchanged when it can't resolve a real, on-disk image file.
+func resolveLocalImage(path string, orig []byte) []byte {
 	info, err := os.Stat(path)
-	if err != nil || info.IsDir() {
-		return content
+	if err != nil || info.IsDir() || !isImagePath(path) {
+		return orig
 	}
-	stable, err := copyToStable(path)
-	if err != nil {
-		return content
+	if isEphemeralScreenshot(path) {
+		if stable, err := copyToStable(path); err == nil {
+			return []byte(stable)
+		}
+		return orig
 	}
-	return []byte(stable)
+	return []byte(path)
+}
+
+// fileURLToPath converts a dragged file:// URL (Finder/Desktop drags deliver these,
+// percent-encoded) to a local filesystem path. Returns ok=false when content is not
+// a file:// URL, so the caller falls back to plain-path handling.
+func fileURLToPath(content string) (string, bool) {
+	s := strings.TrimSpace(content)
+	if !strings.HasPrefix(s, "file://") {
+		return "", false
+	}
+	u, err := url.Parse(s)
+	if err != nil || u.Path == "" {
+		return "", false
+	}
+	return u.Path, true
 }
 
 // unescape undoes shell backslash-escaping (Ghostty escapes spaces as "\ ").
@@ -133,9 +162,11 @@ func unescape(s string) string {
 }
 
 func isEphemeralScreenshot(path string) bool {
-	if !strings.Contains(path, "/TemporaryItems/") || !strings.Contains(path, "screencaptureui") {
-		return false
-	}
+	return strings.Contains(path, "/TemporaryItems/") &&
+		strings.Contains(path, "screencaptureui") && isImagePath(path)
+}
+
+func isImagePath(path string) bool {
 	switch strings.ToLower(filepath.Ext(path)) {
 	case ".png", ".jpg", ".jpeg", ".gif", ".webp":
 		return true

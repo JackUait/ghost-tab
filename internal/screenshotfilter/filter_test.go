@@ -2,6 +2,7 @@ package screenshotfilter
 
 import (
 	"bytes"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -62,6 +63,80 @@ func TestRewriteScreenshotPath_missing_file_passthrough(t *testing.T) {
 	out := string(RewriteScreenshotPath([]byte(in)))
 	if out != in {
 		t.Errorf("missing-file path changed: got %q want %q", out, in)
+	}
+}
+
+// A Finder/Desktop drag in Ghostty delivers a bracketed paste of a percent-encoded
+// file:// URL, NOT a plain path. Claude Code attaches a plain filesystem path but
+// never a file:// URL (proven empirically), so the filter must decode the URL to the
+// real local path. The name carries a U+202F narrow no-break space (how macOS names
+// screenshots) plus regular spaces, so this also proves %E2%80%AF and %20 both decode.
+func TestRewriteScreenshotPath_fileurl_existing_decodes_to_plain_path(t *testing.T) {
+	dir := t.TempDir()
+	src := filepath.Join(dir, "Screenshot 2026-06-20 at 1.38.03 PM.png")
+	if err := os.WriteFile(src, []byte("PNGDATA"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	urlStr := (&url.URL{Scheme: "file", Path: src}).String()
+	if !strings.HasPrefix(urlStr, "file://") || !strings.Contains(urlStr, "%20") {
+		t.Fatalf("test setup: expected a percent-encoded file:// URL, got %q", urlStr)
+	}
+
+	out := string(RewriteScreenshotPath([]byte(urlStr)))
+
+	if strings.HasPrefix(out, "file://") {
+		t.Fatalf("file:// URL must be decoded (Claude won't attach a URL): got %q", out)
+	}
+	if out != src {
+		t.Errorf("decoded path = %q, want the real local path %q", out, src)
+	}
+	if _, err := os.Stat(out); err != nil {
+		t.Errorf("decoded path must resolve to the real file: %v", err)
+	}
+}
+
+// A file:// URL whose file does not exist must pass through unchanged (no worse than
+// today): we only rewrite when we can resolve a real local image.
+func TestRewriteScreenshotPath_fileurl_missing_passthrough(t *testing.T) {
+	in := "file:///no/such/dir/Screenshot%20gone.png"
+	out := string(RewriteScreenshotPath([]byte(in)))
+	if out != in {
+		t.Errorf("missing file:// must pass through unchanged: got %q want %q", out, in)
+	}
+}
+
+// A file:// URL pointing at an ephemeral screencaptureui temp file (which macOS
+// deletes moments after the drop) must be copied to the stable, space-free dir and
+// the path rewritten to the stable copy — same contract as the plain-path ephemeral
+// case, but reached via a file:// URL.
+func TestRewriteScreenshotPath_fileurl_ephemeral_copies_to_stable(t *testing.T) {
+	root := t.TempDir()
+	tempDir := filepath.Join(root, "TemporaryItems", "NSIRD_screencaptureui_ABC")
+	if err := os.MkdirAll(tempDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	src := filepath.Join(tempDir, "Screenshot 2026-06-20 at 2.04.15 PM.png")
+	if err := os.WriteFile(src, []byte("PNGDATA"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	stash := filepath.Join(root, "stash")
+	t.Setenv("GT_SCREENSHOT_STASH_DIR", stash)
+
+	urlStr := (&url.URL{Scheme: "file", Path: src}).String()
+	out := string(RewriteScreenshotPath([]byte(urlStr)))
+
+	if !strings.HasPrefix(out, stash) {
+		t.Fatalf("ephemeral file:// should copy to stash %q; got %q", stash, out)
+	}
+	if strings.Contains(out, " ") {
+		t.Errorf("stable path should be space-free: %q", out)
+	}
+	data, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatalf("stable copy unreadable: %v", err)
+	}
+	if string(data) != "PNGDATA" {
+		t.Errorf("stable copy content = %q, want PNGDATA", data)
 	}
 }
 
