@@ -601,6 +601,36 @@ func TestMenuBox_SelectedProjectPathNotHighlighted(t *testing.T) {
 	}
 }
 
+func TestMenuBox_AddProjectRowHasHint(t *testing.T) {
+	prev := lipgloss.ColorProfile()
+	lipgloss.SetColorProfile(termenv.TrueColor)
+	defer lipgloss.SetColorProfile(prev)
+
+	projects := []models.Project{
+		{Name: "proj", Path: "/tmp/proj"},
+	}
+	m := NewMainMenu(projects, []string{"claude"}, "claude", "animated")
+	m.width = 100
+	m.height = 40
+	box := m.renderMenuBox()
+
+	// The add-project row carries a meaningful hint subtitle, styled with the
+	// neutral dim color (245), instead of just repeating the label.
+	var hintLine string
+	for _, line := range strings.Split(box, "\n") {
+		if strings.Contains(stripAnsi(line), "Register a folder") {
+			hintLine = line
+			break
+		}
+	}
+	if hintLine == "" {
+		t.Fatal("expected an Add project hint subtitle line")
+	}
+	if !strings.Contains(hintLine, "\x1b[38;5;245m") {
+		t.Errorf("add-project hint should use neutral dim color (245): %q", hintLine)
+	}
+}
+
 func TestMenuBox_UnselectedAddProjectUsesThemeText(t *testing.T) {
 	// Force color output so lipgloss emits ANSI codes in tests.
 	prev := lipgloss.ColorProfile()

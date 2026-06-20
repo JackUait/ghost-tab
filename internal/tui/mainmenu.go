@@ -1266,10 +1266,10 @@ func (m *MainMenuModel) CalculateLayout(width, height int) MenuLayout {
 	if numProjects == 0 {
 		emptyStateRow = 1
 	}
-	// 11 fixed chrome lines: top + title + tab-bar + sep + leading-blank +
-	// spacer-before-add + add-project + sep-before-action + action-bar + bottom + help.
-	// Plus the optional subscription row (Claude only).
-	menuHeight := 11 + m.subscriptionRowCount() + projectRows + worktreeRows + addWorktreeRows + emptyStateRow
+	// 12 fixed chrome lines: top + title + tab-bar + sep + leading-blank +
+	// spacer-before-add + add-project + add-project-hint + sep-before-action +
+	// action-bar + bottom + help. Plus the optional subscription row (Claude only).
+	menuHeight := 12 + m.subscriptionRowCount() + projectRows + worktreeRows + addWorktreeRows + emptyStateRow
 	menuWidth := 58
 
 	ghostPosition := "hidden"
@@ -1339,8 +1339,8 @@ func (m *MainMenuModel) MapRowToItem(clickY int) int {
 	// Blank spacer row before the add-project row.
 	currentRow++
 
-	// Add-project row (1 row, the final selectable item).
-	if clickY == currentRow {
+	// Add-project row (label + hint subtitle, 2 rows; the final selectable item).
+	if clickY == currentRow || clickY == currentRow+1 {
 		return flatIdx
 	}
 

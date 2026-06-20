@@ -442,8 +442,31 @@ func (m *MainMenuModel) renderProjectRows(leftBorder, rightBorder string) []stri
 		rows = append(rows, leftBorder+prefix+strings.Repeat(" ", gap)+rightBorder)
 	}
 
+	// Hint subtitle under the label (mirrors the project path subtitle) so the
+	// row explains what it does instead of just repeating "Add project".
+	hintStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
+	var hintContent string
+	if addSelected {
+		hintContent = "      " + hintStyle.Render(addProjectHint)
+	} else {
+		hintContent = "       " + hintStyle.Render(addProjectHint)
+	}
+	hintGap := menuContentWidth - lipgloss.Width(hintContent)
+	if hintGap < 0 {
+		hintGap = 0
+	}
+	if addSelected {
+		rows = append(rows, leftBorder+selectedBgStyle.Render(hintContent+strings.Repeat(" ", hintGap))+rightBorder)
+	} else {
+		rows = append(rows, leftBorder+hintContent+strings.Repeat(" ", hintGap)+rightBorder)
+	}
+
 	return rows
 }
+
+// addProjectHint is the subtitle shown under the "+ Add project" row, mirroring
+// the path subtitle on real project rows.
+const addProjectHint = "Register a folder to launch dev sessions in"
 
 // renderHelpRow renders the centered footer hint line. It sits below the box
 // (after the bottom border) and is centered to the full box width.

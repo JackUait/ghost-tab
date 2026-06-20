@@ -74,20 +74,20 @@ func TestCalculateLayout_accountsForTabBar(t *testing.T) {
 	// Non-Claude tool: no subscription row, so layout matches the documented rows.
 	m := NewMainMenu(projects, []string{"codex"}, "codex", "none")
 	layout := m.CalculateLayout(120, 40)
-	// Rendered line count for 1 project = 13 (box 12 + help 1).
-	// MenuHeight must equal that; old formula (+4 action rows) gives 14.
-	if layout.MenuHeight != 13 {
-		t.Errorf("MenuHeight = %d, want 13 (must match rendered lines)", layout.MenuHeight)
+	// Rendered line count for 1 project = 14 (box 13 + help 1), including the
+	// add-project hint subtitle row. MenuHeight must equal that.
+	if layout.MenuHeight != 14 {
+		t.Errorf("MenuHeight = %d, want 14 (must match rendered lines)", layout.MenuHeight)
 	}
 }
 
 func TestCalculateLayout_emptyStateAddsRow(t *testing.T) {
-	// 0 projects: renderMenuBox emits empty-state row → 12 total lines.
-	// Non-Claude tool: no subscription row.
+	// 0 projects: renderMenuBox emits empty-state row plus the add-project hint
+	// subtitle → 13 total lines. Non-Claude tool: no subscription row.
 	m := NewMainMenu(nil, []string{"codex"}, "codex", "none")
 	layout := m.CalculateLayout(120, 40)
-	if layout.MenuHeight != 12 {
-		t.Errorf("MenuHeight (0 proj) = %d, want 12", layout.MenuHeight)
+	if layout.MenuHeight != 13 {
+		t.Errorf("MenuHeight (0 proj) = %d, want 13", layout.MenuHeight)
 	}
 }
 
@@ -103,7 +103,7 @@ func TestMapRowToItem_matchesRenderedLayout(t *testing.T) {
 
 	// Layout (see render_projects.go): top(0) title(1) tabbar(2) sep(3)
 	// blank(4) alpha-name(5) alpha-path(6) beta-name(7) beta-path(8)
-	// blank(9) add-project(10) sep(11) actionbar(12) bottom(13) help(14)
+	// blank(9) add-project(10) add-hint(11) sep(12) actionbar(13) bottom(14) help(15)
 	cases := map[int]int{
 		0:  -1, // top border
 		2:  -1, // tab bar
@@ -114,10 +114,11 @@ func TestMapRowToItem_matchesRenderedLayout(t *testing.T) {
 		7:  1,  // beta name
 		8:  1,  // beta path
 		9:  -1, // blank spacer before add-project
-		10: 2,  // add-project row (TotalItems-1)
-		11: -1, // separator
-		12: -1, // action bar
-		13: -1, // bottom border
+		10: 2,  // add-project label row (TotalItems-1)
+		11: 2,  // add-project hint subtitle row
+		12: -1, // separator
+		13: -1, // action bar
+		14: -1, // bottom border
 	}
 	for clickY, want := range cases {
 		if got := m.MapRowToItem(clickY); got != want {
