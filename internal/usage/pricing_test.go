@@ -62,7 +62,7 @@ func TestModelCostUSD_prefixMatchAndUnknown(t *testing.T) {
 	if !priced || !approx(usd, 1) {
 		t.Errorf("suffixed haiku = %v priced=%v, want 1/true", usd, priced)
 	}
-	if _, priced := ModelCostUSD(ModelUsage{Model: "gpt-4o", Input: 1_000_000}); priced {
+	if _, priced := ModelCostUSD(ModelUsage{Model: "llama-3.1-70b-instruct", Input: 1_000_000}); priced {
 		t.Errorf("unknown model should be unpriced")
 	}
 }
@@ -117,6 +117,88 @@ func TestRateFor_longestPrefixWins(t *testing.T) {
 		usd, priced := ModelCostUSD(ModelUsage{Model: "mimo-v2.5-pro", Input: 1_000_000, Output: 1_000_000})
 		if !priced || !approx(usd, 0.435+0.87) {
 			t.Fatalf("mimo-v2.5-pro = %v priced=%v, want %v (pro rate, not standard)", usd, priced, 0.435+0.87)
+		}
+	}
+}
+
+func TestModelCostUSD_openCodeProviders(t *testing.T) {
+	// Non-Anthropic models routed through OpenCode, priced at their models.dev
+	// (the catalog OpenCode uses) input+output rates. Each case is 1M input +
+	// 1M output, so want = input$/MTok + output$/MTok. Several cases use a
+	// date/variant-suffixed id to exercise longest-prefix resolution.
+	cases := []struct {
+		model string
+		want  float64
+	}{
+		// OpenAI
+		{"gpt-5", 1.25 + 10},
+		{"gpt-5-mini", 0.25 + 2},
+		{"gpt-5-nano", 0.05 + 0.4},
+		{"gpt-5-codex", 1.25 + 10},   // shares base gpt-5 rate via prefix
+		{"gpt-5.1-codex", 1.25 + 10}, // gpt-5.1 family
+		{"gpt-5.2", 1.75 + 14},
+		{"gpt-5.3-codex", 1.75 + 14},
+		{"gpt-4.1", 2 + 8},
+		{"gpt-4.1-mini", 0.4 + 1.6},
+		{"gpt-4o", 2.5 + 10},
+		{"gpt-4o-mini", 0.15 + 0.6},
+		{"o3", 2 + 8},
+		{"o4-mini", 1.1 + 4.4},
+		// Google Gemini
+		{"gemini-2.5-pro", 1.25 + 10},
+		{"gemini-2.5-flash", 0.3 + 2.5},
+		{"gemini-2.5-flash-lite", 0.1 + 0.4},
+		{"gemini-3-pro-preview", 2 + 12},
+		{"gemini-3-flash-preview", 0.5 + 3},
+		// xAI (grok-4 family all share 1.25/2.5)
+		{"grok-4.3", 1.25 + 2.5},
+		{"grok-4.20-0309-reasoning", 1.25 + 2.5},
+		// DeepSeek
+		{"deepseek-chat", 0.14 + 0.28},
+		{"deepseek-reasoner", 0.14 + 0.28},
+		// Alibaba Qwen
+		{"qwen3-coder-plus", 1 + 5},
+		{"qwen3-coder-480b-a35b-instruct", 1.5 + 7.5}, // base qwen3-coder
+		{"qwen3-max", 1.2 + 6},
+		// Moonshot Kimi
+		{"kimi-k2-0905-preview", 0.6 + 2.5}, // base kimi-k2
+		{"kimi-k2-turbo-preview", 2.4 + 10},
+		{"kimi-k2.6", 0.95 + 4},
+		// Z.ai GLM (new additions)
+		{"glm-4.6", 0.6 + 2.2},
+		{"glm-5.1", 6 + 24},
+		// Mistral
+		{"codestral-latest", 0.3 + 0.9},
+		{"devstral-medium-latest", 0.4 + 2},
+	}
+	for _, c := range cases {
+		usd, priced := ModelCostUSD(ModelUsage{Model: c.model, Input: 1_000_000, Output: 1_000_000})
+		if !priced || !approx(usd, c.want) {
+			t.Errorf("%s = %v priced=%v, want %v/true", c.model, usd, priced, c.want)
+		}
+	}
+}
+
+func TestModelCostUSD_openCodeLongestPrefixWins(t *testing.T) {
+	// Sibling ids that share a shorter prefix but have different prices must NOT
+	// be mispriced as the cheaper/base model. Hammer the randomized map order.
+	cases := []struct {
+		model string
+		want  float64 // 1M in + 1M out
+	}{
+		{"gpt-5-mini", 0.25 + 2},            // not gpt-5 (11.25)
+		{"gpt-5.2", 1.75 + 14},              // not gpt-5 (11.25)
+		{"gpt-5.4", 2.5 + 15},               // not gpt-5 (11.25)
+		{"glm-5.2", 1.40 + 4.40},            // existing entry beats new glm-5 (4.2)
+		{"qwen3-coder-plus", 1 + 5},         // not qwen3-coder (9)
+		{"kimi-k2-turbo-preview", 2.4 + 10}, // not kimi-k2 (3.1)
+	}
+	for i := 0; i < 30; i++ {
+		for _, c := range cases {
+			usd, priced := ModelCostUSD(ModelUsage{Model: c.model, Input: 1_000_000, Output: 1_000_000})
+			if !priced || !approx(usd, c.want) {
+				t.Fatalf("%s = %v priced=%v, want %v (longest prefix must win)", c.model, usd, priced, c.want)
+			}
 		}
 	}
 }

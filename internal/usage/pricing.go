@@ -33,6 +33,77 @@ var modelRates = map[string]modelRate{
 	"glm-4.5-air":   {0.13, 0.85},  // Z.ai
 	"mimo-v2.5":     {0.14, 0.28},  // Xiaomi
 	"mimo-v2.5-pro": {0.435, 0.87}, // Xiaomi
+
+	// Models routed through OpenCode (and other tools), priced from models.dev —
+	// the catalog OpenCode itself uses — input/output USD per 1M tokens, sourced
+	// 2026-06-20. Only input/output are stored; cache reads/writes reuse the shared
+	// multipliers below (cache_read ≈ 0.1x input holds for these). Version siblings
+	// that differ in price get their own entry so longest-prefix resolves them; a
+	// not-yet-listed newer variant falls back to its base prefix (a close estimate).
+
+	// OpenAI
+	"gpt-5":        {1.25, 10},
+	"gpt-5-mini":   {0.25, 2},
+	"gpt-5-nano":   {0.05, 0.4},
+	"gpt-5.1":      {1.25, 10},
+	"gpt-5.2":      {1.75, 14},
+	"gpt-5.3":      {1.75, 14}, // covers gpt-5.3-codex / -spark / -chat
+	"gpt-5.4":      {2.5, 15},
+	"gpt-5.5":      {5, 30},
+	"gpt-4.1":      {2, 8},
+	"gpt-4.1-mini": {0.4, 1.6},
+	"gpt-4.1-nano": {0.1, 0.4},
+	"gpt-4o":       {2.5, 10},
+	"gpt-4o-mini":  {0.15, 0.6},
+	"o3":           {2, 8},
+	"o3-mini":      {1.1, 4.4},
+	"o4-mini":      {1.1, 4.4},
+
+	// Google Gemini
+	"gemini-2.5-pro":        {1.25, 10},
+	"gemini-2.5-flash":      {0.3, 2.5},
+	"gemini-2.5-flash-lite": {0.1, 0.4},
+	"gemini-2.0-flash":      {0.1, 0.4},
+	"gemini-3-pro":          {2, 12}, // -preview suffix
+	"gemini-3.1-pro":        {2, 12},
+	"gemini-3-flash":        {0.5, 3},
+	"gemini-3.5-flash":      {1.5, 9},
+	"gemini-3.1-flash-lite": {0.25, 1.5},
+
+	// xAI (grok-4 family currently all input 1.25 / output 2.5)
+	"grok-4": {1.25, 2.5},
+
+	// DeepSeek (input is the standard/cache-miss rate)
+	"deepseek-chat":     {0.14, 0.28},
+	"deepseek-reasoner": {0.14, 0.28},
+	"deepseek-v4-pro":   {0.435, 0.87},
+	"deepseek-v4-flash": {0.14, 0.28},
+
+	// Alibaba Qwen
+	"qwen3-coder-plus":  {1, 5},
+	"qwen3-coder-flash": {0.3, 1.5},
+	"qwen3-coder":       {1.5, 7.5}, // covers qwen3-coder-480b-a35b-instruct
+	"qwen3-max":         {1.2, 6},
+	"qwen-max":          {1.6, 6.4},
+
+	// Moonshot Kimi
+	"kimi-k2":                {0.6, 2.5},
+	"kimi-k2-turbo":          {2.4, 10},
+	"kimi-k2-thinking-turbo": {1.15, 8},
+	"kimi-k2.5":              {0.6, 3},
+	"kimi-k2.6":              {0.95, 4},
+	"kimi-k2.7-code":         {0.95, 4},
+
+	// Z.ai GLM (additions; existing glm-5.2 / glm-4.7 / glm-4.5-air above win by prefix)
+	"glm-5":   {1, 3.2},
+	"glm-5.1": {6, 24},
+	"glm-4.6": {0.6, 2.2},
+	"glm-4.5": {0.6, 2.2},
+
+	// Mistral (coding models)
+	"codestral":       {0.3, 0.9},
+	"devstral-small":  {0.1, 0.3},
+	"devstral-medium": {0.4, 2},
 }
 
 const (
