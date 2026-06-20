@@ -67,13 +67,16 @@ func TestStatsView_monthRendersAsName(t *testing.T) {
 	}
 }
 
-func TestStatsView_biggerGapBeforeTotal(t *testing.T) {
-	// The Total column is set apart from the calculation columns by widening the
-	// gap after Cache R from 1 to 3 spaces (7 visible spaces between the headers).
+func TestStatsView_columnGapsAndTotal(t *testing.T) {
+	// The numeric columns are spread by a 3-space separator; Total then sits one
+	// space past Cache R (5 visible spaces with the %9s padding before "Total").
 	view := stripANSI(NewStatsModelWithData(twoMonths()).View())
-	gap := "Cache R" + strings.Repeat(" ", 11) + "Total"
+	if !strings.Contains(view, "Output   Cache W   Cache R") {
+		t.Errorf("expected 3-space gaps between the numeric column headers:\n%s", view)
+	}
+	gap := "Cache R" + strings.Repeat(" ", 5) + "Total"
 	if !strings.Contains(view, gap) {
-		t.Errorf("expected a wider gap %q before Total:\n%s", gap, view)
+		t.Errorf("expected the gap %q before Total:\n%s", gap, view)
 	}
 }
 

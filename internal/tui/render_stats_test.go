@@ -171,6 +171,20 @@ func TestRenderStatsBox_blankRowBetweenMonths(t *testing.T) {
 	}
 }
 
+// TestRenderStatsBox_widerColumnGaps verifies the numeric columns are spread apart
+// by a 3-space separator (Input/Output/Cache W/Cache R) so the table doesn't read
+// as one cramped block.
+func TestRenderStatsBox_widerColumnGaps(t *testing.T) {
+	m := NewMainMenu(nil, []string{"claude"}, "claude", "none")
+	m.SetActiveTab(TabStats)
+	months := []usage.MonthlyUsage{{Month: "2026-06", Input: 2_000_000}}
+	updated, _ := m.Update(statsLoadedMsg{months: months})
+	out := stripANSI(updated.(*MainMenuModel).renderStatsBox())
+	if !strings.Contains(out, "Output   Cache W   Cache R") {
+		t.Errorf("expected 3-space gaps between the numeric column headers:\n%s", out)
+	}
+}
+
 // TestRenderStatsBox_costColumnRightAligned verifies every dollar figure (per-model
 // cost, the month bar-row cost, and the grand-total cost) shares the same right edge
 // as the month's Total-tokens number, so the money reads as one clean column under
@@ -278,9 +292,9 @@ func TestRenderStatsBox_biggerGapBeforeTotal(t *testing.T) {
 	months := []usage.MonthlyUsage{{Month: "2026-06", Input: 2_000_000}}
 	updated, _ := m.Update(statsLoadedMsg{months: months})
 	out := stripANSI(updated.(*MainMenuModel).renderStatsBox())
-	gap := "Cache R" + strings.Repeat(" ", 11) + "Total"
+	gap := "Cache R" + strings.Repeat(" ", 5) + "Total"
 	if !strings.Contains(out, gap) {
-		t.Errorf("expected a wider gap %q before Total:\n%s", gap, out)
+		t.Errorf("expected the gap %q before Total:\n%s", gap, out)
 	}
 }
 
