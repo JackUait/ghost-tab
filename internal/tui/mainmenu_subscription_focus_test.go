@@ -75,6 +75,33 @@ func TestSubFocus_downFromAISkipsWhenNonClaude(t *testing.T) {
 	}
 }
 
+// The PLAN/subscription row only renders on the Projects tab, so it must not be
+// a focus stop on Settings or Stats — otherwise navigating the ring lands on an
+// invisible stop.
+func TestSubFocus_skippedOnNonProjectTabs(t *testing.T) {
+	for _, tab := range []MenuTab{TabSettings, TabStats} {
+		m := subFocusMenu(t, "claude", true)
+		m.SetActiveTab(tab)
+		if m.subscriptionFocusable() {
+			t.Errorf("tab %v: subscription should not be focusable when its row is not rendered", tab)
+		}
+
+		// Down from AI must skip straight to the tab bar.
+		m.SetFocus(FocusAI)
+		m.Update(tea.KeyMsg{Type: tea.KeyDown})
+		if m.Focus() != FocusTabs {
+			t.Errorf("tab %v: Down from AI = %v, want FocusTabs", tab, m.Focus())
+		}
+
+		// Up from the tab bar must skip straight back to AI.
+		m.SetFocus(FocusTabs)
+		m.Update(tea.KeyMsg{Type: tea.KeyUp})
+		if m.Focus() != FocusAI {
+			t.Errorf("tab %v: Up from tabs = %v, want FocusAI", tab, m.Focus())
+		}
+	}
+}
+
 func TestSubFocus_downFromSubscriptionGoesToTabs(t *testing.T) {
 	m := subFocusMenu(t, "claude", true)
 	m.SetFocus(FocusSubscription)

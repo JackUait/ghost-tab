@@ -857,10 +857,11 @@ func (m *MainMenuModel) CurrentClaudeConfigFile() string {
 func (m *MainMenuModel) ClaudeConfigVisible() bool { return m.CurrentAITool() == "claude" }
 
 // subscriptionFocusable reports whether the main-page subscription line is a
-// reachable focus stop: it must be visible (Claude) and offer something to
-// switch to beyond Standard — i.e. at least one custom config with an API key.
+// reachable focus stop: its PLAN row only renders on the Projects tab, it must
+// be visible (Claude), and it must offer something to switch to beyond Standard
+// — i.e. at least one custom config with an API key.
 func (m *MainMenuModel) subscriptionFocusable() bool {
-	return m.ClaudeConfigVisible() && len(m.mainSubscriptionRing()) > 1
+	return m.activeTab == TabProjects && m.ClaudeConfigVisible() && len(m.mainSubscriptionRing()) > 1
 }
 
 // configHasKey reports whether the custom config file carries an API key.
