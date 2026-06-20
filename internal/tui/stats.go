@@ -13,9 +13,9 @@ import (
 )
 
 const (
-	statsInner  = 60 // inner content width between the box borders
-	statsGaugeW = 26 // gauge length (columns) for a month that is 100% of all tokens
-	statsColEnd = 58 // right edge of the Total column; money/totals align here
+	statsInner  = 68 // inner content width between the box borders
+	statsGaugeW = 34 // gauge length (columns) for a month that is 100% of all tokens
+	statsColEnd = 66 // right edge of the Total column; money/totals align here
 	statsWindow = 8  // months visible at once before scrolling
 )
 
@@ -143,7 +143,7 @@ func statsCols(month, in, out, cw, cr, total string, monthStyle, numStyle, total
 		numStyle.Render(fmt.Sprintf("%7s", in)) + "   " +
 		numStyle.Render(fmt.Sprintf("%7s", out)) + "   " +
 		numStyle.Render(fmt.Sprintf("%7s", cw)) + "   " +
-		numStyle.Render(fmt.Sprintf("%7s", cr)) + " " +
+		numStyle.Render(fmt.Sprintf("%7s", cr)) + "         " +
 		totalStyle.Render(fmt.Sprintf("%9s", total))
 }
 

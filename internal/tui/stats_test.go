@@ -68,15 +68,24 @@ func TestStatsView_monthRendersAsName(t *testing.T) {
 }
 
 func TestStatsView_columnGapsAndTotal(t *testing.T) {
-	// The numeric columns are spread by a 3-space separator; Total then sits one
-	// space past Cache R (5 visible spaces with the %9s padding before "Total").
+	// The numeric columns are spread by a 3-space separator; Total is pushed well
+	// clear of Cache R (13 visible spaces with the %9s padding before "Total").
 	view := stripANSI(NewStatsModelWithData(twoMonths()).View())
 	if !strings.Contains(view, "Output   Cache W   Cache R") {
 		t.Errorf("expected 3-space gaps between the numeric column headers:\n%s", view)
 	}
-	gap := "Cache R" + strings.Repeat(" ", 5) + "Total"
+	gap := "Cache R" + strings.Repeat(" ", 13) + "Total"
 	if !strings.Contains(view, gap) {
 		t.Errorf("expected the gap %q before Total:\n%s", gap, view)
+	}
+}
+
+func TestStatsView_gaugeWidth(t *testing.T) {
+	// A month that is 100% of all tokens fills the whole gauge, which is widened
+	// to statsGaugeW (34) columns.
+	view := stripANSI(NewStatsModelWithData([]usage.MonthlyUsage{{Month: "2026-06", Input: 1_000_000}}).View())
+	if n := barBlocksAfter(view, "Jun 2026"); n != 34 {
+		t.Errorf("100%% gauge block count = %d, want 34", n)
 	}
 }
 
