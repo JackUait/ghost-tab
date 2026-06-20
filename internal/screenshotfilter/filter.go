@@ -13,10 +13,14 @@ package screenshotfilter
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -105,14 +109,20 @@ func partialSuffix(b, needle []byte) int {
 //
 // In both cases an ephemeral screencaptureui temp file is copied to a stable
 // location (macOS deletes it moments after the drop); a persistent file is handed
-// over as its plain path. Anything we can't resolve to a real local image — a normal
-// non-image paste, or a temp path whose file is already gone — is returned unchanged,
-// so the filter is never worse than passing the drop straight through.
+// over as its plain path. A dropped video (which Claude cannot attach at all) is
+// turned into image frames via ffmpeg. Anything we can't resolve to a real local
+// image or video — a normal non-media paste, or a temp path whose file is already
+// gone — is returned unchanged, so the filter is never worse than passing the drop
+// straight through.
 func RewriteScreenshotPath(content []byte) []byte {
-	if path, ok := fileURLToPath(string(content)); ok {
-		return resolveLocalImage(path, content)
+	path, ok := fileURLToPath(string(content))
+	if !ok {
+		path = unescape(string(content))
 	}
-	return resolveLocalImage(unescape(string(content)), content)
+	if payload := videoFramesPayload(path); payload != nil {
+		return payload
+	}
+	return resolveLocalImage(path, content)
 }
 
 // resolveLocalImage returns the bytes to hand Claude for a dragged image at `path`,
@@ -172,6 +182,95 @@ func isImagePath(path string) bool {
 		return true
 	}
 	return false
+}
+
+func isVideoPath(path string) bool {
+	switch strings.ToLower(filepath.Ext(path)) {
+	case ".mov", ".mp4", ".m4v", ".webm", ".mkv", ".avi":
+		return true
+	}
+	return false
+}
+
+// videoFramesPayload returns a rewrite payload of extracted image frames when `path`
+// is an existing video file (which Claude cannot attach directly), or nil when it is
+// not a video or frames can't be produced — in which case the caller falls back to
+// normal image handling / passthrough.
+func videoFramesPayload(path string) []byte {
+	if !isVideoPath(path) {
+		return nil
+	}
+	if info, err := os.Stat(path); err != nil || info.IsDir() {
+		return nil
+	}
+	frames, err := extractVideoFrames(path)
+	if err != nil || len(frames) == 0 {
+		return nil
+	}
+	return framesToPayload(frames)
+}
+
+// framesToPayload renders frame paths as back-to-back bracketed pastes. Filter.Process
+// wraps a rewrite result in a single 200~/201~ pair, so joining frames with
+// "201~ 200~" splits the wrapped output into one paste per frame — Claude attaches
+// multiple images only as separate pastes (proven against a live TUI).
+func framesToPayload(frames []string) []byte {
+	return []byte(strings.Join(frames, pasteEnd+pasteStart))
+}
+
+// maxVideoFrames caps how many evenly-spaced frames are pulled from a dropped video
+// (each becomes one attached image, so this bounds context cost). Overridable via
+// GT_VIDEO_MAX_FRAMES.
+const maxVideoFrames = 8
+
+func videoFrameCap() int {
+	if v := os.Getenv("GT_VIDEO_MAX_FRAMES"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			return n
+		}
+	}
+	return maxVideoFrames
+}
+
+// extractVideoFrames pulls up to videoFrameCap() evenly-spaced frames from src into
+// the stable dir via ffmpeg and returns their (space-free) paths in order. Frames are
+// spread across the whole clip by deriving an fps of frames/duration from ffprobe.
+func extractVideoFrames(src string) ([]string, error) {
+	dir := StableDir()
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, err
+	}
+	n := videoFrameCap()
+	prefix := fmt.Sprintf("gt-frame-%d-", time.Now().UnixNano())
+	pattern := filepath.Join(dir, prefix+"%03d.png")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "ffmpeg", "-nostdin", "-loglevel", "error", "-y",
+		"-i", src, "-vf", "fps="+frameRate(src, n), "-frames:v", strconv.Itoa(n), pattern)
+	if err := cmd.Run(); err != nil {
+		return nil, err
+	}
+
+	frames, err := filepath.Glob(filepath.Join(dir, prefix+"*.png"))
+	if err != nil || len(frames) == 0 {
+		return nil, fmt.Errorf("no frames extracted from %s", src)
+	}
+	sort.Strings(frames)
+	return frames, nil
+}
+
+// frameRate returns the ffmpeg fps that yields ~n frames across the clip's full
+// duration (n/duration). Falls back to "1" when the duration can't be probed.
+func frameRate(src string, n int) string {
+	out, err := exec.Command("ffprobe", "-v", "error", "-show_entries",
+		"format=duration", "-of", "default=nw=1:nk=1", src).Output()
+	if err == nil {
+		if d, perr := strconv.ParseFloat(strings.TrimSpace(string(out)), 64); perr == nil && d > 0 {
+			return strconv.FormatFloat(float64(n)/d, 'f', 6, 64)
+		}
+	}
+	return "1"
 }
 
 // StableDir is where ephemeral screenshots are copied. Matches the bash side's
