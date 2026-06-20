@@ -503,3 +503,18 @@ func TestWriteModelMappings_writes_file_with_0600_perms(t *testing.T) {
 		t.Fatalf("config file perm = %o, want 0600", perm)
 	}
 }
+
+func TestProviderBaseURL(t *testing.T) {
+	cases := map[string]string{
+		"Work GLM zhipu": "https://api.z.ai/api/anthropic",
+		"my zhipu plan":  "https://api.z.ai/api/anthropic",
+		"ZHIPU upper":    "https://api.z.ai/api/anthropic",
+		"unknown vendor": "",
+		"":               "",
+	}
+	for name, want := range cases {
+		if got := ProviderBaseURL(name); got != want {
+			t.Errorf("ProviderBaseURL(%q) = %q, want %q", name, got, want)
+		}
+	}
+}

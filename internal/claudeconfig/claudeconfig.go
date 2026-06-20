@@ -261,6 +261,27 @@ var ProviderModels = map[string][]string{
 	"mimo":   {"mimo-v2.5-pro", "mimo-v2.5", "mimo-v2-pro", "mimo-v2-omni", "mimo-v2-flash"},
 }
 
+// ProviderBaseURLs maps a provider key to its Anthropic-compatible gateway base
+// URL. Subscriptions store no base URL, so OpenCode mirroring derives it from the
+// config name. zhipu (z.ai GLM Coding Plan) is verified; add new providers here as
+// their endpoints are confirmed. mimo is intentionally absent until verified, so
+// mimo subscriptions are skipped rather than pointed at a guessed endpoint.
+var ProviderBaseURLs = map[string]string{
+	"zhipu": "https://api.z.ai/api/anthropic",
+}
+
+// ProviderBaseURL returns the base URL for the provider whose key appears in the
+// config name (case-insensitive), or "" if no known provider matches.
+func ProviderBaseURL(configName string) string {
+	lower := strings.ToLower(configName)
+	for key, url := range ProviderBaseURLs {
+		if strings.Contains(lower, key) {
+			return url
+		}
+	}
+	return ""
+}
+
 // ModelsForConfig returns the model list for the provider matching the config
 // name. Falls back to GLM models if no provider matches.
 func ModelsForConfig(configName string) []string {
