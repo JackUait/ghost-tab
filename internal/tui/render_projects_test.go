@@ -8,22 +8,34 @@ import (
 )
 
 func TestActionBarFor_byRowType(t *testing.T) {
-	cases := map[string][]string{
-		"project":     {"Open", "Worktrees", "Delete"},
-		"worktree":    {"Open", "Delete"},
+	cases := []struct {
+		rowType      string
+		hasWorktrees bool
+		want         []string
+		notWant      []string
+	}{
+		// W Worktrees only appears when the project actually has worktrees.
+		{"project", true, []string{"Open", "Worktrees", "Delete"}, nil},
+		{"project", false, []string{"Open", "Delete"}, []string{"Worktrees"}},
+		{"worktree", false, []string{"Open", "Delete"}, nil},
 		// Leading glyph doubles as the keymap: Enter triggers add-project, so the
 		// action bar must show ⏎ like the other rows (not a bare "+").
-		"add-project": {"⏎", "Add project"},
+		{"add-project", false, []string{"⏎", "Add project"}, nil},
 	}
-	for rowType, wantWords := range cases {
-		got := actionBarFor(rowType)
-		for _, w := range wantWords {
+	for _, c := range cases {
+		got := actionBarFor(c.rowType, c.hasWorktrees)
+		for _, w := range c.want {
 			if !strings.Contains(got, w) {
-				t.Errorf("actionBarFor(%q)=%q missing %q", rowType, got, w)
+				t.Errorf("actionBarFor(%q, %v)=%q missing %q", c.rowType, c.hasWorktrees, got, w)
+			}
+		}
+		for _, nw := range c.notWant {
+			if strings.Contains(got, nw) {
+				t.Errorf("actionBarFor(%q, %v)=%q should not contain %q", c.rowType, c.hasWorktrees, got, nw)
 			}
 		}
 	}
-	if actionBarFor("action") != "" {
+	if actionBarFor("action", false) != "" {
 		t.Errorf("actionBarFor(action) should be empty")
 	}
 }

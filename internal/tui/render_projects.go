@@ -8,12 +8,17 @@ import (
 )
 
 // actionBarFor returns the contextual action label text for a selected row type.
-func actionBarFor(itemType string) string {
+// hasWorktrees is consulted for project rows: the "W Worktrees" action only does
+// something when the project actually has worktrees, so it is hidden otherwise.
+func actionBarFor(itemType string, hasWorktrees bool) string {
 	// Labels double as a keymap: the leading glyph/letter is the real keybinding
 	// (Enter opens, W toggles worktrees, D deletes — see handleRune).
 	switch itemType {
 	case "project":
-		return "⏎ Open    W Worktrees    D Delete"
+		if hasWorktrees {
+			return "⏎ Open    W Worktrees    D Delete"
+		}
+		return "⏎ Open    D Delete"
 	case "worktree":
 		return "⏎ Open    D Delete"
 	case "add-project":
@@ -26,8 +31,9 @@ func actionBarFor(itemType string) string {
 // renderActionBar renders the contextual action line for the current selection.
 func (m *MainMenuModel) renderActionBar(leftBorder, rightBorder string) string {
 	style := lipgloss.NewStyle().Foreground(m.theme.Accent)
-	itemType, _, _ := m.ResolveItem(m.selectedItem)
-	text := actionBarFor(itemType)
+	itemType, projectIdx, _ := m.ResolveItem(m.selectedItem)
+	hasWorktrees := itemType == "project" && projectIdx >= 0 && projectIdx < len(m.projects) && len(m.projects[projectIdx].Worktrees) > 0
+	text := actionBarFor(itemType, hasWorktrees)
 	rendered := style.Render(text)
 	gap := menuContentWidth - lipgloss.Width(rendered) - 2
 	if gap < 0 {
