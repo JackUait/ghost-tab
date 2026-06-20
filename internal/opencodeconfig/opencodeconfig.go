@@ -1,0 +1,109 @@
+// Package opencodeconfig mirrors Ghost Tab subscriptions (custom Claude configs)
+// into OpenCode's global config as custom providers. MergeSubscriptions is the
+// pure core; Sync (sync.go) wires it to disk.
+package opencodeconfig
+
+import (
+	"encoding/json"
+	"strings"
+
+	"github.com/jackuait/ghost-tab/internal/claudeconfig"
+)
+
+// ProviderPrefix namespaces every provider Ghost Tab owns in opencode.json, so a
+// rebuild can remove and re-add only these without touching user-authored ones.
+const ProviderPrefix = "ghost-tab-"
+
+const schemaURL = "https://opencode.ai/config.json"
+
+// Subscription is the resolved view of a Ghost Tab subscription that OpenCode
+// needs. BaseURL is pre-resolved by the caller (empty -> not mirrorable).
+type Subscription struct {
+	Name      string
+	File      string
+	APIKey    string
+	BaseURL   string
+	OpusModel string
+	Models    []string
+	Active    bool
+}
+
+// providerID returns the namespaced OpenCode provider id for a subscription.
+func (s Subscription) providerID() string {
+	slug := claudeconfig.Slugify(strings.TrimSuffix(s.File, ".json"))
+	return ProviderPrefix + slug
+}
+
+// mirrorable reports whether the subscription has everything a working OpenCode
+// provider needs.
+func (s Subscription) mirrorable() bool {
+	return s.APIKey != "" && s.BaseURL != "" && len(s.Models) > 0
+}
+
+// defaultModel returns the "<providerID>/<model>" string for the active provider.
+func (s Subscription) defaultModel() string {
+	model := s.OpusModel
+	if model == "" {
+		model = s.Models[0]
+	}
+	return s.providerID() + "/" + model
+}
+
+// MergeSubscriptions rebuilds the ghost-tab-* providers in existing opencode.json
+// bytes from subs, preserving every other key. Returns (nil, false) when existing
+// is non-empty but not valid JSON (e.g. JSONC), meaning the caller must not write.
+func MergeSubscriptions(existing []byte, subs []Subscription) ([]byte, bool) {
+	m := map[string]any{}
+	if len(strings.TrimSpace(string(existing))) > 0 {
+		if err := json.Unmarshal(existing, &m); err != nil {
+			return nil, false
+		}
+	}
+
+	m["$schema"] = schemaURL
+
+	provider, _ := m["provider"].(map[string]any)
+	if provider == nil {
+		provider = map[string]any{}
+	}
+	// Drop every provider we own; user-authored ones stay.
+	for id := range provider {
+		if strings.HasPrefix(id, ProviderPrefix) {
+			delete(provider, id)
+		}
+	}
+
+	for _, s := range subs {
+		if !s.mirrorable() {
+			continue
+		}
+		models := map[string]any{}
+		for _, id := range s.Models {
+			models[id] = map[string]any{"name": id}
+		}
+		provider[s.providerID()] = map[string]any{
+			"npm":  "@ai-sdk/anthropic",
+			"name": s.Name,
+			"options": map[string]any{
+				"baseURL": s.BaseURL,
+				"apiKey":  s.APIKey,
+			},
+			"models": models,
+		}
+		if s.Active {
+			m["model"] = s.defaultModel()
+		}
+	}
+
+	if len(provider) == 0 {
+		delete(m, "provider")
+	} else {
+		m["provider"] = provider
+	}
+
+	out, err := json.MarshalIndent(m, "", "  ")
+	if err != nil {
+		return nil, false
+	}
+	return append(out, '\n'), true
+}
