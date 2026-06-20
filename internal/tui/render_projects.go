@@ -545,6 +545,9 @@ func (m *MainMenuModel) renderMenuBox() string {
 		lines = append(lines, m.renderSubscriptionRow(leftBorder, rightBorder))
 	}
 
+	// Blank spacer separating the agent/plan switchers from the tab bar.
+	lines = append(lines, m.emptyMenuRow(leftBorder, rightBorder))
+
 	// Tab bar
 	lines = append(lines, m.renderTabBar(leftBorder, rightBorder))
 
@@ -608,9 +611,9 @@ func (m *MainMenuModel) renderMenuBox() string {
 	lines = append(lines, m.renderHelpRow())
 
 	// Scroll clipping when menu is taller than the available terminal height.
-	// Fixed header = top + title + tab-bar + sep + leading-blank (5), plus the
-	// optional subscription and update rows.
-	headerEnd := 5 + m.subscriptionRowCount()
+	// Fixed header = top + title + switcher-gap + tab-bar + sep + leading-blank (6),
+	// plus the optional subscription and update rows.
+	headerEnd := 6 + m.subscriptionRowCount()
 	if m.updateVersion != "" {
 		headerEnd++
 	}

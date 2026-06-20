@@ -115,24 +115,25 @@ func TestMapRowToItem_matchesRenderedLayout(t *testing.T) {
 	m.width = 100
 	m.height = 60
 
-	// Layout (see render_projects.go): top(0) title(1) tabbar(2) sep(3)
-	// blank(4) alpha-name(5) alpha-path(6) beta-name(7) beta-path(8)
-	// blank(9) add-project(10) add-hint(11) sep(12) actionbar(13) bottom(14) help(15)
+	// Layout (see render_projects.go): top(0) title(1) switcher-gap(2) tabbar(3)
+	// sep(4) blank(5) alpha-name(6) alpha-path(7) beta-name(8) beta-path(9)
+	// blank(10) add-project(11) add-hint(12) sep(13) actionbar(14) bottom(15) help(16)
 	cases := map[int]int{
 		0:  -1, // top border
-		2:  -1, // tab bar
-		3:  -1, // separator
-		4:  -1, // blank spacer
-		5:  0,  // alpha name
-		6:  0,  // alpha path
-		7:  1,  // beta name
-		8:  1,  // beta path
-		9:  -1, // blank spacer before add-project
-		10: 2,  // add-project label row (TotalItems-1)
-		11: 2,  // add-project hint subtitle row
-		12: -1, // separator
-		13: -1, // action bar
-		14: -1, // bottom border
+		2:  -1, // switcher gap
+		3:  -1, // tab bar
+		4:  -1, // separator
+		5:  -1, // blank spacer
+		6:  0,  // alpha name
+		7:  0,  // alpha path
+		8:  1,  // beta name
+		9:  1,  // beta path
+		10: -1, // blank spacer before add-project
+		11: 2,  // add-project label row (TotalItems-1)
+		12: 2,  // add-project hint subtitle row
+		13: -1, // separator
+		14: -1, // action bar
+		15: -1, // bottom border
 	}
 	for clickY, want := range cases {
 		if got := m.MapRowToItem(clickY); got != want {
@@ -141,7 +142,7 @@ func TestMapRowToItem_matchesRenderedLayout(t *testing.T) {
 	}
 
 	// The add-project row must map to the final selectable index.
-	addRow := m.MapRowToItem(10)
+	addRow := m.MapRowToItem(11)
 	if addRow != m.TotalItems()-1 {
 		t.Errorf("add-project row = %d, want TotalItems-1=%d", addRow, m.TotalItems()-1)
 	}

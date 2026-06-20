@@ -1020,24 +1020,24 @@ func TestMainMenu_MapRowToItem_Projects(t *testing.T) {
 		{Name: "p1", Path: "/p1"},
 		{Name: "p2", Path: "/p2"},
 	}
-	// Non-Claude tool: no subscription row, so projects start at row 5.
+	// Non-Claude tool: no subscription row, so projects start at row 6.
 	m := tui.NewMainMenu(projects, []string{"codex"}, "codex", "animated")
 	m.SetSize(80, 30)
 
-	// Layout: row 0 border, 1 title, 2 tab bar, 3 separator, 4 empty,
-	// then first project at rows 5-6.
-	if m.MapRowToItem(5) != 0 {
-		t.Errorf("click at row 5 should map to item 0, got %d", m.MapRowToItem(5))
-	}
+	// Layout: row 0 border, 1 title, 2 switcher gap, 3 tab bar, 4 separator,
+	// 5 empty, then first project at rows 6-7.
 	if m.MapRowToItem(6) != 0 {
-		t.Errorf("click at row 6 should map to item 0 (path line), got %d", m.MapRowToItem(6))
+		t.Errorf("click at row 6 should map to item 0, got %d", m.MapRowToItem(6))
 	}
-	// Second project at rows 7-8
-	if m.MapRowToItem(7) != 1 {
-		t.Errorf("click at row 7 should map to item 1, got %d", m.MapRowToItem(7))
+	if m.MapRowToItem(7) != 0 {
+		t.Errorf("click at row 7 should map to item 0 (path line), got %d", m.MapRowToItem(7))
 	}
+	// Second project at rows 8-9
 	if m.MapRowToItem(8) != 1 {
-		t.Errorf("click at row 8 should map to item 1 (path line), got %d", m.MapRowToItem(8))
+		t.Errorf("click at row 8 should map to item 1, got %d", m.MapRowToItem(8))
+	}
+	if m.MapRowToItem(9) != 1 {
+		t.Errorf("click at row 9 should map to item 1 (path line), got %d", m.MapRowToItem(9))
 	}
 }
 
@@ -1049,21 +1049,21 @@ func TestMainMenu_MapRowToItem_AddProjectRow(t *testing.T) {
 	m := tui.NewMainMenu(projects, []string{"codex"}, "codex", "animated")
 	m.SetSize(80, 30)
 
-	// Layout: 1 project at rows 5-6, blank spacer at row 7, add-project label at
-	// row 8, add-project hint subtitle at row 9. Both add-project rows map to the
+	// Layout: 1 project at rows 6-7, blank spacer at row 8, add-project label at
+	// row 9, add-project hint subtitle at row 10. Both add-project rows map to the
 	// same item. The old delete/open-once/plain-terminal action rows no longer exist.
-	if m.MapRowToItem(8) != 1 {
-		t.Errorf("click at add-project label row should map to item 1, got %d", m.MapRowToItem(8))
-	}
 	if m.MapRowToItem(9) != 1 {
-		t.Errorf("click at add-project hint row should map to item 1, got %d", m.MapRowToItem(9))
+		t.Errorf("click at add-project label row should map to item 1, got %d", m.MapRowToItem(9))
 	}
-	if m.MapRowToItem(8) != m.TotalItems()-1 {
-		t.Errorf("add-project row should be the final selectable item (%d), got %d", m.TotalItems()-1, m.MapRowToItem(8))
+	if m.MapRowToItem(10) != 1 {
+		t.Errorf("click at add-project hint row should map to item 1, got %d", m.MapRowToItem(10))
+	}
+	if m.MapRowToItem(9) != m.TotalItems()-1 {
+		t.Errorf("add-project row should be the final selectable item (%d), got %d", m.TotalItems()-1, m.MapRowToItem(9))
 	}
 	// Rows past the add-project row are not selectable items.
-	if m.MapRowToItem(10) != -1 {
-		t.Errorf("click below add-project row should return -1, got %d", m.MapRowToItem(10))
+	if m.MapRowToItem(11) != -1 {
+		t.Errorf("click below add-project row should return -1, got %d", m.MapRowToItem(11))
 	}
 }
 
@@ -1081,21 +1081,25 @@ func TestMainMenu_MapRowToItem_Invalid(t *testing.T) {
 	if m.MapRowToItem(1) != -1 {
 		t.Errorf("click on title should return -1, got %d", m.MapRowToItem(1))
 	}
-	// Row 2 is the tab bar
+	// Row 2 is the switcher gap
 	if m.MapRowToItem(2) != -1 {
-		t.Errorf("click on tab bar should return -1, got %d", m.MapRowToItem(2))
+		t.Errorf("click on switcher gap should return -1, got %d", m.MapRowToItem(2))
 	}
-	// Row 3 is separator
+	// Row 3 is the tab bar
 	if m.MapRowToItem(3) != -1 {
-		t.Errorf("click on separator should return -1, got %d", m.MapRowToItem(3))
+		t.Errorf("click on tab bar should return -1, got %d", m.MapRowToItem(3))
 	}
-	// Row 4 is empty
+	// Row 4 is separator
 	if m.MapRowToItem(4) != -1 {
-		t.Errorf("click on empty row should return -1, got %d", m.MapRowToItem(4))
+		t.Errorf("click on separator should return -1, got %d", m.MapRowToItem(4))
 	}
-	// Row 7 is the blank spacer before the add-project row
-	if m.MapRowToItem(7) != -1 {
-		t.Errorf("click on blank spacer should return -1, got %d", m.MapRowToItem(7))
+	// Row 5 is empty
+	if m.MapRowToItem(5) != -1 {
+		t.Errorf("click on empty row should return -1, got %d", m.MapRowToItem(5))
+	}
+	// Row 8 is the blank spacer before the add-project row
+	if m.MapRowToItem(8) != -1 {
+		t.Errorf("click on blank spacer should return -1, got %d", m.MapRowToItem(8))
 	}
 	// Row way beyond menu should return -1
 	if m.MapRowToItem(100) != -1 {
@@ -1108,13 +1112,13 @@ func TestMainMenu_MapRowToItem_NoProjects(t *testing.T) {
 	m := tui.NewMainMenu(nil, []string{"codex"}, "codex", "animated")
 	m.SetSize(80, 30)
 
-	// No projects: row 0 border, 1 title, 2 tab bar, 3 separator, 4 empty,
-	// 5 blank spacer, 6 add-project row (the only selectable item).
-	if m.MapRowToItem(6) != 0 {
-		t.Errorf("add-project row at row 6 should map to item 0, got %d", m.MapRowToItem(6))
+	// No projects: row 0 border, 1 title, 2 switcher gap, 3 tab bar, 4 separator,
+	// 5 empty, 6 blank spacer, 7 add-project row (the only selectable item).
+	if m.MapRowToItem(7) != 0 {
+		t.Errorf("add-project row at row 7 should map to item 0, got %d", m.MapRowToItem(7))
 	}
-	if m.MapRowToItem(5) != -1 {
-		t.Errorf("blank spacer at row 5 should return -1, got %d", m.MapRowToItem(5))
+	if m.MapRowToItem(6) != -1 {
+		t.Errorf("blank spacer at row 6 should return -1, got %d", m.MapRowToItem(6))
 	}
 }
 
@@ -1126,13 +1130,13 @@ func TestMainMenu_MapRowToItem_WithUpdateVersion(t *testing.T) {
 	m.SetSize(80, 30)
 
 	// With update version, rows shift down by 1:
-	// Row 0: border, 1: title, 2: tab bar, 3: separator, 4: update notification,
-	// 5: empty, 6-7: project.
-	if m.MapRowToItem(6) != 0 {
-		t.Errorf("with update version, project should be at row 6, got %d", m.MapRowToItem(6))
-	}
+	// Row 0: border, 1: title, 2: switcher gap, 3: tab bar, 4: separator,
+	// 5: update notification, 6: empty, 7-8: project.
 	if m.MapRowToItem(7) != 0 {
-		t.Errorf("with update version, project path at row 7 should map to 0, got %d", m.MapRowToItem(7))
+		t.Errorf("with update version, project should be at row 7, got %d", m.MapRowToItem(7))
+	}
+	if m.MapRowToItem(8) != 0 {
+		t.Errorf("with update version, project path at row 8 should map to 0, got %d", m.MapRowToItem(8))
 	}
 }
 
@@ -1146,11 +1150,11 @@ func TestMainMenu_MouseClickSelectsItem(t *testing.T) {
 	m.SetSize(80, 30)
 	_ = m.View() // compute the vertical centering offset
 
-	// Second project's name line is box row 7 (border, title, tab bar,
-	// separator, empty, p0-name, p0-path, p1-name). Account for centering.
+	// Second project's name line is box row 8 (border, title, switcher gap,
+	// tab bar, separator, empty, p0-name, p0-path, p1-name). Account for centering.
 	mouseMsg := tea.MouseMsg{
 		X:      10,
-		Y:      m.CenterOffsetY() + 7,
+		Y:      m.CenterOffsetY() + 8,
 		Action: tea.MouseActionPress,
 		Button: tea.MouseButtonLeft,
 	}
@@ -1175,11 +1179,11 @@ func TestMainMenu_MouseDoubleClickActivates(t *testing.T) {
 	m.SetSize(80, 30)
 	_ = m.View() // compute the vertical centering offset
 
-	// First project's name line is box row 5. Clicking the already-selected
+	// First project's name line is box row 6. Clicking the already-selected
 	// item acts as a double-click activation. Account for centering.
 	mouseMsg := tea.MouseMsg{
 		X:      10,
-		Y:      m.CenterOffsetY() + 5,
+		Y:      m.CenterOffsetY() + 6,
 		Action: tea.MouseActionPress,
 		Button: tea.MouseButtonLeft,
 	}
@@ -2061,9 +2065,9 @@ func TestMainMenu_MouseClickWorksWithCentering(t *testing.T) {
 	m.View()
 
 	// With ghost=none, 2 projects + the add-project row.
-	// Menu box rows: border, title, tab bar, separator, empty, p0-name,
-	// p0-path, p1-name, ... so the second project name is at box row 7.
-	// Absolute row = centering offset + 7.
+	// Menu box rows: border, title, switcher gap, tab bar, separator, empty,
+	// p0-name, p0-path, p1-name, ... so the second project name is at box row 8.
+	// Absolute row = centering offset + 8.
 	offset := m.CenterOffsetY()
 	if offset <= 0 {
 		t.Fatalf("expected positive centering offset with 80x40 and ghost=none, got %d", offset)
@@ -2071,7 +2075,7 @@ func TestMainMenu_MouseClickWorksWithCentering(t *testing.T) {
 
 	mouseMsg := tea.MouseMsg{
 		X:      40,
-		Y:      offset + 7,
+		Y:      offset + 8,
 		Action: tea.MouseActionPress,
 		Button: tea.MouseButtonLeft,
 	}
@@ -3863,39 +3867,40 @@ func TestMainMenu_MapRowToItemWithWorktrees(t *testing.T) {
 	// Row layout (0-indexed within menu box):
 	// 0: top border
 	// 1: title
-	// 2: tab bar
-	// 3: separator
-	// 4: empty
-	// 5-6: project 0 (name + path) -> item 0
-	// 7-8: worktree 0 (branch + path) -> item 1
-	// 9-10: worktree 1 (branch + path) -> item 2
-	// 11-12: project 1 (name + path) -> item 3
+	// 2: switcher gap
+	// 3: tab bar
+	// 4: separator
+	// 5: empty
+	// 6-7: project 0 (name + path) -> item 0
+	// 8-9: worktree 0 (branch + path) -> item 1
+	// 10-11: worktree 1 (branch + path) -> item 2
+	// 12-13: project 1 (name + path) -> item 3
 
 	// Project 0
-	if m.MapRowToItem(5) != 0 {
-		t.Errorf("row 5: expected item 0, got %d", m.MapRowToItem(5))
-	}
 	if m.MapRowToItem(6) != 0 {
 		t.Errorf("row 6: expected item 0, got %d", m.MapRowToItem(6))
 	}
+	if m.MapRowToItem(7) != 0 {
+		t.Errorf("row 7: expected item 0, got %d", m.MapRowToItem(7))
+	}
 
 	// Worktree entries (2 rows each: branch + path)
-	if m.MapRowToItem(7) != 1 {
-		t.Errorf("row 7: expected item 1 (wt0), got %d", m.MapRowToItem(7))
-	}
 	if m.MapRowToItem(8) != 1 {
-		t.Errorf("row 8: expected item 1 (wt0 path row), got %d", m.MapRowToItem(8))
+		t.Errorf("row 8: expected item 1 (wt0), got %d", m.MapRowToItem(8))
 	}
-	if m.MapRowToItem(9) != 2 {
-		t.Errorf("row 9: expected item 2 (wt1), got %d", m.MapRowToItem(9))
+	if m.MapRowToItem(9) != 1 {
+		t.Errorf("row 9: expected item 1 (wt0 path row), got %d", m.MapRowToItem(9))
 	}
 	if m.MapRowToItem(10) != 2 {
-		t.Errorf("row 10: expected item 2 (wt1 path row), got %d", m.MapRowToItem(10))
+		t.Errorf("row 10: expected item 2 (wt1), got %d", m.MapRowToItem(10))
+	}
+	if m.MapRowToItem(11) != 2 {
+		t.Errorf("row 11: expected item 2 (wt1 path row), got %d", m.MapRowToItem(11))
 	}
 
 	// Project 1
-	if m.MapRowToItem(11) != 3 {
-		t.Errorf("row 11: expected item 3 (proj1), got %d", m.MapRowToItem(11))
+	if m.MapRowToItem(12) != 3 {
+		t.Errorf("row 12: expected item 3 (proj1), got %d", m.MapRowToItem(12))
 	}
 }
 
@@ -4080,12 +4085,12 @@ func TestMainMenu_MapRowToItemWithAddWorktree(t *testing.T) {
 	m.SetSize(100, 40)
 
 	m.ToggleWorktrees(0)
-	// Layout: P0(rows 5-6), WT0(rows 7-8), WT1(rows 9-10), +Add(row 11), P1(rows 12-13)
-	if got := m.MapRowToItem(11); got != 3 {
-		t.Errorf("+Add row 11: got flat %d, want 3", got)
+	// Layout: P0(rows 6-7), WT0(rows 8-9), WT1(rows 10-11), +Add(row 12), P1(rows 13-14)
+	if got := m.MapRowToItem(12); got != 3 {
+		t.Errorf("+Add row 12: got flat %d, want 3", got)
 	}
-	if got := m.MapRowToItem(12); got != 4 {
-		t.Errorf("P1 row 12: got flat %d, want 4", got)
+	if got := m.MapRowToItem(13); got != 4 {
+		t.Errorf("P1 row 13: got flat %d, want 4", got)
 	}
 }
 

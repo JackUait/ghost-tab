@@ -63,9 +63,10 @@ func (m *MainMenuModel) renderSettingsBox() string {
 
 	var lines []string
 
-	// Shared chrome: top border + title row + tab bar + separator
+	// Shared chrome: top border + title row + switcher gap + tab bar + separator
 	lines = append(lines, top)
 	lines = append(lines, m.renderTitleRow(leftBorder, rightBorder))
+	lines = append(lines, m.emptyMenuRow(leftBorder, rightBorder))
 	lines = append(lines, m.renderTabBar(leftBorder, rightBorder))
 	lines = append(lines, separator)
 

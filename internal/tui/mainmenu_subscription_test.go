@@ -61,14 +61,17 @@ func TestMainPage_NoSubscription_NonClaude(t *testing.T) {
 // The subscription row shifts the project rows down by one; click mapping and
 // the layout height must stay in sync.
 func TestMapRowToItem_accountsForSubscriptionRow(t *testing.T) {
+	// Header rows: top, title, [subscription], switcher-gap, tab bar, separator,
+	// leading blank — so the first project lands at row 6 (+1 for the Claude
+	// subscription row).
 	mClaude := subTestMenu("claude")
-	if got := mClaude.MapRowToItem(6); got != 0 {
-		t.Errorf("claude: first project should be at row 6, MapRowToItem(6)=%d", got)
+	if got := mClaude.MapRowToItem(7); got != 0 {
+		t.Errorf("claude: first project should be at row 7, MapRowToItem(7)=%d", got)
 	}
 
 	mCodex := subTestMenu("codex")
-	if got := mCodex.MapRowToItem(5); got != 0 {
-		t.Errorf("codex: first project should be at row 5, MapRowToItem(5)=%d", got)
+	if got := mCodex.MapRowToItem(6); got != 0 {
+		t.Errorf("codex: first project should be at row 6, MapRowToItem(6)=%d", got)
 	}
 }
 

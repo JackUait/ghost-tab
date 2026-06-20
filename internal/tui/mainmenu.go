@@ -1298,12 +1298,13 @@ func (m *MainMenuModel) MapRowToItem(clickY int) int {
 	// Row 0: top border
 	// Row 1: title row
 	// (optional) subscription row (Claude only)
-	// Row 2: tab bar
-	// Row 3: separator
+	// switcher gap (blank row separating switchers from the tab bar)
+	// tab bar
+	// separator
 	// (optional) update notification row
-	// Row 4/5: empty row
+	// leading empty row
 	// Then project items start
-	startRow := 5 + m.subscriptionRowCount()
+	startRow := 6 + m.subscriptionRowCount()
 	if m.updateVersion != "" {
 		startRow++ // update notification takes a row
 	}

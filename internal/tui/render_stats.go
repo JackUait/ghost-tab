@@ -194,6 +194,7 @@ func (m *MainMenuModel) renderStatsBox() string {
 	var lines []string
 	lines = append(lines, top)
 	lines = append(lines, m.renderTitleRow(leftBorder, rightBorder))
+	lines = append(lines, m.emptyMenuRow(leftBorder, rightBorder))
 	lines = append(lines, m.renderTabBar(leftBorder, rightBorder))
 	lines = append(lines, separator)
 	lines = append(lines, m.renderStatsRows(leftBorder, rightBorder)...)

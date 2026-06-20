@@ -32,6 +32,12 @@ func (m *MainMenuModel) boxBorders() (top, separator, bottom, leftBorder, rightB
 	return
 }
 
+// emptyMenuRow returns a blank box row (just borders + interior spaces), used as
+// a spacer inside the menu box.
+func (m *MainMenuModel) emptyMenuRow(leftBorder, rightBorder string) string {
+	return leftBorder + strings.Repeat(" ", menuContentWidth) + rightBorder
+}
+
 // menuTabLabels is the ordered list of top-level tab labels.
 var menuTabLabels = []string{"Projects", "Settings", "Stats"}
 

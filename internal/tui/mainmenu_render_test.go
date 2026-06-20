@@ -68,6 +68,27 @@ func TestMenuBox_AIToolRightAligned(t *testing.T) {
 	}
 }
 
+func TestMenuBox_GapAboveTabBar(t *testing.T) {
+	m := newTestMenu()
+	raw := stripAnsi(m.renderMenuBox())
+	lines := strings.Split(raw, "\n")
+	tabIdx := -1
+	for i, l := range lines {
+		if strings.Contains(l, "Projects") && strings.Contains(l, "Settings") && strings.Contains(l, "Stats") {
+			tabIdx = i
+			break
+		}
+	}
+	if tabIdx <= 0 {
+		t.Fatalf("could not find the tab bar row:\n%s", raw)
+	}
+	above := lines[tabIdx-1]
+	inner := strings.TrimSuffix(strings.TrimPrefix(above, "│"), "│")
+	if strings.TrimSpace(inner) != "" {
+		t.Errorf("expected a blank spacer row above the tab bar, got: %q", above)
+	}
+}
+
 func TestMenuBox_TitleRightAligned(t *testing.T) {
 	m := newTestMenu()
 	box := m.renderMenuBox()
