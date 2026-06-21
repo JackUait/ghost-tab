@@ -72,6 +72,12 @@ func MergeSubscriptions(existing []byte, subs []Subscription) ([]byte, bool) {
 		}
 	}
 
+	// Clear the model key if it currently points to a ghost-tab provider; it
+	// will be re-set below if an active subscription is still mirrorable.
+	if current, ok := m["model"].(string); ok && strings.HasPrefix(current, ProviderPrefix) {
+		delete(m, "model")
+	}
+
 	for _, s := range subs {
 		if !s.mirrorable() {
 			continue
