@@ -15,6 +15,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/jackuait/ghost-tab/internal/claudeconfig"
 	"github.com/jackuait/ghost-tab/internal/models"
+	"github.com/jackuait/ghost-tab/internal/opencodeconfig"
 	"github.com/jackuait/ghost-tab/internal/usage"
 	"github.com/jackuait/ghost-tab/internal/util"
 )
@@ -928,10 +929,27 @@ func (m *MainMenuModel) persistClaudeConfig() {
 	file := m.CurrentClaudeConfigFile()
 	if file == "" {
 		_ = os.Remove(m.claudeConfigFile)
+		m.syncOpenCode()
 		return
 	}
 	_ = os.MkdirAll(filepath.Dir(m.claudeConfigFile), 0755)
 	_ = os.WriteFile(m.claudeConfigFile, []byte(file+"\n"), 0644)
+	m.syncOpenCode()
+}
+
+// syncOpenCode mirrors the current subscriptions into OpenCode's global config.
+// Best-effort: errors are swallowed inside opencodeconfig.Sync.
+func (m *MainMenuModel) syncOpenCode() {
+	if m.claudeConfigsList == "" || m.claudeConfigsDir == "" {
+		return
+	}
+	home, _ := os.UserHomeDir()
+	_ = opencodeconfig.Sync(opencodeconfig.Inputs{
+		ListFile:    m.claudeConfigsList,
+		ConfigsDir:  m.claudeConfigsDir,
+		PointerFile: m.claudeConfigFile,
+		Home:        home,
+	})
 }
 
 // soundNameForResult returns a pointer to the sound name if changed, nil if unchanged.

@@ -45,6 +45,7 @@ func (m *MainMenuModel) updateModelMap(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.modelMapErr = err
 			return m, nil
 		}
+		m.syncOpenCode()
 		m.modelMapOpen = false
 		return m, nil
 	case tea.KeyUp:
@@ -120,6 +121,7 @@ func (m *MainMenuModel) updateModelMapKeyInput(msg tea.KeyMsg) (tea.Model, tea.C
 				m.modelMapErr = err
 				return m, nil
 			}
+			m.syncOpenCode()
 		}
 		m.modelMapKeyMode = false
 		m.modelMapKeyInput.Blur()
