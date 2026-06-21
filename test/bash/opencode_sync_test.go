@@ -62,7 +62,7 @@ func TestCLIAdd_then_key_mirrors_into_opencode(t *testing.T) {
 	os.WriteFile(cfgFile, []byte(`{"env":{"ANTHROPIC_AUTH_TOKEN":"sk-abc","ANTHROPIC_DEFAULT_OPUS_MODEL":"glm-4.6"}}`), 0644)
 	os.WriteFile(pointer, []byte("work-glm-zhipu.json\n"), 0644)
 	// rename triggers a re-sync that now sees the key+mapping.
-	run("claude-config", "rename", "--list", list, "--pointer", pointer, "--file", "work-glm-zhipu.json", "--name", "Work GLM zhipu")
+	run("claude-config", "rename", "--list", list, "--dir", configsDir, "--pointer", pointer, "--file", "work-glm-zhipu.json", "--name", "Work GLM zhipu")
 
 	data, err := os.ReadFile(filepath.Join(home, ".config", "opencode", "opencode.json"))
 	if err != nil {

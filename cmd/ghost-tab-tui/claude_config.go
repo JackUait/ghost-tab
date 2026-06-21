@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/jackuait/ghost-tab/internal/claudeconfig"
 	"github.com/jackuait/ghost-tab/internal/opencodeconfig"
@@ -19,17 +18,13 @@ var (
 )
 
 func syncOpenCode() {
-	if ccList == "" {
+	if ccList == "" || ccDir == "" {
 		return
-	}
-	dir := ccDir
-	if dir == "" {
-		dir = filepath.Join(filepath.Dir(ccList), "claude-configs")
 	}
 	home, _ := os.UserHomeDir()
 	_ = opencodeconfig.Sync(opencodeconfig.Inputs{
 		ListFile:    ccList,
-		ConfigsDir:  dir,
+		ConfigsDir:  ccDir,
 		PointerFile: ccPointer,
 		Home:        home,
 	})
