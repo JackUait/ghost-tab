@@ -3904,9 +3904,9 @@ func TestMainMenu_MapRowToItemWithWorktrees(t *testing.T) {
 		t.Errorf("row 12: expected item 2 (wt1 path row), got %d", m.MapRowToItem(12))
 	}
 
-	// Project 1
+	// Add-worktree row (item 3); project 1 is item 4 at row 14.
 	if m.MapRowToItem(13) != 3 {
-		t.Errorf("row 13: expected item 3 (proj1), got %d", m.MapRowToItem(13))
+		t.Errorf("row 13: expected item 3 (add-worktree), got %d", m.MapRowToItem(13))
 	}
 }
 

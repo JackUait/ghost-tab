@@ -80,15 +80,17 @@ func TestMainPage_ShowsSubscription_NonClaude(t *testing.T) {
 // the layout height must stay in sync. The row is present for every agent.
 func TestMapRowToItem_accountsForSubscriptionRow(t *testing.T) {
 	// Header rows: top, title, subscription, switcher-gap, tab bar, separator,
-	// leading blank — so the first project lands at row 7 for every agent.
-	mClaude := subTestMenu("claude")
-	if got := mClaude.MapRowToItem(7); got != 0 {
-		t.Errorf("claude: first project should be at row 7, MapRowToItem(7)=%d", got)
-	}
-
-	mCodex := subTestMenu("codex")
-	if got := mCodex.MapRowToItem(7); got != 0 {
-		t.Errorf("codex: first project should also be at row 7, MapRowToItem(7)=%d", got)
+	// leading blank(6) — so the first project lands at row 7 for every agent.
+	// Asserting row 6 maps to -1 (and row 7 to item 0) is what makes this catch a
+	// regression: without the subscription row the first project would sit at row 6.
+	for _, tool := range []string{"claude", "codex"} {
+		m := subTestMenu(tool)
+		if got := m.MapRowToItem(6); got != -1 {
+			t.Errorf("%s: row 6 should be the leading blank (-1) once the subscription row is present, got %d", tool, got)
+		}
+		if got := m.MapRowToItem(7); got != 0 {
+			t.Errorf("%s: first project should be at row 7, MapRowToItem(7)=%d", tool, got)
+		}
 	}
 }
 
