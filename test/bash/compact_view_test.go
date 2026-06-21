@@ -438,3 +438,52 @@ func TestCompactView_omits_untracked_new_section(t *testing.T) {
 		t.Errorf("modified file app.txt should still appear:\n%q", got)
 	}
 }
+
+// The header separator line must span the full inner width (a horizontal rule),
+// not collapse to a single "─". Regression for `printf '%.*s' "$iw" '─'`, where
+// the precision merely truncates the one-char string instead of repeating it —
+// rendering a lone dash under the branch heading instead of a side-to-side line.
+func TestCompactView_separator_spans_full_width(t *testing.T) {
+	zsh, err := exec.LookPath("zsh")
+	if err != nil {
+		t.Skip("zsh not available")
+	}
+	root := projectRoot(t)
+	module := filepath.Join(root, "lib", "compact-view.sh")
+
+	dir := t.TempDir()
+	git := func(args ...string) {
+		t.Helper()
+		c := exec.Command("git", append([]string{"-C", dir}, args...)...)
+		c.Env = append(os.Environ(),
+			"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t",
+			"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@t")
+		if out, err := c.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	git("init", "-q")
+	writeTempFile(t, dir, "a.txt", "one\n")
+	git("add", "a.txt")
+	git("commit", "-q", "-m", "init")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 800*time.Millisecond)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, zsh, "-c", "source "+module+" && compact_view "+dir)
+	env := []string{}
+	for _, e := range os.Environ() {
+		if strings.HasPrefix(e, "TMUX=") {
+			continue
+		}
+		env = append(env, e)
+	}
+	cmd.Env = append(env, "COMPACT_VIEW_INTERVAL=0.1", "TERM=xterm", "COLUMNS=80")
+	out, _ := cmd.CombinedOutput()
+	got := string(out)
+
+	// A real horizontal rule repeats the box-drawing dash many times. The buggy
+	// single-dash separator yields exactly one. Require a long run.
+	if n := strings.Count(got, "─"); n < 20 {
+		t.Errorf("separator should span the pane as a full-width rule, got %d '─' chars:\n%q", n, got)
+	}
+}

@@ -268,9 +268,11 @@ compact_view() {
       fi
       printf "\n"
 
-      # Separator line
+      # Separator line — a full-width horizontal rule. printf '%.*s' only
+      # *truncates* the one-char string to the precision (it never repeats it),
+      # so it must be emitted iw times; '─%.0s' prints the dash per seq arg.
       printf " ${dimline}"
-      printf '%.*s' "$iw" '─'
+      printf '─%.0s' $(seq 1 "$iw")
       printf "${reset}\n"
 
       # Filenames follow the right-aligned "+NNN −NNN  " prefix:
