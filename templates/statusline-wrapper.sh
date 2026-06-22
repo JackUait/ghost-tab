@@ -21,10 +21,19 @@ while [ -n "$pid" ] && [ "$pid" != "1" ]; do
   [ "${comm##*/}" = "claude" ] && is_claude=1
   case "$comm" in */claude/*) is_claude=1 ;; esac
   if [ -n "$is_claude" ]; then
-    if type get_tree_rss_kb &>/dev/null; then
-      mem_kb=$(get_tree_rss_kb "$pid")
-    else
-      mem_kb=$(ps -o rss= -p "$pid" 2>/dev/null | tr -d ' ')
+    # Prefer phys_footprint (Activity Monitor's "Memory") — RSS overcounts shared
+    # pages 2-4x, so it is the wrong memory load. Fall back to RSS if `footprint`
+    # is unavailable, so the panel still shows a value.
+    mem_kb=""
+    if type get_tree_footprint_kb &>/dev/null; then
+      mem_kb=$(get_tree_footprint_kb "$pid")
+    fi
+    if [ -z "$mem_kb" ]; then
+      if type get_tree_rss_kb &>/dev/null; then
+        mem_kb=$(get_tree_rss_kb "$pid")
+      else
+        mem_kb=$(ps -o rss= -p "$pid" 2>/dev/null | tr -d ' ')
+      fi
     fi
     if [ -n "$mem_kb" ] && [ "$mem_kb" -gt 0 ] 2>/dev/null; then
       mem_mb=$((mem_kb / 1024))

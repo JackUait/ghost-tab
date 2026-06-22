@@ -268,9 +268,10 @@ if [[ "$*" == *"comm="* ]]; then echo "sh"; else echo "1"; fi
 }
 
 // setupWrapperMemTest creates a hermetic env for the wrapper where the parent
-// process walk resolves to a process whose `comm` is claudeComm, with total
-// tree RSS = rssKB (no children). Lets us assert the memory segment renders.
-func setupWrapperMemTest(t *testing.T, claudeComm, rssKB string) []string {
+// process walk resolves to a process whose `comm` is claudeComm. Both footprint
+// and RSS report memMB megabytes (no children), so the rendered memory segment
+// is "<memMB>M" regardless of which metric the wrapper uses.
+func setupWrapperMemTest(t *testing.T, claudeComm, memMB string) []string {
 	t.Helper()
 	dir := t.TempDir()
 
@@ -279,25 +280,28 @@ func setupWrapperMemTest(t *testing.T, claudeComm, rssKB string) []string {
 
 	// npx ccstatusline -> context percentage
 	mockCommand(t, dir, "npx", `echo "12.3%"`)
-	// pgrep -P <pid> -> no children, so tree RSS == root RSS only (deterministic)
+	// pgrep -P <pid> -> no children (deterministic single-process tree)
 	mockCommand(t, dir, "pgrep", `exit 1`)
+	// footprint -> phys_footprint = memMB MB, plus a peak line that must be ignored
+	mockCommand(t, dir, "footprint", fmt.Sprintf(`
+printf 'proc [1]: 64-bit Footprint: %s MB\n    phys_footprint: %s MB\n    phys_footprint_peak: 9999 MB\n'
+`, memMB, memMB))
 	// ps: comm= always reports the claude process (matches on first walk step);
-	// rss= reports a fixed RSS; ppid= terminates the walk if comm ever misses.
+	// rss= reports memMB*1024 KB; ppid= terminates the walk if comm ever misses.
 	mockCommand(t, dir, "ps", fmt.Sprintf(`
 case "$*" in
   *comm=*) printf '%%s\n' %q ;;
-  *rss=*)  printf '%%s\n' %q ;;
+  *rss=*)  printf '%%s\n' "$(( %s * 1024 ))" ;;
   *ppid=*) printf '%%s\n' "1" ;;
 esac
-`, claudeComm, rssKB))
+`, claudeComm, memMB))
 
 	binDir := filepath.Join(dir, "bin")
 	return buildEnv(t, []string{binDir}, "HOME="+fakeHome)
 }
 
 func TestStatusline_wrapper_shows_memory_segment_for_claude_ancestor(t *testing.T) {
-	// 51200 KB = 50 MB
-	env := setupWrapperMemTest(t, "/Users/test/.local/bin/claude", "51200")
+	env := setupWrapperMemTest(t, "/Users/test/.local/bin/claude", "50")
 
 	root := projectRoot(t)
 	wrapperPath := filepath.Join(root, "templates", "statusline-wrapper.sh")
@@ -314,7 +318,7 @@ func TestStatusline_wrapper_shows_memory_segment_for_claude_ancestor(t *testing.
 // resolved path, `comm` has no `claude` basename — the memory segment must
 // still render so the panel shows the memory load at ALL times.
 func TestStatusline_wrapper_shows_memory_for_versioned_claude_path(t *testing.T) {
-	env := setupWrapperMemTest(t, "/Users/test/.local/share/claude/versions/2.1.185", "51200")
+	env := setupWrapperMemTest(t, "/Users/test/.local/share/claude/versions/2.1.185", "50")
 
 	root := projectRoot(t)
 	wrapperPath := filepath.Join(root, "templates", "statusline-wrapper.sh")
@@ -329,7 +333,159 @@ func TestStatusline_wrapper_shows_memory_for_versioned_claude_path(t *testing.T)
 // A claude launcher path containing spaces must still resolve (the old
 // `xargs basename` would word-split the path and mis-parse it).
 func TestStatusline_wrapper_shows_memory_for_claude_path_with_spaces(t *testing.T) {
-	env := setupWrapperMemTest(t, "/Users/test/My Tools/claude", "51200")
+	env := setupWrapperMemTest(t, "/Users/test/My Tools/claude", "50")
+
+	root := projectRoot(t)
+	wrapperPath := filepath.Join(root, "templates", "statusline-wrapper.sh")
+	stdinData := `{"workspace":{"current_dir":"/tmp"}}`
+	script := fmt.Sprintf(`echo '%s' | bash '%s'`, stdinData, wrapperPath)
+
+	out, code := runBashSnippet(t, script, env)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "50M")
+}
+
+// --- get_tree_footprint_kb: phys_footprint is the correct memory load ---
+// macOS RSS overcounts shared dyld/framework pages 2-4x; phys_footprint
+// (Activity Monitor's "Memory") is the accurate per-process figure.
+
+func TestStatusline_get_tree_footprint_kb_sums_phys_footprint_excluding_peak(t *testing.T) {
+	dir := t.TempDir()
+
+	// 100 -> [101], others none
+	mockCommand(t, dir, "pgrep", `
+pid="${@: -1}"
+case "$pid" in
+  100) printf '101\n' ;;
+  *) exit 1 ;;
+esac
+`)
+	// footprint output for the tree; phys_footprint_peak lines must be ignored.
+	mockCommand(t, dir, "footprint", `
+printf 'claude [100]: 64-bit Footprint: 280 MB\n'
+printf '    phys_footprint: 280 MB\n'
+printf '    phys_footprint_peak: 3000 MB\n'
+printf 'caffeinate [101]: 64-bit Footprint: 1632 KB\n'
+printf '    phys_footprint: 1632 KB\n'
+printf 'Summary Footprint: 281 MB\n'
+`)
+
+	binDir := filepath.Join(dir, "bin")
+	env := buildEnv(t, []string{binDir})
+	out, code := runBashFunc(t, "lib/statusline.sh", "get_tree_footprint_kb", []string{"100"}, env)
+	assertExitCode(t, code, 0)
+	// 280 MB = 286720 KB, + 1632 KB = 288352 KB
+	if strings.TrimSpace(out) != "288352" {
+		t.Errorf("expected 288352, got %q", strings.TrimSpace(out))
+	}
+}
+
+func TestStatusline_get_tree_footprint_kb_handles_GB_units(t *testing.T) {
+	dir := t.TempDir()
+	mockCommand(t, dir, "pgrep", `exit 1`)
+	mockCommand(t, dir, "footprint", `printf '    phys_footprint: 1.5 GB\n'`)
+
+	binDir := filepath.Join(dir, "bin")
+	env := buildEnv(t, []string{binDir})
+	out, code := runBashFunc(t, "lib/statusline.sh", "get_tree_footprint_kb", []string{"100"}, env)
+	assertExitCode(t, code, 0)
+	// 1.5 * 1024 * 1024 = 1572864 KB
+	if strings.TrimSpace(out) != "1572864" {
+		t.Errorf("expected 1572864, got %q", strings.TrimSpace(out))
+	}
+}
+
+func TestStatusline_get_tree_footprint_kb_passes_every_tree_pid_to_footprint(t *testing.T) {
+	dir := t.TempDir()
+	// 100 -> [101,102], 101 -> [103]  => tree is {100,101,102,103}
+	mockCommand(t, dir, "pgrep", `
+pid="${@: -1}"
+case "$pid" in
+  100) printf '101\n102\n' ;;
+  101) printf '103\n' ;;
+  *) exit 1 ;;
+esac
+`)
+	// Emit one 10 MB phys_footprint line per pid argument, so the summed total
+	// proves every collected pid was passed to footprint.
+	mockCommand(t, dir, "footprint", `for _ in "$@"; do printf '    phys_footprint: 10 MB\n'; done`)
+
+	binDir := filepath.Join(dir, "bin")
+	env := buildEnv(t, []string{binDir})
+	out, code := runBashFunc(t, "lib/statusline.sh", "get_tree_footprint_kb", []string{"100"}, env)
+	assertExitCode(t, code, 0)
+	// 4 pids * 10 MB = 40 MB = 40960 KB
+	if strings.TrimSpace(out) != "40960" {
+		t.Errorf("expected 40960 (4 pids x 10MB), got %q", strings.TrimSpace(out))
+	}
+}
+
+func TestStatusline_get_tree_footprint_kb_empty_when_footprint_yields_nothing(t *testing.T) {
+	dir := t.TempDir()
+	mockCommand(t, dir, "pgrep", `exit 1`)
+	mockCommand(t, dir, "footprint", `exit 0`) // no output (e.g. sandboxed/unavailable)
+
+	binDir := filepath.Join(dir, "bin")
+	env := buildEnv(t, []string{binDir})
+	out, code := runBashFunc(t, "lib/statusline.sh", "get_tree_footprint_kb", []string{"100"}, env)
+	assertExitCode(t, code, 0)
+	if strings.TrimSpace(out) != "" {
+		t.Errorf("expected empty output so caller falls back to RSS, got %q", strings.TrimSpace(out))
+	}
+}
+
+// --- wrapper: prefer phys_footprint, fall back to RSS ---
+
+// wrapperHomeWithCmd creates a fake home + statusline-command.sh and returns the
+// temp dir and fake home so a test can add its own ps/footprint/pgrep mocks.
+func wrapperHomeWithCmd(t *testing.T) (string, string) {
+	t.Helper()
+	dir := t.TempDir()
+	fakeHome := filepath.Join(dir, "home")
+	writeTempFile(t, fakeHome, ".claude/statusline-command.sh", `echo "GITINFO"`)
+	mockCommand(t, dir, "npx", `echo "12.3%"`)
+	mockCommand(t, dir, "pgrep", `exit 1`)
+	return dir, fakeHome
+}
+
+func TestStatusline_wrapper_prefers_footprint_over_rss(t *testing.T) {
+	// footprint says 30 MB, RSS says 50 MB. The panel must show the footprint
+	// value — RSS overcounts shared memory and is the wrong "memory load".
+	dir, fakeHome := wrapperHomeWithCmd(t)
+	mockCommand(t, dir, "footprint", `printf '    phys_footprint: 30 MB\n'`)
+	mockCommand(t, dir, "ps", `
+case "$*" in
+  *comm=*) printf '%s\n' "/Users/test/.local/bin/claude" ;;
+  *rss=*)  printf '%s\n' "51200" ;;
+  *ppid=*) printf '%s\n' "1" ;;
+esac
+`)
+	env := buildEnv(t, []string{filepath.Join(dir, "bin")}, "HOME="+fakeHome)
+
+	root := projectRoot(t)
+	wrapperPath := filepath.Join(root, "templates", "statusline-wrapper.sh")
+	stdinData := `{"workspace":{"current_dir":"/tmp"}}`
+	script := fmt.Sprintf(`echo '%s' | bash '%s'`, stdinData, wrapperPath)
+
+	out, code := runBashSnippet(t, script, env)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "30M")
+	assertNotContains(t, out, "50M")
+}
+
+func TestStatusline_wrapper_falls_back_to_rss_when_footprint_unavailable(t *testing.T) {
+	// footprint produces nothing (sandboxed/missing); the memory load must still
+	// render, using RSS as a fallback.
+	dir, fakeHome := wrapperHomeWithCmd(t)
+	mockCommand(t, dir, "footprint", `exit 0`) // no output
+	mockCommand(t, dir, "ps", `
+case "$*" in
+  *comm=*) printf '%s\n' "/Users/test/.local/bin/claude" ;;
+  *rss=*)  printf '%s\n' "51200" ;;
+  *ppid=*) printf '%s\n' "1" ;;
+esac
+`)
+	env := buildEnv(t, []string{filepath.Join(dir, "bin")}, "HOME="+fakeHome)
 
 	root := projectRoot(t)
 	wrapperPath := filepath.Join(root, "templates", "statusline-wrapper.sh")
