@@ -244,6 +244,28 @@ func TestStatusline_statusline_command_non_git_directory_shows_just_dirname(t *t
 	assertNotContains(t, out, "/ -")
 }
 
+func TestStatusline_statusline_command_omits_branch_name(t *testing.T) {
+	repoDir := statuslineCmdSetupGitRepo(t)
+	repoBasename := filepath.Base(repoDir)
+
+	// Check out a uniquely-named branch so its presence is unambiguous.
+	branchName := "ghost-tab-omit-branch-check"
+	cmd := exec.Command("git", "-C", repoDir, "checkout", "-q", "-b", branchName)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git checkout failed: %v\n%s", err, out)
+	}
+
+	root := projectRoot(t)
+	cmdPath := filepath.Join(root, "templates", "statusline-command.sh")
+	stdinData := fmt.Sprintf(`{"current_dir":"%s"}`, repoDir)
+	script := fmt.Sprintf(`echo '%s' | bash '%s'`, stdinData, cmdPath)
+
+	out, code := runBashSnippet(t, script, nil)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, repoBasename)
+	assertNotContains(t, out, branchName)
+}
+
 // --- statusline-wrapper.sh: model segment ---
 
 // setupWrapperTest creates a fake home with a mock statusline-command.sh and
