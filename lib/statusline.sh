@@ -69,3 +69,42 @@ get_tree_footprint_kb() {
     END { if (total > 0) printf "%d\n", total }
   '
 }
+
+# Returns the real CPU load (summed `ps -o %cpu`, rounded to an integer) for a
+# process and all its descendants. macOS `ps %cpu` is a recent-usage average and
+# is read synchronously — a `top -l 2` sample would stall the statusline ~1s. The
+# sum can exceed 100 on multi-core machines. An idle session reports 0. Echoes
+# nothing only when no pid yields a reading (the process tree is gone), so the
+# caller omits the segment rather than showing a stale value.
+# Usage: get_tree_cpu_pct 12345  =>  "23"
+get_tree_cpu_pct() {
+  local root_pid="$1"
+  local queue=("$root_pid")
+  local cpus=()
+
+  while [ ${#queue[@]} -gt 0 ]; do
+    local pid="${queue[0]}"
+    queue=("${queue[@]:1}")
+
+    local cpu
+    cpu=$(ps -o %cpu= -p "$pid" 2>/dev/null | tr -d ' ')
+    if [ -n "$cpu" ]; then
+      cpus+=("$cpu")
+    fi
+
+    local children
+    children=$(pgrep -P "$pid" 2>/dev/null) || true
+    if [ -n "$children" ]; then
+      while IFS= read -r child; do
+        queue+=("$child")
+      done <<< "$children"
+    fi
+  done
+
+  [ ${#cpus[@]} -eq 0 ] && return 0
+
+  printf '%s\n' "${cpus[@]}" | awk '
+    { total += $0 }
+    END { printf "%d\n", total + 0.5 }
+  '
+}

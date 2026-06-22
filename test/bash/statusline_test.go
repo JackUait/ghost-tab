@@ -540,6 +540,127 @@ func TestStatusline_wrapper_omits_model_segment_when_model_missing(t *testing.T)
 	}
 }
 
+// --- get_tree_cpu_pct: real CPU load of the session process tree ---
+// Sums macOS `ps -o %cpu` across the Claude Code process and its descendants.
+// `ps %cpu` is a fast recent-usage average — a `top` sample would block the
+// statusline for ~1s. The sum can exceed 100 on multi-core machines.
+
+func TestStatusline_get_tree_cpu_pct_sums_cpu_of_process_and_children(t *testing.T) {
+	dir := t.TempDir()
+
+	// 100 -> [101, 102], 101 -> [103]
+	mockCommand(t, dir, "pgrep", `
+pid="${@: -1}"
+case "$pid" in
+  100) printf '101\n102\n' ;;
+  101) printf '103\n' ;;
+  *) exit 1 ;;
+esac
+`)
+	mockCommand(t, dir, "ps", `
+pid="${@: -1}"
+case "$pid" in
+  100) echo " 10.4" ;;
+  101) echo "  5.3" ;;
+  102) echo "  2.0" ;;
+  103) echo "  0.0" ;;
+  *) echo "" ;;
+esac
+`)
+
+	binDir := filepath.Join(dir, "bin")
+	env := buildEnv(t, []string{binDir})
+	out, code := runBashFunc(t, "lib/statusline.sh", "get_tree_cpu_pct", []string{"100"}, env)
+	assertExitCode(t, code, 0)
+	// 10.4 + 5.3 + 2.0 + 0.0 = 17.7 -> rounds to 18
+	if strings.TrimSpace(out) != "18" {
+		t.Errorf("expected 18, got %q", strings.TrimSpace(out))
+	}
+}
+
+func TestStatusline_get_tree_cpu_pct_rounds_to_nearest_integer(t *testing.T) {
+	dir := t.TempDir()
+	mockCommand(t, dir, "pgrep", `exit 1`)
+	mockCommand(t, dir, "ps", `echo " 12.6"`)
+
+	binDir := filepath.Join(dir, "bin")
+	env := buildEnv(t, []string{binDir})
+	out, code := runBashFunc(t, "lib/statusline.sh", "get_tree_cpu_pct", []string{"100"}, env)
+	assertExitCode(t, code, 0)
+	if strings.TrimSpace(out) != "13" {
+		t.Errorf("expected 13 (12.6 rounded), got %q", strings.TrimSpace(out))
+	}
+}
+
+func TestStatusline_get_tree_cpu_pct_reports_zero_for_idle_process(t *testing.T) {
+	dir := t.TempDir()
+	mockCommand(t, dir, "pgrep", `exit 1`)
+	mockCommand(t, dir, "ps", `echo "  0.0"`)
+
+	binDir := filepath.Join(dir, "bin")
+	env := buildEnv(t, []string{binDir})
+	out, code := runBashFunc(t, "lib/statusline.sh", "get_tree_cpu_pct", []string{"100"}, env)
+	assertExitCode(t, code, 0)
+	// An idle session is genuinely 0% — show it, don't omit it.
+	if strings.TrimSpace(out) != "0" {
+		t.Errorf("expected 0 for idle process, got %q", strings.TrimSpace(out))
+	}
+}
+
+func TestStatusline_get_tree_cpu_pct_empty_when_process_gone(t *testing.T) {
+	dir := t.TempDir()
+	mockCommand(t, dir, "pgrep", `exit 1`)
+	mockCommand(t, dir, "ps", `echo ""`)
+
+	binDir := filepath.Join(dir, "bin")
+	env := buildEnv(t, []string{binDir})
+	out, code := runBashFunc(t, "lib/statusline.sh", "get_tree_cpu_pct", []string{"999"}, env)
+	assertExitCode(t, code, 0)
+	if strings.TrimSpace(out) != "" {
+		t.Errorf("expected empty output when no pid yields a reading, got %q", strings.TrimSpace(out))
+	}
+}
+
+// --- wrapper: CPU segment ---
+
+func TestStatusline_wrapper_shows_cpu_segment_for_claude_ancestor(t *testing.T) {
+	dir, fakeHome := wrapperHomeWithCmd(t)
+	mockCommand(t, dir, "footprint", `printf '    phys_footprint: 30 MB\n'`)
+	mockCommand(t, dir, "ps", `
+case "$*" in
+  *comm=*)  printf '%s\n' "/Users/test/.local/bin/claude" ;;
+  *%cpu=*)  printf '%s\n' " 42.4" ;;
+  *rss=*)   printf '%s\n' "51200" ;;
+  *ppid=*)  printf '%s\n' "1" ;;
+esac
+`)
+	env := buildEnv(t, []string{filepath.Join(dir, "bin")}, "HOME="+fakeHome)
+
+	root := projectRoot(t)
+	wrapperPath := filepath.Join(root, "templates", "statusline-wrapper.sh")
+	stdinData := `{"workspace":{"current_dir":"/tmp"}}`
+	script := fmt.Sprintf(`echo '%s' | bash '%s'`, stdinData, wrapperPath)
+
+	out, code := runBashSnippet(t, script, env)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "42%") // 42.4 rounds to 42
+}
+
+func TestStatusline_wrapper_omits_cpu_when_no_claude_ancestor(t *testing.T) {
+	env := setupWrapperTest(t) // ps comm= -> "sh", ppid= -> 1
+
+	root := projectRoot(t)
+	wrapperPath := filepath.Join(root, "templates", "statusline-wrapper.sh")
+	stdinData := `{"workspace":{"current_dir":"/tmp"}}`
+	script := fmt.Sprintf(`echo '%s' | bash '%s'`, stdinData, wrapperPath)
+
+	out, code := runBashSnippet(t, script, env)
+	assertExitCode(t, code, 0)
+	if strings.TrimSpace(out) != "GITINFO | 12.3%" {
+		t.Errorf("expected no cpu segment without a claude ancestor, got %q", strings.TrimSpace(out))
+	}
+}
+
 // ============================================================
 // statusline-setup.sh tests (TestStatuslineSetup_*)
 // ============================================================

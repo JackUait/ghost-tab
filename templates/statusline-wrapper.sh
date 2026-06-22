@@ -9,9 +9,10 @@ git_info=$(echo "$input" | bash ~/.claude/statusline-command.sh)
 context_pct=$(echo "$input" | npx ccstatusline 2>/dev/null)
 model_name=$(echo "$input" | sed -n 's/.*"display_name":"\([^"]*\)".*/\1/p')
 
-# Find parent Claude Code process and get total tree memory usage
+# Find parent Claude Code process and get total tree memory + CPU usage
 pid=$PPID
 mem_label=""
+cpu_label=""
 while [ -n "$pid" ] && [ "$pid" != "1" ]; do
   comm=$(ps -o comm= -p "$pid" 2>/dev/null)
   # Recognize the Claude Code process even when comm is the resolved versioned
@@ -44,6 +45,17 @@ while [ -n "$pid" ] && [ "$pid" != "1" ]; do
         mem_label="${mem_mb}M"
       fi
     fi
+    # Real CPU load of this session's process tree (Activity Monitor's %CPU).
+    cpu_pct=""
+    if type get_tree_cpu_pct &>/dev/null; then
+      cpu_pct=$(get_tree_cpu_pct "$pid")
+    else
+      cpu_pct=$(ps -o %cpu= -p "$pid" 2>/dev/null | tr -d ' ' \
+        | awk 'NF { printf "%d\n", $0 + 0.5 }')
+    fi
+    if [ -n "$cpu_pct" ]; then
+      cpu_label="${cpu_pct}%"
+    fi
     break
   fi
   pid=$(ps -o ppid= -p "$pid" 2>/dev/null | tr -d ' ')
@@ -52,6 +64,9 @@ done
 line=$(printf '%s | %s' "$git_info" "$context_pct")
 if [ -n "$mem_label" ]; then
   line="$line$(printf ' | \033[01;35m%s\033[00m' "$mem_label")"
+fi
+if [ -n "$cpu_label" ]; then
+  line="$line$(printf ' | \033[01;33m%s\033[00m' "$cpu_label")"
 fi
 if [ -n "$model_name" ]; then
   line="$line$(printf ' | \033[01;34m%s\033[00m' "$model_name")"
