@@ -411,6 +411,13 @@ func TestDiffViewCmd_HasTitleFlag(t *testing.T) {
 	}
 }
 
+func TestDiffViewCmd_HasBackdropFileFlag(t *testing.T) {
+	cmd, _, _ := rootCmd.Find([]string{"diff-view"})
+	if cmd.Flags().Lookup("backdrop-file") == nil {
+		t.Fatal("expected --backdrop-file flag on diff-view")
+	}
+}
+
 func TestClaudeConfigMenuCmd_Registered(t *testing.T) {
 	cmd, _, err := rootCmd.Find([]string{"claude-config-menu"})
 	if err != nil {

@@ -32,6 +32,13 @@ func runeDiff(m DiffViewModel, r rune) (DiffViewModel, tea.Cmd) {
 	return updated.(DiffViewModel), cmd
 }
 
+func clickDiff(m DiffViewModel, x, y int) (DiffViewModel, tea.Cmd) {
+	updated, cmd := m.Update(tea.MouseMsg{
+		X: x, Y: y, Action: tea.MouseActionPress, Button: tea.MouseButtonLeft,
+	})
+	return updated.(DiffViewModel), cmd
+}
+
 func quits(cmd tea.Cmd) bool {
 	if cmd == nil {
 		return false
@@ -124,18 +131,111 @@ func TestDiffView_header_shows_path_and_line_counts(t *testing.T) {
 	content := " ctx\n+a\n+b\n+c\n-x\n-y\n"
 	m := sizeDiff(NewDiffView("lib/x.sh", content), 80, 24)
 	out := m.View()
-	header := strings.SplitN(out, "\n", 2)[0]
-	if !strings.Contains(header, "lib/x.sh") {
-		t.Errorf("header should show the file path, got %q", header)
+	if !strings.Contains(out, "lib/x.sh") {
+		t.Errorf("header should show the file path, got:\n%s", out)
 	}
-	if !strings.Contains(header, "+3") {
-		t.Errorf("header should show +3 added lines, got %q", header)
+	if !strings.Contains(out, "+3") {
+		t.Errorf("header should show +3 added lines, got:\n%s", out)
 	}
-	if !strings.Contains(header, "−2") { // U+2212 minus, matching the ledger
-		t.Errorf("header should show −2 deleted lines, got %q", header)
+	if !strings.Contains(out, "−2") { // U+2212 minus, matching the ledger
+		t.Errorf("header should show −2 deleted lines, got:\n%s", out)
 	}
 	if strings.Contains(out, "git diff:") {
-		t.Errorf("header should NOT carry a 'git diff:' label, got %q", out)
+		t.Errorf("header should NOT carry a 'git diff:' label, got:\n%s", out)
+	}
+}
+
+// The popup is a centered, rounded-bordered box floating on a full-screen
+// surface. A left-click in the surrounding margin (outside the box) closes it;
+// a click inside the box does not. This is the only way to honor "click outside
+// to close": tmux 3.6 swallows clicks outside a sub-full-screen popup, so the
+// popup runs full-screen and the pager owns the margin itself.
+func TestDiffView_click_in_margin_quits(t *testing.T) {
+	for _, pt := range []struct{ x, y int }{{0, 0}, {79, 23}} {
+		m := sizeDiff(NewDiffView("f", sampleDiff(5)), 80, 24)
+		m2, cmd := clickDiff(m, pt.x, pt.y)
+		if !m2.quitting {
+			t.Errorf("left-click in margin at (%d,%d) should set quitting", pt.x, pt.y)
+		}
+		if !quits(cmd) {
+			t.Errorf("left-click in margin at (%d,%d) should emit tea.Quit", pt.x, pt.y)
+		}
+	}
+}
+
+func TestDiffView_click_inside_box_does_not_quit(t *testing.T) {
+	m := sizeDiff(NewDiffView("f", sampleDiff(5)), 80, 24)
+	m2, cmd := clickDiff(m, 40, 12)
+	if m2.quitting {
+		t.Error("left-click inside the box should not set quitting")
+	}
+	if quits(cmd) {
+		t.Error("left-click inside the box should not emit tea.Quit")
+	}
+}
+
+func TestDiffView_View_is_rounded_border_box(t *testing.T) {
+	m := sizeDiff(NewDiffView("lib/x.sh", "+a\n"), 80, 24)
+	out := m.View()
+	if !strings.Contains(out, "╭") { // rounded top-left corner
+		t.Errorf("view should draw a rounded border box, got:\n%s", out)
+	}
+}
+
+// ParseBackdrop composites the serialized screen capture (a "W H" header, then
+// "PANE left top" blocks of captured lines ending in "ENDPANE") into W×H rows,
+// placing each pane's lines at its window position. This is what the pager
+// renders dimmed behind the floating box.
+func TestParseBackdrop_places_panes_by_geometry(t *testing.T) {
+	data := "10 3\n" +
+		"PANE 0 0\nAAAAA\nBBBBB\nCCCCC\nENDPANE\n" +
+		"PANE 5 0\nVVVVV\nWWWWW\nXXXXX\nENDPANE\n"
+	rows := ParseBackdrop(data)
+	want := []string{"AAAAAVVVVV", "BBBBBWWWWW", "CCCCCXXXXX"}
+	if len(rows) != len(want) {
+		t.Fatalf("got %d rows %q, want %d %q", len(rows), rows, len(want), want)
+	}
+	for i := range want {
+		if rows[i] != want[i] {
+			t.Errorf("row %d: got %q, want %q", i, rows[i], want[i])
+		}
+	}
+}
+
+func TestParseBackdrop_offset_pane_placed_at_top(t *testing.T) {
+	// A pane starting at row 1 leaves row 0 blank.
+	data := "6 2\nPANE 0 1\nHELLO\nENDPANE\n"
+	rows := ParseBackdrop(data)
+	if len(rows) != 2 {
+		t.Fatalf("got %d rows, want 2: %q", len(rows), rows)
+	}
+	if strings.TrimSpace(rows[0]) != "" {
+		t.Errorf("row 0 should be blank, got %q", rows[0])
+	}
+	if !strings.HasPrefix(rows[1], "HELLO") {
+		t.Errorf("row 1 should start with HELLO, got %q", rows[1])
+	}
+}
+
+// With a backdrop set, the margin around the floating box shows the (dimmed)
+// captured screen — not blank — while the box itself stays on top.
+func TestDiffView_shows_backdrop_in_margin(t *testing.T) {
+	rows := make([]string, 24)
+	for i := range rows {
+		rows[i] = strings.Repeat("·", 80)
+	}
+	rows[0] = "BEHIND-TOP" + strings.Repeat("·", 70) // top row sits in the margin
+	m := NewDiffView("lib/x.sh", "+a\n").WithBackdrop(rows)
+	m = sizeDiff(m, 80, 24)
+	out := m.View()
+	if !strings.Contains(out, "BEHIND-TOP") {
+		t.Errorf("margin should show the backdrop text, got:\n%s", out)
+	}
+	if !strings.Contains(out, "lib/x.sh") {
+		t.Errorf("box (with header) should still render on top, got:\n%s", out)
+	}
+	if !strings.Contains(out, "╭") {
+		t.Errorf("box border should still render, got:\n%s", out)
 	}
 }
 

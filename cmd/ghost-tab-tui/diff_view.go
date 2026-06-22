@@ -11,17 +11,22 @@ import (
 	"github.com/jackuait/ghost-tab/internal/util"
 )
 
-var diffViewTitle string
+var (
+	diffViewTitle        string
+	diffViewBackdropFile string
+)
 
 var diffViewCmd = &cobra.Command{
 	Use:   "diff-view",
 	Short: "Scrollable diff pager",
-	Long:  "Reads a (colored) diff from stdin and shows it in a scrollable popup pager that closes on Esc, q, or ctrl+c.",
+	Long:  "Reads a (colored) diff from stdin and shows it in a scrollable popup pager that closes on Esc, q, ctrl+c, or a click outside the box.",
 	RunE:  runDiffView,
 }
 
 func init() {
 	diffViewCmd.Flags().StringVar(&diffViewTitle, "title", "", "title shown in the header")
+	diffViewCmd.Flags().StringVar(&diffViewBackdropFile, "backdrop-file", "",
+		"file with a serialized screen capture shown dimmed behind the popup")
 	rootCmd.AddCommand(diffViewCmd)
 }
 
@@ -35,6 +40,13 @@ func runDiffView(cmd *cobra.Command, args []string) error {
 
 	tui.ApplyTheme(tui.ThemeForTool(aiToolFlag))
 	model := tui.NewDiffView(diffViewTitle, string(data))
+	// Show the screen behind the (full-screen) popup dimmed in the margin. Best
+	// effort: an unreadable/missing backdrop file just leaves the margin blank.
+	if diffViewBackdropFile != "" {
+		if raw, err := os.ReadFile(diffViewBackdropFile); err == nil {
+			model = model.WithBackdrop(tui.ParseBackdrop(string(raw)))
+		}
+	}
 
 	ttyOpts, cleanup, err := util.TUITeaOptions()
 	if err != nil {

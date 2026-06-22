@@ -426,11 +426,12 @@ func TestOpenDiffPopup_quotes_path_with_spaces(t *testing.T) {
 	}
 }
 
-// The diff popup is a rounded, ORANGE-bordered frame whose content is rendered
-// by the ghost-tab-tui diff-view pager (which closes on Esc/q and handles
-// scrolling + its own control bar). The redundant header block (diff --git /
-// index / --- / +++ / the hunk @@ line) is still stripped so content starts at
-// the top; the filename is passed as the viewer's --title.
+// The diff popup runs FULL-SCREEN and BORDERLESS: the rounded orange box and its
+// click-to-close margin are drawn by the ghost-tab-tui diff-view pager (tmux
+// swallows clicks outside a smaller popup, so the pager must own the whole
+// window). The redundant header block (diff --git / index / --- / +++ / the hunk
+// @@ line) is still stripped so content starts at the top; the filename is
+// passed as the viewer's --title.
 func TestOpenDiffPopup_uses_diff_viewer(t *testing.T) {
 	dir := t.TempDir()
 	binDir := mockCommand(t, dir, "tmux", `echo "$@"`)
@@ -446,10 +447,10 @@ func TestOpenDiffPopup_uses_diff_viewer(t *testing.T) {
 	}
 	got := string(out)
 
-	// Rounded popup frame with an ORANGE border.
-	assertContains(t, got, "rounded")
-	assertContains(t, got, "-S ")
-	assertContains(t, got, "colour208") // 256-color orange
+	// Full-screen, borderless popup — the pager draws its own (orange) frame and
+	// owns the margin so a click outside the box can close it.
+	assertContains(t, got, "-B")
+	assertContains(t, got, "100%")
 
 	// Strip the redundant diff header: drop everything through the first @@.
 	assertContains(t, got, "awk")
@@ -458,6 +459,10 @@ func TestOpenDiffPopup_uses_diff_viewer(t *testing.T) {
 	// Rendered by the Go pager (closes on Esc), with the file as its title.
 	assertContains(t, got, "ghost-tab-tui diff-view")
 	assertContains(t, got, "--title")
+
+	// A screen snapshot is captured and handed to the pager so it can show what's
+	// behind the full-screen popup dimmed in the margin.
+	assertContains(t, got, "--backdrop-file")
 
 	// The pager header now shows the path + added/deleted counts itself, so the
 	// popup carries no redundant "git diff:" border-title label.
