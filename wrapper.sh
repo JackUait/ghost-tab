@@ -209,6 +209,7 @@ cleanup() {
   fi
   cleanup_tmux_session "$SESSION_NAME" "$WATCHER_PID" "$TMUX_CMD"
   rm -f "$SHARE_DIR/spare-${SESSION_NAME}.conf"
+  rm -rf "$SHARE_DIR/spare-zdotdir-${SESSION_NAME}"
 }
 trap cleanup EXIT HUP TERM INT
 
@@ -298,7 +299,10 @@ _spare_label="$(spare_tabs_socket "$SESSION_NAME")"
 mkdir -p "$SHARE_DIR"
 _spare_conf="$SHARE_DIR/spare-${SESSION_NAME}.conf"
 spare_tabs_config "$PROJECT_NAME" "$PROJECT_DIR" "$_WRAPPER_DIR/lib/spare-tabs.sh" "$_spare_label" > "$_spare_conf"
-_spare_cmd="$(spare_tabs_launch_cmd "$_spare_label" "$_spare_conf" "$PROJECT_DIR")"
+# Minimal cwd-only prompt for the spare shell (drops user@host and conda's
+# "(base)"). Echoes empty for non-zsh shells, leaving them untouched.
+_spare_zdotdir="$(spare_prompt_zdotdir "$SHARE_DIR" "$SESSION_NAME" "$SHELL" "${ZDOTDIR:-$HOME}")"
+_spare_cmd="$(spare_tabs_launch_cmd "$_spare_label" "$_spare_conf" "$PROJECT_DIR" "$_spare_zdotdir")"
 _spare_close_bind="bash -c 'source \"$_WRAPPER_DIR/lib/spare-tabs.sh\" && spare_tabs_close_current \"$_spare_label\"'"
 
 "$TMUX_CMD" new-session -s "$SESSION_NAME" -e "PATH=$PATH" -e "GHOST_TAB_MARKER_FILE=$GHOST_TAB_MARKER_FILE" -e "GHOST_TAB=1" -e "GHOST_TAB_BOOT=$GHOST_TAB_BOOT_ID" -e "GHOST_TAB_PROJECT=$PROJECT_NAME" -e "GHOST_TAB_PATH=$PROJECT_DIR" -e "GHOST_TAB_TOOL=$SELECTED_AI_TOOL" -e "GHOST_TAB_TERMINAL=$GHOST_TAB_TERMINAL" -e "GHOST_TAB_PLAN=$GHOST_TAB_PLAN" -c "$PROJECT_DIR" \

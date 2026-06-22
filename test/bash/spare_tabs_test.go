@@ -87,6 +87,69 @@ func TestSpareTabs_launch_cmd(t *testing.T) {
 	}
 }
 
+// With a zdotdir argument the launch command must pin ZDOTDIR onto the inner
+// tmux env (so the spare shell and every tab it spawns load the minimal prompt).
+func TestSpareTabs_launch_cmd_with_zdotdir(t *testing.T) {
+	out, code := runBashFunc(t, "lib/spare-tabs.sh", "spare_tabs_launch_cmd",
+		[]string{"gtspare_x", "/run/spare.conf", "/proj/dir", "/run/zd"}, nil)
+	assertExitCode(t, code, 0)
+	got := strings.TrimSpace(out)
+	for _, want := range []string{
+		"env -u TMUX", // still sheds the parent tmux env
+		"ZDOTDIR=",    // points zsh at our throwaway config dir
+		"/run/zd",
+		"new-session",
+		"|| exec bash",
+	} {
+		assertContains(t, got, want)
+	}
+}
+
+// For a zsh login shell, spare_prompt_zdotdir builds a throwaway ZDOTDIR that
+// sources the user's real config then pins a cwd-only prompt; it echoes the path.
+func TestSpareTabs_prompt_zdotdir_zsh(t *testing.T) {
+	dir := t.TempDir()
+	share := filepath.Join(dir, "share")
+	real := filepath.Join(dir, "home")
+	out, code := runBashFunc(t, "lib/spare-tabs.sh", "spare_prompt_zdotdir",
+		[]string{share, "dev-ghost-tab", "/bin/zsh", real}, nil)
+	assertExitCode(t, code, 0)
+	target := strings.TrimSpace(out)
+	if target == "" {
+		t.Fatal("expected a ZDOTDIR path for a zsh login shell, got empty")
+	}
+
+	zshrc, err := os.ReadFile(filepath.Join(target, ".zshrc"))
+	if err != nil {
+		t.Fatalf("reading generated .zshrc: %v", err)
+	}
+	assertContains(t, string(zshrc), real+"/.zshrc") // sources the real config
+	assertContains(t, string(zshrc), "PROMPT='%1~ %# '") // then overrides the prompt
+
+	zshenv, err := os.ReadFile(filepath.Join(target, ".zshenv"))
+	if err != nil {
+		t.Fatalf("reading generated .zshenv: %v", err)
+	}
+	assertContains(t, string(zshenv), real+"/.zshenv")        // sources the real .zshenv
+	assertContains(t, string(zshenv), `ZDOTDIR="`+target+`"`) // re-pins so our .zshrc wins
+}
+
+// For any non-zsh login shell, spare_prompt_zdotdir is a no-op: nothing written,
+// empty output (bash spare shells keep their default prompt).
+func TestSpareTabs_prompt_zdotdir_nonzsh(t *testing.T) {
+	dir := t.TempDir()
+	share := filepath.Join(dir, "share")
+	out, code := runBashFunc(t, "lib/spare-tabs.sh", "spare_prompt_zdotdir",
+		[]string{share, "dev-ghost-tab", "/bin/bash", filepath.Join(dir, "home")}, nil)
+	assertExitCode(t, code, 0)
+	if strings.TrimSpace(out) != "" {
+		t.Errorf("non-zsh shell should yield no ZDOTDIR, got %q", out)
+	}
+	if _, err := os.Stat(filepath.Join(share, "spare-zdotdir-dev-ghost-tab")); !os.IsNotExist(err) {
+		t.Errorf("non-zsh shell should not create a zdotdir, but it exists")
+	}
+}
+
 // spare_tabs_close never empties the bar: the last remaining tab is respawned
 // (fresh shell) rather than killed.
 func TestSpareTabs_close_last_window_respawns(t *testing.T) {

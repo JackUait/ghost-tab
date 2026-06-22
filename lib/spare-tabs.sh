@@ -55,11 +55,53 @@ EOF
 
 # The command the spare pane runs. Sheds the parent $TMUX env so tmux allows
 # nesting, then execs the inner server; falls back to a plain shell on failure.
-# Args: <socket_label> <config_path> <project_dir>
+# A non-empty zdotdir is pinned onto the inner tmux env so the spare shell (and
+# every tab it spawns) loads the minimal-prompt config from spare_prompt_zdotdir.
+# Args: <socket_label> <config_path> <project_dir> [zdotdir]
 spare_tabs_launch_cmd() {
-  local label="$1" conf="$2" dir="$3"
-  printf 'env -u TMUX -u TMUX_PANE tmux -L %q -f %q new-session -c %q || exec bash' \
-    "$label" "$conf" "$dir"
+  local label="$1" conf="$2" dir="$3" zdotdir="${4:-}"
+  local envpfx="env -u TMUX -u TMUX_PANE"
+  [ -n "$zdotdir" ] && envpfx="$envpfx ZDOTDIR=$(printf '%q' "$zdotdir")"
+  printf '%s tmux -L %q -f %q new-session -c %q || exec bash' \
+    "$envpfx" "$label" "$conf" "$dir"
+}
+
+# Build a throwaway ZDOTDIR that sources the user's real zsh config and then
+# pins a minimal, cwd-only prompt for the spare pane — dropping the system
+# user@host prefix and conda's "(base)" so only the directory shows. Only zsh is
+# handled; any other login shell is left with its default prompt (returns empty,
+# writes nothing). Echoes the generated ZDOTDIR path.
+# Args: <share_dir> <session_name> <login_shell> <real_zdotdir>
+spare_prompt_zdotdir() {
+  local share="$1" session="$2" shell="$3" real="$4"
+  case "$shell" in
+    */zsh | zsh) ;;
+    *) return 0 ;;
+  esac
+
+  local target="$share/spare-zdotdir-$session"
+  mkdir -p "$target"
+
+  # .zshenv runs first on every shell; re-pin ZDOTDIR so our .zshrc still wins
+  # even if the user's .zshenv repoints it.
+  cat > "$target/.zshenv" <<EOF
+[ -f "$real/.zshenv" ] && . "$real/.zshenv"
+ZDOTDIR="$target"
+EOF
+  cat > "$target/.zprofile" <<EOF
+[ -f "$real/.zprofile" ] && . "$real/.zprofile"
+EOF
+  # Source the real interactive config (conda, PATH, aliases...) then override
+  # the prompt last so only the cwd is shown.
+  cat > "$target/.zshrc" <<EOF
+[ -f "$real/.zshrc" ] && . "$real/.zshrc"
+PROMPT='%1~ %# '
+EOF
+  cat > "$target/.zlogin" <<EOF
+[ -f "$real/.zlogin" ] && . "$real/.zlogin"
+EOF
+
+  printf '%s\n' "$target"
 }
 
 # Close one tab, but never empty the bar: the last remaining tab is respawned
