@@ -39,7 +39,7 @@ if [ ! -d "$_WRAPPER_DIR/lib" ]; then
   exit 1
 fi
 
-_gt_libs=(ai-tools projects process input tui menu-tui project-actions tmux-session settings-json notification-setup tab-title-watcher terminals/ghostty session-restore claude-configs compact-view screenshot)
+_gt_libs=(ai-tools projects process input tui menu-tui project-actions tmux-session settings-json notification-setup tab-title-watcher terminals/ghostty session-restore claude-configs compact-view screenshot spare-tabs)
 for _gt_lib in "${_gt_libs[@]}"; do
   if [ ! -f "$_WRAPPER_DIR/lib/${_gt_lib}.sh" ]; then
     printf '\033[31mError:\033[0m Missing library %s/lib/%s.sh\n' "$_WRAPPER_DIR" "$_gt_lib" >&2
@@ -208,6 +208,7 @@ cleanup() {
     fi
   fi
   cleanup_tmux_session "$SESSION_NAME" "$WATCHER_PID" "$TMUX_CMD"
+  rm -f "$SHARE_DIR/spare-${SESSION_NAME}.conf"
 }
 trap cleanup EXIT HUP TERM INT
 
@@ -289,6 +290,17 @@ fi
 #      regardless of which pane is active. See lib/screenshot.sh.
 _screenshot_bind="bash -c 'source \"$_WRAPPER_DIR/lib/screenshot.sh\" && gt_paste_latest_screenshot'"
 
+# Spare pane: a nested tmux whose top status bar is a tab bar (project name on
+# the first tab, numbered extras, a [ + ] add button and per-tab × close). The
+# config is written ahead of time; the pane execs the inner server. See
+# lib/spare-tabs.sh. Outer mouse stays off so clicks reach the inner tmux.
+_spare_label="$(spare_tabs_socket "$SESSION_NAME")"
+mkdir -p "$SHARE_DIR"
+_spare_conf="$SHARE_DIR/spare-${SESSION_NAME}.conf"
+spare_tabs_config "$PROJECT_NAME" "$PROJECT_DIR" "$_WRAPPER_DIR/lib/spare-tabs.sh" "$_spare_label" > "$_spare_conf"
+_spare_cmd="$(spare_tabs_launch_cmd "$_spare_label" "$_spare_conf" "$PROJECT_DIR")"
+_spare_close_bind="bash -c 'source \"$_WRAPPER_DIR/lib/spare-tabs.sh\" && spare_tabs_close_current \"$_spare_label\"'"
+
 "$TMUX_CMD" new-session -s "$SESSION_NAME" -e "PATH=$PATH" -e "GHOST_TAB_MARKER_FILE=$GHOST_TAB_MARKER_FILE" -e "GHOST_TAB=1" -e "GHOST_TAB_BOOT=$GHOST_TAB_BOOT_ID" -e "GHOST_TAB_PROJECT=$PROJECT_NAME" -e "GHOST_TAB_PATH=$PROJECT_DIR" -e "GHOST_TAB_TOOL=$SELECTED_AI_TOOL" -e "GHOST_TAB_TERMINAL=$GHOST_TAB_TERMINAL" -e "GHOST_TAB_PLAN=$GHOST_TAB_PLAN" -c "$PROJECT_DIR" \
   "$_pane0_cmd" \; \
   set-option status-left " ⬡ ${PROJECT_NAME} " \; \
@@ -300,9 +312,13 @@ _screenshot_bind="bash -c 'source \"$_WRAPPER_DIR/lib/screenshot.sh\" && gt_past
   set-option pane-border-style "fg=colour238" \; \
   set-option pane-active-border-style "fg=colour209" \; \
   bind-key i run-shell "$_screenshot_bind" \; \
+  bind-key t run-shell "env -u TMUX -u TMUX_PANE tmux -L $_spare_label new-window -c \"$PROJECT_DIR\"" \; \
+  bind-key w run-shell "$_spare_close_bind" \; \
+  bind-key Tab run-shell "env -u TMUX -u TMUX_PANE tmux -L $_spare_label next-window" \; \
+  bind-key BTab run-shell "env -u TMUX -u TMUX_PANE tmux -L $_spare_label previous-window" \; \
   split-window -h -p "$_pane0_pct" -c "$PROJECT_DIR" \
   "$AI_LAUNCH_CMD; exec bash" \; \
   set-option -p @gt_ai 1 \; \
   select-pane -L \; \
-  split-window -v -p 45 -c "$PROJECT_DIR" \; \
+  split-window -v -p 45 -c "$PROJECT_DIR" "$_spare_cmd" \; \
   select-pane -R

@@ -107,6 +107,28 @@ func TestWrapper_selects_ai_pane_geometrically(t *testing.T) {
 	}
 }
 
+// TestWrapper_spare_pane_runs_tabbed_tmux verifies the spare bottom-left pane
+// launches a nested tmux (the tab bar) instead of a bare shell, and that the
+// tab keybindings (add/close) are wired on the outer session.
+func TestWrapper_spare_pane_runs_tabbed_tmux(t *testing.T) {
+	got := recordWrapperNewSession(t)
+	if !strings.Contains(got, "split-window -v -p 45") {
+		t.Fatalf("expected the spare pane split; got:\n%s", got)
+	}
+	for _, want := range []string{
+		"env -u TMUX -u TMUX_PANE tmux -L gtspare_", // nested server, $TMUX shed
+		"new-session",              // the inner session that hosts the tabs
+		"|| exec bash",             // graceful fallback if tmux is unavailable
+		"bind-key t ",              // keyboard: add a tab
+		"bind-key w ",              // keyboard: close current tab
+		"spare_tabs_close_current", // close routes through the guarded helper
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("expected new-session chain to contain %q; got:\n%s", want, got)
+		}
+	}
+}
+
 // TestWrapper_marks_ai_pane locks in the @gt_ai marker on the AI pane, which
 // lib/screenshot.sh uses to resolve the AI pane for prefix+i injection.
 func TestWrapper_marks_ai_pane(t *testing.T) {

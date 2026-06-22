@@ -63,4 +63,11 @@ cleanup_tmux_session() {
   done
 
   "$tmux_cmd" kill-session -t "$session_name" 2>/dev/null || true
+
+  # The spare pane's nested tmux is a detached server that reparents away from
+  # the pane tree, so the kills above don't reap it. Tear it down explicitly
+  # when lib/spare-tabs.sh is loaded.
+  if command -v spare_tabs_cleanup >/dev/null 2>&1; then
+    spare_tabs_cleanup "$(spare_tabs_socket "$session_name")"
+  fi
 }
