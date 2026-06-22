@@ -267,6 +267,95 @@ if [[ "$*" == *"comm="* ]]; then echo "sh"; else echo "1"; fi
 	return buildEnv(t, []string{binDir}, "HOME="+fakeHome)
 }
 
+// setupWrapperMemTest creates a hermetic env for the wrapper where the parent
+// process walk resolves to a process whose `comm` is claudeComm, with total
+// tree RSS = rssKB (no children). Lets us assert the memory segment renders.
+func setupWrapperMemTest(t *testing.T, claudeComm, rssKB string) []string {
+	t.Helper()
+	dir := t.TempDir()
+
+	fakeHome := filepath.Join(dir, "home")
+	writeTempFile(t, fakeHome, ".claude/statusline-command.sh", `echo "GITINFO"`)
+
+	// npx ccstatusline -> context percentage
+	mockCommand(t, dir, "npx", `echo "12.3%"`)
+	// pgrep -P <pid> -> no children, so tree RSS == root RSS only (deterministic)
+	mockCommand(t, dir, "pgrep", `exit 1`)
+	// ps: comm= always reports the claude process (matches on first walk step);
+	// rss= reports a fixed RSS; ppid= terminates the walk if comm ever misses.
+	mockCommand(t, dir, "ps", fmt.Sprintf(`
+case "$*" in
+  *comm=*) printf '%%s\n' %q ;;
+  *rss=*)  printf '%%s\n' %q ;;
+  *ppid=*) printf '%%s\n' "1" ;;
+esac
+`, claudeComm, rssKB))
+
+	binDir := filepath.Join(dir, "bin")
+	return buildEnv(t, []string{binDir}, "HOME="+fakeHome)
+}
+
+func TestStatusline_wrapper_shows_memory_segment_for_claude_ancestor(t *testing.T) {
+	// 51200 KB = 50 MB
+	env := setupWrapperMemTest(t, "/Users/test/.local/bin/claude", "51200")
+
+	root := projectRoot(t)
+	wrapperPath := filepath.Join(root, "templates", "statusline-wrapper.sh")
+	stdinData := `{"workspace":{"current_dir":"/tmp"}}`
+	script := fmt.Sprintf(`echo '%s' | bash '%s'`, stdinData, wrapperPath)
+
+	out, code := runBashSnippet(t, script, env)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "50M")
+}
+
+// Regression: the `claude` launcher is a symlink to a versioned binary
+// (e.g. ~/.local/share/claude/versions/2.1.185). If Claude Code execs the
+// resolved path, `comm` has no `claude` basename — the memory segment must
+// still render so the panel shows the memory load at ALL times.
+func TestStatusline_wrapper_shows_memory_for_versioned_claude_path(t *testing.T) {
+	env := setupWrapperMemTest(t, "/Users/test/.local/share/claude/versions/2.1.185", "51200")
+
+	root := projectRoot(t)
+	wrapperPath := filepath.Join(root, "templates", "statusline-wrapper.sh")
+	stdinData := `{"workspace":{"current_dir":"/tmp"}}`
+	script := fmt.Sprintf(`echo '%s' | bash '%s'`, stdinData, wrapperPath)
+
+	out, code := runBashSnippet(t, script, env)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "50M")
+}
+
+// A claude launcher path containing spaces must still resolve (the old
+// `xargs basename` would word-split the path and mis-parse it).
+func TestStatusline_wrapper_shows_memory_for_claude_path_with_spaces(t *testing.T) {
+	env := setupWrapperMemTest(t, "/Users/test/My Tools/claude", "51200")
+
+	root := projectRoot(t)
+	wrapperPath := filepath.Join(root, "templates", "statusline-wrapper.sh")
+	stdinData := `{"workspace":{"current_dir":"/tmp"}}`
+	script := fmt.Sprintf(`echo '%s' | bash '%s'`, stdinData, wrapperPath)
+
+	out, code := runBashSnippet(t, script, env)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "50M")
+}
+
+func TestStatusline_wrapper_omits_memory_when_no_claude_ancestor(t *testing.T) {
+	env := setupWrapperTest(t) // ps comm= -> "sh", ppid= -> 1
+
+	root := projectRoot(t)
+	wrapperPath := filepath.Join(root, "templates", "statusline-wrapper.sh")
+	stdinData := `{"workspace":{"current_dir":"/tmp"}}`
+	script := fmt.Sprintf(`echo '%s' | bash '%s'`, stdinData, wrapperPath)
+
+	out, code := runBashSnippet(t, script, env)
+	assertExitCode(t, code, 0)
+	if strings.TrimSpace(out) != "GITINFO | 12.3%" {
+		t.Errorf("expected no memory segment without a claude ancestor, got %q", strings.TrimSpace(out))
+	}
+}
+
 func TestStatusline_wrapper_shows_model_display_name(t *testing.T) {
 	env := setupWrapperTest(t)
 

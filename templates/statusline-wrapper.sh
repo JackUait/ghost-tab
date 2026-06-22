@@ -13,8 +13,14 @@ model_name=$(echo "$input" | sed -n 's/.*"display_name":"\([^"]*\)".*/\1/p')
 pid=$PPID
 mem_label=""
 while [ -n "$pid" ] && [ "$pid" != "1" ]; do
-  comm=$(ps -o comm= -p "$pid" 2>/dev/null | xargs basename 2>/dev/null)
-  if [ "$comm" = "claude" ]; then
+  comm=$(ps -o comm= -p "$pid" 2>/dev/null)
+  # Recognize the Claude Code process even when comm is the resolved versioned
+  # path (~/.local/share/claude/versions/X) instead of the `claude` symlink, so
+  # the memory load renders at all times. ${comm##*/} is a space-safe basename.
+  is_claude=""
+  [ "${comm##*/}" = "claude" ] && is_claude=1
+  case "$comm" in */claude/*) is_claude=1 ;; esac
+  if [ -n "$is_claude" ]; then
     if type get_tree_rss_kb &>/dev/null; then
       mem_kb=$(get_tree_rss_kb "$pid")
     else
