@@ -21,13 +21,28 @@ type DiffViewModel struct {
 	content  string
 	added    int
 	deleted  int
-	width    int // full popup (window) size; the box floats centered within it
-	height   int
-	backdrop []string // dimmed screen snapshot shown behind the box (may be nil)
-	viewport viewport.Model
-	ready    bool
-	quitting bool
+	width      int // full popup (window) size; the box floats centered within it
+	height     int
+	backdrop   []string // dimmed screen snapshot shown behind the box (may be nil)
+	mode       int      // diffModeInline | diffModeSideBySide
+	modeForced bool     // true once the user picks a view (stops width auto-pick)
+	viewport   viewport.Model
+	ready      bool
+	quitting   bool
 }
+
+// View modes and the clickable tab labels that switch between them. The labels
+// have fixed visible widths so the click hit-boxes (tabAt) stay stable.
+const (
+	diffModeInline = iota
+	diffModeSideBySide
+)
+
+const (
+	diffTabIndent     = 1
+	diffTabInlineText = "[ Inline ]"
+	diffTabSxsText    = "[ Side-by-side ]"
+)
 
 var (
 	diffTitleStyle = lipgloss.NewStyle().
@@ -39,6 +54,10 @@ var (
 	diffDelStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("1")) // red
 
 	diffRuleStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("208"))
+
+	// View-switch tab buttons: the active mode is an orange chip, the other dim.
+	diffTabActiveStyle   = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("0")).Background(lipgloss.Color("208"))
+	diffTabInactiveStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("244"))
 
 	diffBarStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("244")).
@@ -162,6 +181,238 @@ func numberLines(content string) string {
 	return b.String()
 }
 
+// Diff line kinds, classified from the leading marker once color is stripped.
+const (
+	diffSkip = iota // empty trailing line; produces no row
+	diffContext
+	diffAdd
+	diffDel
+)
+
+// diffMinColWidth is the minimum number of columns each side needs for the
+// side-by-side view to be worthwhile; below it, the inline view is used.
+const diffMinColWidth = 40
+
+// classifyDiffLine reports a line's kind and its text with the leading marker
+// (and the diff's context-space prefix) removed but its ANSI color preserved.
+func classifyDiffLine(line string) (int, string) {
+	vis := diffAnsiSeq.ReplaceAllString(line, "")
+	if vis == "" {
+		return diffSkip, ""
+	}
+	switch vis[0] {
+	case '+':
+		return diffAdd, dropMarker(line)
+	case '-':
+		return diffDel, dropMarker(line)
+	default:
+		return diffContext, dropMarker(line)
+	}
+}
+
+// dropMarker removes the leading diff marker (the +/-/space prefix) from a
+// possibly ANSI-colored line, preserving every escape sequence and the rest of
+// the text (so a colored line keeps its color, minus the marker glyph).
+func dropMarker(line string) string {
+	rs := []rune(line)
+	var b strings.Builder
+	for i := 0; i < len(rs); {
+		if rs[i] == '\x1b' { // copy an ESC...m sequence verbatim
+			j := i
+			for j < len(rs) && rs[j] != 'm' {
+				j++
+			}
+			if j < len(rs) {
+				j++
+			}
+			b.WriteString(string(rs[i:j]))
+			i = j
+			continue
+		}
+		// first visible rune: drop it, then copy the remainder verbatim
+		b.WriteString(string(rs[i+1:]))
+		break
+	}
+	return b.String()
+}
+
+// fitColumn truncates or space-pads a possibly ANSI-colored string to exactly
+// width visible columns (escape sequences don't count toward width), ending in a
+// reset so color can't bleed into the next column.
+func fitColumn(s string, width int) string {
+	if width < 0 {
+		width = 0
+	}
+	rs := []rune(s)
+	var b strings.Builder
+	vis := 0
+	for i := 0; i < len(rs) && vis < width; {
+		if rs[i] == '\x1b' {
+			j := i
+			for j < len(rs) && rs[j] != 'm' {
+				j++
+			}
+			if j < len(rs) {
+				j++
+			}
+			b.WriteString(string(rs[i:j]))
+			i = j
+			continue
+		}
+		b.WriteRune(rs[i])
+		vis++
+		i++
+	}
+	b.WriteString("\x1b[0m")
+	if vis < width {
+		b.WriteString(strings.Repeat(" ", width-vis))
+	}
+	return b.String()
+}
+
+// pickByWidth chooses the view that fits: side-by-side when each column would
+// get at least diffMinColWidth columns, otherwise inline.
+func pickByWidth(cw int) int {
+	if (cw-3)/2 >= diffMinColWidth { // 3 = the " │ " divider
+		return diffModeSideBySide
+	}
+	return diffModeInline
+}
+
+// renderBodyMode renders the unified diff <content> in the requested mode for a
+// box interior <cw> columns wide.
+func renderBodyMode(content string, cw, mode int) string {
+	if mode == diffModeSideBySide {
+		return renderSideBySide(content, cw)
+	}
+	return numberLines(content)
+}
+
+// renderDiffBody renders in whichever mode the width suggests (used when the
+// user hasn't explicitly chosen one).
+func renderDiffBody(content string, cw int) string {
+	return renderBodyMode(content, cw, pickByWidth(cw))
+}
+
+// tabRow renders the clickable "[ Inline ] [ Side-by-side ]" view switcher, the
+// active mode shown as a filled chip. Its column layout matches tabAt.
+func (m DiffViewModel) tabRow() string {
+	inline, sxs := diffTabInactiveStyle, diffTabInactiveStyle
+	if m.mode == diffModeSideBySide {
+		sxs = diffTabActiveStyle
+	} else {
+		inline = diffTabActiveStyle
+	}
+	return strings.Repeat(" ", diffTabIndent) +
+		inline.Render(diffTabInlineText) + " " + sxs.Render(diffTabSxsText)
+}
+
+// tabAt maps a click's column (relative to the box content's left edge) to the
+// view mode whose button it lands on, or -1 if it misses both. Mirrors tabRow's
+// layout: indent, then the Inline label, a space, then the Side-by-side label.
+func tabAt(contentX int) int {
+	inStart := diffTabIndent
+	inEnd := inStart + len(diffTabInlineText)
+	sxStart := inEnd + 1
+	sxEnd := sxStart + len(diffTabSxsText)
+	switch {
+	case contentX >= inStart && contentX < inEnd:
+		return diffModeInline
+	case contentX >= sxStart && contentX < sxEnd:
+		return diffModeSideBySide
+	default:
+		return -1
+	}
+}
+
+// sbsCell is one side of a side-by-side row: a line number (0 = blank cell) and
+// the colored text.
+type sbsCell struct {
+	no   int
+	text string
+}
+
+// renderSideBySide lays the diff out in two columns. Context lines appear on
+// both sides at their respective old/new line numbers; a change block pairs its
+// removed lines (left) with its added lines (right), padding the shorter side
+// with blank cells. Each column is line-numbered and truncated to fit.
+func renderSideBySide(content string, cw int) string {
+	lines := strings.Split(content, "\n")
+
+	oldTotal, newTotal := 0, 0
+	for _, ln := range lines {
+		switch k, _ := classifyDiffLine(ln); k {
+		case diffContext:
+			oldTotal++
+			newTotal++
+		case diffAdd:
+			newTotal++
+		case diffDel:
+			oldTotal++
+		}
+	}
+	gw := len(itoa(maxInt(oldTotal, newTotal)))
+	if gw < 1 {
+		gw = 1
+	}
+	colW := (cw - 3) / 2
+	textW := colW - gw - 1 // gutter digits + one space
+	if textW < 1 {
+		textW = 1
+	}
+
+	var rows []string
+	emit := func(l, r sbsCell) {
+		rows = append(rows, sbsCellStr(l, gw, textW)+diffGutterStyle.Render(" │ ")+sbsCellStr(r, gw, textW))
+	}
+	var dels, adds []sbsCell
+	flush := func() {
+		n := maxInt(len(dels), len(adds))
+		for i := 0; i < n; i++ {
+			var l, r sbsCell
+			if i < len(dels) {
+				l = dels[i]
+			}
+			if i < len(adds) {
+				r = adds[i]
+			}
+			emit(l, r)
+		}
+		dels, adds = nil, nil
+	}
+
+	oldNo, newNo := 0, 0
+	for _, ln := range lines {
+		k, text := classifyDiffLine(ln)
+		switch k {
+		case diffSkip:
+			continue
+		case diffContext:
+			flush()
+			oldNo++
+			newNo++
+			emit(sbsCell{oldNo, text}, sbsCell{newNo, text})
+		case diffDel:
+			oldNo++
+			dels = append(dels, sbsCell{oldNo, text})
+		case diffAdd:
+			newNo++
+			adds = append(adds, sbsCell{newNo, text})
+		}
+	}
+	flush()
+	return strings.Join(rows, "\n")
+}
+
+// sbsCellStr renders one column: a dim right-aligned line-number gutter then the
+// fitted text. A blank cell (no == 0) yields an all-space gutter and text.
+func sbsCellStr(c sbsCell, gw, textW int) string {
+	if c.no == 0 {
+		return diffGutterStyle.Render(strings.Repeat(" ", gw)+" ") + fitColumn("", textW)
+	}
+	return diffGutterStyle.Render(fmt.Sprintf("%*d ", gw, c.no)) + fitColumn(c.text, textW)
+}
+
 // countDiffLines tallies the added (+) and deleted (-) lines of the diff body.
 // The body is pre-colored (git --color=always) and the +++/--- file markers are
 // stripped upstream, so after dropping the ANSI escapes a leading +/- is an
@@ -204,7 +455,7 @@ func (m DiffViewModel) Init() tea.Cmd {
 // headerHeight and footerHeight are the chrome rows reserved above and below the
 // scrolling viewport: a title line + a rule, and a single control bar.
 const (
-	diffHeaderHeight = 2
+	diffHeaderHeight = 3 // path+counts line, view-switch tabs, rule
 	diffFooterHeight = 1
 )
 
@@ -245,19 +496,34 @@ func (m DiffViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if !m.ready {
 			m.viewport = viewport.New(cw, h)
-			m.viewport.SetContent(numberLines(m.content))
 			m.ready = true
 		} else {
 			m.viewport.Width = cw
 			m.viewport.Height = h
 		}
+		// Until the user picks a view, the layout auto-adapts to width: side-by-side
+		// when wide enough, inline otherwise.
+		if !m.modeForced {
+			m.mode = pickByWidth(cw)
+		}
+		m.viewport.SetContent(renderBodyMode(m.content, cw, m.mode))
 		return m, nil
 
 	case tea.MouseMsg:
-		// Click outside the floating box (in the margin) closes the popup. Inside
-		// clicks fall through to the viewport (mouse-wheel scrolling).
 		if msg.Action == tea.MouseActionPress && msg.Button == tea.MouseButtonLeft {
-			mh, mv, _, _ := m.layout()
+			mh, mv, cw, _ := m.layout()
+			// A click on the view-switch tabs (content row 1 -> screen row mv+2,
+			// content cols offset by the left border at mh+1) switches the mode.
+			if msg.Y == mv+2 {
+				if mode := tabAt(msg.X - (mh + 1)); mode != -1 {
+					m.modeForced = true
+					m.mode = mode
+					m.viewport.SetContent(renderBodyMode(m.content, cw, m.mode))
+					return m, nil
+				}
+			}
+			// A click in the margin outside the floating box closes the popup;
+			// other inside clicks fall through to the viewport (wheel scrolling).
 			if msg.X < mh || msg.X >= m.width-mh || msg.Y < mv || msg.Y >= m.height-mv {
 				m.quitting = true
 				return m, tea.Quit
@@ -269,6 +535,17 @@ func (m DiffViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyCtrlC, tea.KeyEscape:
 			m.quitting = true
 			return m, tea.Quit
+		case tea.KeyTab:
+			// Toggle inline <-> side-by-side from the keyboard.
+			m.modeForced = true
+			if m.mode == diffModeSideBySide {
+				m.mode = diffModeInline
+			} else {
+				m.mode = diffModeSideBySide
+			}
+			_, _, cw, _ := m.layout()
+			m.viewport.SetContent(renderBodyMode(m.content, cw, m.mode))
+			return m, nil
 		case tea.KeyRunes:
 			if len(msg.Runes) == 1 {
 				switch msg.Runes[0] {
@@ -307,10 +584,10 @@ func (m DiffViewModel) View() string {
 	rule := diffRuleStyle.Render(strings.Repeat("─", maxInt(cw, 0)))
 
 	pct := int(m.viewport.ScrollPercent() * 100)
-	hints := "↑↓/jk scroll · space/b page · g/G top·end · click-out/q/Esc close"
+	hints := "↑↓/jk scroll · space/b page · g/G top·end · tab view · click-out/q/Esc close"
 	bar := diffBarStyle.Render(hints + "    " + padPercent(pct))
 
-	inner := strings.Join([]string{title, rule, m.viewport.View(), bar}, "\n")
+	inner := strings.Join([]string{title, m.tabRow(), rule, m.viewport.View(), bar}, "\n")
 	box := diffBoxStyle.Width(cw).Height(ch).Render(inner)
 
 	// No backdrop: float the box on a blank surface.

@@ -230,6 +230,153 @@ func TestDiffView_View_shows_line_numbers(t *testing.T) {
 	}
 }
 
+func stripA(s string) string { return diffAnsiSeq.ReplaceAllString(s, "") }
+
+// dropMarker strips the leading +/-/space diff marker while preserving the
+// line's ANSI color.
+func TestDropMarker_drops_prefix_keeps_color(t *testing.T) {
+	if got := dropMarker(" ctx"); got != "ctx" {
+		t.Errorf("context: got %q, want %q", got, "ctx")
+	}
+	if got := dropMarker("+add"); got != "add" {
+		t.Errorf("added: got %q, want %q", got, "add")
+	}
+	if got := dropMarker("\x1b[32m+code\x1b[m"); got != "\x1b[32mcode\x1b[m" {
+		t.Errorf("colored: got %q, want %q", got, "\x1b[32mcode\x1b[m")
+	}
+}
+
+// fitColumn truncates/pads to a fixed visible width, counting only printable
+// columns (ANSI escapes don't count) so colored text aligns.
+func TestFitColumn_truncates_and_pads(t *testing.T) {
+	if got := stripA(fitColumn("ab", 5)); got != "ab   " {
+		t.Errorf("pad: got %q, want %q", got, "ab   ")
+	}
+	if got := stripA(fitColumn("abcdef", 3)); got != "abc" {
+		t.Errorf("truncate: got %q, want %q", got, "abc")
+	}
+	if got := stripA(fitColumn("\x1b[32mabcdef\x1b[m", 3)); got != "abc" {
+		t.Errorf("ansi truncate: got %q, want %q", got, "abc")
+	}
+}
+
+// Narrow popup -> inline numbered view (markers kept, single gutter).
+func TestRenderDiffBody_inline_when_narrow(t *testing.T) {
+	out := stripA(renderDiffBody(" ctx\n-del\n+add\n", 50))
+	if !strings.Contains(out, "+add") || !strings.Contains(out, "-del") {
+		t.Errorf("inline should keep the +/- markers, got:\n%s", out)
+	}
+}
+
+// Wide popup -> side-by-side: markers dropped, deletions on the left of the
+// divider and additions on the right, context shown on both sides.
+func TestRenderDiffBody_side_by_side_when_wide(t *testing.T) {
+	out := stripA(renderDiffBody(" ctx\n-del\n+add\n ctx2\n", 120))
+	if strings.Contains(out, "+add") || strings.Contains(out, "-del") {
+		t.Errorf("side-by-side should drop the +/- markers, got:\n%s", out)
+	}
+	var changeRow, ctxRow string
+	for _, ln := range strings.Split(out, "\n") {
+		if strings.Contains(ln, "del") && strings.Contains(ln, "add") {
+			changeRow = ln
+		}
+		if strings.Count(ln, "ctx2") == 2 {
+			ctxRow = ln
+		}
+	}
+	if changeRow == "" {
+		t.Fatalf("expected a row pairing del|add, got:\n%s", out)
+	}
+	bar := strings.Index(changeRow, "│")
+	if bar < 0 || strings.Index(changeRow, "del") > bar || strings.Index(changeRow, "add") < bar {
+		t.Errorf("del should be left of the divider, add right: %q", changeRow)
+	}
+	if ctxRow == "" {
+		t.Errorf("a context line should appear on both sides of a row, got:\n%s", out)
+	}
+}
+
+func TestDiffView_side_by_side_when_wide(t *testing.T) {
+	m := sizeDiff(NewDiffView("lib/x.sh", " ctx\n-del\n+add\n ctx2\n"), 200, 40)
+	out := stripA(m.View())
+	found := false
+	for _, ln := range strings.Split(out, "\n") {
+		if strings.Contains(ln, "del") && strings.Contains(ln, "add") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("wide view should render side-by-side (del|add on one row), got:\n%s", out)
+	}
+}
+
+func TestDiffView_inline_when_narrow(t *testing.T) {
+	m := sizeDiff(NewDiffView("lib/x.sh", " ctx\n-del\n+add\n"), 60, 24)
+	out := stripA(m.View())
+	if !strings.Contains(out, "+add") {
+		t.Errorf("narrow view should be inline (markers kept), got:\n%s", out)
+	}
+}
+
+func isSideBySide(out string) bool {
+	for _, ln := range strings.Split(out, "\n") {
+		if strings.Contains(ln, "del") && strings.Contains(ln, "add") {
+			return true
+		}
+	}
+	return false
+}
+
+func TestDiffView_View_shows_view_buttons(t *testing.T) {
+	m := sizeDiff(NewDiffView("lib/x.sh", " ctx\n+add\n"), 200, 40)
+	out := stripA(m.View())
+	if !strings.Contains(out, "Inline") {
+		t.Errorf("view should show an Inline button, got:\n%s", out)
+	}
+	if !strings.Contains(out, "Side-by-side") {
+		t.Errorf("view should show a Side-by-side button, got:\n%s", out)
+	}
+}
+
+// At 200x40 the layout auto-picks side-by-side; clicking the Inline button must
+// force inline, and clicking Side-by-side must force it back. Button hit boxes
+// (computed in the model): tabs row is screen y=4, content starts at screen
+// x=11, Inline spans content cols [1,11), Side-by-side [12,28).
+func TestDiffView_click_buttons_switch_mode(t *testing.T) {
+	m := sizeDiff(NewDiffView("lib/x.sh", " ctx\n-del\n+add\n ctx2\n"), 200, 40)
+	if !isSideBySide(stripA(m.View())) {
+		t.Fatal("expected auto side-by-side at 200 wide")
+	}
+	// Click the Inline button (screen x=15, y=4).
+	m, cmd := clickDiff(m, 15, 4)
+	if quits(cmd) || m.quitting {
+		t.Fatal("clicking a button must not close the popup")
+	}
+	if isSideBySide(stripA(m.View())) || !strings.Contains(stripA(m.View()), "+add") {
+		t.Errorf("clicking Inline should switch to inline, got:\n%s", stripA(m.View()))
+	}
+	// Click the Side-by-side button (screen x=30, y=4).
+	m, _ = clickDiff(m, 30, 4)
+	if !isSideBySide(stripA(m.View())) {
+		t.Errorf("clicking Side-by-side should switch back, got:\n%s", stripA(m.View()))
+	}
+}
+
+func TestDiffView_tab_key_toggles_view(t *testing.T) {
+	m := sizeDiff(NewDiffView("lib/x.sh", " ctx\n-del\n+add\n ctx2\n"), 200, 40)
+	if !isSideBySide(stripA(m.View())) {
+		t.Fatal("expected auto side-by-side at 200 wide")
+	}
+	m, _ = keyDiff(m, tea.KeyTab)
+	if isSideBySide(stripA(m.View())) {
+		t.Errorf("Tab should toggle to inline, got:\n%s", stripA(m.View()))
+	}
+	m, _ = keyDiff(m, tea.KeyTab)
+	if !isSideBySide(stripA(m.View())) {
+		t.Errorf("Tab again should toggle back to side-by-side, got:\n%s", stripA(m.View()))
+	}
+}
+
 // ParseBackdrop composites the serialized screen capture (a "W H" header, then
 // "PANE left top" blocks of captured lines ending in "ENDPANE") into W×H rows,
 // placing each pane's lines at its window position. This is what the pager
