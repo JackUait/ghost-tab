@@ -426,6 +426,46 @@ func TestOpenDiffPopup_quotes_path_with_spaces(t *testing.T) {
 	}
 }
 
+// The diff popup should look like a polished viewer, not a bare pager: a rounded,
+// styled tmux border; a calm color palette overriding git's default diff colors;
+// mouse-wheel scrolling inside less; and a persistent control bar (key hints +
+// scroll position) at the bottom.
+func TestOpenDiffPopup_styled_controls_and_scroll(t *testing.T) {
+	dir := t.TempDir()
+	binDir := mockCommand(t, dir, "tmux", `echo "$@"`)
+	env := buildEnv(t, []string{binDir})
+	root := projectRoot(t)
+	module := filepath.Join(root, "lib", "compact-view.sh")
+	script := "source " + module + " && open_diff_popup /proj lib/x.sh"
+	cmd := exec.Command("bash", "-c", script)
+	cmd.Env = env
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("open_diff_popup: %v\n%s", err, out)
+	}
+	got := string(out)
+
+	// Rounded, styled popup frame.
+	assertContains(t, got, "rounded")
+	assertContains(t, got, "-S ")
+
+	// Calm editorial palette: git diff color overrides for the noisy metadata
+	// and hunk-header lines.
+	assertContains(t, got, "color.diff.frag")
+	assertContains(t, got, "color.diff.meta")
+
+	// Mouse-wheel scroll inside the popup.
+	assertContains(t, got, "--mouse")
+	assertContains(t, got, "--wheel-lines")
+
+	// A control bar with key hints and live scroll position.
+	assertContains(t, got, "-P")
+	assertContains(t, got, "scroll")
+	assertContains(t, got, "quit")
+	assertContains(t, got, "search")
+	assertContains(t, got, `%pb`) // percent-into-file escape -> live position
+}
+
 // enter_ui_mode must also enable any-motion mouse tracking (\033[?1003h) so the
 // ledger receives hover (no-button) motion reports and can highlight the file
 // row under the cursor; exit_ui_mode must turn it back off (\033[?1003l).

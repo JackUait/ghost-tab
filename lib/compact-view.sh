@@ -140,6 +140,12 @@ body_line_for_click() {
 # display-popup overlays the entire client window (not just this pane) and is
 # blocking, so the ledger loop pauses until the user closes it (q/Esc). No-op
 # when tmux is unavailable. The path is shell-quoted so spaces survive.
+#
+# Presentation: a rounded, dim-bordered popup; a calm editorial palette that
+# overrides git's default diff colors (dim the noisy file/index metadata, make
+# hunk headers pop in cyan for quick navigation, keep classic red/green for
+# content); less with mouse-wheel scrolling and a persistent control bar — key
+# hints on the left, live scroll position on the right — rendered in standout.
 # Usage: open_diff_popup <project_dir> <file>
 open_diff_popup() {
   local dir="$1" file="$2"
@@ -147,8 +153,19 @@ open_diff_popup() {
   local qd qf
   qd=$(printf '%q' "$dir")
   qf=$(printf '%q' "$file")
-  tmux display-popup -E -w 95% -h 95% -T " git diff: ${file} " \
-    "git -C ${qd} --no-pager diff HEAD -U999999 --color=always -- ${qf} | less -R"
+
+  # Diff color overrides applied only inside this viewer (the user's own
+  # `git diff` is untouched). dim metadata, cyan hunk headers, soft func ctx.
+  local colors="-c color.diff.meta='dim' -c color.diff.frag='bold cyan' -c color.diff.func='dim cyan' -c color.diff.old='red' -c color.diff.new='green'"
+
+  # less control bar. `%lb`/`%L` = bottom/total line, `%pb` = percent into file,
+  # `\%` = a literal percent. less draws the short prompt in standout video, so
+  # this reads as a status bar without needing -m/-M.
+  local bar=' ↑↓/jk scroll · g/G top·end · / search · n/N next · q quit    %lb/%L · %pb\% '
+
+  tmux display-popup -E -w 90% -h 90% -b rounded -S 'fg=colour244' \
+    -T " git diff: ${file} " \
+    "git -C ${qd} ${colors} --no-pager diff HEAD -U999999 --color=always -- ${qf} | less -R --mouse --wheel-lines=3 -P'${bar}'"
 }
 
 # enter_ui_mode prepares the live pane's terminal for the ledger UI: the
