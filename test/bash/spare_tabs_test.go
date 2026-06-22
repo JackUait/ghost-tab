@@ -77,6 +77,50 @@ func TestSpareTabs_config_flush_left(t *testing.T) {
 	assertContains(t, out, `set -g status-left ""`)
 }
 
+// lineWithPrefix returns the first line of out whose trimmed text starts with
+// prefix (and, when forbidden is non-empty, does NOT start with it).
+func lineWithPrefix(out, prefix, forbidden string) string {
+	for _, ln := range strings.Split(out, "\n") {
+		t := strings.TrimSpace(ln)
+		if forbidden != "" && strings.HasPrefix(t, forbidden) {
+			continue
+		}
+		if strings.HasPrefix(t, prefix) {
+			return t
+		}
+	}
+	return ""
+}
+
+// Inactive tabs render as a plain bracketed label — no chip colour, no hexagon
+// brand mark, no close ✕ — while the current tab keeps its coloured chip. Click
+// selection (the sel range) must still work on inactive tabs.
+func TestSpareTabs_config_inactive_tabs_are_plain(t *testing.T) {
+	out, code := runBashFunc(t, "lib/spare-tabs.sh", "spare_tabs_config",
+		[]string{"ghost-tab", "/proj/dir", "/abs/lib/spare-tabs.sh", "gtspare_x"}, nil)
+	assertExitCode(t, code, 0)
+
+	// The inactive format line (not the -current- one).
+	inactive := lineWithPrefix(out, "set -g window-status-format ", "set -g window-status-current-format ")
+	if inactive == "" {
+		t.Fatalf("could not find window-status-format line in:\n%s", out)
+	}
+	assertContains(t, inactive, "[") // bracketed label
+	assertContains(t, inactive, "]")
+	assertContains(t, inactive, "range=user|sel:") // still clickable to select
+	for _, forbidden := range []string{"✕", "⬡", "colour209", "colour236", "range=user|close:"} {
+		assertNotContains(t, inactive, forbidden)
+	}
+
+	// The current/active tab keeps its colour and close button.
+	active := lineWithPrefix(out, "set -g window-status-current-format ", "")
+	if active == "" {
+		t.Fatalf("could not find window-status-current-format line in:\n%s", out)
+	}
+	assertContains(t, active, "colour209") // orange accent
+	assertContains(t, active, "✕")         // close button
+}
+
 // The launch command must escape the outer $TMUX guard (tmux refuses to nest
 // otherwise) and fall back to a plain shell if tmux is unavailable.
 func TestSpareTabs_launch_cmd(t *testing.T) {

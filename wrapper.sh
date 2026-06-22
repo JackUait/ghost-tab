@@ -313,8 +313,8 @@ _spare_close_bind="bash -c 'source \"$_WRAPPER_DIR/lib/spare-tabs.sh\" && spare_
   set-option status-right "" \; \
   set-option set-titles off \; \
   set-option exit-unattached on \; \
-  set-option pane-border-style "fg=colour238,bg=colour235" \; \
-  set-option pane-active-border-style "fg=colour209,bg=colour235" \; \
+  set-option pane-border-style "fg=colour238" \; \
+  set-option pane-active-border-style "fg=colour209" \; \
   bind-key i run-shell "$_screenshot_bind" \; \
   bind-key t run-shell "env -u TMUX -u TMUX_PANE tmux -L $_spare_label new-window -c \"$PROJECT_DIR\"" \; \
   bind-key w run-shell "$_spare_close_bind" \; \
