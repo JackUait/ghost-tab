@@ -148,3 +148,19 @@ func TestWrapper_active_pane_border_is_visible(t *testing.T) {
 		t.Errorf("expected new-session to set a distinct pane-active-border-style; got:\n%s", got)
 	}
 }
+
+// TestWrapper_pane_dividers_match_tab_bar verifies the pane-border background is
+// tinted to the spare tab bar's charcoal (colour235). The divider above the
+// spare pane is its own row; tinting its background makes the tab bar appear
+// flush against the divider instead of separated by a dark gap.
+func TestWrapper_pane_dividers_match_tab_bar(t *testing.T) {
+	got := recordWrapperNewSession(t)
+	for _, want := range []string{
+		"pane-border-style fg=colour238,bg=colour235",
+		"pane-active-border-style fg=colour209,bg=colour235",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("expected pane border tinted to the tab-bar charcoal: %q; got:\n%s", want, got)
+		}
+	}
+}
