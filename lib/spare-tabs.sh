@@ -25,13 +25,12 @@ spare_tabs_socket() {
 spare_tabs_config() {
   local project="$1" dir="$2" lib="$3" label="$4"
 
-  # Tab bar styling — amber CRT / phosphor retro. Monochrome amber on a
-  # near-black screen: idle tabs are dim amber text divided by box-drawing
-  # bars, and the selected tab is INVERSE VIDEO (a solid bright-amber block
-  # with black text) the way old terminals highlighted a menu selection. The
-  # [+] add button is a bright-amber DOS-style bracket button and the close is
-  # a lowercase ASCII x. Square edges, no rounded caps.
-  # Amber ramp: 233 CRT black · 94 dim amber · 172 amber · 214 bright amber.
+  # Tab bar styling — matches the rest of Ghost Tab. Mirrors the outer (bottom)
+  # tmux status bar: grey colour236 chips on a colour235 bar, the ⬡ hexagon
+  # brand mark on the project tab (exactly as the bottom bar shows the session),
+  # and the orange colour209 accent — the app's focus colour (pane-active
+  # border) — for the selected tab. Idle tabs are muted; extras are numbered.
+  # ⬡ (U+2B21) and ✕ are literal UTF-8 (bash 3.2 --posix has no \u escapes).
   cat <<EOF
 set -g mouse on
 set -g status-position top
@@ -39,14 +38,14 @@ set -g exit-unattached on
 set -g remain-on-exit on
 set -g base-index 1
 set -g status-justify left
-set -g status-style "fg=colour172,bg=colour233"
-set -g window-status-style "bg=colour233"
-set -g status-left "#[fg=colour94,bg=colour233] "
-set -g status-right "#[range=user|new]#[fg=colour214,bg=colour233,bold] [+] #[nobold]#[norange]#[bg=colour233] "
-set -g window-status-separator "#[fg=colour94,bg=colour233] │ "
+set -g status-style "fg=colour250,bg=colour235"
+set -g window-status-style "bg=colour235"
+set -g status-left "#[bg=colour235] "
+set -g status-right "#[range=user|new]#[fg=colour209,bg=colour236,bold] + #[nobold]#[norange]#[bg=colour235] "
+set -g window-status-separator " "
 set -g @gt_dir "$dir"
-set -g window-status-format "#[range=user|sel:#{window_id}]#[fg=colour172,bg=colour233] #{?#{==:#{window_index},1},$project,#{window_index}} #[norange]#[range=user|close:#{window_id}]#[fg=colour94,bg=colour233]x #[norange]"
-set -g window-status-current-format "#[range=user|sel:#{window_id}]#[fg=colour233,bg=colour214,bold] #{?#{==:#{window_index},1},$project,#{window_index}} #[norange]#[range=user|close:#{window_id}]#[fg=colour233,bg=colour214,bold]x #[nobold]#[norange]"
+set -g window-status-format "#[range=user|sel:#{window_id}]#[fg=colour250,bg=colour236] #{?#{==:#{window_index},1},⬡ $project,#{window_index}} #[norange]#[range=user|close:#{window_id}]#[fg=colour243,bg=colour236]✕ #[norange]#[bg=colour235]"
+set -g window-status-current-format "#[range=user|sel:#{window_id}]#[fg=colour235,bg=colour209,bold] #{?#{==:#{window_index},1},⬡ $project,#{window_index}} #[norange]#[range=user|close:#{window_id}]#[fg=colour235,bg=colour209,bold]✕ #[nobold]#[norange]#[bg=colour235]"
 bind -n MouseDown1Status run-shell ". \"$lib\" && spare_tabs_dispatch \"$label\" \"#{mouse_status_range}\""
 bind -n MouseDown1StatusLeft run-shell ". \"$lib\" && spare_tabs_dispatch \"$label\" \"#{mouse_status_range}\""
 bind -n MouseDown1StatusRight run-shell ". \"$lib\" && spare_tabs_dispatch \"$label\" \"#{mouse_status_range}\""
