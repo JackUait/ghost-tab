@@ -8,6 +8,13 @@ input=$(cat)
 git_info=$(echo "$input" | bash ~/.claude/statusline-command.sh)
 context_pct=$(echo "$input" | npx ccstatusline 2>/dev/null)
 model_name=$(echo "$input" | sed -n 's/.*"display_name":"\([^"]*\)".*/\1/p')
+# Reasoning effort (low/medium/high/xhigh/max). Conditionally present in the
+# statusline JSON — only when the current model supports the effort parameter —
+# so it is appended in brackets after the model name only when set.
+effort_level=$(echo "$input" | sed -n 's/.*"effort":{"level":"\([^"]*\)".*/\1/p')
+if [ -n "$effort_level" ]; then
+  model_name="$model_name [$effort_level]"
+fi
 
 # Find parent Claude Code process and get total tree memory + CPU usage
 pid=$PPID

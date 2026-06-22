@@ -661,6 +661,33 @@ func TestStatusline_wrapper_omits_model_segment_when_model_missing(t *testing.T)
 	}
 }
 
+func TestStatusline_wrapper_appends_effort_level_to_model(t *testing.T) {
+	env := setupWrapperTest(t)
+
+	root := projectRoot(t)
+	wrapperPath := filepath.Join(root, "templates", "statusline-wrapper.sh")
+	stdinData := `{"model":{"id":"claude-fable-5","display_name":"Fable 5"},"effort":{"level":"high"},"workspace":{"current_dir":"/tmp"}}`
+	script := fmt.Sprintf(`echo '%s' | bash '%s'`, stdinData, wrapperPath)
+
+	out, code := runBashSnippet(t, script, env)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "Fable 5 [high]")
+}
+
+func TestStatusline_wrapper_omits_effort_brackets_when_effort_absent(t *testing.T) {
+	env := setupWrapperTest(t)
+
+	root := projectRoot(t)
+	wrapperPath := filepath.Join(root, "templates", "statusline-wrapper.sh")
+	stdinData := `{"model":{"id":"claude-fable-5","display_name":"Fable 5"},"workspace":{"current_dir":"/tmp"}}`
+	script := fmt.Sprintf(`echo '%s' | bash '%s'`, stdinData, wrapperPath)
+
+	out, code := runBashSnippet(t, script, env)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "Fable 5")
+	assertNotContains(t, out, "Fable 5 [")
+}
+
 // --- get_tree_cpu_pct: real CPU load of the session process tree ---
 // Sums macOS `ps -o %cpu` across the Claude Code process and its descendants.
 // `ps %cpu` is a fast recent-usage average — a `top` sample would block the
