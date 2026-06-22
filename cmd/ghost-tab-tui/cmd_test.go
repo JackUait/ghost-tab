@@ -394,6 +394,23 @@ func TestSelectProjectCmd_ProjectsFileFlagRequired(t *testing.T) {
 	}
 }
 
+func TestDiffViewCmd_Registered(t *testing.T) {
+	cmd, _, err := rootCmd.Find([]string{"diff-view"})
+	if err != nil {
+		t.Fatalf("subcommand not found: %v", err)
+	}
+	if cmd.Name() != "diff-view" {
+		t.Fatalf("got %q", cmd.Name())
+	}
+}
+
+func TestDiffViewCmd_HasTitleFlag(t *testing.T) {
+	cmd, _, _ := rootCmd.Find([]string{"diff-view"})
+	if cmd.Flags().Lookup("title") == nil {
+		t.Fatal("expected --title flag on diff-view")
+	}
+}
+
 func TestClaudeConfigMenuCmd_Registered(t *testing.T) {
 	cmd, _, err := rootCmd.Find([]string{"claude-config-menu"})
 	if err != nil {

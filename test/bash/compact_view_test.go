@@ -426,12 +426,12 @@ func TestOpenDiffPopup_quotes_path_with_spaces(t *testing.T) {
 	}
 }
 
-// The diff popup should look like a polished viewer, not a bare pager: a rounded
-// ORANGE border; the redundant header block (diff --git / index / --- / +++ /
-// the hunk @@ line) stripped so content starts at the top (the filename already
-// lives in the popup title); mouse-wheel scrolling inside less; and a persistent
-// control bar (key hints + scroll position) at the bottom.
-func TestOpenDiffPopup_styled_controls_and_scroll(t *testing.T) {
+// The diff popup is a rounded, ORANGE-bordered frame whose content is rendered
+// by the ghost-tab-tui diff-view pager (which closes on Esc/q and handles
+// scrolling + its own control bar). The redundant header block (diff --git /
+// index / --- / +++ / the hunk @@ line) is still stripped so content starts at
+// the top; the filename is passed as the viewer's --title.
+func TestOpenDiffPopup_uses_diff_viewer(t *testing.T) {
 	dir := t.TempDir()
 	binDir := mockCommand(t, dir, "tmux", `echo "$@"`)
 	env := buildEnv(t, []string{binDir})
@@ -455,16 +455,9 @@ func TestOpenDiffPopup_styled_controls_and_scroll(t *testing.T) {
 	assertContains(t, got, "awk")
 	assertContains(t, got, "/@@/")
 
-	// Mouse-wheel scroll inside the popup.
-	assertContains(t, got, "--mouse")
-	assertContains(t, got, "--wheel-lines")
-
-	// A control bar with key hints and live scroll position.
-	assertContains(t, got, "-P")
-	assertContains(t, got, "scroll")
-	assertContains(t, got, "quit")
-	assertContains(t, got, "search")
-	assertContains(t, got, `%pb`) // percent-into-file escape -> live position
+	// Rendered by the Go pager (closes on Esc), with the file as its title.
+	assertContains(t, got, "ghost-tab-tui diff-view")
+	assertContains(t, got, "--title")
 }
 
 // The header filter must drop the diff --git / index / --- / +++ metadata AND

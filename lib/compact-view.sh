@@ -143,11 +143,12 @@ body_line_for_click() {
 #
 # Presentation: a rounded, ORANGE-bordered popup. The redundant header block
 # (diff --git / index / --- / +++ and the @@ hunk line) is stripped — the
-# filename already lives in the popup title — so file content starts at the top.
+# filename already lives in the title — so file content starts at the top.
 # Because -U999999 emits the whole file as a single hunk, dropping everything
-# through the first @@ line removes the header exactly. Content keeps git's
-# classic red/green coloring; less adds mouse-wheel scrolling and a persistent
-# control bar (key hints left, live scroll position right) drawn in standout.
+# through the first @@ line removes the header exactly. The colored body is
+# rendered by the ghost-tab-tui diff-view pager, which scrolls (arrows/jk, page,
+# mouse wheel) and closes on a single Esc (or q) — something less can't do
+# cleanly, since Esc is its command prefix.
 # Usage: open_diff_popup <project_dir> <file>
 open_diff_popup() {
   local dir="$1" file="$2"
@@ -161,14 +162,9 @@ open_diff_popup() {
   # line is wrapped in ANSI color escapes.
   local strip="awk 'f;/@@/{f=1}'"
 
-  # less control bar. `%lb`/`%L` = bottom/total line, `%pb` = percent into file,
-  # `\%` = a literal percent. less draws the short prompt in standout video, so
-  # this reads as a status bar without needing -m/-M.
-  local bar=' ↑↓/jk scroll · g/G top·end · / search · n/N next · q quit    %lb/%L · %pb\% '
-
   tmux display-popup -E -w 90% -h 90% -b rounded -S 'fg=colour208' \
     -T " git diff: ${file} " \
-    "git -C ${qd} --no-pager diff HEAD -U999999 --color=always -- ${qf} | ${strip} | less -R --mouse --wheel-lines=3 -P'${bar}'"
+    "git -C ${qd} --no-pager diff HEAD -U999999 --color=always -- ${qf} | ${strip} | ghost-tab-tui diff-view --title ${qf}"
 }
 
 # enter_ui_mode prepares the live pane's terminal for the ledger UI: the
