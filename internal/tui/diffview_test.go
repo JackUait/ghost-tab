@@ -98,6 +98,47 @@ func TestDiffView_View_shows_title_controls_and_content(t *testing.T) {
 	}
 }
 
+// countDiffLines tallies added (+) and deleted (-) lines of the (possibly
+// ANSI-colored) diff body. The +++/--- file markers are already stripped
+// upstream, so a plain leading +/- after stripping color is authoritative.
+func TestCountDiffLines_counts_added_and_deleted(t *testing.T) {
+	content := " context line\n" +
+		"+added one\n" +
+		"+added two\n" +
+		"-removed one\n" +
+		"\x1b[32m+added colored\x1b[m\n" +
+		"\x1b[31m-removed colored\x1b[m\n" +
+		"\n" // trailing blank
+	added, deleted := countDiffLines(content)
+	if added != 3 {
+		t.Errorf("added = %d, want 3", added)
+	}
+	if deleted != 2 {
+		t.Errorf("deleted = %d, want 2", deleted)
+	}
+}
+
+// The header must show ONLY the file path and the added/deleted line counts —
+// nothing else (no "git diff:" label).
+func TestDiffView_header_shows_path_and_line_counts(t *testing.T) {
+	content := " ctx\n+a\n+b\n+c\n-x\n-y\n"
+	m := sizeDiff(NewDiffView("lib/x.sh", content), 80, 24)
+	out := m.View()
+	header := strings.SplitN(out, "\n", 2)[0]
+	if !strings.Contains(header, "lib/x.sh") {
+		t.Errorf("header should show the file path, got %q", header)
+	}
+	if !strings.Contains(header, "+3") {
+		t.Errorf("header should show +3 added lines, got %q", header)
+	}
+	if !strings.Contains(header, "−2") { // U+2212 minus, matching the ledger
+		t.Errorf("header should show −2 deleted lines, got %q", header)
+	}
+	if strings.Contains(out, "git diff:") {
+		t.Errorf("header should NOT carry a 'git diff:' label, got %q", out)
+	}
+}
+
 func TestDiffView_preserves_ansi_color_in_content(t *testing.T) {
 	colored := "\x1b[32m+added\x1b[m\n\x1b[31m-removed\x1b[m\n"
 	m := sizeDiff(NewDiffView("f", colored), 80, 24)

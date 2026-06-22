@@ -189,14 +189,14 @@ split_content() {
 # blocking, so the ledger loop pauses until the user closes it (q/Esc). No-op
 # when tmux is unavailable. The path is shell-quoted so spaces survive.
 #
-# Presentation: a rounded, ORANGE-bordered popup. The redundant header block
-# (diff --git / index / --- / +++ and the @@ hunk line) is stripped — the
-# filename already lives in the title — so file content starts at the top.
-# Because -U999999 emits the whole file as a single hunk, dropping everything
-# through the first @@ line removes the header exactly. The colored body is
-# rendered by the ghost-tab-tui diff-view pager, which scrolls (arrows/jk, page,
-# mouse wheel) and closes on a single Esc (or q) — something less can't do
-# cleanly, since Esc is its command prefix.
+# Presentation: a rounded, ORANGE-bordered popup. The redundant git header block
+# (diff --git / index / --- / +++ and the @@ hunk line) is stripped so file
+# content starts at the top. Because -U999999 emits the whole file as a single
+# hunk, dropping everything through the first @@ line removes the header exactly.
+# The colored body is rendered by the ghost-tab-tui diff-view pager, whose own
+# header shows just the file path plus the added/deleted line counts; it scrolls
+# (arrows/jk, page, mouse wheel) and closes on a single Esc (or q) — something
+# less can't do cleanly, since Esc is its command prefix.
 # Usage: open_diff_popup <project_dir> <file>
 open_diff_popup() {
   local dir="$1" file="$2"
@@ -210,8 +210,9 @@ open_diff_popup() {
   # line is wrapped in ANSI color escapes.
   local strip="awk 'f;/@@/{f=1}'"
 
+  # No border -T title: the pager's own header shows the path + added/deleted
+  # line counts, so a "git diff:" label here would just duplicate it.
   tmux display-popup -E -w 90% -h 90% -b rounded -S 'fg=colour208' \
-    -T " git diff: ${file} " \
     "git -C ${qd} --no-pager diff HEAD -U999999 --color=always -- ${qf} | ${strip} | ghost-tab-tui diff-view --title ${qf}"
 }
 

@@ -458,6 +458,10 @@ func TestOpenDiffPopup_uses_diff_viewer(t *testing.T) {
 	// Rendered by the Go pager (closes on Esc), with the file as its title.
 	assertContains(t, got, "ghost-tab-tui diff-view")
 	assertContains(t, got, "--title")
+
+	// The pager header now shows the path + added/deleted counts itself, so the
+	// popup carries no redundant "git diff:" border-title label.
+	assertNotContains(t, got, "git diff:")
 }
 
 // The header filter must drop the diff --git / index / --- / +++ metadata AND

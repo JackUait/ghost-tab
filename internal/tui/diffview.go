@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"regexp"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/viewport"
@@ -17,6 +18,8 @@ import (
 type DiffViewModel struct {
 	title    string
 	content  string
+	added    int
+	deleted  int
 	viewport viewport.Model
 	ready    bool
 	quitting bool
@@ -28,6 +31,9 @@ var (
 			Foreground(lipgloss.Color("208")). // orange, matching the popup border
 			Padding(0, 1)
 
+	diffAddStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("2")) // green
+	diffDelStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("1")) // red
+
 	diffRuleStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("208"))
 
 	diffBarStyle = lipgloss.NewStyle().
@@ -35,10 +41,34 @@ var (
 			Padding(0, 1)
 )
 
+var diffAnsiSeq = regexp.MustCompile("\x1b\\[[0-9;]*m")
+
+// countDiffLines tallies the added (+) and deleted (-) lines of the diff body.
+// The body is pre-colored (git --color=always) and the +++/--- file markers are
+// stripped upstream, so after dropping the ANSI escapes a leading +/- is an
+// authoritative add/delete marker; context lines (leading space) are ignored.
+func countDiffLines(content string) (added, deleted int) {
+	for _, line := range strings.Split(content, "\n") {
+		s := diffAnsiSeq.ReplaceAllString(line, "")
+		if s == "" {
+			continue
+		}
+		switch s[0] {
+		case '+':
+			added++
+		case '-':
+			deleted++
+		}
+	}
+	return added, deleted
+}
+
 // NewDiffView builds the pager for the given title (the file path, shown in the
-// header) and content (the colored diff body).
+// header) and content (the colored diff body). The added/deleted line counts
+// shown in the header are derived from the content.
 func NewDiffView(title, content string) DiffViewModel {
-	return DiffViewModel{title: title, content: content}
+	added, deleted := countDiffLines(content)
+	return DiffViewModel{title: title, content: content, added: added, deleted: deleted}
 }
 
 func (m DiffViewModel) Init() tea.Cmd {
@@ -105,7 +135,10 @@ func (m DiffViewModel) View() string {
 	}
 
 	width := m.viewport.Width
-	title := diffTitleStyle.Render("git diff: " + m.title)
+	// Top line: ONLY the file path and the added/deleted line counts.
+	title := diffTitleStyle.Render(m.title) +
+		diffAddStyle.Render("+"+itoa(m.added)) + " " +
+		diffDelStyle.Render("−"+itoa(m.deleted))
 	rule := diffRuleStyle.Render(strings.Repeat("─", maxInt(width, 0)))
 
 	pct := int(m.viewport.ScrollPercent() * 100)
