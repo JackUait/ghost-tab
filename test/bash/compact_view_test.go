@@ -233,6 +233,198 @@ func TestExitUiMode_noninteractive_emits_nothing(t *testing.T) {
 	}
 }
 
+// numstat_path extracts the actual working-tree path from a `git --numstat`
+// third field, which for renames is encoded as "old => new" (or with a common
+// prefix/suffix brace form "pre{old => new}suf"). Clicking a renamed file must
+// open the diff for its CURRENT path, so the map needs the post-rename path.
+
+func TestNumstatPath_plain_path_unchanged(t *testing.T) {
+	out, code := runBashFunc(t, "lib/compact-view.sh", "numstat_path",
+		[]string{"lib/compact-view.sh"}, nil)
+	assertExitCode(t, code, 0)
+	if got := strings.TrimSpace(out); got != "lib/compact-view.sh" {
+		t.Errorf("got %q, want %q", got, "lib/compact-view.sh")
+	}
+}
+
+func TestNumstatPath_simple_rename_takes_new(t *testing.T) {
+	out, code := runBashFunc(t, "lib/compact-view.sh", "numstat_path",
+		[]string{"old/name.txt => new/name.txt"}, nil)
+	assertExitCode(t, code, 0)
+	if got := strings.TrimSpace(out); got != "new/name.txt" {
+		t.Errorf("got %q, want %q", got, "new/name.txt")
+	}
+}
+
+func TestNumstatPath_brace_rename_rebuilds_new(t *testing.T) {
+	// git collapses a partial rename to a common prefix/suffix with a brace.
+	out, code := runBashFunc(t, "lib/compact-view.sh", "numstat_path",
+		[]string{"src/{old => new}/file.go"}, nil)
+	assertExitCode(t, code, 0)
+	if got := strings.TrimSpace(out); got != "src/new/file.go" {
+		t.Errorf("got %q, want %q", got, "src/new/file.go")
+	}
+}
+
+// body_path_map emits ONE entry per rendered body line — the file's path on a
+// file row, and an EMPTY line on a group-header or trailing-blank row — so a
+// click's body-line index can be looked up to a path. It MUST mirror
+// render_group's line structure exactly (1 header line + N file rows + 1 blank
+// per non-empty group, staged then modified). Clicking a non-file line yields
+// no path and opens nothing.
+
+func bodyPathMap(t *testing.T, staged, unstaged string) []string {
+	t.Helper()
+	root := projectRoot(t)
+	module := filepath.Join(root, "lib", "compact-view.sh")
+	script := "source " + module + " && body_path_map \"$1\" \"$2\""
+	cmd := exec.Command("bash", "-c", script, "bash", staged, unstaged)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("body_path_map: %v\n%s", err, out)
+	}
+	// Trim only the single trailing newline printf adds, then split.
+	s := strings.TrimSuffix(string(out), "\n")
+	return strings.Split(s, "\n")
+}
+
+func TestBodyPathMap_file_rows_carry_path_headers_blank(t *testing.T) {
+	staged := "1\t2\tlib/a.sh\n3\t4\tlib/b.sh"
+	unstaged := "5\t6\tcmd/c.go"
+	lines := bodyPathMap(t, staged, unstaged)
+	// [0]="" (staged header), [1]=lib/a.sh, [2]=lib/b.sh, [3]="" (blank),
+	// [4]="" (modified header), [5]=cmd/c.go, [6]="" (blank)
+	want := []string{"", "lib/a.sh", "lib/b.sh", "", "", "cmd/c.go", ""}
+	if len(lines) != len(want) {
+		t.Fatalf("got %d lines %q, want %d %q", len(lines), lines, len(want), want)
+	}
+	for i := range want {
+		if lines[i] != want[i] {
+			t.Errorf("line %d: got %q, want %q (all=%q)", i, lines[i], want[i], lines)
+		}
+	}
+}
+
+func TestBodyPathMap_rename_row_uses_new_path(t *testing.T) {
+	lines := bodyPathMap(t, "1\t2\told.txt => new.txt", "")
+	// header, file row, trailing blank
+	if len(lines) < 2 || lines[1] != "new.txt" {
+		t.Errorf("file row should carry the post-rename path %q, got %q", "new.txt", lines)
+	}
+}
+
+func TestBodyPathMap_empty_state_has_no_paths(t *testing.T) {
+	lines := bodyPathMap(t, "", "")
+	for i, l := range lines {
+		if strings.TrimSpace(l) != "" {
+			t.Errorf("empty changeset must yield no file paths, line %d = %q (all=%q)", i, l, lines)
+		}
+	}
+}
+
+// body_line_for_click maps a clicked SCREEN row to a 1-based body-line index, or
+// 0 when the click landed on the pinned header (rows 1-2), the bottom scroll
+// status row, or past the end of the content. Args: <row> <scroll> <avail> <total>.
+
+func TestBodyLineForClick_header_rows_yield_zero(t *testing.T) {
+	for _, r := range []string{"1", "2"} {
+		out, code := runBashFunc(t, "lib/compact-view.sh", "body_line_for_click",
+			[]string{r, "0", "10", "5"}, nil)
+		assertExitCode(t, code, 0)
+		if got := strings.TrimSpace(out); got != "0" {
+			t.Errorf("header row %s should yield 0, got %q", r, got)
+		}
+	}
+}
+
+func TestBodyLineForClick_body_no_overflow(t *testing.T) {
+	// row 3 is the first body line; scroll 0.
+	out, _ := runBashFunc(t, "lib/compact-view.sh", "body_line_for_click",
+		[]string{"3", "0", "10", "5"}, nil)
+	if got := strings.TrimSpace(out); got != "1" {
+		t.Errorf("row 3 should map to body line 1, got %q", got)
+	}
+	out, _ = runBashFunc(t, "lib/compact-view.sh", "body_line_for_click",
+		[]string{"4", "0", "10", "5"}, nil)
+	if got := strings.TrimSpace(out); got != "2" {
+		t.Errorf("row 4 should map to body line 2, got %q", got)
+	}
+}
+
+func TestBodyLineForClick_past_content_yields_zero(t *testing.T) {
+	// total=5, so row 10 (body line 8) is beyond the content.
+	out, _ := runBashFunc(t, "lib/compact-view.sh", "body_line_for_click",
+		[]string{"10", "0", "10", "5"}, nil)
+	if got := strings.TrimSpace(out); got != "0" {
+		t.Errorf("click past content should yield 0, got %q", got)
+	}
+}
+
+func TestBodyLineForClick_applies_scroll_offset(t *testing.T) {
+	// overflowing: scroll 4, row 3 -> body line 5.
+	out, _ := runBashFunc(t, "lib/compact-view.sh", "body_line_for_click",
+		[]string{"3", "4", "9", "20"}, nil)
+	if got := strings.TrimSpace(out); got != "5" {
+		t.Errorf("row 3 at scroll 4 should map to body line 5, got %q", got)
+	}
+}
+
+func TestBodyLineForClick_status_row_yields_zero(t *testing.T) {
+	// avail=9 -> body view rows are 1..9 (screen rows 3..11); the status row at
+	// screen row 12 (view row 10) is past avail and must not open a file.
+	out, _ := runBashFunc(t, "lib/compact-view.sh", "body_line_for_click",
+		[]string{"12", "4", "9", "20"}, nil)
+	if got := strings.TrimSpace(out); got != "0" {
+		t.Errorf("status row should yield 0, got %q", got)
+	}
+}
+
+// open_diff_popup floats a whole-window tmux popup running the full-file diff
+// for the clicked path, piped through less. It builds the popup command; the
+// actual rendering is tmux's job (mocked here).
+
+func TestOpenDiffPopup_builds_whole_file_diff_popup(t *testing.T) {
+	dir := t.TempDir()
+	binDir := mockCommand(t, dir, "tmux", `echo "$@"`)
+	env := buildEnv(t, []string{binDir})
+	root := projectRoot(t)
+	module := filepath.Join(root, "lib", "compact-view.sh")
+	script := "source " + module + " && open_diff_popup /proj lib/x.sh"
+	cmd := exec.Command("bash", "-c", script)
+	cmd.Env = env
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("open_diff_popup: %v\n%s", err, out)
+	}
+	got := string(out)
+	assertContains(t, got, "display-popup")
+	assertContains(t, got, "diff HEAD -U999999")
+	assertContains(t, got, "lib/x.sh")
+	assertContains(t, got, "color=always")
+}
+
+func TestOpenDiffPopup_quotes_path_with_spaces(t *testing.T) {
+	dir := t.TempDir()
+	binDir := mockCommand(t, dir, "tmux", `echo "$@"`)
+	env := buildEnv(t, []string{binDir})
+	root := projectRoot(t)
+	module := filepath.Join(root, "lib", "compact-view.sh")
+	// Pass a path containing a space; open_diff_popup must shell-quote it so the
+	// popup command treats it as a single argument.
+	script := "source " + module + " && open_diff_popup /proj 'a dir/my file.sh'"
+	cmd := exec.Command("bash", "-c", script)
+	cmd.Env = env
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("open_diff_popup: %v\n%s", err, out)
+	}
+	got := string(out)
+	// The space must be escaped (a\ dir / my\ file.sh) rather than passed raw.
+	if !strings.Contains(got, `my\ file.sh`) && !strings.Contains(got, `'my file.sh'`) {
+		t.Errorf("path with spaces should be shell-quoted in the popup command:\n%q", got)
+	}
+}
+
 // The pinned header must state the number of changed files (not just the net
 // +/- line stamp), so the user always sees the changeset size at a glance.
 func TestCompactView_header_shows_changed_file_count(t *testing.T) {

@@ -67,6 +67,90 @@ scroll_status() {
   printf ' \033[2m%s%s %d-%d/%d\033[0m' "$up" "$down" "$first" "$last" "$total"
 }
 
+# numstat_path returns the working-tree path for a `git --numstat` third field.
+# For renames git encodes it as "old => new" (or, when a common prefix/suffix is
+# shared, the brace form "pre{old => new}suf"); a clicked rename must open the
+# diff for its CURRENT path, so we resolve to the post-rename path. Plain paths
+# pass through unchanged.
+# Usage: numstat_path <numstat-path-field>
+numstat_path() {
+  local p="$1"
+  case "$p" in
+    *'{'*' => '*'}'*)
+      # pre{old => new}suf  ->  pre + new + suf
+      local pre post mid new
+      pre="${p%%\{*}"
+      post="${p#*\}}"
+      mid="${p#*\{}"; mid="${mid%%\}*}"   # "old => new"
+      new="${mid#* => }"
+      p="${pre}${new}${post}"
+      ;;
+    *' => '*)
+      p="${p#* => }"
+      ;;
+  esac
+  printf '%s' "$p"
+}
+
+# body_path_map emits ONE line per rendered body line: the file's path on a file
+# row, and an EMPTY line on a group-header or trailing-blank row. A click's
+# body-line index is looked up against this map to find the path to diff. It
+# MUST mirror render_group's line structure exactly — 1 header line + N file
+# rows + 1 trailing blank per non-empty group, staged first then modified, or a
+# single (empty-path) line for the "no changes" state — so the Nth map line
+# always describes the Nth body line. Untracked files are omitted (as in the
+# ledger). Renames resolve to their post-rename path via numstat_path.
+# Usage: body_path_map <staged numstat> <unstaged numstat>
+body_path_map() {
+  local staged="$1" unstaged="$2"
+  emit_group() {
+    local data="$1"
+    [ -z "$data" ] && return
+    printf '\n'                       # group-header row -> no path
+    local a d f
+    while IFS=$'\t' read -r a d f; do
+      [ -z "$a" ] && continue
+      printf '%s\n' "$(numstat_path "$f")"
+    done <<< "$data"
+    printf '\n'                       # trailing blank row -> no path
+  }
+  emit_group "$staged"
+  emit_group "$unstaged"
+  if [ -z "$staged" ] && [ -z "$unstaged" ]; then
+    printf '\n'                       # "no changes" row -> no path
+  fi
+}
+
+# body_line_for_click maps a clicked SCREEN row to a 1-based body-line index, or
+# 0 when the click landed on the pinned 2-row header, the bottom scroll-status
+# row, or past the end of the content. The body viewport starts at screen row 3,
+# so view-row = row - 2; with overflow the scroll offset is added.
+# Usage: body_line_for_click <row> <scroll> <avail> <total>
+body_line_for_click() {
+  local row="$1" scroll="$2" avail="$3" total="$4"
+  local vr=$((row - 2))                 # 1-based row within the body viewport
+  { [ "$vr" -lt 1 ] || [ "$vr" -gt "$avail" ]; } && { printf 0; return; }
+  local line=$((scroll + vr))
+  { [ "$line" -lt 1 ] || [ "$line" -gt "$total" ]; } && { printf 0; return; }
+  printf '%d' "$line"
+}
+
+# open_diff_popup floats a whole-window tmux popup showing the WHOLE-FILE diff
+# (full context, -U999999) for the clicked path versus HEAD, piped through less.
+# display-popup overlays the entire client window (not just this pane) and is
+# blocking, so the ledger loop pauses until the user closes it (q/Esc). No-op
+# when tmux is unavailable. The path is shell-quoted so spaces survive.
+# Usage: open_diff_popup <project_dir> <file>
+open_diff_popup() {
+  local dir="$1" file="$2"
+  command -v tmux &>/dev/null || return 0
+  local qd qf
+  qd=$(printf '%q' "$dir")
+  qf=$(printf '%q' "$file")
+  tmux display-popup -E -w 95% -h 95% -T " git diff: ${file} " \
+    "git -C ${qd} --no-pager diff HEAD -U999999 --color=always -- ${qf} | less -R"
+}
+
 # enter_ui_mode prepares the live pane's terminal for the ledger UI: the
 # ALTERNATE screen buffer (\033[?1049h) — which has NO scrollback, so the mouse
 # wheel can't scroll past the rendered viewport into a pile of stale refresh
@@ -177,6 +261,8 @@ compact_view() {
   # a *display* command that prints "NAME=value" to stdout. Re-declaring `local
   # w` each iteration flashed "w=141" on screen until the next refresh.
   local w h content header body body_total avail mbtn
+  local staged unstaged body_map
+  local mterm mrest mrow bl cpath
   local scroll=0
   local need_build=1
   local interval="${COMPACT_VIEW_INTERVAL:-2}"
@@ -200,7 +286,17 @@ compact_view() {
 
     # Rebuild the ledger only on a refresh tick; scroll keys just re-slice the
     # cached content so the wheel stays snappy (no git calls per keystroke).
-    [ "$need_build" = 1 ] && content=$(
+    if [ "$need_build" = 1 ]; then
+    # Gather the tracked changes up here (not inside the render subshell) so the
+    # SAME data feeds both the rendered body and the click→path map. Untracked
+    # files carry no +/- counts and are intentionally omitted from the ledger.
+    staged=$(git -C "$project_dir" diff --cached --numstat 2>/dev/null)
+    unstaged=$(git -C "$project_dir" diff --numstat 2>/dev/null)
+    # One path per body line, mirroring the render below. Captured (like the
+    # body) via $(), so both shed their trailing blank identically and the Nth
+    # map line keeps describing the Nth body line.
+    body_map=$(body_path_map "$staged" "$unstaged")
+    content=$(
       cd "$project_dir" || exit 1
 
       # Inner content width (2-space padding each side)
@@ -221,11 +317,8 @@ compact_view() {
         fi
       fi
 
-      # Gather data (tracked changes only — untracked files carry no +/- counts
-      # and are excess for a line-change ledger, so they are intentionally omitted)
-      local staged unstaged
-      staged=$(git diff --cached --numstat 2>/dev/null)
-      unstaged=$(git diff --numstat 2>/dev/null)
+      # Tracked changes ($staged/$unstaged) are gathered by the parent shell and
+      # inherited here, so the render and the click→path map share one snapshot.
 
       # Count totals
       local n_staged=0 n_unstaged=0
@@ -302,6 +395,7 @@ compact_view() {
         printf " ${dim}no changes${reset}\n\n"
       fi
     )
+    fi
 
     # The header is the first 2 lines (branch heading + separator); it is PINNED
     # — always drawn at the top, never part of the scroll region. Only the body
@@ -362,17 +456,38 @@ compact_view() {
             5) scroll=$((scroll - avail)); read_key 0.02 || true ;;  # PgUp + ~
             6) scroll=$((scroll + avail)); read_key 0.02 || true ;;  # PgDn + ~
             '<')
-              # SGR mouse "<btn;col;rowM": wheel up=64, down=65.
-              mbtn=""
+              # SGR mouse "<btn;col;rowM": wheel up=64, down=65, left button=0.
+              # The terminator is M on press, m on release — capture it so a
+              # left-click opens a file only on press (not again on release).
+              mbtn=""; mterm=""
               while read_key 0.05; do
                 case "$KEY" in
-                  M|m) break ;;
+                  M) mterm=M; break ;;
+                  m) mterm=m; break ;;
                   *) mbtn="$mbtn$KEY" ;;
                 esac
               done
               case "${mbtn%%;*}" in
                 64) scroll=$((scroll - 3)) ;;
                 65) scroll=$((scroll + 3)) ;;
+                0)
+                  # Left-click: map the report's row (the 3rd ";"-field of
+                  # "btn;col;row") to a body line, then to a path, and float the
+                  # whole-file diff over the window.
+                  if [ "$mterm" = M ]; then
+                    mrest="${mbtn#*;}"          # "col;row"
+                    mrow="${mrest#*;}"          # "row"
+                    bl=$(body_line_for_click "$mrow" "$scroll" "$avail" "$body_total")
+                    if [ "$bl" != 0 ]; then
+                      cpath=$(printf '%s\n' "$body_map" | sed -n "${bl}p")
+                      if [ -n "$cpath" ]; then
+                        open_diff_popup "$project_dir" "$cpath"
+                        enter_ui_mode "$interactive"   # re-assert alt-screen + mouse
+                        need_build=1                   # redraw after the popup closes
+                      fi
+                    fi
+                  fi
+                  ;;
               esac
               ;;
           esac
