@@ -236,6 +236,30 @@ echo "AFTER"
 	assertContains(t, out, "AFTER")
 }
 
+func TestGhosttyAdapter_terminal_install_message_omits_removed_flag(t *testing.T) {
+	// Terminal selection was removed; ghost-tab takes no flags. The
+	// not-found message must not tell users to run a flag that now errors.
+	dir := t.TempDir()
+	fakeApps := filepath.Join(dir, "Applications")
+
+	binDir := mockCommand(t, dir, "open", `true`)
+
+	root := projectRoot(t)
+	tuiPath := filepath.Join(root, "lib", "tui.sh")
+	installPath := filepath.Join(root, "lib", "install.sh")
+	adapterPath := filepath.Join(root, "lib", "terminals", "ghostty.sh")
+	script := fmt.Sprintf(`
+source %q && source %q && source %q
+GHOSTTY_APP_PATH=%q
+terminal_install </dev/null || true
+`, tuiPath, installPath, adapterPath, filepath.Join(fakeApps, "Ghostty.app"))
+
+	env := buildEnv(t, []string{binDir})
+	out, _ := runBashSnippet(t, script, env)
+	assertNotContains(t, out, "--terminal")
+	assertContains(t, out, "ghost-tab")
+}
+
 func TestGhosttyAdapter_launch_restore(t *testing.T) {
 	dir := t.TempDir()
 	rec := filepath.Join(dir, "rec")
