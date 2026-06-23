@@ -37,9 +37,9 @@ func (m *MainMenuModel) openAccountMenu() {
 
 // enterAccountAddInput opens the inline label text input for a new login.
 func (m *MainMenuModel) enterAccountAddInput() tea.Cmd {
+	// The field is rendered manually in renderAccountMenuPanel, so this model is
+	// only the value/keystroke buffer.
 	ti := textinput.New()
-	ti.Placeholder = "Work, Personal…"
-	ti.Width = menuContentWidth - 12
 	ti.Focus()
 	m.accountMenuInput = ti
 	m.accountMenuInputMode = true
@@ -255,10 +255,20 @@ func (m *MainMenuModel) renderAccountMenuPanel() string {
 	lines = append(lines, emptyRow)
 
 	if m.accountMenuInputMode {
-		// Inline label entry for a new login.
-		lines = append(lines, pad(primaryBoldStyle.Render("Add a Claude login")))
-		lines = append(lines, pad(dimStyle.Render("Label (e.g. Work, Personal):")))
-		lines = append(lines, pad(m.accountMenuInput.View()))
+		// Inline label entry for a new login — a single labeled field that sits
+		// where the add row was, keeping the panel's vertical rhythm. The field is
+		// rendered by hand (not textinput.View) because bubbles self-pads the view
+		// to an inconsistent width that overflows the box; here the width is
+		// deterministic so pad() keeps the right border steady while typing.
+		promptStyle := lipgloss.NewStyle().Foreground(m.theme.Primary)
+		var field string
+		if v := m.accountMenuInput.Value(); v == "" {
+			field = promptStyle.Render("❯ ") + lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render("Work, Personal…")
+		} else {
+			cursor := lipgloss.NewStyle().Reverse(true).Render(" ")
+			field = promptStyle.Render("❯ ") + lipgloss.NewStyle().Foreground(lipgloss.Color("252")).Render(v) + cursor
+		}
+		lines = append(lines, pad("    "+primaryBoldStyle.Render("New login")+"   "+field))
 	} else {
 		// Add row.
 		addRow := m.accountMenuAddRow()

@@ -182,8 +182,8 @@ func TestAccountMenu_inlineInputRenders(t *testing.T) {
 	m.openAccountMenu()
 	m.updateAccountMenu(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
 	out := stripAnsi(m.renderAccountMenuPanel())
-	if !strings.Contains(out, "Label") {
-		t.Errorf("input mode should render a label prompt:\n%s", out)
+	if !strings.Contains(out, "New login") {
+		t.Errorf("input mode should render the new-login field:\n%s", out)
 	}
 }
 
