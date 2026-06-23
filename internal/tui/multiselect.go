@@ -23,7 +23,12 @@ type MultiSelectModel struct {
 	result   *MultiSelectResult
 	quitting bool
 	errorMsg string
+	btnHover bool // pointer is over the Confirm button
 }
+
+// multiSelectConfirmLabel is the clickable Confirm button text (mouse parity for
+// the Enter key).
+const multiSelectConfirmLabel = "[ Confirm ]"
 
 // NewMultiSelect creates a new multi-select model.
 // Claude is always pre-checked. Other tools are pre-checked only if installed.
@@ -74,6 +79,9 @@ func (m MultiSelectModel) Init() tea.Cmd {
 // Update implements tea.Model.
 func (m MultiSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case tea.MouseMsg:
+		return m.handleMouse(msg)
+
 	case tea.KeyMsg:
 		// Clear error on any key press (before processing the key)
 		if m.errorMsg != "" {
@@ -105,25 +113,7 @@ func (m MultiSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 
 		case tea.KeyEnter:
-			// Collect selected tools in list order
-			var selected []string
-			for i, t := range m.tools {
-				if m.checked[i] {
-					selected = append(selected, t.Name)
-				}
-			}
-
-			if len(selected) == 0 {
-				m.errorMsg = "Select at least one AI tool"
-				return m, nil
-			}
-
-			m.result = &MultiSelectResult{
-				Tools:     selected,
-				Confirmed: true,
-			}
-			m.quitting = true
-			return m, tea.Quit
+			return m, m.confirm()
 
 		case tea.KeyRunes:
 			if len(msg.Runes) == 1 {
@@ -149,6 +139,74 @@ func (m MultiSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
+	return m, nil
+}
+
+// confirm collects the checked tools, validating that at least one is picked.
+// Shared by the Enter key and the Confirm button. Returns the resulting command.
+func (m *MultiSelectModel) confirm() tea.Cmd {
+	var selected []string
+	for i, t := range m.tools {
+		if m.checked[i] {
+			selected = append(selected, t.Name)
+		}
+	}
+	if len(selected) == 0 {
+		m.errorMsg = "Select at least one AI tool"
+		return nil
+	}
+	m.result = &MultiSelectResult{Tools: selected, Confirmed: true}
+	m.quitting = true
+	return tea.Quit
+}
+
+// multiSelectConfirmRow returns the screen row of the Confirm button. The view
+// renders at the origin: title(0) blank(1) tools(2..) blank Confirm.
+func (m MultiSelectModel) multiSelectConfirmRow() int {
+	return 2 + len(m.tools) + 1
+}
+
+// handleMouse gives the multi-select pointer parity: hover moves the cursor (or
+// highlights the Confirm button), clicking a tool toggles its checkbox, clicking
+// Confirm finalizes, and the wheel scrolls.
+func (m MultiSelectModel) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+	switch msg.Button {
+	case tea.MouseButtonWheelDown:
+		m.cursor = (m.cursor + 1) % len(m.tools)
+		return m, nil
+	case tea.MouseButtonWheelUp:
+		m.cursor = (m.cursor - 1 + len(m.tools)) % len(m.tools)
+		return m, nil
+	}
+
+	toolIdx := -1
+	if i := msg.Y - 2; i >= 0 && i < len(m.tools) {
+		toolIdx = i
+	}
+	onConfirm := msg.Y == m.multiSelectConfirmRow() &&
+		msg.X >= 2 && msg.X < 2+lipgloss.Width(multiSelectConfirmLabel)
+
+	switch msg.Action {
+	case tea.MouseActionMotion:
+		m.btnHover = onConfirm
+		if toolIdx >= 0 {
+			m.cursor = toolIdx
+		}
+		return m, nil
+	case tea.MouseActionPress:
+		if msg.Button != tea.MouseButtonLeft {
+			return m, nil
+		}
+		m.errorMsg = ""
+		if onConfirm {
+			return m, m.confirm()
+		}
+		if toolIdx >= 0 {
+			m.cursor = toolIdx
+			m.checked[toolIdx] = !m.checked[toolIdx]
+		}
+		return m, nil
+	}
 	return m, nil
 }
 
@@ -196,6 +254,15 @@ func (m MultiSelectModel) View() string {
 
 		b.WriteString("\n")
 	}
+
+	// Clickable Confirm button (mouse parity for Enter); kept directly under the
+	// tool list so its row is fixed regardless of the optional error line.
+	b.WriteString("\n")
+	confirmStyle := hintStyle
+	if m.btnHover {
+		confirmStyle = selectedItemStyle.Copy().Reverse(true)
+	}
+	b.WriteString("  " + confirmStyle.Render(multiSelectConfirmLabel) + "\n")
 
 	// Error message
 	if m.errorMsg != "" {

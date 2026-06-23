@@ -37,7 +37,7 @@ func runConfigMenu(cmd *cobra.Command, args []string) error {
 	}
 	defer cleanup()
 
-	opts := append([]tea.ProgramOption{tea.WithAltScreen()}, ttyOpts...)
+	opts := append([]tea.ProgramOption{tea.WithAltScreen(), tea.WithMouseAllMotion()}, ttyOpts...)
 	p := tea.NewProgram(model, opts...)
 
 	finalModel, err := p.Run()

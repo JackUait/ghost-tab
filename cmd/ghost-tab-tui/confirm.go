@@ -35,7 +35,9 @@ func runConfirm(cmd *cobra.Command, args []string) error {
 	}
 	defer cleanup()
 
-	p := tea.NewProgram(model, ttyOpts...)
+	// Mouse enabled so the Yes/No buttons are clickable (and hoverable).
+	opts := append([]tea.ProgramOption{tea.WithMouseAllMotion()}, ttyOpts...)
+	p := tea.NewProgram(model, opts...)
 
 	finalModel, err := p.Run()
 	if err != nil {

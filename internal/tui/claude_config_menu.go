@@ -58,6 +58,8 @@ func (m ClaudeConfigMenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		return m, nil
+	case tea.MouseMsg:
+		return m.handleMouse(msg)
 	}
 
 	key, ok := msg.(tea.KeyMsg)
@@ -137,6 +139,59 @@ func (m ClaudeConfigMenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, textinput.Blink
 			}
 		}
+	}
+	return m, nil
+}
+
+// ccmRowAt maps an absolute screen row to a list index (0..len = configs, then
+// the "Add new config…" row), or -1. The box renders at the origin: top
+// border(0), padding(1), then one row per config from row 2, then the Add row.
+func (m ClaudeConfigMenuModel) ccmRowAt(y int) int {
+	row := y - 2
+	if row >= 0 && row <= m.addRowIndex() {
+		return row
+	}
+	return -1
+}
+
+// handleMouse gives the config-management list pointer parity: hover and click
+// move the cursor over a row, clicking the Add row starts a new config, and the
+// wheel scrolls. Rename/delete stay on the r/d shortcuts for the hovered row.
+func (m ClaudeConfigMenuModel) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+	if m.mode != ccmList {
+		return m, nil
+	}
+	switch msg.Button {
+	case tea.MouseButtonWheelDown:
+		if m.cursor < m.addRowIndex() {
+			m.cursor++
+		}
+		return m, nil
+	case tea.MouseButtonWheelUp:
+		if m.cursor > 0 {
+			m.cursor--
+		}
+		return m, nil
+	}
+	row := m.ccmRowAt(msg.Y)
+	if row < 0 {
+		return m, nil
+	}
+	switch msg.Action {
+	case tea.MouseActionMotion:
+		m.cursor = row
+		return m, nil
+	case tea.MouseActionPress:
+		if msg.Button == tea.MouseButtonLeft {
+			m.cursor = row
+			if row == m.addRowIndex() {
+				m.mode = ccmAddInput
+				m.input.SetValue("")
+				m.input.Focus()
+				return m, textinput.Blink
+			}
+		}
+		return m, nil
 	}
 	return m, nil
 }

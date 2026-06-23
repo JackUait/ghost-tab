@@ -78,6 +78,9 @@ func (m ConfigMenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		return m, nil
 
+	case tea.MouseMsg:
+		return m.handleMouse(msg)
+
 	case tea.KeyMsg:
 		switch msg.Type {
 		case tea.KeyCtrlC, tea.KeyEscape:
@@ -129,6 +132,55 @@ func (m ConfigMenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
+	return m, nil
+}
+
+// configMenuItemAt maps an absolute screen row to a menu item index, or -1. The
+// box renders at the screen origin (AltScreen, no centering): row 0 is the top
+// border, row 1 the top padding, then each item takes a title row, a description
+// row, and a trailing blank — so item i occupies rows 2+3i (title) and 3+3i.
+func (m ConfigMenuModel) configMenuItemAt(y int) int {
+	row := y - 2
+	if row < 0 {
+		return -1
+	}
+	if row%3 == 2 { // the blank spacer between items
+		return -1
+	}
+	i := row / 3
+	if i >= 0 && i < len(m.items) {
+		return i
+	}
+	return -1
+}
+
+// handleMouse gives the config menu pointer parity: hover moves the cursor,
+// left-click selects the item under it (the Enter action), and the wheel scrolls.
+func (m ConfigMenuModel) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+	switch msg.Button {
+	case tea.MouseButtonWheelDown:
+		m.cursor = (m.cursor + 1) % len(m.items)
+		return m, nil
+	case tea.MouseButtonWheelUp:
+		m.cursor = (m.cursor - 1 + len(m.items)) % len(m.items)
+		return m, nil
+	}
+	i := m.configMenuItemAt(msg.Y)
+	if i < 0 {
+		return m, nil
+	}
+	switch msg.Action {
+	case tea.MouseActionMotion:
+		m.cursor = i
+		return m, nil
+	case tea.MouseActionPress:
+		if msg.Button == tea.MouseButtonLeft {
+			item := m.items[i]
+			m.selected = &item
+			m.quitting = true
+			return m, tea.Quit
+		}
+	}
 	return m, nil
 }
 
