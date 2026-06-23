@@ -68,30 +68,7 @@ resolve_claude_account_dir() {
   [ -d "$path" ] && printf '%s\n' "$path"
 }
 
-# login_claude_account <config_root> <dir> — run `claude auth login` under an
-# already-registered account's isolated CLAUDE_CONFIG_DIR (browser OAuth), then
-# make it the active account. The menu registers the account inline (label entry
-# + `ghost-tab-tui claude-account add`) and exits with the "login-account" action
-# carrying <dir>; wrapper.sh calls this between menu loops to perform the
-# interactive browser login that can't run inside the alt-screen TUI.
-login_claude_account() {
-  local cfg_root="${1:-${XDG_CONFIG_HOME:-$HOME/.config}/ghost-tab}"
-  local dir="$2"
-  local accounts_dir="$cfg_root/claude-accounts"
-  local pointer_file="$cfg_root/claude-account"
-
-  if [ -z "$dir" ]; then
-    return 1
-  fi
-
-  printf '\nOpening Claude login…\n'
-  CLAUDE_CONFIG_DIR="$accounts_dir/$dir" claude auth login || \
-    printf 'Login did not complete; you can retry by switching to this account later.\n' >&2
-
-  # Make the account active so the next launch uses it.
-  set_active_claude_account "$pointer_file" "$dir"
-  return 0
-}
-
-# Account registration and removal live in Go — the single source of truth —
-# exposed as `ghost-tab-tui claude-account <action>`. See internal/claudeaccount.
+# Account registration, login, rename, and removal all live in the Go TUI (the
+# single source of truth): the login panel runs `claude auth login` in place via
+# tea.ExecProcess, so no bash helper drops out of the menu to do it. See
+# internal/tui/claude_account_menu.go and internal/claudeaccount.

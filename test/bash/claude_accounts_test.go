@@ -116,58 +116,6 @@ func TestActiveAccountName_maps_active_dir_to_list_label(t *testing.T) {
 	}
 }
 
-// login_claude_account runs `claude auth login` under an already-registered
-// account's isolated CLAUDE_CONFIG_DIR (the menu registers it inline), then makes
-// it the active account. The label entry now happens inside the TUI, so this
-// helper only performs the browser login that can't run in the alt-screen.
-func TestLoginClaudeAccount_logs_in_under_dir_and_activates(t *testing.T) {
-	dir := t.TempDir()
-	cfgRoot := filepath.Join(dir, "ghost-tab")
-	if err := os.MkdirAll(filepath.Join(cfgRoot, "claude-accounts", "work"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	// Mock claude: record argv + the inherited CLAUDE_CONFIG_DIR so the test can
-	// assert login ran under the new account.
-	bin := mockCommand(t, dir, "claude", `echo "args:$*" > "`+dir+`/claude-call"
-echo "cfgdir:$CLAUDE_CONFIG_DIR" >> "`+dir+`/claude-call"`)
-
-	env := buildEnv(t, []string{bin})
-	out, code := runBashFunc(t, "lib/claude-accounts.sh", "login_claude_account",
-		[]string{cfgRoot, "work"}, env)
-	assertExitCode(t, code, 0)
-	_ = out
-
-	// claude auth login ran under the account's config dir.
-	call, _ := os.ReadFile(filepath.Join(dir, "claude-call"))
-	if !strings.Contains(string(call), "args:auth login") {
-		t.Errorf("expected `claude auth login`, got: %q", string(call))
-	}
-	if !strings.Contains(string(call), "cfgdir:"+filepath.Join(cfgRoot, "claude-accounts", "work")) {
-		t.Errorf("login should run under the new CLAUDE_CONFIG_DIR, got: %q", string(call))
-	}
-	// The account is now active.
-	ptr := filepath.Join(cfgRoot, "claude-account")
-	if b, _ := os.ReadFile(ptr); strings.TrimSpace(string(b)) != "work" {
-		t.Errorf("new account should be active, pointer = %q", string(b))
-	}
-}
-
-// An empty dir is a no-op error (nothing to log into).
-func TestLoginClaudeAccount_empty_dir_is_noop(t *testing.T) {
-	dir := t.TempDir()
-	cfgRoot := filepath.Join(dir, "ghost-tab")
-	bin := mockCommand(t, dir, "claude", `echo ran > "`+dir+`/claude-call"`)
-	env := buildEnv(t, []string{bin})
-	_, code := runBashFunc(t, "lib/claude-accounts.sh", "login_claude_account",
-		[]string{cfgRoot, ""}, env)
-	if code == 0 {
-		t.Errorf("empty dir should return non-zero")
-	}
-	if _, err := os.Stat(filepath.Join(dir, "claude-call")); !os.IsNotExist(err) {
-		t.Errorf("claude should not be invoked with an empty dir")
-	}
-}
-
 func TestActiveAccountName_unknown_dir_falls_back_to_default(t *testing.T) {
 	dir := t.TempDir()
 	ptr := filepath.Join(dir, "claude-account")

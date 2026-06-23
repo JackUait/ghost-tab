@@ -92,7 +92,6 @@ type MainMenuResult struct {
 	TabTitle     string  `json:"tab_title,omitempty"`
 	SoundName    *string `json:"sound_name,omitempty"`
 	PanelMode    string  `json:"panel_mode,omitempty"`
-	AccountDir   string  `json:"account_dir,omitempty"` // new login's config-dir name (login-account)
 }
 
 // MenuTab identifies which top-level tab is active.
@@ -1687,6 +1686,8 @@ func (m *MainMenuModel) Init() tea.Cmd {
 // Update implements tea.Model. Handles key bindings, window resize, and animation ticks.
 func (m *MainMenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case accountLoginDoneMsg:
+		return m.handleAccountLoginDone(msg)
 	case bobTickMsg:
 		if m.ghostDisplay == "animated" {
 			m.bobPhase += bobPhaseStep

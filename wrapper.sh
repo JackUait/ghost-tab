@@ -130,14 +130,6 @@ elif [ -z "$1" ]; then
           # Loop back to menu — worktrees refresh on reload
           continue
           ;;
-        login-account)
-          # The menu registered a new login inline (label entry + account dir);
-          # run its browser OAuth here (can't run in the alt-screen TUI), then
-          # reopen the menu with the new account active.
-          # shellcheck disable=SC2154
-          login_claude_account "${XDG_CONFIG_HOME:-$HOME/.config}/ghost-tab" "$_selected_account_dir"
-          continue
-          ;;
         *)
           # settings or unknown — loop back to menu
           continue

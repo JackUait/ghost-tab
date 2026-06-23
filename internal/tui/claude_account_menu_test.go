@@ -122,9 +122,9 @@ func TestAccountMenu_aKeyOpensInlineInput(t *testing.T) {
 }
 
 // Typing a label and pressing Enter registers the login in-process (dir + list
-// entry) and exits with the login-account action carrying the new dir, so
-// wrapper.sh only runs the browser `claude auth login`.
-func TestAccountMenu_inlineSubmitRegistersAndExitsForLogin(t *testing.T) {
+// entry) and returns a command to run the interactive login in place — it stays
+// in the panel rather than exiting the menu.
+func TestAccountMenu_inlineSubmitRegistersAndStaysInPanel(t *testing.T) {
 	dir := t.TempDir()
 	accountsDir := filepath.Join(dir, "claude-accounts")
 	listFile := filepath.Join(accountsDir, "claude-accounts.list")
@@ -136,20 +136,61 @@ func TestAccountMenu_inlineSubmitRegistersAndExitsForLogin(t *testing.T) {
 	m.openAccountMenu()
 	m.updateAccountMenu(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}}) // input mode
 	m.accountMenuInput.SetValue("Work")
-	m.updateAccountMenu(tea.KeyMsg{Type: tea.KeyEnter})
+	_, cmd := m.updateAccountMenu(tea.KeyMsg{Type: tea.KeyEnter})
 
-	r := m.Result()
-	if r == nil || r.Action != "login-account" {
-		t.Fatalf("submit should exit with login-account, got %+v", r)
+	if r := m.Result(); r != nil {
+		t.Fatalf("submit must not exit the menu, got result %+v", r)
 	}
-	if r.AccountDir != "work" {
-		t.Errorf("result should carry the new dir 'work', got %q", r.AccountDir)
+	if cmd == nil {
+		t.Errorf("submit should return a command to run the inline login")
+	}
+	if !m.accountMenuOpen {
+		t.Errorf("the panel should stay open during/after login")
+	}
+	if m.accountMenuInputMode {
+		t.Errorf("the label input should be dismissed after submit")
 	}
 	if _, err := os.Stat(filepath.Join(accountsDir, "work")); err != nil {
 		t.Errorf("the account config dir should have been created: %v", err)
 	}
 	if b, _ := os.ReadFile(listFile); !strings.Contains(string(b), "Work:work") {
 		t.Errorf("registry should list the new login, got %q", string(b))
+	}
+	// The new login already appears in the list, ready to become active when the
+	// login finishes.
+	if len(m.claudeAccounts) != 1 || m.claudeAccounts[0].Dir != "work" {
+		t.Errorf("new login should show in the list immediately, got %+v", m.claudeAccounts)
+	}
+}
+
+// When the interactive login finishes, the new account becomes active and the
+// panel stays open.
+func TestAccountMenu_loginDoneActivatesAndStays(t *testing.T) {
+	dir := t.TempDir()
+	accountsDir := filepath.Join(dir, "claude-accounts")
+	listFile := filepath.Join(accountsDir, "claude-accounts.list")
+	ptr := filepath.Join(dir, "claude-account")
+	if err := os.MkdirAll(filepath.Join(accountsDir, "work"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(listFile, []byte("Work:work\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	m := acctTestMenu("claude")
+	m.SetClaudeAccountPaths(listFile, accountsDir)
+	m.SetClaudeAccountFile(ptr)
+	m.openAccountMenu()
+	m.Update(accountLoginDoneMsg{dir: "work"})
+
+	if m.CurrentClaudeAccountDir() != "work" {
+		t.Errorf("finished login should be active, got %q", m.CurrentClaudeAccountDir())
+	}
+	if !m.accountMenuOpen {
+		t.Errorf("panel should stay open after login")
+	}
+	if b, _ := os.ReadFile(ptr); strings.TrimSpace(string(b)) != "work" {
+		t.Errorf("active login should persist, got %q", string(b))
 	}
 }
 

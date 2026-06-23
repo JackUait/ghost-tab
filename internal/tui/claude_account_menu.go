@@ -3,6 +3,9 @@ package tui
 import (
 	"errors"
 	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -174,10 +177,18 @@ func (m *MainMenuModel) submitAccountInput() (tea.Model, tea.Cmd) {
 	return m.submitAccountAdd(label)
 }
 
+// accountLoginDoneMsg is delivered after the interactive `claude auth login`
+// (run via tea.ExecProcess) returns, so the panel can activate the new login and
+// stay put.
+type accountLoginDoneMsg struct {
+	dir string
+	err error
+}
+
 // submitAccountAdd registers the new login in-process (config dir + registry
-// entry) and exits with the login-account action carrying its dir, so wrapper.sh
-// runs only the interactive browser `claude auth login` that can't live inside
-// the alt-screen TUI.
+// entry), then runs the interactive browser `claude auth login` in place via
+// tea.ExecProcess so the user returns to this panel when it finishes — no drop
+// out to the bash menu loop.
 func (m *MainMenuModel) submitAccountAdd(label string) (tea.Model, tea.Cmd) {
 	if m.claudeAccountsList == "" || m.claudeAccountsDir == "" {
 		m.accountMenuErr = errors.New("login storage is not configured")
@@ -190,11 +201,46 @@ func (m *MainMenuModel) submitAccountAdd(label string) (tea.Model, tea.Cmd) {
 		m.accountMenuInputMode = false
 		return m, nil
 	}
+	// Show the new login in the list immediately; leave input mode but keep the
+	// panel open so it's there when the login returns.
+	m.SetClaudeAccounts(LoadClaudeAccountsList(m.claudeAccountsList))
 	m.accountMenuInputMode = false
-	m.accountMenuOpen = false
-	m.setActionResult("login-account")
-	m.result.AccountDir = dir
-	return m, tea.Quit
+	m.accountMenuRenameRow = -1
+	m.accountMenuErr = nil
+	return m, m.beginAccountLogin(dir)
+}
+
+// beginAccountLogin returns a command that runs `claude auth login` under the new
+// account's isolated CLAUDE_CONFIG_DIR. tea.ExecProcess releases the alt-screen
+// for the interactive OAuth and restores the TUI afterward. If `claude` isn't on
+// PATH the account is still registered (it will prompt for login on first use).
+func (m *MainMenuModel) beginAccountLogin(dir string) tea.Cmd {
+	bin, err := exec.LookPath("claude")
+	if err != nil {
+		return func() tea.Msg { return accountLoginDoneMsg{dir: dir, err: err} }
+	}
+	c := exec.Command(bin, "auth", "login")
+	c.Env = append(os.Environ(), "CLAUDE_CONFIG_DIR="+filepath.Join(m.claudeAccountsDir, dir))
+	return tea.ExecProcess(c, func(err error) tea.Msg {
+		return accountLoginDoneMsg{dir: dir, err: err}
+	})
+}
+
+// handleAccountLoginDone keeps the panel open after the interactive login. On
+// success it switches to the new login; on failure it leaves the active login
+// untouched (the account is still registered, so the user can switch to it to
+// retry) and shows a note.
+func (m *MainMenuModel) handleAccountLoginDone(msg accountLoginDoneMsg) (tea.Model, tea.Cmd) {
+	m.SetClaudeAccounts(LoadClaudeAccountsList(m.claudeAccountsList))
+	m.accountMenuOpen = true
+	m.accountMenuInputMode = false
+	if msg.err != nil {
+		m.accountMenuErr = errors.New("login didn't finish — switch to this login to retry")
+		return m, nil
+	}
+	m.SetActiveClaudeAccount(msg.dir)
+	m.persistClaudeAccount()
+	return m, nil
 }
 
 // submitAccountRename changes the highlighted login's label in place (the config
