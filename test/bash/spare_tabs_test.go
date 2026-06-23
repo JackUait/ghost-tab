@@ -163,6 +163,19 @@ func TestSpareTabs_config_tabs_are_padded(t *testing.T) {
 	assertContains(t, sl, "  +  ")               // + button padded to match
 }
 
+// Creating a new tab from the keyboard must work *inside* the spare pane, where
+// the inner tmux owns the prefix. tmux's default prefix+t is clock-mode, so the
+// inner config must rebind t to new-window (opening in the project dir) — the
+// new window then joins the existing tab list via the #{W:...} expansion. This
+// mirrors the outer prefix+t binding, so the shortcut is identical no matter
+// which pane has focus.
+func TestSpareTabs_config_keyboard_new_tab(t *testing.T) {
+	out, code := runBashFunc(t, "lib/spare-tabs.sh", "spare_tabs_config",
+		[]string{"ghost-tab", "/proj/dir", "/abs/lib/spare-tabs.sh", "gtspare_x"}, nil)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, `bind t new-window -c "/proj/dir"`)
+}
+
 // The launch command must escape the outer $TMUX guard (tmux refuses to nest
 // otherwise) and fall back to a plain shell if tmux is unavailable.
 func TestSpareTabs_launch_cmd(t *testing.T) {

@@ -54,6 +54,11 @@ set -g window-status-separator ""
 set -g window-status-format ""
 set -g window-status-current-format ""
 set -g @gt_dir "$dir"
+# Keyboard new-tab from *inside* the spare pane: the inner tmux owns the prefix
+# here, and its default prefix+t is clock-mode. Rebind t to new-window (in the
+# project dir) so the new tab joins the existing list — matching the outer
+# prefix+t binding so the shortcut works the same regardless of pane focus.
+bind t new-window -c "$dir"
 bind -n MouseDown1Status run-shell ". \"$lib\" && spare_tabs_dispatch \"$label\" \"#{mouse_status_range}\""
 bind -n MouseDown1StatusLeft run-shell ". \"$lib\" && spare_tabs_dispatch \"$label\" \"#{mouse_status_range}\""
 bind -n MouseDown1StatusRight run-shell ". \"$lib\" && spare_tabs_dispatch \"$label\" \"#{mouse_status_range}\""
