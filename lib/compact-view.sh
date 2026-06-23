@@ -214,8 +214,12 @@ split_content() {
   return 0
 }
 
-# open_diff_popup floats a whole-window tmux popup showing the WHOLE-FILE diff
-# (full context, -U999999) for the clicked path versus HEAD, piped through less.
+# open_diff_popup floats a whole-window tmux popup showing the clicked path's
+# diff versus HEAD. The whole file is fed to the pager (-U999999, full context),
+# but the pager DEFAULTS to a changes-only view — just the changed lines plus a
+# few lines of context, the rest collapsed behind a "⋯ N unchanged lines" marker
+# — with a "Full" toggle (click or 'f') to reveal the whole file. Sending the
+# full file keeps line numbers accurate and makes the toggle instant (no respawn).
 # display-popup overlays the entire client window (not just this pane) and is
 # blocking, so the ledger loop pauses until the user closes it (q/Esc). No-op
 # when tmux is unavailable. The path is shell-quoted so spaces survive.

@@ -22,16 +22,19 @@ type DiffViewModel struct {
 	status   string // "added" | "deleted" | "modified", derived from the diff
 	added    int
 	deleted  int
-	width      int // full popup (window) size; the box floats centered within it
-	height     int
-	backdrop   []string // dimmed screen snapshot shown behind the box (may be nil)
-	mode       int      // diffModeInline | diffModeSideBySide
-	modeForced bool     // true once the user picks a view (stops width auto-pick)
-	singleView bool     // whole-file add/delete: lock to inline, hide the switcher
-	viewport   viewport.Model
-	ready      bool
-	quitting   bool
-	hoverMode  int // view-switch tab under the pointer, or -1 (none)
+	width       int // full popup (window) size; the box floats centered within it
+	height      int
+	backdrop    []string // dimmed screen snapshot shown behind the box (may be nil)
+	mode        int      // diffModeInline | diffModeSideBySide
+	modeForced  bool     // true once the user picks a view (stops width auto-pick)
+	singleView  bool     // whole-file add/delete: lock to inline, hide the switcher
+	compact     bool     // true = changes-only (collapsed context); false = full file
+	collapsible bool     // true when the full diff has context worth collapsing
+	viewport    viewport.Model
+	ready       bool
+	quitting    bool
+	hoverMode   int // layout-switch tab under the pointer, or -1 (none)
+	hoverCtx    int // context-switch tab under the pointer, or -1 (none)
 }
 
 // View modes and the clickable tab labels that switch between them. The labels
@@ -45,7 +48,23 @@ const (
 	diffTabIndent     = 1
 	diffTabInlineText = "[ Inline ]"
 	diffTabSxsText    = "[ Side-by-side ]"
+	// The context (changes-only vs full) switcher sits to the right of the layout
+	// switcher, separated by a gap. Its labels have fixed widths so contextTabAt's
+	// hit-boxes stay stable.
+	diffCtxTabGap      = 4
+	diffTabChangesText = "[ Changes ]"
+	diffTabFullText    = "[ Full ]"
 )
+
+// Context-switch tab ids, returned by contextTabAt.
+const (
+	ctxTabChanges = iota
+	ctxTabFull
+)
+
+// diffContextLines is how many unchanged lines the changes-only view keeps
+// around each change (git's own default), the rest collapsed into a marker.
+const diffContextLines = 3
 
 var (
 	diffTitleStyle = lipgloss.NewStyle().
@@ -149,6 +168,10 @@ var diffAnsiSeq = regexp.MustCompile("\x1b\\[[0-9;]*m")
 // the code without competing with the diff's own green/red.
 var diffGutterStyle = lipgloss.NewStyle().Faint(true).Foreground(lipgloss.Color("240"))
 
+// diffGapRowStyle renders the "⋯ N unchanged lines" divider shown where the
+// changes-only view has collapsed a run of context.
+var diffGapRowStyle = lipgloss.NewStyle().Faint(true).Foreground(lipgloss.Color("244"))
+
 // isRemovedLine reports whether a (possibly ANSI-colored) diff line is a removal
 // (leading '-' once color is stripped). The +++/--- markers are stripped
 // upstream, so a leading '-' here is a removed file line.
@@ -166,6 +189,10 @@ func numberLines(content string) string {
 	lines := strings.Split(content, "\n")
 	maxNo := 0
 	for _, ln := range lines {
+		if cnt, ok := isGapLine(ln); ok {
+			maxNo += cnt // hidden context lines still occupy new-file numbers
+			continue
+		}
 		if ln != "" && !isRemovedLine(ln) {
 			maxNo++
 		}
@@ -179,6 +206,12 @@ func numberLines(content string) string {
 	for i, ln := range lines {
 		if i > 0 {
 			b.WriteByte('\n')
+		}
+		if cnt, ok := isGapLine(ln); ok {
+			n += cnt
+			b.WriteString(diffGutterStyle.Render(strings.Repeat(" ", width) + " │ "))
+			b.WriteString(diffGapRowStyle.Render("⋯ " + itoa(cnt) + " unchanged lines"))
+			continue
 		}
 		if ln == "" {
 			continue
@@ -248,6 +281,123 @@ func dropMarker(line string) string {
 		b.WriteString(string(rs[i+1:]))
 		break
 	}
+	return b.String()
+}
+
+// diffGapPrefix marks a synthetic "collapsed context" line. The integer that
+// follows is how many unchanged lines were hidden; the renderers use it to draw
+// a divider and to advance the line-number counters across the gap. The NUL
+// prefix can't collide with a real diff line (those start with +/-/space).
+const diffGapPrefix = "\x00GAP:"
+
+// gapLine builds the sentinel for a collapsed run of n unchanged lines.
+func gapLine(n int) string { return diffGapPrefix + itoa(n) }
+
+// isGapLine reports whether s is a gap sentinel and, if so, how many lines it
+// hides.
+func isGapLine(s string) (int, bool) {
+	if !strings.HasPrefix(s, diffGapPrefix) {
+		return 0, false
+	}
+	digits := s[len(diffGapPrefix):]
+	if digits == "" {
+		return 0, false
+	}
+	n := 0
+	for _, c := range digits {
+		if c < '0' || c > '9' {
+			return 0, false
+		}
+		n = n*10 + int(c-'0')
+	}
+	return n, true
+}
+
+// diffKeepMask classifies each diff line and marks which lines the changes-only
+// view keeps: every changed (+/-) line plus the `ctx` unchanged lines on either
+// side of it. Returns the keep flags and the per-line kinds (so callers needn't
+// re-classify).
+func diffKeepMask(lines []string, ctx int) (keep []bool, kind []int) {
+	n := len(lines)
+	keep = make([]bool, n)
+	kind = make([]int, n)
+	for i, ln := range lines {
+		kind[i], _ = classifyDiffLine(ln)
+	}
+	for i := range lines {
+		if kind[i] != diffAdd && kind[i] != diffDel {
+			continue
+		}
+		keep[i] = true
+		for d := 1; d <= ctx; d++ {
+			if i-d >= 0 {
+				keep[i-d] = true
+			}
+			if i+d < n {
+				keep[i+d] = true
+			}
+		}
+	}
+	return keep, kind
+}
+
+// hasCollapsibleContext reports whether the changes-only view would hide any
+// line: there must be at least one change to anchor context around AND at least
+// one unchanged line farther than ctx from every change. A change-less diff has
+// nothing to collapse, so it's shown in full. Used to decide whether the
+// changes/full switcher is worth showing.
+func hasCollapsibleContext(content string, ctx int) bool {
+	lines := strings.Split(content, "\n")
+	keep, kind := diffKeepMask(lines, ctx)
+	hasChange, hasHidden := false, false
+	for i := range lines {
+		switch {
+		case kind[i] == diffAdd || kind[i] == diffDel:
+			hasChange = true
+		case kind[i] == diffContext && !keep[i]:
+			hasHidden = true
+		}
+	}
+	return hasChange && hasHidden
+}
+
+// collapseContext returns the diff body with every run of unchanged context
+// farther than ctx lines from a change replaced by a single gap sentinel
+// (gapLine) encoding how many lines it hid. Changed lines, nearby context, and
+// the trailing blank line are kept verbatim.
+func collapseContext(content string, ctx int) string {
+	lines := strings.Split(content, "\n")
+	keep, kind := diffKeepMask(lines, ctx)
+
+	var b strings.Builder
+	first := true
+	hidden := 0
+	write := func(s string) {
+		if !first {
+			b.WriteByte('\n')
+		}
+		b.WriteString(s)
+		first = false
+	}
+	flushGap := func() {
+		if hidden > 0 {
+			write(gapLine(hidden))
+			hidden = 0
+		}
+	}
+	for i, ln := range lines {
+		switch {
+		case kind[i] == diffSkip: // trailing blank line: keep it, never collapse
+			flushGap()
+			write(ln)
+		case keep[i]:
+			flushGap()
+			write(ln)
+		default: // an unchanged line too far from any change: collapse it
+			hidden++
+		}
+	}
+	flushGap()
 	return b.String()
 }
 
@@ -325,8 +475,26 @@ func (m DiffViewModel) tabRow() string {
 	if m.hoverMode == diffModeSideBySide && m.mode != diffModeSideBySide {
 		sxs = diffTabHoverStyle
 	}
-	return strings.Repeat(" ", diffTabIndent) +
+	row := strings.Repeat(" ", diffTabIndent) +
 		inline.Render(diffTabInlineText) + " " + sxs.Render(diffTabSxsText)
+	if !m.collapsible {
+		return row
+	}
+	// The changes-only vs full switcher, to the right of the layout switcher.
+	changes, full := diffTabInactiveStyle, diffTabInactiveStyle
+	if m.compact {
+		changes = diffTabActiveStyle
+	} else {
+		full = diffTabActiveStyle
+	}
+	if m.hoverCtx == ctxTabChanges && !m.compact {
+		changes = diffTabHoverStyle
+	}
+	if m.hoverCtx == ctxTabFull && m.compact {
+		full = diffTabHoverStyle
+	}
+	return row + strings.Repeat(" ", diffCtxTabGap) +
+		changes.Render(diffTabChangesText) + " " + full.Render(diffTabFullText)
 }
 
 // tabAt maps a click's column (relative to the box content's left edge) to the
@@ -342,6 +510,24 @@ func tabAt(contentX int) int {
 		return diffModeInline
 	case contentX >= sxStart && contentX < sxEnd:
 		return diffModeSideBySide
+	default:
+		return -1
+	}
+}
+
+// contextTabAt maps a click's content column to the context (changes/full)
+// switcher button it lands on, or -1 if it misses both. Mirrors tabRow's layout:
+// the layout switcher, then diffCtxTabGap spaces, then Changes, a space, Full.
+func contextTabAt(contentX int) int {
+	base := diffTabIndent + len(diffTabInlineText) + 1 + len(diffTabSxsText) + diffCtxTabGap
+	changesEnd := base + len(diffTabChangesText)
+	fullStart := changesEnd + 1
+	fullEnd := fullStart + len(diffTabFullText)
+	switch {
+	case contentX >= base && contentX < changesEnd:
+		return ctxTabChanges
+	case contentX >= fullStart && contentX < fullEnd:
+		return ctxTabFull
 	default:
 		return -1
 	}
@@ -363,6 +549,11 @@ func renderSideBySide(content string, cw int) string {
 
 	oldTotal, newTotal := 0, 0
 	for _, ln := range lines {
+		if cnt, ok := isGapLine(ln); ok {
+			oldTotal += cnt
+			newTotal += cnt
+			continue
+		}
 		switch k, _ := classifyDiffLine(ln); k {
 		case diffContext:
 			oldTotal++
@@ -405,6 +596,13 @@ func renderSideBySide(content string, cw int) string {
 
 	oldNo, newNo := 0, 0
 	for _, ln := range lines {
+		if cnt, ok := isGapLine(ln); ok {
+			flush()
+			oldNo += cnt // hidden lines are unchanged context: both sides advance
+			newNo += cnt
+			rows = append(rows, diffGapRowStyle.Render("⋯ "+itoa(cnt)+" unchanged lines"))
+			continue
+		}
 		k, text := classifyDiffLine(ln)
 		switch k {
 		case diffSkip:
@@ -504,15 +702,28 @@ func diffStatus(content string) string {
 // switcher.
 func NewDiffView(title, content string) DiffViewModel {
 	added, deleted := countDiffLines(content)
+	single := isSingleSided(content)
 	return DiffViewModel{
-		title:      title,
-		content:    content,
-		added:      added,
-		deleted:    deleted,
-		status:     diffStatus(content),
-		singleView: isSingleSided(content),
-		hoverMode:  -1,
+		title:       title,
+		content:     content,
+		added:       added,
+		deleted:     deleted,
+		status:      diffStatus(content),
+		singleView:  single,
+		compact:     true,
+		collapsible: !single && hasCollapsibleContext(content, diffContextLines),
+		hoverMode:   -1,
+		hoverCtx:    -1,
 	}
+}
+
+// bodyContent is the diff body to render: collapsed (changes-only) when the view
+// is compact and there's context worth hiding, otherwise the full file.
+func (m DiffViewModel) bodyContent() string {
+	if m.compact && m.collapsible {
+		return collapseContext(m.content, diffContextLines)
+	}
+	return m.content
 }
 
 // WithBackdrop sets the dimmed screen snapshot shown behind the floating box
@@ -591,7 +802,7 @@ func (m DiffViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else if !m.modeForced {
 			m.mode = pickByWidth(cw)
 		}
-		m.viewport.SetContent(renderBodyMode(m.content, cw, m.mode))
+		m.viewport.SetContent(renderBodyMode(m.bodyContent(), cw, m.mode))
 		return m, nil
 
 	case tea.MouseMsg:
@@ -600,22 +811,32 @@ func (m DiffViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// columns offset by the left border at mh+1. Single-sided files have no
 		// switcher. Track which tab the pointer is over so it can highlight.
 		onTabRow := !m.singleView && msg.Y == mv+2
-		hovered := -1
+		hovered, hoveredCtx := -1, -1
 		if onTabRow {
 			hovered = tabAt(msg.X - (mh + 1))
+			if m.collapsible {
+				hoveredCtx = contextTabAt(msg.X - (mh + 1))
+			}
 		}
 
 		if msg.Action == tea.MouseActionMotion {
 			m.hoverMode = hovered
+			m.hoverCtx = hoveredCtx
 			return m, nil
 		}
 
 		if msg.Action == tea.MouseActionPress && msg.Button == tea.MouseButtonLeft {
-			// A click on a view-switch tab switches the mode.
+			// A click on a layout-switch tab switches the inline/side-by-side mode.
 			if hovered != -1 {
 				m.modeForced = true
 				m.mode = hovered
-				m.viewport.SetContent(renderBodyMode(m.content, cw, m.mode))
+				m.viewport.SetContent(renderBodyMode(m.bodyContent(), cw, m.mode))
+				return m, nil
+			}
+			// A click on the context switcher toggles changes-only vs full file.
+			if hoveredCtx != -1 {
+				m.compact = hoveredCtx == ctxTabChanges
+				m.viewport.SetContent(renderBodyMode(m.bodyContent(), cw, m.mode))
 				return m, nil
 			}
 			// A click in the margin outside the floating box closes the popup;
@@ -644,7 +865,7 @@ func (m DiffViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.mode = diffModeSideBySide
 			}
 			_, _, cw, _ := m.layout()
-			m.viewport.SetContent(renderBodyMode(m.content, cw, m.mode))
+			m.viewport.SetContent(renderBodyMode(m.bodyContent(), cw, m.mode))
 			return m, nil
 		case tea.KeyRunes:
 			if len(msg.Runes) == 1 {
@@ -652,6 +873,17 @@ func (m DiffViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				case 'q', 'Q':
 					m.quitting = true
 					return m, tea.Quit
+				case 'f', 'F':
+					// Toggle changes-only <-> full file. A non-collapsible diff (a
+					// whole-file add/delete, or a file with no far context) has only the
+					// one view, so f is a no-op.
+					if !m.collapsible {
+						return m, nil
+					}
+					m.compact = !m.compact
+					_, _, cw, _ := m.layout()
+					m.viewport.SetContent(renderBodyMode(m.bodyContent(), cw, m.mode))
+					return m, nil
 				case 'g':
 					m.viewport.GotoTop()
 					return m, nil
@@ -696,10 +928,18 @@ func (m DiffViewModel) View() string {
 	rule := diffRuleStyle.Render(strings.Repeat("─", maxInt(cw, 0)))
 
 	pct := int(m.viewport.ScrollPercent() * 100)
-	hints := "↑↓/jk scroll · space/b page · g/G top·end · tab view · click-out/q/Esc close"
-	if m.singleView { // no view switcher, so drop the "tab view" hint
-		hints = "↑↓/jk scroll · space/b page · g/G top·end · click-out/q/Esc close"
+	hints := "↑↓/jk scroll · space/b page · g/G top·end"
+	if !m.singleView { // modified file: the layout switcher is available
+		hints += " · tab view"
 	}
+	if m.collapsible { // far context to collapse: the changes/full switcher is available
+		if m.compact {
+			hints += " · f full"
+		} else {
+			hints += " · f changes"
+		}
+	}
+	hints += " · click-out/q/Esc close"
 	bar := diffBarStyle.Render(hints + "    " + padPercent(pct))
 
 	// A single-sided file (whole-file add/delete) shows no view switcher row.

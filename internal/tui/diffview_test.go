@@ -1,11 +1,27 @@
 package tui
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
+
+// collapsibleDiff is a modified file with long unchanged runs both before and
+// after the single changed line, so the default (changes-only) view collapses
+// the far context while the full view shows all of it.
+func collapsibleDiff() string {
+	var b strings.Builder
+	for i := 1; i <= 20; i++ {
+		fmt.Fprintf(&b, " context-%02d\n", i)
+	}
+	b.WriteString("-old line\n+new line\n")
+	for i := 21; i <= 40; i++ {
+		fmt.Fprintf(&b, " context-%02d\n", i)
+	}
+	return b.String()
+}
 
 func sampleDiff(lines int) string {
 	var b strings.Builder
@@ -596,6 +612,203 @@ func TestDiffView_preserves_ansi_color_in_content(t *testing.T) {
 	out := m.View()
 	if !strings.Contains(out, "\x1b[32m") || !strings.Contains(out, "\x1b[31m") {
 		t.Error("view should preserve the diff's ANSI color escapes")
+	}
+}
+
+// gapLine encodes a count of hidden (collapsed) context lines into a sentinel
+// line; isGapLine parses it back. The renderers use the count to keep line
+// numbers accurate across a collapsed run.
+func TestGapLine_roundtrips(t *testing.T) {
+	if n, ok := isGapLine(gapLine(7)); !ok || n != 7 {
+		t.Errorf("isGapLine(gapLine(7)) = (%d,%v), want (7,true)", n, ok)
+	}
+	if _, ok := isGapLine(" context"); ok {
+		t.Error("a normal line must not be detected as a gap")
+	}
+	if _, ok := isGapLine("+added"); ok {
+		t.Error("an added line must not be detected as a gap")
+	}
+}
+
+// collapseContext keeps every changed line plus ctx unchanged lines around it,
+// and replaces each longer run of unchanged context with a single gap sentinel
+// encoding how many lines it hid.
+func TestCollapseContext_collapses_far_context_keeps_near(t *testing.T) {
+	content := " a\n b\n c\n+X\n d\n e\n f\n"
+	got := collapseContext(content, 1)
+	lines := strings.Split(got, "\n")
+	want := []string{"\x00GAP:2", " c", "+X", " d", "\x00GAP:2", ""}
+	if len(lines) != len(want) {
+		t.Fatalf("got %d lines %q, want %d %q", len(lines), lines, len(want), want)
+	}
+	for i := range want {
+		if lines[i] != want[i] {
+			t.Errorf("line %d: got %q, want %q", i, lines[i], want[i])
+		}
+	}
+}
+
+func TestCollapseContext_noop_when_all_context_near_change(t *testing.T) {
+	content := " a\n+X\n b\n"
+	if got := collapseContext(content, 3); got != content {
+		t.Errorf("collapseContext should be a no-op when nothing is far enough to hide, got %q", got)
+	}
+}
+
+// hasCollapsibleContext reports whether collapseContext would hide any line.
+func TestHasCollapsibleContext(t *testing.T) {
+	if !hasCollapsibleContext(collapsibleDiff(), 3) {
+		t.Error("a diff with long unchanged runs should be collapsible")
+	}
+	if hasCollapsibleContext(" a\n+X\n b\n", 3) {
+		t.Error("a tiny diff with no far context should not be collapsible")
+	}
+	if hasCollapsibleContext("+a\n+b\n+c\n", 3) {
+		t.Error("a whole-file addition has no context to collapse")
+	}
+}
+
+// numberLines renders a gap sentinel as a dim "N unchanged" divider and advances
+// the new-file line counter by N so the numbers after the gap stay correct.
+func TestNumberLines_gap_advances_line_numbers(t *testing.T) {
+	content := " l1\n" + gapLine(5) + "\n l7\n"
+	out := stripA(numberLines(content))
+	lines := strings.Split(out, "\n")
+	if !strings.Contains(lines[0], "1 │") || !strings.Contains(lines[0], "l1") {
+		t.Errorf("first line should be numbered 1, got %q", lines[0])
+	}
+	if !strings.Contains(lines[1], "unchanged") || !strings.Contains(lines[1], "5") {
+		t.Errorf("gap row should advertise 5 unchanged lines, got %q", lines[1])
+	}
+	if !strings.Contains(lines[2], "7 │") || !strings.Contains(lines[2], "l7") {
+		t.Errorf("line after a 5-line gap should be numbered 7, got %q", lines[2])
+	}
+}
+
+// In side-by-side, a gap advances both the old and new line numbers (the hidden
+// lines are unchanged context, present on both sides).
+func TestRenderSideBySide_gap_advances_both_sides(t *testing.T) {
+	content := " a\n" + gapLine(4) + "\n-old\n+new\n"
+	out := stripA(renderSideBySide(content, 120))
+	if !strings.Contains(out, "unchanged") {
+		t.Errorf("side-by-side should render a gap divider, got:\n%s", out)
+	}
+	var changeRow string
+	for _, ln := range strings.Split(out, "\n") {
+		if strings.Contains(ln, "old") && strings.Contains(ln, "new") {
+			changeRow = ln
+		}
+	}
+	if changeRow == "" {
+		t.Fatalf("expected an old|new change row, got:\n%s", out)
+	}
+	// a(line1) + 4 hidden = the change is old line 6 / new line 6.
+	if !strings.Contains(changeRow, "6") {
+		t.Errorf("change row after a 4-line gap should be numbered 6, got %q", changeRow)
+	}
+}
+
+func TestNewDiffView_defaults_to_compact(t *testing.T) {
+	m := NewDiffView("f.go", collapsibleDiff())
+	if !m.compact {
+		t.Error("a fresh diff view should default to the changes-only (compact) view")
+	}
+	if !m.collapsible {
+		t.Error("a diff with far context should be marked collapsible")
+	}
+}
+
+// By default the popup shows only the changed lines plus a little context; the
+// far-away unchanged lines are hidden behind a collapse marker.
+func TestDiffView_defaults_to_changes_only_view(t *testing.T) {
+	m := sizeDiff(NewDiffView("f.go", collapsibleDiff()), 120, 30)
+	out := stripA(m.View())
+	if !strings.Contains(out, "context-20") {
+		t.Errorf("nearby context (context-20) should stay visible, got:\n%s", out)
+	}
+	if strings.Contains(out, "context-01") {
+		t.Errorf("far context (context-01) should be hidden by default, got:\n%s", out)
+	}
+	if !strings.Contains(out, "unchanged") {
+		t.Errorf("a collapse marker should advertise the hidden lines, got:\n%s", out)
+	}
+}
+
+func TestDiffView_f_key_toggles_full_context(t *testing.T) {
+	m := sizeDiff(NewDiffView("f.go", collapsibleDiff()), 120, 30)
+	if strings.Contains(stripA(m.View()), "context-01") {
+		t.Fatal("should start in the changes-only view")
+	}
+	m, _ = runeDiff(m, 'f')
+	if !strings.Contains(stripA(m.View()), "context-01") {
+		t.Errorf("f should reveal the full file context, got:\n%s", stripA(m.View()))
+	}
+	m, _ = runeDiff(m, 'f')
+	if strings.Contains(stripA(m.View()), "context-01") {
+		t.Errorf("f again should hide the far context, got:\n%s", stripA(m.View()))
+	}
+}
+
+func TestDiffView_View_shows_changes_and_full_buttons(t *testing.T) {
+	m := sizeDiff(NewDiffView("f.go", collapsibleDiff()), 200, 40)
+	out := stripA(m.View())
+	if !strings.Contains(out, "Changes") {
+		t.Errorf("view should show a Changes button, got:\n%s", out)
+	}
+	if !strings.Contains(out, "Full") {
+		t.Errorf("view should show a Full button, got:\n%s", out)
+	}
+}
+
+// Button hit boxes (content cols): Changes [32,43), Full [44,52); screen X adds
+// the left margin+border (mh+1 = 11 at width 200), tab row is screen y=4.
+func TestDiffView_click_full_button_switches_to_full(t *testing.T) {
+	m := sizeDiff(NewDiffView("f.go", collapsibleDiff()), 200, 40)
+	if strings.Contains(stripA(m.View()), "context-01") {
+		t.Fatal("should start in the changes-only view")
+	}
+	m, cmd := clickDiff(m, 58, 4) // Full button
+	if quits(cmd) || m.quitting {
+		t.Fatal("clicking a button must not close the popup")
+	}
+	if !strings.Contains(stripA(m.View()), "context-01") {
+		t.Errorf("clicking Full should reveal the full context, got:\n%s", stripA(m.View()))
+	}
+	m, _ = clickDiff(m, 46, 4) // Changes button
+	if strings.Contains(stripA(m.View()), "context-01") {
+		t.Errorf("clicking Changes should hide the far context, got:\n%s", stripA(m.View()))
+	}
+}
+
+func TestDiffView_hover_highlights_context_tab(t *testing.T) {
+	m := sizeDiff(NewDiffView("f.go", collapsibleDiff()), 200, 40)
+	updated, cmd := m.Update(tea.MouseMsg{X: 58, Y: 4, Action: tea.MouseActionMotion})
+	m = updated.(DiffViewModel)
+	if cmd != nil {
+		t.Error("hover should not emit a command")
+	}
+	if m.hoverCtx != ctxTabFull {
+		t.Errorf("hovering Full should set hoverCtx=%d, got %d", ctxTabFull, m.hoverCtx)
+	}
+}
+
+// A single-sided file (whole-file add/delete) has no context to collapse, so the
+// changes/full switcher is hidden.
+func TestDiffView_added_file_has_no_context_switcher(t *testing.T) {
+	m := sizeDiff(NewDiffView("new.go", "+a\n+b\n+c\n"), 200, 40)
+	out := stripA(m.View())
+	if strings.Contains(out, "Changes") || strings.Contains(out, "Full") {
+		t.Errorf("single-sided file should hide the context switcher, got:\n%s", out)
+	}
+}
+
+// A modified file whose every line is already near a change has nothing to
+// collapse, so the changes/full switcher is hidden.
+func TestDiffView_noncollapsible_modified_has_no_context_switcher(t *testing.T) {
+	m := sizeDiff(NewDiffView("f.go", " ctx\n-old\n+new\n"), 200, 40)
+	out := stripA(m.View())
+	if strings.Contains(out, "Changes") || strings.Contains(out, "Full") {
+		t.Errorf("a non-collapsible modified file should hide the context switcher, got:\n%s", out)
 	}
 }
 
