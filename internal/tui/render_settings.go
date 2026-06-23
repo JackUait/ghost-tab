@@ -31,6 +31,21 @@ func (m *MainMenuModel) renderSettingsItem(index int, label, stateText string, s
 		}
 		return leftBorder + washStyle.Render(prefix+strings.Repeat(" ", gap)+stateRendered+" ") + rightBorder
 	}
+	// Hovered-but-unselected row: a faint cursor marker + subtle wash marks the
+	// pointer target, matching the off-focus selected treatment so the two read
+	// as the same "this row would act" affordance.
+	if m.isHovered(regionSettings) && m.hover.index == index {
+		marker := lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Render("▌")
+		labelText := lipgloss.NewStyle().Foreground(lipgloss.Color("252")).Render(label)
+		prefix := " " + marker + labelText
+		gap := menuContentWidth - lipgloss.Width(prefix) - lipgloss.Width(stateRendered) - 1
+		if gap < 1 {
+			gap = 1
+		}
+		wash := lipgloss.NewStyle().Background(lipgloss.Color("236"))
+		return leftBorder + wash.Render(prefix+strings.Repeat(" ", gap)+stateRendered+" ") + rightBorder
+	}
+
 	prefix := "    " + label
 	gap := menuContentWidth - lipgloss.Width(prefix) - lipgloss.Width(stateRendered) - 1
 	if gap < 1 {

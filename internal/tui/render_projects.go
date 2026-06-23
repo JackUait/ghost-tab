@@ -55,7 +55,7 @@ func (m *MainMenuModel) renderTitleRow(leftBorder, rightBorder string) string {
 	// the active focus stop driven by ←/→.
 	chevronStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
 	nameStyle := primaryStyle
-	if m.focus == FocusAI {
+	if m.focus == FocusAI || m.isHovered(regionAI) {
 		chevronStyle = lipgloss.NewStyle().Foreground(m.theme.Accent)
 		nameStyle = lipgloss.NewStyle().Foreground(m.theme.Bright).Bold(true)
 	}
@@ -110,7 +110,7 @@ func (m *MainMenuModel) renderAccountRow(leftBorder, rightBorder string) string 
 		valColor = m.theme.Primary // orange for Default, mirroring the AGENT value
 	}
 	nameStyle := lipgloss.NewStyle().Foreground(valColor)
-	if m.focus == FocusAccount {
+	if m.focus == FocusAccount || m.isHovered(regionAccount) {
 		nameStyle = lipgloss.NewStyle().Foreground(m.theme.Bright).Bold(true)
 	}
 
@@ -119,7 +119,7 @@ func (m *MainMenuModel) renderAccountRow(leftBorder, rightBorder string) string 
 	// The row only renders when a managed account exists, so there is always a
 	// choice to switch between (Default + the account) — the chevrons always show.
 	chevronStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-	if m.focus == FocusAccount {
+	if m.focus == FocusAccount || m.isHovered(regionAccount) {
 		chevronStyle = lipgloss.NewStyle().Foreground(m.theme.Accent)
 	}
 	content := acctLabel + chevronStyle.Render("◂ ") + nameStyle.Render(label) + chevronStyle.Render(" ▸")
@@ -144,7 +144,7 @@ func (m *MainMenuModel) renderSubscriptionRow(leftBorder, rightBorder string) st
 	nameStyle := lipgloss.NewStyle().Foreground(valColor)
 	// When this row holds focus, brighten the name so it reads as the active
 	// ←/→ target, matching the AI switcher's focus treatment.
-	if m.focus == FocusSubscription {
+	if m.focus == FocusSubscription || m.isHovered(regionSubscription) {
 		nameStyle = lipgloss.NewStyle().Foreground(m.theme.Bright).Bold(true)
 	}
 
@@ -157,7 +157,7 @@ func (m *MainMenuModel) renderSubscriptionRow(leftBorder, rightBorder string) st
 	var content string
 	if m.subscriptionFocusable() {
 		chevronStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-		if m.focus == FocusSubscription {
+		if m.focus == FocusSubscription || m.isHovered(regionSubscription) {
 			chevronStyle = lipgloss.NewStyle().Foreground(m.theme.Accent)
 		}
 		content = planLabel + chevronStyle.Render("◂ ") + nameStyle.Render(name) + chevronStyle.Render(" ▸")
@@ -335,6 +335,13 @@ func (m *MainMenuModel) renderProjectRows(leftBorder, rightBorder string) []stri
 				rowDimStyle = moveFlashStyle
 			}
 
+			// A hovered-but-unselected project gets a faint wash so the pointer
+			// target is visible without competing with the selection cursor.
+			rowWash := lipgloss.NewStyle()
+			if !flashing && m.isHovered(regionBody) && m.hover.index == m.projectToFlatIndex(i) {
+				rowWash = selectedBgStyle
+			}
+
 			numText := rowDimStyle.Render(num)
 			truncName := TruncateMiddle(proj.Name, menuContentWidth-6-len(num))
 			nameText := rowNameStyle.Render(truncName)
@@ -353,13 +360,13 @@ func (m *MainMenuModel) renderProjectRows(leftBorder, rightBorder string) []stri
 				if gap < 1 {
 					gap = 1
 				}
-				nameLine = leftBorder + nameContent + strings.Repeat(" ", gap) + wtStyled + rightBorder
+				nameLine = leftBorder + rowWash.Render(nameContent+strings.Repeat(" ", gap)) + wtStyled + rightBorder
 			} else {
 				namePadding := menuContentWidth - lipgloss.Width(nameContent)
 				if namePadding < 0 {
 					namePadding = 0
 				}
-				nameLine = leftBorder + nameContent + strings.Repeat(" ", namePadding) + rightBorder
+				nameLine = leftBorder + rowWash.Render(nameContent+strings.Repeat(" ", namePadding)) + rightBorder
 			}
 
 			pathContent := "       " + rowDimStyle.Render(shortPath)
@@ -367,7 +374,7 @@ func (m *MainMenuModel) renderProjectRows(leftBorder, rightBorder string) []stri
 			if pathPadding < 0 {
 				pathPadding = 0
 			}
-			pathLine = leftBorder + pathContent + strings.Repeat(" ", pathPadding) + rightBorder
+			pathLine = leftBorder + rowWash.Render(pathContent+strings.Repeat(" ", pathPadding)) + rightBorder
 		}
 
 		rows = append(rows, nameLine)
@@ -420,6 +427,10 @@ func (m *MainMenuModel) renderProjectRows(leftBorder, rightBorder string) []stri
 					}
 					wtPathLine = leftBorder + selectedBgStyle.Render(pathContent+strings.Repeat(" ", pathPadding)) + rightBorder
 				} else {
+					wtWash := lipgloss.NewStyle()
+					if m.isHovered(regionBody) && m.hover.index == wtFlatIdx {
+						wtWash = selectedBgStyle
+					}
 					connStyled := neutralDimStyle.Render(connector)
 					branchText := neutralTextStyle.Render(branchDisplay)
 					content := "       " + connStyled + " " + branchText
@@ -427,14 +438,14 @@ func (m *MainMenuModel) renderProjectRows(leftBorder, rightBorder string) []stri
 					if padding < 0 {
 						padding = 0
 					}
-					wtBranchLine = leftBorder + content + strings.Repeat(" ", padding) + rightBorder
+					wtBranchLine = leftBorder + wtWash.Render(content+strings.Repeat(" ", padding)) + rightBorder
 
 					pathContent := "          " + neutralDimStyle.Render(shortWtPath)
 					pathPadding := menuContentWidth - lipgloss.Width(pathContent)
 					if pathPadding < 0 {
 						pathPadding = 0
 					}
-					wtPathLine = leftBorder + pathContent + strings.Repeat(" ", pathPadding) + rightBorder
+					wtPathLine = leftBorder + wtWash.Render(pathContent+strings.Repeat(" ", pathPadding)) + rightBorder
 				}
 				rows = append(rows, wtBranchLine)
 				rows = append(rows, wtPathLine)
@@ -456,6 +467,10 @@ func (m *MainMenuModel) renderProjectRows(leftBorder, rightBorder string) []stri
 				}
 				addWtLine = leftBorder + selectedBgStyle.Render(content+strings.Repeat(" ", padding)) + rightBorder
 			} else {
+				addWtWash := lipgloss.NewStyle()
+				if m.isHovered(regionBody) && m.hover.index == addWtFlatIdx {
+					addWtWash = selectedBgStyle
+				}
 				connStyled := neutralDimStyle.Render(addConnector)
 				addLabel := neutralDimStyle.Render("+ Add worktree")
 				content := "       " + connStyled + " " + addLabel
@@ -463,7 +478,7 @@ func (m *MainMenuModel) renderProjectRows(leftBorder, rightBorder string) []stri
 				if padding < 0 {
 					padding = 0
 				}
-				addWtLine = leftBorder + content + strings.Repeat(" ", padding) + rightBorder
+				addWtLine = leftBorder + addWtWash.Render(content+strings.Repeat(" ", padding)) + rightBorder
 			}
 			rows = append(rows, addWtLine)
 		}
@@ -481,6 +496,14 @@ func (m *MainMenuModel) renderProjectRows(leftBorder, rightBorder string) []stri
 		t, _, _ := m.ResolveItem(m.selectedItem)
 		return t == "add-project" && !m.deleteMode
 	}()
+	// The add-project row is the final flat item, so it can be hover-washed like
+	// the project rows above when the pointer is over it but it isn't selected.
+	addHovered := !addSelected && !m.deleteMode &&
+		m.isHovered(regionBody) && m.hover.index == m.TotalItems()-1
+	addWash := lipgloss.NewStyle()
+	if addHovered {
+		addWash = selectedBgStyle
+	}
 	if addSelected {
 		prefix = " " + addSel.Render("▌") + addSel.Render(label)
 	} else {
@@ -493,7 +516,7 @@ func (m *MainMenuModel) renderProjectRows(leftBorder, rightBorder string) []stri
 	if addSelected {
 		rows = append(rows, leftBorder+selectedBgStyle.Render(prefix+strings.Repeat(" ", gap))+rightBorder)
 	} else {
-		rows = append(rows, leftBorder+prefix+strings.Repeat(" ", gap)+rightBorder)
+		rows = append(rows, leftBorder+addWash.Render(prefix+strings.Repeat(" ", gap))+rightBorder)
 	}
 
 	// Hint subtitle under the label (mirrors the project path subtitle) so the
@@ -512,7 +535,7 @@ func (m *MainMenuModel) renderProjectRows(leftBorder, rightBorder string) []stri
 	if addSelected {
 		rows = append(rows, leftBorder+selectedBgStyle.Render(hintContent+strings.Repeat(" ", hintGap))+rightBorder)
 	} else {
-		rows = append(rows, leftBorder+hintContent+strings.Repeat(" ", hintGap)+rightBorder)
+		rows = append(rows, leftBorder+addWash.Render(hintContent+strings.Repeat(" ", hintGap))+rightBorder)
 	}
 
 	return rows

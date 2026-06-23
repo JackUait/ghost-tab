@@ -216,6 +216,16 @@ type MainMenuModel struct {
 	zzz                 *ZzzAnimation
 	centerOffsetY       int
 
+	// Mouse support: absolute screen coordinates of the menu box's top-left
+	// corner (the "╭"), recomputed every View so click/hover hit-testing can map
+	// pointer coordinates back to box-relative cells. hoverTab is the tab index
+	// currently under the pointer (-1 = none) so the tab bar can highlight a
+	// hovered-but-inactive tab.
+	menuOriginX int
+	menuOriginY int
+	hoverTab    int
+	hover       hitTarget
+
 	// Inline input mode (add-project or open-once)
 	inputMode    string // "", "add-project", "open-once"
 	pathInput    textinput.Model
@@ -350,6 +360,7 @@ func NewMainMenu(projects []models.Project, aiTools []string, currentAI string, 
 		moveFlashIdx:              -1,
 		staleConfirmIdx:           -1,
 		defaultAccountLabel:       "Default",
+		hoverTab:                  -1,
 	}
 }
 
@@ -1780,21 +1791,7 @@ func (m *MainMenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.MouseMsg:
 		// Reset sleep state on any mouse activity
 		m.Wake()
-
-		if msg.Button == tea.MouseButtonLeft && msg.Action == tea.MouseActionPress {
-			item := m.MapRowToItem(msg.Y - m.centerOffsetY)
-			if item >= 0 {
-				if m.selectedItem == item {
-					// Already selected, activate (double-click-like behavior)
-					if cmd := m.selectCurrent(); cmd != nil {
-						return m, cmd
-					}
-					return m, tea.Quit
-				}
-				m.selectedItem = item
-			}
-		}
-		return m, nil
+		return m.handleMouse(msg)
 
 	case tea.KeyMsg:
 		// Reset sleep state on any keypress
@@ -3312,14 +3309,36 @@ func (m *MainMenuModel) View() string {
 		content = menuBox
 	}
 
+	// Locate the menu box's top-left corner within the (possibly ghost-padded)
+	// content so mouse hit-testing can map absolute pointer coordinates to box
+	// cells. The box is the left column in the "side" layout and centered under
+	// the ghost in the "above" layout.
+	var boxRelX, boxRelY int
+	switch ghostPosition {
+	case "above":
+		boxRelY = strings.Count(content, "\n") + 1 - (strings.Count(menuBox, "\n") + 1)
+		if cw := lipgloss.Width(content); cw > menuBoxWidth {
+			boxRelX = (cw - menuBoxWidth) / 2
+		}
+	}
+
 	if m.width > 0 && m.height > 0 {
+		contentWidth := lipgloss.Width(content)
 		contentHeight := strings.Count(content, "\n") + 1
 		m.centerOffsetY = (m.height - contentHeight) / 2
 		if m.centerOffsetY < 0 {
 			m.centerOffsetY = 0
 		}
+		placedLeft := (m.width - contentWidth) / 2
+		if placedLeft < 0 {
+			placedLeft = 0
+		}
+		m.menuOriginX = placedLeft + boxRelX
+		m.menuOriginY = m.centerOffsetY + boxRelY
 		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, content)
 	}
 	m.centerOffsetY = 0
+	m.menuOriginX = boxRelX
+	m.menuOriginY = boxRelY
 	return content
 }

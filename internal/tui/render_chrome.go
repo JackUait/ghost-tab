@@ -76,11 +76,18 @@ func (m *MainMenuModel) renderTabBar(leftBorder, rightBorder string) string {
 		return activeStyle.Render("[" + label + "]")
 	}
 
+	// A hovered-but-inactive tab brightens and underlines so the pointer target
+	// reads as clickable without disturbing which tab is actually active.
+	hoverStyle := lipgloss.NewStyle().Foreground(m.theme.Bright).Underline(true)
+
 	var parts []string
 	for i, label := range menuTabLabels {
-		if MenuTab(i) == m.activeTab {
+		switch {
+		case MenuTab(i) == m.activeTab:
 			parts = append(parts, renderActive(label))
-		} else {
+		case i == m.hoverTab:
+			parts = append(parts, hoverStyle.Render(" "+label+" "))
+		default:
 			parts = append(parts, inactiveStyle.Render(" "+label+" "))
 		}
 	}

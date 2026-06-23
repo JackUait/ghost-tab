@@ -129,7 +129,9 @@ func runMainMenu(cmd *cobra.Command, args []string) error {
 	defer cleanup()
 
 	appModel := tui.NewAppModel(model)
-	opts := append([]tea.ProgramOption{tea.WithAltScreen(), tea.WithMouseCellMotion()}, ttyOpts...)
+	// All-motion (not just cell-motion) so hover events arrive without a button
+	// held down — the main menu highlights whatever the pointer is over.
+	opts := append([]tea.ProgramOption{tea.WithAltScreen(), tea.WithMouseAllMotion()}, ttyOpts...)
 	p := tea.NewProgram(appModel, opts...)
 
 	finalModel, err := p.Run()
