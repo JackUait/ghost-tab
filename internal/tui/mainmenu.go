@@ -1000,15 +1000,10 @@ func (m *MainMenuModel) CurrentClaudeAccountDir() string {
 }
 
 // accountFocusable reports whether the LOGIN/account row is a reachable focus
-// stop. It always is: even with no managed accounts the row hosts the
-// Enter-to-add-login affordance, so it must be reachable via ↑.
+// stop. It is shown — and thus focusable — only once the user has a managed
+// account beyond the implicit Default login. Adding the first account is done
+// with the always-available 'L' key, since the row is hidden until then.
 func (m *MainMenuModel) accountFocusable() bool {
-	return true
-}
-
-// accountHasChoices reports whether there is a managed account to switch to
-// beyond the implicit Default — i.e. whether the cycle chevrons should render.
-func (m *MainMenuModel) accountHasChoices() bool {
 	return len(m.claudeAccounts) > 0
 }
 
@@ -2068,6 +2063,12 @@ func (m *MainMenuModel) handleRune(r rune) (tea.Model, tea.Cmd) {
 		return m.enterInputMode("open-once")
 	case 'p', 'P':
 		m.setActionResult("plain-terminal")
+		return m, tea.Quit
+	case 'l', 'L':
+		// Add a native Claude login. Always available (the LOGIN switcher row is
+		// hidden until at least one managed account exists), so this is the entry
+		// point for the first account. wrapper.sh runs `claude auth login`.
+		m.setActionResult("add-account")
 		return m, tea.Quit
 	case 'w', 'W':
 		m.ToggleWorktreesAtCursor()

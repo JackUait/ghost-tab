@@ -85,12 +85,16 @@ func (m *MainMenuModel) subscriptionRowCount() int {
 	return 0
 }
 
-// accountRowCount returns 1 — the LOGIN/account line is always shown as a peer
-// of the AGENT and PLAN rows (each of which renders even with a single choice).
-// It renders in every tab's header chrome, so all layout math (height, scroll
-// header, click mapping) adds it to keep the body rows aligned.
+// accountRowCount returns 1 when the LOGIN/account line is shown, else 0. The
+// row appears only once the user has a real choice — i.e. at least one managed
+// account beyond the implicit Default login — so a single-account user sees no
+// extra row. When shown it renders in every tab's header chrome, so all layout
+// math (height, scroll header, click mapping) adds it to keep body rows aligned.
 func (m *MainMenuModel) accountRowCount() int {
-	return 1
+	if len(m.claudeAccounts) > 0 {
+		return 1
+	}
+	return 0
 }
 
 // renderAccountRow renders the active native Claude login, left-aligned at the
@@ -112,19 +116,13 @@ func (m *MainMenuModel) renderAccountRow(leftBorder, rightBorder string) string 
 
 	labelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
 	acctLabel := labelStyle.Render("LOGIN ")
-	// Chevrons appear only when there is a managed account to switch to (mirrors
-	// the PLAN row, which hides them when only Standard exists). The row stays a
-	// focus stop regardless so Enter can launch the add-login flow.
-	var content string
-	if m.accountHasChoices() {
-		chevronStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-		if m.focus == FocusAccount {
-			chevronStyle = lipgloss.NewStyle().Foreground(m.theme.Accent)
-		}
-		content = acctLabel + chevronStyle.Render("◂ ") + nameStyle.Render(label) + chevronStyle.Render(" ▸")
-	} else {
-		content = acctLabel + nameStyle.Render(label)
+	// The row only renders when a managed account exists, so there is always a
+	// choice to switch between (Default + the account) — the chevrons always show.
+	chevronStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
+	if m.focus == FocusAccount {
+		chevronStyle = lipgloss.NewStyle().Foreground(m.theme.Accent)
 	}
+	content := acctLabel + chevronStyle.Render("◂ ") + nameStyle.Render(label) + chevronStyle.Render(" ▸")
 
 	pad := menuContentWidth - lipgloss.Width(content) - 1 // -1 for leading space
 	if pad < 1 {
@@ -569,7 +567,7 @@ func (m *MainMenuModel) focusHint() string {
 		case TabStats:
 			return "↑↓ scroll · ↑ sections"
 		default: // projects
-			return "↑↓ move · ↵ open · ↑ sections · O open once · P plain mode"
+			return "↑↓ move · ↵ open · ↑ sections · O open once · P plain · L login"
 		}
 	}
 }
