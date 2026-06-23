@@ -279,11 +279,13 @@ type MainMenuModel struct {
 	claudeConfigsDir  string         // directory holding the settings JSON files
 
 	// Claude account (native login) selection state
-	claudeAccounts     []ClaudeAccount // Default is implicit index 0, not stored here
-	selectedAccount    int             // 0 = Default, 1.. = claudeAccounts[i-1]
-	claudeAccountFile  string          // pointer file path for persistence
-	claudeAccountsList string          // label:dir list file path (for mutations)
-	claudeAccountsDir  string          // directory holding the per-account config dirs
+	claudeAccounts         []ClaudeAccount // Default is implicit index 0, not stored here
+	selectedAccount        int             // 0 = Default, 1.. = claudeAccounts[i-1]
+	claudeAccountFile      string          // pointer file path for persistence
+	claudeAccountsList     string          // label:dir list file path (for mutations)
+	claudeAccountsDir      string          // directory holding the per-account config dirs
+	defaultAccountLabel    string          // display label for the implicit Default login
+	claudeDefaultLabelFile string          // file persisting the Default login's label
 
 	// Login-management panel, opened from the LOGIN row (mirrors the model-map
 	// panel that Plan opens). Lists Default + managed logins + an add row.
@@ -292,7 +294,7 @@ type MainMenuModel struct {
 	accountMenuConfirm   bool // delete confirmation showing for the cursor login
 	accountMenuInputMode bool // inline label entry (add or rename) is showing
 	accountMenuInput     textinput.Model
-	accountMenuRenameIdx int // -1 = adding a login; >=0 = renaming claudeAccounts[idx]
+	accountMenuRenameRow int // -1 = adding a login; 0 = renaming Default; 1..len = renaming a managed login (cursor row)
 	accountMenuErr       error
 
 	// Model mapping panel for non-Standard configs
@@ -348,6 +350,7 @@ func NewMainMenu(projects []models.Project, aiTools []string, currentAI string, 
 		worktreePendingProjectIdx: -1,
 		moveFlashIdx:              -1,
 		staleConfirmIdx:           -1,
+		defaultAccountLabel:       "Default",
 	}
 }
 
@@ -1015,10 +1018,29 @@ func (m *MainMenuModel) SetActiveClaudeAccount(dir string) {
 // CurrentClaudeAccountLabel returns the active account's display label.
 func (m *MainMenuModel) CurrentClaudeAccountLabel() string {
 	if m.selectedAccount <= 0 || m.selectedAccount > len(m.claudeAccounts) {
-		return "Default"
+		return m.DefaultAccountLabel()
 	}
 	return m.claudeAccounts[m.selectedAccount-1].Label
 }
+
+// DefaultAccountLabel returns the display label for the implicit Default login.
+func (m *MainMenuModel) DefaultAccountLabel() string {
+	if m.defaultAccountLabel == "" {
+		return "Default"
+	}
+	return m.defaultAccountLabel
+}
+
+// SetClaudeDefaultLabel sets the implicit Default login's display label.
+func (m *MainMenuModel) SetClaudeDefaultLabel(label string) {
+	if label == "" {
+		label = "Default"
+	}
+	m.defaultAccountLabel = label
+}
+
+// SetClaudeDefaultLabelFile records where the Default login's label is persisted.
+func (m *MainMenuModel) SetClaudeDefaultLabelFile(path string) { m.claudeDefaultLabelFile = path }
 
 // CurrentClaudeAccountDir returns the active account's dir name ("" for Default).
 func (m *MainMenuModel) CurrentClaudeAccountDir() string {
@@ -1174,6 +1196,12 @@ func LoadClaudeAccountsList(path string) []ClaudeAccount {
 // ("" if none/default).
 func ReadActiveClaudeAccount(path string) string {
 	return claudeaccount.GetActive(path)
+}
+
+// ReadDefaultAccountLabel returns the implicit Default login's custom label, or
+// "Default" if none is set.
+func ReadDefaultAccountLabel(path string) string {
+	return claudeaccount.GetDefaultLabel(path)
 }
 
 // CycleGhostDisplay cycles through ghost display modes: animated -> static -> none -> animated.

@@ -173,6 +173,40 @@ func TestRename_unknown_dir_is_noop(t *testing.T) {
 	}
 }
 
+func TestDefaultLabel_get_set_and_revert(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "claude-account-default-label")
+
+	// Absent → "Default".
+	if got := GetDefaultLabel(file); got != "Default" {
+		t.Fatalf("absent default label should be %q, got %q", "Default", got)
+	}
+	// Set a custom label.
+	if err := SetDefaultLabel(file, "Personal"); err != nil {
+		t.Fatal(err)
+	}
+	if got := GetDefaultLabel(file); got != "Personal" {
+		t.Errorf("got %q, want %q", got, "Personal")
+	}
+	// Empty reverts (removes the file) back to "Default".
+	if err := SetDefaultLabel(file, ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(file); !os.IsNotExist(err) {
+		t.Errorf("empty label should remove the file")
+	}
+	if got := GetDefaultLabel(file); got != "Default" {
+		t.Errorf("after revert, got %q, want %q", got, "Default")
+	}
+	// The literal "Default" also reverts (no point storing the fallback).
+	if err := SetDefaultLabel(file, "Default"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(file); !os.IsNotExist(err) {
+		t.Errorf("storing the fallback label should not create a file")
+	}
+}
+
 func TestResolveDir_existing_vs_missing_vs_default(t *testing.T) {
 	dir := t.TempDir()
 	accountsDir := filepath.Join(dir, "claude-accounts")

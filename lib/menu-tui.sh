@@ -70,6 +70,7 @@ select_project_interactive() {
   cmd_args+=("--claude-account-file" "$gt_config_dir/claude-account")
   cmd_args+=("--claude-accounts-list" "$gt_config_dir/claude-accounts.list")
   cmd_args+=("--claude-accounts-dir" "$gt_config_dir/claude-accounts")
+  cmd_args+=("--claude-default-label-file" "$gt_config_dir/claude-account-default-label")
   if [ -n "${_update_version:-}" ]; then
     cmd_args+=("--update-version" "$_update_version")
   fi

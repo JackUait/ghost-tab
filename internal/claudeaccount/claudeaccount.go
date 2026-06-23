@@ -138,6 +138,37 @@ func Add(listFile, accountsDir, label string) (string, error) {
 	return dir, nil
 }
 
+// GetDefaultLabel returns the custom display label for the implicit Default
+// login (the standard ~/.claude Keychain login), or "Default" if none is set.
+func GetDefaultLabel(file string) string {
+	data, err := os.ReadFile(file)
+	if err != nil {
+		return "Default"
+	}
+	v := strings.TrimSpace(string(data))
+	if v == "" {
+		return "Default"
+	}
+	return v
+}
+
+// SetDefaultLabel writes a custom display label for the Default login. An empty
+// label, or the literal fallback "Default", removes the file (there is no point
+// storing the default name).
+func SetDefaultLabel(file, label string) error {
+	label = strings.TrimSpace(label)
+	if label == "" || label == "Default" {
+		if err := os.Remove(file); err != nil && !os.IsNotExist(err) {
+			return err
+		}
+		return nil
+	}
+	if err := os.MkdirAll(filepath.Dir(file), 0755); err != nil {
+		return err
+	}
+	return os.WriteFile(file, []byte(label+"\n"), 0644)
+}
+
 // Rename changes the display label of the account whose dir matches, leaving the
 // config directory (and its login) untouched. It is a no-op if no line matches.
 // The dir name is the stable identifier; only the label changes.

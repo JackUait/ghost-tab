@@ -203,14 +203,47 @@ func TestAccountMenu_rKeyOpensRenameInput(t *testing.T) {
 	}
 }
 
-// 'r' on Default is a no-op — the implicit login has no editable label.
-func TestAccountMenu_rKeyOnDefaultNoop(t *testing.T) {
+// 'r' on Default opens the rename field too, prefilled with its current label.
+func TestAccountMenu_rKeyOnDefaultOpensRename(t *testing.T) {
 	m := acctTestMenu("claude")
 	m.SetClaudeAccounts([]ClaudeAccount{{Label: "Work", Dir: "work"}})
 	m.openAccountMenu() // cursor on Default (0)
 	m.updateAccountMenu(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'r'}})
+	if !m.accountMenuInputMode {
+		t.Fatalf("Default login should be renamable")
+	}
+	if m.accountMenuInput.Value() != "Default" {
+		t.Errorf("rename field should prefill the current default label, got %q", m.accountMenuInput.Value())
+	}
+}
+
+// Renaming Default updates its label everywhere and persists it.
+func TestAccountMenu_renameDefaultUpdatesLabel(t *testing.T) {
+	dir := t.TempDir()
+	labelFile := filepath.Join(dir, "claude-account-default-label")
+	m := acctTestMenu("claude")
+	m.SetClaudeDefaultLabelFile(labelFile)
+	m.openAccountMenu() // cursor on Default (0)
+	m.updateAccountMenu(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'r'}})
+	m.accountMenuInput.SetValue("Personal")
+	m.updateAccountMenu(tea.KeyMsg{Type: tea.KeyEnter})
+
 	if m.accountMenuInputMode {
-		t.Errorf("Default login must not be renamable")
+		t.Errorf("submitting should leave input mode")
+	}
+	if !m.accountMenuOpen {
+		t.Errorf("renaming Default should stay in the panel")
+	}
+	// selectedAccount is 0 (Default), so the active label is the new one.
+	if m.CurrentClaudeAccountLabel() != "Personal" {
+		t.Errorf("Default label should now be 'Personal', got %q", m.CurrentClaudeAccountLabel())
+	}
+	out := stripAnsi(m.renderAccountMenuPanel())
+	if !strings.Contains(out, "Personal") || strings.Contains(out, "Default ") {
+		t.Errorf("panel should show the renamed Default:\n%s", out)
+	}
+	if b, _ := os.ReadFile(labelFile); strings.TrimSpace(string(b)) != "Personal" {
+		t.Errorf("default label should persist to disk, got %q", string(b))
 	}
 }
 
