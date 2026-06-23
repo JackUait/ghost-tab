@@ -16,6 +16,20 @@ marker_age() {
   echo $(( now - mtime ))
 }
 
+# Return success (0) if the captured Claude pane content shows Claude is
+# actively working rather than waiting for the user. Claude's TUI renders a
+# spinner status line while generating — a gerund with an elapsed timer
+# ("Clauding… (7m 56s …"), a live token counter ("↓ 28.1k tokens"), or an
+# "esc to interrupt" hint. None of these are present once Claude is idle.
+# The match is gerund-agnostic and fails safe: if a future Claude Code build
+# changes the spinner, detection simply stops suppressing (degrades to the
+# old over-notify behavior) rather than going silent.
+# Usage: claude_pane_working <content>
+claude_pane_working() {
+  local content="$1"
+  printf '%s\n' "$content" | grep -qE '↓ [0-9]|esc to interrupt|… \([0-9]'
+}
+
 # Check if the AI tool is waiting for user input.
 # Usage: check_ai_tool_state <ai_tool> <session_name> <tmux_cmd> <marker_file> <pane_index>
 # Outputs "waiting" or "active".
@@ -24,14 +38,22 @@ check_ai_tool_state() {
   local pane_index="${5:-3}"
 
   if [ "$ai_tool" = "claude" ]; then
-    # Claude uses marker-file-only detection.
-    # Stop hook creates the marker (Claude stopped generating).
-    # UserPromptSubmit hook removes it (user answered).
-    # PreToolUse hook also removes it (Claude is calling tools).
-    if [ -f "$marker_file" ]; then
-      echo "waiting"
-    else
+    # The Stop hook creates the marker, UserPromptSubmit/PreToolUse remove it.
+    # But the marker alone is not enough: the Stop hook also fires during
+    # mid-turn "thinking" gaps after tool completions, and when a blocking
+    # Stop hook makes Claude continue — leaving the marker present while
+    # Claude is still working. Confirm against the live pane: marker present
+    # AND no working spinner means Claude is genuinely waiting for the user.
+    if [ ! -f "$marker_file" ]; then
       echo "active"
+    else
+      local content
+      content="$("$tmux_cmd" capture-pane -t "$session_name:0.$pane_index" -p 2>/dev/null | tail -n 15 || true)"
+      if claude_pane_working "$content"; then
+        echo "active"
+      else
+        echo "waiting"
+      fi
     fi
   else
     local content last_line
@@ -105,31 +127,14 @@ start_tab_title_watcher() {
       state=$(check_ai_tool_state "$ai_tool" "$session_name" "$tmux_cmd" "$marker_file" "$ai_pane")
 
       if [ "$state" = "waiting" ] && [ "$was_waiting" = false ]; then
-        # Debounce: only notify if marker has existed long enough.
-        # After tool completions (subagent results, file writes, etc.),
-        # Claude thinks for 2-15+ seconds before acting. A PostToolUse
-        # hook creates a cooldown file to signal this window. When the
-        # cooldown file exists and is < 30s old, we use a longer 15s
-        # debounce to avoid false notifications. Otherwise, use the
-        # normal 1s debounce for genuine idle detection.
-        local age debounce_threshold=1
+        # Debounce: require the marker to persist for ~1s before notifying.
+        # check_ai_tool_state already filters active work via the pane
+        # spinner, so this only guards the sub-second race where a Stop fires
+        # an instant before Claude resumes and the pane reflects it. No
+        # cooldown/extended debounce — that delayed genuine notifications.
+        local age
         age=$(marker_age "$marker_file") || continue
-        local ask_file="${marker_file}-ask"
-        if [ -f "$ask_file" ]; then
-          # AskUserQuestion detected — definitive user-input-needed signal.
-          # Use short debounce regardless of cooldown.
-          debounce_threshold=1
-        else
-          local cooldown_file="${marker_file}-cooldown"
-          if [ -f "$cooldown_file" ]; then
-            local cooldown_age
-            cooldown_age=$(marker_age "$cooldown_file") || true
-            if [ -n "$cooldown_age" ] && [ "$cooldown_age" -lt 30 ]; then
-              debounce_threshold=15
-            fi
-          fi
-        fi
-        if [ "$age" -ge "$debounce_threshold" ]; then
+        if [ "$age" -ge 1 ]; then
           apply_tab_title "waiting" "$tab_title_setting" "$project_name" "$ai_tool"
           if [[ -n "$config_dir" ]]; then
             play_notification_sound "$ai_tool" "$config_dir"

@@ -44,9 +44,10 @@ exit 0
 	}
 }
 
-func TestTabTitleWatcher_check_ai_tool_state_claude_marker_only_no_pane_check(t *testing.T) {
-	// Claude detection is marker-only. Even without a prompt in the pane,
-	// marker existing means Stop hook fired → Claude is waiting.
+func TestTabTitleWatcher_check_ai_tool_state_claude_waiting_when_marker_and_no_spinner(t *testing.T) {
+	// Detection requires the marker AND no working spinner in the pane. Pane
+	// text without a recognized spinner indicator (no token counter, no
+	// gerund timer, no "esc to interrupt") counts as idle → "waiting".
 	tmpDir := t.TempDir()
 	markerFile := filepath.Join(tmpDir, "marker")
 	os.WriteFile(markerFile, []byte(""), 0644)
@@ -67,6 +68,110 @@ exit 0
 	assertExitCode(t, code, 0)
 	if strings.TrimSpace(out) != "waiting" {
 		t.Errorf("expected 'waiting' (marker exists = Claude idle), got %q", strings.TrimSpace(out))
+	}
+}
+
+// --- Claude pane-aware suppression (working-spinner detection) ---
+
+// claudePaneMock returns a mock-tmux body whose capture-pane prints the given
+// pane content. Used to simulate Claude's TUI in working vs idle states.
+func claudePaneMock(content string) string {
+	return fmt.Sprintf(`
+if [ "$1" = "capture-pane" ]; then
+  cat <<'PANE_EOF'
+%s
+PANE_EOF
+  exit 0
+fi
+exit 0
+`, content)
+}
+
+func TestTabTitleWatcher_check_ai_tool_state_claude_suppresses_when_pane_shows_working_spinner(t *testing.T) {
+	// Marker exists (Stop fired) BUT the pane shows Claude actively working
+	// (spinner line with live token counter). This is a mid-turn "thinking"
+	// gap, not a genuine idle — must report "active" so no sound fires.
+	tmpDir := t.TempDir()
+	markerFile := filepath.Join(tmpDir, "marker")
+	os.WriteFile(markerFile, []byte(""), 0644)
+
+	working := "" +
+		"⏺ Let me check the files.\n" +
+		"✢ Clauding… (7m 56s · ↓ 28.1k tokens · thought for 3s)\n" +
+		"                                              ◎ /goal active (8m)\n" +
+		"────────────────────────────\n" +
+		"❯ \n" +
+		"────────────────────────────\n" +
+		"  ghost-tab | Opus 4.8 (1M context) [high]\n"
+
+	binDir := mockCommand(t, tmpDir, "tmux", claudePaneMock(working))
+	env := buildEnv(t, []string{binDir})
+	tmuxPath := filepath.Join(binDir, "tmux")
+
+	snippet := tabTitleSnippet(t,
+		fmt.Sprintf(`check_ai_tool_state "claude" "dev-test-123" %q %q`, tmuxPath, markerFile))
+
+	out, code := runBashSnippet(t, snippet, env)
+	assertExitCode(t, code, 0)
+	if strings.TrimSpace(out) != "active" {
+		t.Errorf("expected 'active' (pane shows working spinner = not genuinely idle), got %q", strings.TrimSpace(out))
+	}
+}
+
+func TestTabTitleWatcher_check_ai_tool_state_claude_waiting_when_marker_and_pane_idle(t *testing.T) {
+	// Marker exists AND the pane shows no working spinner (just the finished
+	// response and an idle input box) — Claude is genuinely waiting for the
+	// user. Must report "waiting" so the sound fires.
+	tmpDir := t.TempDir()
+	markerFile := filepath.Join(tmpDir, "marker")
+	os.WriteFile(markerFile, []byte(""), 0644)
+
+	idle := "" +
+		"⏺ All done — the fix is in place and tests pass.\n" +
+		"────────────────────────────\n" +
+		"❯ \n" +
+		"────────────────────────────\n" +
+		"  ghost-tab | Opus 4.8 (1M context) [high]\n"
+
+	binDir := mockCommand(t, tmpDir, "tmux", claudePaneMock(idle))
+	env := buildEnv(t, []string{binDir})
+	tmuxPath := filepath.Join(binDir, "tmux")
+
+	snippet := tabTitleSnippet(t,
+		fmt.Sprintf(`check_ai_tool_state "claude" "dev-test-123" %q %q`, tmuxPath, markerFile))
+
+	out, code := runBashSnippet(t, snippet, env)
+	assertExitCode(t, code, 0)
+	if strings.TrimSpace(out) != "waiting" {
+		t.Errorf("expected 'waiting' (marker + idle pane = genuinely waiting), got %q", strings.TrimSpace(out))
+	}
+}
+
+func TestTabTitleWatcher_claude_pane_working_detects_indicators(t *testing.T) {
+	tests := []struct {
+		name string
+		line string
+		want string // "0" = working (true), "1" = not working
+	}{
+		{"token counter", "· Deliberating… (8m 34s · ↓ 34.1k tokens)", "0"},
+		{"gerund timer", "✶ Cascading… (5m 19s · thinking more)", "0"},
+		{"esc to interrupt", "Working (esc to interrupt)", "0"},
+		{"idle response prose", "⏺ Here are the results, all done.", "1"},
+		{"empty prompt", "❯ ", "1"},
+		{"statusline", "  ghost-tab | 10.0% | Opus 4.8 (1M context) [high]", "1"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// claude_pane_working returns 0 (true) when the content shows a
+			// working indicator, non-zero otherwise.
+			snippet := tabTitleSnippet(t,
+				fmt.Sprintf(`if claude_pane_working %q; then echo 0; else echo 1; fi`, tt.line))
+			out, code := runBashSnippet(t, snippet, nil)
+			assertExitCode(t, code, 0)
+			if strings.TrimSpace(out) != tt.want {
+				t.Errorf("claude_pane_working(%q) = %q, want %q", tt.line, strings.TrimSpace(out), tt.want)
+			}
+		})
 	}
 }
 
@@ -384,14 +489,13 @@ func TestTabTitleWatcher_watcher_uses_stop_hook_with_marker_age_debounce(t *test
 	if !strings.Contains(content, "discover_ai_pane") {
 		t.Error("watcher should use discover_ai_pane for dynamic pane discovery")
 	}
-
-	// Should use cooldown file for extended debounce after tool use
-	if !strings.Contains(content, "cooldown") {
-		t.Error("watcher should use cooldown file to extend debounce after tool completions")
-	}
 }
 
-func TestTabTitleWatcher_watcher_uses_extended_debounce_when_cooldown_present(t *testing.T) {
+func TestTabTitleWatcher_watcher_suppresses_active_work_via_pane_check(t *testing.T) {
+	// The watcher no longer relies on a cooldown / 15s extended debounce to
+	// filter mid-turn "thinking" noise — that delayed genuine notifications.
+	// Instead check_ai_tool_state confirms idleness against the live pane via
+	// claude_pane_working, and the loop uses a single short debounce.
 	root := projectRoot(t)
 	watcherPath := filepath.Join(root, "lib", "tab-title-watcher.sh")
 	data, err := os.ReadFile(watcherPath)
@@ -400,15 +504,14 @@ func TestTabTitleWatcher_watcher_uses_extended_debounce_when_cooldown_present(t 
 	}
 	content := string(data)
 
-	// The watcher should check for a cooldown file (marker_file + "-cooldown")
-	if !strings.Contains(content, "-cooldown") {
-		t.Error("watcher should reference cooldown file suffix (-cooldown)")
+	// Should suppress active work via the pane working-spinner check.
+	if !strings.Contains(content, "claude_pane_working") {
+		t.Error("watcher should use claude_pane_working to confirm idleness against the pane")
 	}
 
-	// When cooldown is active, debounce should be significantly longer than 1 second
-	// to filter out subagent completion noise
-	if !strings.Contains(content, "cooldown") {
-		t.Error("watcher should contain cooldown logic for extended debounce")
+	// Should NOT use a 15s extended debounce threshold anymore.
+	if strings.Contains(content, "debounce_threshold=15") {
+		t.Error("watcher should no longer use a 15s extended debounce (caused late notifications)")
 	}
 }
 
