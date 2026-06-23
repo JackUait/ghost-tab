@@ -63,9 +63,14 @@ func (m *MainMenuModel) renderSettingsBox() string {
 
 	var lines []string
 
-	// Shared chrome: top border + title row + switcher gap + tab bar + separator
+	// Shared chrome: top border + title row + PLAN switcher + switcher gap +
+	// tab bar + separator. The PLAN row mirrors the Projects header so the chrome
+	// lines up identically on every tab.
 	lines = append(lines, top)
 	lines = append(lines, m.renderTitleRow(leftBorder, rightBorder))
+	if m.subscriptionRowCount() > 0 {
+		lines = append(lines, m.renderSubscriptionRow(leftBorder, rightBorder))
+	}
 	lines = append(lines, m.emptyMenuRow(leftBorder, rightBorder))
 	lines = append(lines, m.renderTabBar(leftBorder, rightBorder))
 	lines = append(lines, separator)

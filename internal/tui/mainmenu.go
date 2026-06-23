@@ -859,12 +859,12 @@ func (m *MainMenuModel) CurrentClaudeConfigFile() string {
 // control is shown regardless of the selected agent.
 func (m *MainMenuModel) ClaudeConfigVisible() bool { return true }
 
-// subscriptionFocusable reports whether the main-page subscription line is a
-// reachable focus stop: its PLAN row only renders on the Projects tab, it must
-// be visible (Claude), and it must offer something to switch to beyond Standard
-// — i.e. at least one custom config with an API key.
+// subscriptionFocusable reports whether the PLAN/subscription row is a reachable
+// focus stop. Its row renders in the header chrome of every tab, so the only
+// gates are that the control is visible and that it offers something to switch
+// to beyond Standard — i.e. at least one custom config with an API key.
 func (m *MainMenuModel) subscriptionFocusable() bool {
-	return m.activeTab == TabProjects && m.ClaudeConfigVisible() && len(m.mainSubscriptionRing()) > 1
+	return m.ClaudeConfigVisible() && len(m.mainSubscriptionRing()) > 1
 }
 
 // configHasKey reports whether the custom config file carries an API key.

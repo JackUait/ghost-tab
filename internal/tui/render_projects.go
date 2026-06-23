@@ -75,9 +75,9 @@ func (m *MainMenuModel) renderTitleRow(leftBorder, rightBorder string) string {
 	return leftBorder + " " + aiPart + strings.Repeat(" ", aiPadding) + title + rightBorder
 }
 
-// subscriptionRowCount returns 1 when the main-page subscription line is shown
-// (Claude only), else 0. Layout math (height, scroll header, click mapping) all
-// add this so the project rows stay aligned.
+// subscriptionRowCount returns 1 when the PLAN/subscription line is shown, else
+// 0. The row renders in the header chrome of every tab; layout math (height,
+// scroll header, click mapping) all add this so the body rows stay aligned.
 func (m *MainMenuModel) subscriptionRowCount() int {
 	if m.ClaudeConfigVisible() {
 		return 1
