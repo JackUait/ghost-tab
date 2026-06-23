@@ -173,6 +173,11 @@ func (m *MainMenuModel) mapRowToSettingsItem(boxY int) int {
 // wheel scrolling. Overlay/input modes own all input, so the menu's hit-testing
 // is suppressed while one is open.
 func (m *MainMenuModel) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+	// The login-management modal is clickable (its cursor doubles as the hover
+	// highlight); its text-entry and remove-confirm sub-modes own input.
+	if m.accountMenuOpen && !m.accountMenuInputMode && !m.accountMenuConfirm {
+		return m.handleAccountMenuMouse(msg)
+	}
 	if m.modelMapOpen || m.accountMenuOpen || m.settingsInputMode ||
 		m.inputMode != "" || m.deleteMode || m.staleConfirmIdx >= 0 {
 		return m, nil
@@ -309,6 +314,71 @@ func (m *MainMenuModel) scrollBody(delta int) {
 			m.statsOffset--
 		}
 	}
+}
+
+// accountMenuRowToCursor maps a panel-relative row to a login cursor index, or
+// -1. Panel layout: top(0) title(1) sep(2) blank(3) Default(4) managed(5..4+len)
+// blank then the add row (6+len) when not typing a label.
+func (m *MainMenuModel) accountMenuRowToCursor(panelY int) int {
+	n := len(m.claudeAccounts)
+	switch {
+	case panelY == 4:
+		return 0
+	case panelY >= 5 && panelY <= 4+n:
+		return panelY - 4
+	case !m.accountMenuInputMode && panelY == 6+n:
+		return m.accountMenuAddRow()
+	}
+	return -1
+}
+
+// handleAccountMenuMouse gives the login-management modal pointer parity with the
+// keyboard: hover moves the cursor (its own highlight), left-click activates the
+// row under it (switch login, or open the add-login field), and the wheel moves
+// the cursor.
+func (m *MainMenuModel) handleAccountMenuMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+	addRow := m.accountMenuAddRow()
+	switch msg.Button {
+	case tea.MouseButtonWheelDown:
+		if m.accountMenuCursor < addRow {
+			m.accountMenuCursor++
+		}
+		return m, nil
+	case tea.MouseButtonWheelUp:
+		if m.accountMenuCursor > 0 {
+			m.accountMenuCursor--
+		}
+		return m, nil
+	}
+
+	boxX := msg.X - m.menuOriginX
+	if boxX < 0 || boxX >= menuBoxWidth {
+		return m, nil
+	}
+	cursor := m.accountMenuRowToCursor(msg.Y - m.modalOriginY)
+	if cursor < 0 {
+		return m, nil
+	}
+
+	switch msg.Action {
+	case tea.MouseActionMotion:
+		m.accountMenuCursor = cursor
+		return m, nil
+	case tea.MouseActionPress:
+		if msg.Button == tea.MouseButtonLeft {
+			m.accountMenuCursor = cursor
+			if cursor == addRow {
+				return m, m.enterAccountAddInput()
+			}
+			// Switch the active login to the clicked row and close the modal,
+			// mirroring the Enter action.
+			m.selectedAccount = cursor
+			m.persistClaudeAccount()
+			m.accountMenuOpen = false
+			return m, nil
+		}
+	}
+	return m, nil
 }
 
 // directionFor maps the prev/next flag to the "prev"/"next" strings the Cycle*

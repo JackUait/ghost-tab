@@ -204,6 +204,75 @@ func TestRenderTabBar_highlightsHoveredTab(t *testing.T) {
 	}
 }
 
+func TestAccountMenuRowToCursor_mapsPanelRows(t *testing.T) {
+	m := NewMainMenu(nil, []string{"claude"}, "claude", "none")
+	m.SetClaudeAccounts([]ClaudeAccount{{Label: "Work", Dir: "work"}, {Label: "Personal", Dir: "personal"}})
+	// Panel rows: Default=4, Work=5, Personal=6, blank=7, add=8 (addRow cursor=3).
+	cases := map[int]int{
+		3: -1, // blank
+		4: 0,  // Default
+		5: 1,  // Work
+		6: 2,  // Personal
+		7: -1, // blank
+		8: 3,  // + Add new login
+		9: -1, // separator
+	}
+	for panelY, want := range cases {
+		if got := m.accountMenuRowToCursor(panelY); got != want {
+			t.Errorf("accountMenuRowToCursor(%d) = %d, want %d", panelY, got, want)
+		}
+	}
+}
+
+func TestUpdate_clickAccountRow_switchesAndCloses(t *testing.T) {
+	m := NewMainMenu(nil, []string{"claude"}, "claude", "none")
+	m.SetClaudeAccounts([]ClaudeAccount{{Label: "Work", Dir: "work"}, {Label: "Personal", Dir: "personal"}})
+	m.width = 100
+	m.height = 60
+	m.accountMenuOpen = true
+	_ = m.View() // populates menuOriginX / modalOriginY
+
+	// Click the "Work" row (panel row 5, cursor 1).
+	msg := tea.MouseMsg{
+		X:      m.menuOriginX + 5,
+		Y:      m.modalOriginY + 5,
+		Action: tea.MouseActionPress,
+		Button: tea.MouseButtonLeft,
+	}
+	updated, _ := m.Update(msg)
+	mm := updated.(*MainMenuModel)
+	if mm.selectedAccount != 1 {
+		t.Errorf("after clicking Work login, selectedAccount = %d, want 1", mm.selectedAccount)
+	}
+	if mm.accountMenuOpen {
+		t.Error("clicking a login should close the account modal")
+	}
+}
+
+func TestUpdate_hoverAccountRow_movesCursor(t *testing.T) {
+	m := NewMainMenu(nil, []string{"claude"}, "claude", "none")
+	m.SetClaudeAccounts([]ClaudeAccount{{Label: "Work", Dir: "work"}, {Label: "Personal", Dir: "personal"}})
+	m.width = 100
+	m.height = 60
+	m.accountMenuOpen = true
+	m.accountMenuCursor = 0
+	_ = m.View()
+
+	msg := tea.MouseMsg{
+		X:      m.menuOriginX + 5,
+		Y:      m.modalOriginY + 6, // Personal row (cursor 2)
+		Action: tea.MouseActionMotion,
+	}
+	updated, _ := m.Update(msg)
+	mm := updated.(*MainMenuModel)
+	if mm.accountMenuCursor != 2 {
+		t.Errorf("hover moved accountMenuCursor to %d, want 2", mm.accountMenuCursor)
+	}
+	if !mm.accountMenuOpen {
+		t.Error("hover must not close the account modal")
+	}
+}
+
 func TestRender_hoverHighlights(t *testing.T) {
 	prev := lipgloss.ColorProfile()
 	lipgloss.SetColorProfile(termenv.TrueColor)

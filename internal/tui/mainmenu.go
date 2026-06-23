@@ -225,6 +225,10 @@ type MainMenuModel struct {
 	menuOriginY int
 	hoverTab    int
 	hover       hitTarget
+	// modalOriginY is the absolute screen row of the first line of the modal
+	// panel (account menu / model map) appended below the menu box, or -1 when no
+	// modal is open. Lets the modal's rows be hit-tested like the menu's.
+	modalOriginY int
 
 	// Inline input mode (add-project or open-once)
 	inputMode    string // "", "add-project", "open-once"
@@ -3207,23 +3211,30 @@ func (m *MainMenuModel) View() string {
 	}
 
 	var menuBox string
+	// modalBaseLines records how many lines precede an appended modal panel so its
+	// absolute origin can be computed once the box is placed; -1 means no modal.
+	modalBaseLines := -1
+	appendModal := func(panel string) {
+		modalBaseLines = strings.Count(menuBox, "\n") + 1
+		menuBox += "\n" + panel
+	}
 	switch {
 	case m.inputMode != "":
 		menuBox = m.renderInputBox()
 	case m.activeTab == TabSettings:
 		menuBox = m.renderSettingsBox()
 		if m.modelMapOpen {
-			menuBox += "\n" + m.renderModelMapPanel()
+			appendModal(m.renderModelMapPanel())
 		}
 		if m.accountMenuOpen {
-			menuBox += "\n" + m.renderAccountMenuPanel()
+			appendModal(m.renderAccountMenuPanel())
 		}
 	case m.activeTab == TabStats:
 		menuBox = m.renderStatsBox()
 	default:
 		menuBox = m.renderMenuBox()
 		if m.accountMenuOpen {
-			menuBox += "\n" + m.renderAccountMenuPanel()
+			appendModal(m.renderAccountMenuPanel())
 		}
 	}
 
@@ -3335,10 +3346,22 @@ func (m *MainMenuModel) View() string {
 		}
 		m.menuOriginX = placedLeft + boxRelX
 		m.menuOriginY = m.centerOffsetY + boxRelY
+		m.setModalOrigin(modalBaseLines)
 		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, content)
 	}
 	m.centerOffsetY = 0
 	m.menuOriginX = boxRelX
 	m.menuOriginY = boxRelY
+	m.setModalOrigin(modalBaseLines)
 	return content
+}
+
+// setModalOrigin records the absolute row of an appended modal panel's first
+// line (it shares the menu box's left edge), or -1 when no modal is open.
+func (m *MainMenuModel) setModalOrigin(baseLines int) {
+	if baseLines < 0 {
+		m.modalOriginY = -1
+		return
+	}
+	m.modalOriginY = m.menuOriginY + baseLines
 }
