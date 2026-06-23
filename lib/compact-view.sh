@@ -33,6 +33,37 @@ sum_numstat() {
   printf '%d %d' "$a" "$d"
 }
 
+# format_group_header prints a status group's heading: " <glyph> <label>  (n)".
+# The label starts at column 3 (one space, the 1-wide glyph, one space), which is
+# the column format_ledger_row lines its counts up under. Emits a trailing
+# newline.
+# Usage: format_group_header <glyph_color> <glyph> <label> <count>
+format_group_header() {
+  local gcolor="$1" glyph="$2" label="$3" count="$4"
+  local bold="\033[1m" reset="\033[0m" dim="\033[90m"
+  printf " ${gcolor}${bold}%s${reset} ${gcolor}%s${reset}  ${dim}(%s)${reset}\n" \
+    "$glyph" "$label" "$count"
+}
+
+# format_ledger_row prints one file row of the change ledger: the "+added" and
+# "−deleted" counts, then the (already display-formatted) filename. The "+count"
+# begins at column 3 — the same column as a group's section label (see
+# format_group_header) — so the figures sit directly beneath the section name.
+# Each count is LEFT-aligned from that column inside a fixed 4-wide cell (sign +
+# up to 3 digits), so the "−deleted" column and the filename stay aligned
+# regardless of digit count. The "−" is a format literal (not a %s arg) to keep
+# its multibyte width from skewing printf's padding. Emits a trailing newline.
+# Usage: format_ledger_row <added> <deleted> <display>
+format_ledger_row() {
+  local added="$1" deleted="$2" display="$3"
+  local green="\033[32m" red="\033[31m" bright="\033[97m" reset="\033[0m"
+  local pad_a pad_d
+  pad_a=$((3 - ${#added})); [ "$pad_a" -lt 0 ] && pad_a=0
+  pad_d=$((3 - ${#deleted})); [ "$pad_d" -lt 0 ] && pad_d=0
+  printf "   ${green}+%s${reset}%*s ${red}−%s${reset}%*s  ${bright}%s${reset}\n" \
+    "$added" "$pad_a" '' "$deleted" "$pad_d" '' "$display"
+}
+
 # clamp_scroll keeps a scroll offset within [0, total - avail]. When the content
 # fits (total <= avail) the result is 0.
 # Usage: clamp_scroll <scroll> <total_lines> <viewport_lines>
@@ -379,28 +410,21 @@ compact_view() {
   local dimline="\033[2m"
 
   # render_group prints a status group: a glyph header, then one row per file.
-  # Each row leads with its own aligned "+NNN -NNN" columns, then the filename,
-  # so on a narrow pane the numbers can never drift onto a neighbouring file.
-  # Long filenames truncate at the right edge.
+  # The header label and each row's "+NNN −NNN" counts share column 3, so the
+  # figures line up directly beneath the section name (see format_group_header /
+  # format_ledger_row). Long filenames truncate at the right edge.
   # Usage: render_group <numstat text> <glyph color> <glyph> <label> <name_width> <count>
   render_group() {
     local data="$1" gcolor="$2" glyph="$3" label="$4" name_width="$5" count="$6"
     [ -z "$data" ] && return
-    printf " ${gcolor}${bold}%s${reset} ${gcolor}%s${reset}  ${dim}(%s)${reset}\n" "$glyph" "$label" "$count"
-    local added deleted file display pad_a pad_d
+    format_group_header "$gcolor" "$glyph" "$label" "$count"
+    local added deleted file display
     while IFS=$'\t' read -r added deleted file; do
       [ -z "$added" ] && continue
       [ "$added" = "-" ] && added=0
       [ "$deleted" = "-" ] && deleted=0
       display=$(format_file "$file" "$name_width")
-      # Right-align each number in a 4-wide cell (sign + up to 3 digits) so the
-      # figures form a neat ledger column and the filename sits a tight 2 spaces
-      # away — no trailing-space drift. The "−" is a format literal (not a %s
-      # arg) to keep its multibyte width from skewing printf's padding.
-      pad_a=$((3 - ${#added})); [ "$pad_a" -lt 0 ] && pad_a=0
-      pad_d=$((3 - ${#deleted})); [ "$pad_d" -lt 0 ] && pad_d=0
-      printf "   %*s${green}+%s${reset} %*s${red}−%s${reset}  ${bright}%s${reset}\n" \
-        "$pad_a" '' "$added" "$pad_d" '' "$deleted" "$display"
+      format_ledger_row "$added" "$deleted" "$display"
     done <<< "$data"
     printf "\n"
   }

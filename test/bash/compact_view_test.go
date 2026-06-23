@@ -52,6 +52,83 @@ func TestFormatFile_truncates_long_basename_with_ellipsis(t *testing.T) {
 	}
 }
 
+// The change ledger lines up each file's +/- counts directly UNDER the section
+// name: a group header (" <glyph> <label>  (n)") puts its label at column 3, and
+// a file row must start its "+added" count at that same column 3 — no extra
+// indent — so the figures read as a column beneath "modified"/"added"/etc.
+
+func ledgerRow(t *testing.T, added, deleted, file string) string {
+	t.Helper()
+	out, code := runBashFunc(t, "lib/compact-view.sh", "format_ledger_row",
+		[]string{added, deleted, file}, nil)
+	assertExitCode(t, code, 0)
+	return ansiRE.ReplaceAllString(out, "")
+}
+
+func TestFormatLedgerRow_plus_starts_at_section_label_column(t *testing.T) {
+	plain := ledgerRow(t, "59", "35", "file.go")
+	// 3 leading spaces then the "+count" — column 3, where a section label sits.
+	if !strings.HasPrefix(plain, "   +59") {
+		t.Errorf("row should start +count at column 3, got %q", plain)
+	}
+	// Must NOT be pushed one column further right (the old right-aligned indent).
+	if strings.HasPrefix(plain, "    +") {
+		t.Errorf("row must not indent the +count past column 3, got %q", plain)
+	}
+}
+
+// The section header's label and a file row's "+count" must land in the SAME
+// column, so the counts sit directly under the section name.
+func TestFormatLedgerRow_aligns_with_group_header_label(t *testing.T) {
+	hOut, code := runBashFunc(t, "lib/compact-view.sh", "format_group_header",
+		[]string{"", "○", "modified", "1"}, nil)
+	assertExitCode(t, code, 0)
+	header := []rune(ansiRE.ReplaceAllString(hOut, ""))
+	labelCol := -1
+	for i := 0; i+8 <= len(header); i++ {
+		if string(header[i:i+8]) == "modified" {
+			labelCol = i
+			break
+		}
+	}
+	if labelCol < 0 {
+		t.Fatalf("header should contain the label, got %q", string(header))
+	}
+	row := []rune(ledgerRow(t, "59", "35", "file.go"))
+	plusCol := -1
+	for i, r := range row {
+		if r == '+' {
+			plusCol = i
+			break
+		}
+	}
+	if plusCol != labelCol {
+		t.Errorf("+count column %d must equal section label column %d\nheader=%q\nrow=%q",
+			plusCol, labelCol, string(header), string(row))
+	}
+}
+
+// Counts stay aligned across digit widths: the "−deleted" column must land in
+// the same place whether the added count is 1 or 3 digits wide.
+func TestFormatLedgerRow_minus_column_stable_across_widths(t *testing.T) {
+	minusCol := func(s string) int {
+		for i, r := range []rune(s) {
+			if r == '−' {
+				return i
+			}
+		}
+		return -1
+	}
+	a := minusCol(ledgerRow(t, "5", "5", "f.go"))
+	b := minusCol(ledgerRow(t, "123", "99", "f.go"))
+	if a < 0 || b < 0 {
+		t.Fatalf("both rows should contain a − column (a=%d b=%d)", a, b)
+	}
+	if a != b {
+		t.Errorf("− column drifted with digit width: 1-digit=%d, 3-digit=%d", a, b)
+	}
+}
+
 // sum_numstat totals the added/deleted columns of `git --numstat` output,
 // treating binary markers ("-") as zero. Echoes "<added> <deleted>".
 
