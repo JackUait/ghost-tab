@@ -58,13 +58,15 @@ func TestSpareTabs_config_core(t *testing.T) {
 		"range=user|new",           // [ + ] add button
 		"range=user|sel:",          // click a tab to select it
 		"@gt_dir",                  // cwd for new/respawned tabs
-		"ghost-tab",                // first tab shows the project name
+		"#{window_index}",          // every tab (including the first) shows its number
 		"/abs/lib/spare-tabs.sh",   // dispatch sources the lib
 		"spare_tabs_dispatch",      // mouse handler routes through the helper
 		"pane-died",                // typing `exit` is handled
 	} {
 		assertContains(t, out, want)
 	}
+	// The first tab shows its number, not the project name.
+	assertNotContains(t, out, "ghost-tab")
 }
 
 // The tab bar must sit flush against the pane's left edge — status-left begins
@@ -132,8 +134,8 @@ func TestSpareTabs_config_inactive_tabs_are_plain(t *testing.T) {
 	if sl == "" {
 		t.Fatalf("could not find status-left line in:\n%s", out)
 	}
-	// Inactive tabs: a plain bracketed label (project name on tab 1, else index).
-	assertContains(t, sl, "[#{?#{==:#{window_index},1},ghost-tab,#{window_index}}]")
+	// Inactive tabs: a plain bracketed label showing the tab's number.
+	assertContains(t, sl, "[#{window_index}]")
 	assertContains(t, sl, "colour209")             // active tab keeps its orange chip
 	assertContains(t, sl, "range=user|sel:")       // every tab is clickable
 	assertContains(t, sl, "#{?window_active,")     // active vs inactive branch

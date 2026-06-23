@@ -4,7 +4,7 @@
 # The spare bottom-left pane runs its own *nested* tmux server (one per Ghost
 # Tab window, on a dedicated -L socket). That inner tmux's status bar is pinned
 # to the top of the pane and acts as a tab bar: each inner window is a terminal
-# tab, the project name labels the first tab, extras are numbered, and clickable
+# tab, every tab is labelled by its number (the first included), and clickable
 # user-ranges give a [ + ] add button and a per-tab close (×).
 #
 # The outer tmux keeps mouse OFF so clicks fall through to this inner tmux.
@@ -23,12 +23,12 @@ spare_tabs_socket() {
 # Note: project_dir/lib_path/label are baked in as literals; #{...} stay as
 # tmux formats. The mouse handler's \" are intentional — tmux unescapes them.
 spare_tabs_config() {
-  local project="$1" dir="$2" lib="$3" label="$4"
+  local dir="$2" lib="$3" label="$4"
 
   # Tab bar styling — deliberately minimal. The selected tab is the only thing
-  # with colour: its name on the orange colour209 accent (the app's focus
+  # with colour: its number on the orange colour209 accent (the app's focus
   # colour, matching the pane-active border). Inactive tabs are plain bracketed
-  # labels — [project] for the first tab, [index] for extras — no chip, no
+  # labels — [index] for every tab, the first included — no chip, no
   # decoration. The bar itself is transparent (bg=default), so the tabs and the
   # + button float on the terminal background. Closing is keyboard-only
   # (prefix+w); there is no per-tab ✕.
@@ -48,7 +48,7 @@ set -g window-status-style "bg=default"
 # read as argument separators. The auto window list is blanked out to avoid a
 # duplicate. status-left-length is raised so the list is never truncated.
 set -g status-left-length 1000
-set -g status-left "#{W:#[range=user|sel:#{window_id}]#{?window_active,#[fg=colour235#,bg=colour209#,bold] #{?#{==:#{window_index},1},$project,#{window_index}} #[nobold]#[norange]#[bg=default],#[default fg=colour245][#{?#{==:#{window_index},1},$project,#{window_index}}]#[norange]} }#[range=user|new]#[fg=colour209,bg=colour236,bold] + #[nobold]#[norange]"
+set -g status-left "#{W:#[range=user|sel:#{window_id}]#{?window_active,#[fg=colour235#,bg=colour209#,bold] #{window_index} #[nobold]#[norange]#[bg=default],#[default fg=colour245][#{window_index}]#[norange]} }#[range=user|new]#[fg=colour209,bg=colour236,bold] + #[nobold]#[norange]"
 set -g status-right ""
 set -g window-status-separator ""
 set -g window-status-format ""
