@@ -229,6 +229,10 @@ type MainMenuModel struct {
 	// panel (account menu / model map) appended below the menu box, or -1 when no
 	// modal is open. Lets the modal's rows be hit-tested like the menu's.
 	modalOriginY int
+	// modelMapHover marks which non-cursor element of the model-map panel the
+	// pointer is over so it can highlight: -1 none, 4 = API key row, 5 = Save
+	// button, 6 = Cancel button. (Model-slot hover reuses modelMapCursor.)
+	modelMapHover int
 
 	// Inline input mode (add-project or open-once)
 	inputMode    string // "", "add-project", "open-once"
@@ -365,6 +369,7 @@ func NewMainMenu(projects []models.Project, aiTools []string, currentAI string, 
 		staleConfirmIdx:           -1,
 		defaultAccountLabel:       "Default",
 		hoverTab:                  -1,
+		modelMapHover:             -1,
 	}
 }
 

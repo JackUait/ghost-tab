@@ -3,6 +3,8 @@ package tui
 import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+
+	"github.com/jackuait/ghost-tab/internal/claudeconfig"
 )
 
 // This file holds the mouse layer for the main menu: hover (motion) and click
@@ -178,6 +180,12 @@ func (m *MainMenuModel) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	if m.accountMenuOpen && !m.accountMenuInputMode && !m.accountMenuConfirm {
 		return m.handleAccountMenuMouse(msg)
 	}
+	// The model-map modal is clickable: model slots cycle, the API-key row opens
+	// the key field, and the Save/Cancel buttons finalize. Its key-entry sub-mode
+	// owns input.
+	if m.modelMapOpen && !m.modelMapKeyMode {
+		return m.handleModelMapMouse(msg)
+	}
 	if m.modelMapOpen || m.accountMenuOpen || m.settingsInputMode ||
 		m.inputMode != "" || m.deleteMode || m.staleConfirmIdx >= 0 {
 		return m, nil
@@ -275,10 +283,14 @@ func (m *MainMenuModel) clickSettings(idx int) (tea.Model, tea.Cmd) {
 	m.settingsSelected = idx
 	m.focus = FocusBody
 	loginIdx := m.settingsItemCount() - 1
-	switch idx {
-	case 4: // Default projects dir → inline edit
+	switch {
+	case idx == 4: // Default projects dir → inline edit
 		return m.settingsEnter()
-	case loginIdx: // Login → account management
+	case idx == loginIdx: // Login → account management
+		return m.settingsEnter()
+	case idx == 5 && m.ClaudeConfigVisible() && m.selectedConfig > 0:
+		// Plan row on a custom config → open the model map (its ⏎ action). Cycling
+		// the plan stays available via the top PLAN switcher row.
 		return m.settingsEnter()
 	default:
 		m.settingsValueRight()
@@ -378,6 +390,139 @@ func (m *MainMenuModel) handleAccountMenuMouse(msg tea.MouseMsg) (tea.Model, tea
 			return m, nil
 		}
 	}
+	return m, nil
+}
+
+// model-map hit-test target kinds.
+const (
+	mmNone = iota
+	mmModel
+	mmKey
+	mmSave
+	mmCancel
+)
+
+// modelMapButtonRanges returns the [start,end) box-relative column spans of the
+// Save and Cancel buttons, mirroring renderModelMapPanel's "   [ Save ]   [ Cancel ]"
+// row (content begins at box column 2 after the border + leading space).
+func modelMapButtonRanges() (saveStart, saveEnd, cancelStart, cancelEnd int) {
+	col := 2 + 3 // leading space + the row's three-space indent
+	saveStart = col
+	saveEnd = col + lipgloss.Width(modelMapSaveLabel)
+	col = saveEnd + 3 // three-space gap between buttons
+	cancelStart = col
+	cancelEnd = col + lipgloss.Width(modelMapCancelLabel)
+	return
+}
+
+// modelMapTarget maps a box-relative coordinate to a model-map element. Panel
+// layout: top(0) title(1) sep(2) blank(3) slots(4..7) blank(8) apikey(9)
+// buttons(10).
+func (m *MainMenuModel) modelMapTarget(boxX, panelY int) (kind, index int) {
+	if boxX < 0 || boxX >= menuBoxWidth {
+		return mmNone, 0
+	}
+	switch {
+	case panelY >= 4 && panelY <= 7:
+		return mmModel, panelY - 4
+	case panelY == 9:
+		return mmKey, 0
+	case panelY == 10:
+		saveStart, saveEnd, cancelStart, cancelEnd := modelMapButtonRanges()
+		if boxX >= saveStart && boxX < saveEnd {
+			return mmSave, 0
+		}
+		if boxX >= cancelStart && boxX < cancelEnd {
+			return mmCancel, 0
+		}
+	}
+	return mmNone, 0
+}
+
+// handleModelMapMouse gives the model-map modal full pointer parity: hover
+// highlights slots/buttons, clicking a slot cycles its model forward, the
+// API-key row opens the key field, and Save/Cancel finalize or discard.
+func (m *MainMenuModel) handleModelMapMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+	switch msg.Button {
+	case tea.MouseButtonWheelDown:
+		m.modelMapCursor = (m.modelMapCursor + 1) % 4
+		return m, nil
+	case tea.MouseButtonWheelUp:
+		m.modelMapCursor = (m.modelMapCursor - 1 + 4) % 4
+		return m, nil
+	}
+
+	kind, index := m.modelMapTarget(msg.X-m.menuOriginX, msg.Y-m.modalOriginY)
+
+	switch msg.Action {
+	case tea.MouseActionMotion:
+		m.applyModelMapHover(kind, index)
+		return m, nil
+	case tea.MouseActionPress:
+		if msg.Button == tea.MouseButtonLeft {
+			return m.clickModelMap(kind, index)
+		}
+	}
+	return m, nil
+}
+
+// applyModelMapHover highlights the hovered element: slots move the cursor (its
+// own marker), the API-key row and buttons set modelMapHover.
+func (m *MainMenuModel) applyModelMapHover(kind, index int) {
+	switch kind {
+	case mmModel:
+		m.modelMapCursor = index
+		m.modelMapHover = -1
+	case mmKey:
+		m.modelMapHover = 4
+	case mmSave:
+		m.modelMapHover = 5
+	case mmCancel:
+		m.modelMapHover = 6
+	default:
+		m.modelMapHover = -1
+	}
+}
+
+// clickModelMap activates a model-map element under a left-click.
+func (m *MainMenuModel) clickModelMap(kind, index int) (tea.Model, tea.Cmd) {
+	switch kind {
+	case mmModel:
+		m.modelMapCursor = index
+		// Cycle the slot's model forward, wrapping through "(none)" (mirrors →).
+		n := len(m.modelMapModels)
+		cur := m.modelMap[index]
+		if cur >= n-1 {
+			m.modelMap[index] = -1
+		} else {
+			m.modelMap[index] = cur + 1
+		}
+		return m, nil
+	case mmKey:
+		return m, m.enterModelMapKeyInput()
+	case mmSave:
+		return m.saveModelMap()
+	case mmCancel:
+		m.modelMapOpen = false
+		return m, nil
+	}
+	return m, nil
+}
+
+// saveModelMap persists the current mappings and closes the panel — the click
+// equivalent of pressing Enter in the model map.
+func (m *MainMenuModel) saveModelMap() (tea.Model, tea.Cmd) {
+	file := m.CurrentClaudeConfigFile()
+	if file == "" {
+		m.modelMapOpen = false
+		return m, nil
+	}
+	if err := claudeconfig.WriteModelMappings(m.claudeConfigsDir, file, m.modelMap, m.modelMapModels); err != nil {
+		m.modelMapErr = err
+		return m, nil
+	}
+	m.syncOpenCode()
+	m.modelMapOpen = false
 	return m, nil
 }
 

@@ -11,6 +11,13 @@ import (
 	"github.com/jackuait/ghost-tab/internal/claudeconfig"
 )
 
+// Clickable Save / Cancel button labels in the model-map panel. Defined here so
+// the renderer and the mouse hit-test agree on their widths.
+const (
+	modelMapSaveLabel   = "[ Save ]"
+	modelMapCancelLabel = "[ Cancel ]"
+)
+
 // openModelMap opens the model mapping panel for the active non-Standard config.
 func (m *MainMenuModel) openModelMap() {
 	file := m.CurrentClaudeConfigFile()
@@ -23,6 +30,7 @@ func (m *MainMenuModel) openModelMap() {
 	m.modelMap = claudeconfig.ReadModelMappings(m.claudeConfigsDir, file, m.modelMapModels)
 	m.modelMapErr = nil
 	m.modelMapKeyMode = false
+	m.modelMapHover = -1
 }
 
 // updateModelMap handles key events while the model mapping panel is open.
@@ -191,14 +199,35 @@ func (m *MainMenuModel) renderModelMapPanel() string {
 
 	lines = append(lines, emptyRow)
 
-	// API key row
+	// API key row (the marker + brighter label appear when the pointer hovers it).
 	file := m.CurrentClaudeConfigFile()
 	apiKey := claudeconfig.ReadAPIKey(m.claudeConfigsDir, file)
 	apiKeyStatus := dimStyle.Render("(not set)")
 	if apiKey != "" {
 		apiKeyStatus = greenStyle.Render("••••••••")
 	}
-	lines = append(lines, pad("    "+helpStyle.Render("API Key")+dimStyle.Render(" →  ")+apiKeyStatus+dimStyle.Render("  press 'e' to edit")))
+	keyPrefix := "    "
+	keyLabelStyle := helpStyle
+	if m.modelMapHover == 4 {
+		keyPrefix = " " + primaryBoldStyle.Render("▌") + "  "
+		keyLabelStyle = primaryBoldStyle
+	}
+	lines = append(lines, pad(keyPrefix+keyLabelStyle.Render("API Key")+dimStyle.Render(" →  ")+apiKeyStatus+dimStyle.Render("  press 'e' to edit")))
+
+	// Save / Cancel buttons — the click-friendly equivalents of ⏎ and Esc, so a
+	// pointer-only user can finalize or discard their mapping changes. Kept at a
+	// fixed row (right after the API key row) so hit-testing doesn't shift with
+	// the optional error line below.
+	saveStyle := helpStyle
+	cancelStyle := helpStyle
+	btnHover := lipgloss.NewStyle().Foreground(m.theme.Bright).Bold(true).Reverse(true)
+	if m.modelMapHover == 5 {
+		saveStyle = btnHover
+	}
+	if m.modelMapHover == 6 {
+		cancelStyle = btnHover
+	}
+	lines = append(lines, pad("   "+saveStyle.Render(modelMapSaveLabel)+"   "+cancelStyle.Render(modelMapCancelLabel)))
 
 	if m.modelMapKeyMode {
 		lines = append(lines, emptyRow)

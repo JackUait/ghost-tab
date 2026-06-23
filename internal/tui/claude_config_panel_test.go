@@ -122,6 +122,122 @@ func TestModelMap_CycleModels(t *testing.T) {
 	}
 }
 
+func TestModelMapTarget_mapsCoordinates(t *testing.T) {
+	m, _, _ := newPanelMenu(t)
+	m.CycleClaudeConfig("next")
+	m.openModelMap()
+	saveStart, _, cancelStart, _ := modelMapButtonRanges()
+	cases := []struct {
+		boxX, panelY int
+		wantKind     int
+		wantIndex    int
+	}{
+		{5, 4, mmModel, 0},  // first slot
+		{5, 7, mmModel, 3},  // last slot
+		{5, 8, mmNone, 0},   // blank
+		{5, 9, mmKey, 0},    // API key row
+		{saveStart, 10, mmSave, 0},
+		{cancelStart, 10, mmCancel, 0},
+	}
+	for _, c := range cases {
+		k, i := m.modelMapTarget(c.boxX, c.panelY)
+		if k != c.wantKind || (c.wantKind == mmModel && i != c.wantIndex) {
+			t.Errorf("modelMapTarget(%d,%d) = (%d,%d), want (%d,%d)", c.boxX, c.panelY, k, i, c.wantKind, c.wantIndex)
+		}
+	}
+}
+
+func TestUpdate_clickModelSlot_cyclesModel(t *testing.T) {
+	m, _, _ := newPanelMenu(t)
+	m.CycleClaudeConfig("next")
+	m.openModelMap()
+	m.width, m.height = 100, 60
+	_ = m.View()
+	if m.modelMap[0] != -1 {
+		t.Fatalf("precondition modelMap[0] = %d, want -1", m.modelMap[0])
+	}
+	msg := tea.MouseMsg{X: m.menuOriginX + 5, Y: m.modalOriginY + 4, Action: tea.MouseActionPress, Button: tea.MouseButtonLeft}
+	upd, _ := m.Update(msg)
+	got := upd.(*MainMenuModel)
+	if got.modelMap[0] != 0 {
+		t.Errorf("after clicking slot 0, modelMap[0] = %d, want 0", got.modelMap[0])
+	}
+}
+
+func TestUpdate_clickSaveButton_persistsAndCloses(t *testing.T) {
+	m, _, _ := newPanelMenu(t)
+	m.CycleClaudeConfig("next")
+	m.openModelMap()
+	m.modelMap[0] = 0
+	m.modelMap[1] = 1
+	m.width, m.height = 100, 60
+	_ = m.View()
+	saveStart, _, _, _ := modelMapButtonRanges()
+	msg := tea.MouseMsg{X: m.menuOriginX + saveStart, Y: m.modalOriginY + 10, Action: tea.MouseActionPress, Button: tea.MouseButtonLeft}
+	upd, _ := m.Update(msg)
+	got := upd.(*MainMenuModel)
+	if got.modelMapOpen {
+		t.Error("clicking Save should close the model map panel")
+	}
+	mappings := claudeconfig.ReadModelMappings(got.claudeConfigsDir, "work.json", got.modelMapModels)
+	if mappings[0] != 0 || mappings[1] != 1 {
+		t.Errorf("Save did not persist mappings: got %v, want [0]=0 [1]=1", mappings)
+	}
+}
+
+func TestUpdate_clickCancelButton_closesWithoutSaving(t *testing.T) {
+	m, _, _ := newPanelMenu(t)
+	m.CycleClaudeConfig("next")
+	m.openModelMap()
+	m.modelMap[0] = 0
+	m.width, m.height = 100, 60
+	_ = m.View()
+	_, _, cancelStart, _ := modelMapButtonRanges()
+	msg := tea.MouseMsg{X: m.menuOriginX + cancelStart, Y: m.modalOriginY + 10, Action: tea.MouseActionPress, Button: tea.MouseButtonLeft}
+	upd, _ := m.Update(msg)
+	got := upd.(*MainMenuModel)
+	if got.modelMapOpen {
+		t.Error("clicking Cancel should close the model map panel")
+	}
+	mappings := claudeconfig.ReadModelMappings(got.claudeConfigsDir, "work.json", got.modelMapModels)
+	if mappings[0] == 0 {
+		t.Error("Cancel should not have persisted the in-progress mapping")
+	}
+}
+
+func TestUpdate_clickPlanSettingsRow_opensModelMap(t *testing.T) {
+	m, _, _ := newPanelMenu(t)
+	m.CycleClaudeConfig("next") // select Work (a custom config)
+	m.width, m.height = 100, 60
+	_ = m.View()
+	// Plan is settings item 5.
+	row := m.firstSettingsItemRow() + 5
+	msg := tea.MouseMsg{X: m.menuOriginX + 5, Y: m.menuOriginY + row, Action: tea.MouseActionPress, Button: tea.MouseButtonLeft}
+	upd, _ := m.Update(msg)
+	got := upd.(*MainMenuModel)
+	if !got.modelMapOpen {
+		t.Error("clicking the Plan settings row (custom config) should open the model map")
+	}
+}
+
+func TestUpdate_hoverModelSlot_movesCursor(t *testing.T) {
+	m, _, _ := newPanelMenu(t)
+	m.CycleClaudeConfig("next")
+	m.openModelMap()
+	m.modelMapCursor = 0
+	m.width, m.height = 100, 60
+	_ = m.View()
+	msg := tea.MouseMsg{X: m.menuOriginX + 5, Y: m.modalOriginY + 6, Action: tea.MouseActionMotion}
+	upd, _ := m.Update(msg)
+	got := upd.(*MainMenuModel)
+	if got.modelMapCursor != 2 {
+		t.Errorf("hover moved modelMapCursor to %d, want 2", got.modelMapCursor)
+	}
+	if !got.modelMapOpen {
+		t.Error("hover must not close the model map")
+	}
+}
+
 func TestModelMap_EnterSavesMappings(t *testing.T) {
 	m, _, _ := newPanelMenu(t)
 	m.CycleClaudeConfig("next") // Work
