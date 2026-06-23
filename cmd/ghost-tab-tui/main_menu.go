@@ -21,21 +21,24 @@ var mainMenuCmd = &cobra.Command{
 }
 
 var (
-	mainMenuProjectsFile     string
-	mainMenuProjectsRootFile string
-	mainMenuAITool           string
-	mainMenuAITools          string
-	mainMenuAIToolFile       string
-	mainMenuGhostDisplay     string
-	mainMenuPanelMode        string
-	mainMenuTabTitle         string
-	mainMenuUpdateVer        string
-	mainMenuSoundName        string
-	mainMenuSettingsFile     string
-	mainMenuSoundFile        string
-	mainMenuClaudeConfigFile  string
-	mainMenuClaudeConfigsList string
-	mainMenuClaudeConfigsDir  string
+	mainMenuProjectsFile       string
+	mainMenuProjectsRootFile   string
+	mainMenuAITool             string
+	mainMenuAITools            string
+	mainMenuAIToolFile         string
+	mainMenuGhostDisplay       string
+	mainMenuPanelMode          string
+	mainMenuTabTitle           string
+	mainMenuUpdateVer          string
+	mainMenuSoundName          string
+	mainMenuSettingsFile       string
+	mainMenuSoundFile          string
+	mainMenuClaudeConfigFile   string
+	mainMenuClaudeConfigsList  string
+	mainMenuClaudeConfigsDir   string
+	mainMenuClaudeAccountFile  string
+	mainMenuClaudeAccountsList string
+	mainMenuClaudeAccountsDir  string
 )
 
 func init() {
@@ -55,6 +58,9 @@ func init() {
 	mainMenuCmd.Flags().StringVar(&mainMenuClaudeConfigFile, "claude-config-file", "", "Path to active Claude config pointer file")
 	mainMenuCmd.Flags().StringVar(&mainMenuClaudeConfigsList, "claude-configs-list", "", "Path to Claude configs list (name:file)")
 	mainMenuCmd.Flags().StringVar(&mainMenuClaudeConfigsDir, "claude-configs-dir", "", "Path to Claude configs directory (settings JSON files)")
+	mainMenuCmd.Flags().StringVar(&mainMenuClaudeAccountFile, "claude-account-file", "", "Path to active Claude account pointer file")
+	mainMenuCmd.Flags().StringVar(&mainMenuClaudeAccountsList, "claude-accounts-list", "", "Path to Claude accounts list (label:dir)")
+	mainMenuCmd.Flags().StringVar(&mainMenuClaudeAccountsDir, "claude-accounts-dir", "", "Path to Claude accounts directory (per-account config dirs)")
 	rootCmd.AddCommand(mainMenuCmd)
 }
 
@@ -100,6 +106,14 @@ func runMainMenu(cmd *cobra.Command, args []string) error {
 		model.SetClaudeConfigs(tui.LoadClaudeConfigsList(mainMenuClaudeConfigsList))
 		model.SetActiveClaudeConfig(tui.ReadActiveClaudeConfig(mainMenuClaudeConfigFile))
 		model.SetClaudeConfigPaths(mainMenuClaudeConfigsList, mainMenuClaudeConfigsDir)
+	}
+	if mainMenuClaudeAccountFile != "" {
+		model.SetClaudeAccountFile(mainMenuClaudeAccountFile)
+	}
+	if mainMenuClaudeAccountsList != "" {
+		model.SetClaudeAccounts(tui.LoadClaudeAccountsList(mainMenuClaudeAccountsList))
+		model.SetActiveClaudeAccount(tui.ReadActiveClaudeAccount(mainMenuClaudeAccountFile))
+		model.SetClaudeAccountPaths(mainMenuClaudeAccountsList, mainMenuClaudeAccountsDir)
 	}
 
 	ttyOpts, cleanup, err := util.TUITeaOptions()

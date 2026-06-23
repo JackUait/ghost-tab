@@ -193,6 +193,9 @@ func (m *MainMenuModel) renderStatsBox() string {
 
 	var lines []string
 	lines = append(lines, top)
+	if m.accountRowCount() > 0 {
+		lines = append(lines, m.renderAccountRow(leftBorder, rightBorder))
+	}
 	lines = append(lines, m.renderTitleRow(leftBorder, rightBorder))
 	// PLAN switcher mirrors the Projects header so the chrome lines up on every tab.
 	if m.subscriptionRowCount() > 0 {

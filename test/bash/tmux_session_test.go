@@ -72,3 +72,43 @@ func TestBuildAiLaunchCmd_wraps_claude_resume_with_filter(t *testing.T) {
 		t.Errorf("claude resume wrap: got %q", got)
 	}
 }
+
+// When a non-Default native account is active, wrapper.sh exports
+// GHOST_TAB_CLAUDE_ACCOUNT_DIR and the Claude launch is prefixed with
+// CLAUDE_CONFIG_DIR=<dir> so `claude` runs under that account's isolated login.
+// The Default account leaves the env var unset (Keychain login, unchanged).
+func TestBuildAiLaunchCmd_prefixes_claude_config_dir(t *testing.T) {
+	env := buildEnv(t, nil, "GHOST_TAB_RESUME=0",
+		"GHOST_TAB_CLAUDE_ACCOUNT_DIR=/cfg/claude-accounts/work")
+	out, code := runBashFunc(t, "lib/tmux-session.sh", "build_ai_launch_cmd",
+		[]string{"claude", "claude", "npx opencode-ai@latest", "/p/app"}, env)
+	assertExitCode(t, code, 0)
+	if got := strings.TrimSpace(out); got != `CLAUDE_CONFIG_DIR="/cfg/claude-accounts/work" claude /p/app` {
+		t.Errorf("claude account prefix: got %q", got)
+	}
+}
+
+func TestBuildAiLaunchCmd_account_dir_not_applied_to_opencode(t *testing.T) {
+	env := buildEnv(t, nil, "GHOST_TAB_RESUME=0",
+		"GHOST_TAB_CLAUDE_ACCOUNT_DIR=/cfg/claude-accounts/work")
+	out, _ := runBashFunc(t, "lib/tmux-session.sh", "build_ai_launch_cmd",
+		[]string{"opencode", "claude", "npx opencode-ai@latest", "/p/app"}, env)
+	if strings.Contains(out, "CLAUDE_CONFIG_DIR") {
+		t.Errorf("opencode must not get CLAUDE_CONFIG_DIR: %q", strings.TrimSpace(out))
+	}
+}
+
+// The account prefix composes ahead of the screenshot filter (env is inherited
+// by the child claude) and survives resume mode.
+func TestBuildAiLaunchCmd_account_dir_composes_with_filter_and_resume(t *testing.T) {
+	env := buildEnv(t, nil, "GHOST_TAB_RESUME=1",
+		"GHOST_TAB_CLAUDE_ACCOUNT_DIR=/cfg/claude-accounts/work",
+		"GHOST_TAB_CLAUDE_FILTER=ghost-tab-tui screenshot-filter -- ")
+	out, code := runBashFunc(t, "lib/tmux-session.sh", "build_ai_launch_cmd",
+		[]string{"claude", "claude", "npx opencode-ai@latest", "/p/app"}, env)
+	assertExitCode(t, code, 0)
+	want := `CLAUDE_CONFIG_DIR="/cfg/claude-accounts/work" ghost-tab-tui screenshot-filter -- claude -c`
+	if got := strings.TrimSpace(out); got != want {
+		t.Errorf("claude account+filter+resume: got %q, want %q", got, want)
+	}
+}

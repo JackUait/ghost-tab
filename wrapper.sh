@@ -39,7 +39,7 @@ if [ ! -d "$_WRAPPER_DIR/lib" ]; then
   exit 1
 fi
 
-_gt_libs=(ai-tools projects process input tui menu-tui project-actions tmux-session settings-json notification-setup tab-title-watcher terminals/ghostty session-restore claude-configs compact-view screenshot spare-tabs)
+_gt_libs=(ai-tools projects process input tui menu-tui project-actions tmux-session settings-json notification-setup tab-title-watcher terminals/ghostty session-restore claude-configs claude-accounts compact-view screenshot spare-tabs)
 for _gt_lib in "${_gt_libs[@]}"; do
   if [ ! -f "$_WRAPPER_DIR/lib/${_gt_lib}.sh" ]; then
     printf '\033[31mError:\033[0m Missing library %s/lib/%s.sh\n' "$_WRAPPER_DIR" "$_gt_lib" >&2
@@ -128,6 +128,12 @@ elif [ -z "$1" ]; then
           ;;
         add-worktree)
           # Loop back to menu — worktrees refresh on reload
+          continue
+          ;;
+        add-account)
+          # Enter on the LOGIN row: add a native Claude login interactively
+          # (browser OAuth), then reopen the menu with the new account available.
+          add_claude_account "${XDG_CONFIG_HOME:-$HOME/.config}/ghost-tab"
           continue
           ;;
         *)
@@ -224,6 +230,15 @@ if [ "$SELECTED_AI_TOOL" = "claude" ]; then
   GHOST_TAB_CLAUDE_SETTINGS="$(resolve_claude_config_path "$_gt_cfg_root/claude-configs" "$_gt_cfg_root/claude-config")"
 fi
 export GHOST_TAB_CLAUDE_SETTINGS
+
+# Resolve the active native Claude account (its isolated CLAUDE_CONFIG_DIR) and
+# export for build_ai_launch_cmd. Default (empty) leaves CLAUDE_CONFIG_DIR unset
+# so Claude uses the standard Keychain login.
+GHOST_TAB_CLAUDE_ACCOUNT_DIR=""
+if [ "$SELECTED_AI_TOOL" = "claude" ]; then
+  GHOST_TAB_CLAUDE_ACCOUNT_DIR="$(resolve_claude_account_dir "$_gt_cfg_root/claude-accounts" "$_gt_cfg_root/claude-account")"
+fi
+export GHOST_TAB_CLAUDE_ACCOUNT_DIR
 
 # Resolve the active subscription/plan display name for the compact-view ledger.
 # Subscriptions are shared across agents, so this is resolved for every tool.

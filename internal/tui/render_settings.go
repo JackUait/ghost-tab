@@ -67,6 +67,9 @@ func (m *MainMenuModel) renderSettingsBox() string {
 	// tab bar + separator. The PLAN row mirrors the Projects header so the chrome
 	// lines up identically on every tab.
 	lines = append(lines, top)
+	if m.accountRowCount() > 0 {
+		lines = append(lines, m.renderAccountRow(leftBorder, rightBorder))
+	}
 	lines = append(lines, m.renderTitleRow(leftBorder, rightBorder))
 	if m.subscriptionRowCount() > 0 {
 		lines = append(lines, m.renderSubscriptionRow(leftBorder, rightBorder))

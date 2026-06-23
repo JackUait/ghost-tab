@@ -15,6 +15,16 @@ build_ai_launch_cmd() {
     claude_settings=" --settings \"${GHOST_TAB_CLAUDE_SETTINGS}\""
   fi
 
+  # Claude-only: when a non-Default native account is active, wrapper.sh exports
+  # GHOST_TAB_CLAUDE_ACCOUNT_DIR (the account's isolated CLAUDE_CONFIG_DIR). It is
+  # prefixed onto the launch as an env assignment so `claude` (and any wrapper it
+  # runs behind, which inherits the env) uses that account's login. Default
+  # leaves it unset, so Claude falls back to the standard Keychain login.
+  local claude_account=""
+  if [ -n "${GHOST_TAB_CLAUDE_ACCOUNT_DIR:-}" ]; then
+    claude_account="CLAUDE_CONFIG_DIR=\"${GHOST_TAB_CLAUDE_ACCOUNT_DIR}\" "
+  fi
+
   # Claude-only: a launch prefix that runs Claude behind the screenshot-drag
   # filter. wrapper.sh sets GHOST_TAB_CLAUDE_FILTER (to e.g.
   # "ghost-tab-tui screenshot-filter -- ") only after confirming the TUI binary
@@ -27,7 +37,7 @@ build_ai_launch_cmd() {
   if [ "${GHOST_TAB_RESUME:-0}" = "1" ]; then
     case "$tool" in
       opencode) echo "$opencode_cmd --continue" ;;
-      *)        echo "${claude_filter}$claude_cmd -c${claude_settings}" ;;
+      *)        echo "${claude_account}${claude_filter}$claude_cmd -c${claude_settings}" ;;
     esac
     return 0
   fi
@@ -38,9 +48,9 @@ build_ai_launch_cmd() {
       ;;
     *)
       if [ -n "$extra" ]; then
-        echo "${claude_filter}$claude_cmd $extra${claude_settings}"
+        echo "${claude_account}${claude_filter}$claude_cmd $extra${claude_settings}"
       else
-        echo "${claude_filter}$claude_cmd${claude_settings}"
+        echo "${claude_account}${claude_filter}$claude_cmd${claude_settings}"
       fi
       ;;
   esac

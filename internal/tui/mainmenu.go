@@ -13,6 +13,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/jackuait/ghost-tab/internal/claudeaccount"
 	"github.com/jackuait/ghost-tab/internal/claudeconfig"
 	"github.com/jackuait/ghost-tab/internal/models"
 	"github.com/jackuait/ghost-tab/internal/opencodeconfig"
@@ -118,6 +119,9 @@ const (
 	// FocusSubscription is the optional stop between the AI switcher and the tab
 	// bar, reachable only when the Claude subscription line is changeable.
 	FocusSubscription
+	// FocusAccount is the optional top stop, above the AI switcher, reachable
+	// only when the user has at least one managed native Claude login account.
+	FocusAccount
 )
 
 // MenuLayout describes how the ghost and menu are arranged at a given terminal size.
@@ -132,6 +136,13 @@ type MenuLayout struct {
 type ClaudeConfig struct {
 	Name string
 	File string
+}
+
+// ClaudeAccount is one selectable native Claude login (display label + the
+// config dir name that isolates its credentials via CLAUDE_CONFIG_DIR).
+type ClaudeAccount struct {
+	Label string
+	Dir   string
 }
 
 // actionNames maps action item offsets to their action strings.
@@ -265,6 +276,13 @@ type MainMenuModel struct {
 	claudeConfigFile  string         // pointer file path for persistence
 	claudeConfigsList string         // name:file list file path (for mutations)
 	claudeConfigsDir  string         // directory holding the settings JSON files
+
+	// Claude account (native login) selection state
+	claudeAccounts     []ClaudeAccount // Default is implicit index 0, not stored here
+	selectedAccount    int             // 0 = Default, 1.. = claudeAccounts[i-1]
+	claudeAccountFile  string          // pointer file path for persistence
+	claudeAccountsList string          // label:dir list file path (for mutations)
+	claudeAccountsDir  string          // directory holding the per-account config dirs
 
 	// Model mapping panel for non-Standard configs
 	modelMapOpen     bool
@@ -939,6 +957,90 @@ func (m *MainMenuModel) persistClaudeConfig() {
 	m.syncOpenCode()
 }
 
+// SetClaudeAccountFile sets the pointer file path for account persistence.
+func (m *MainMenuModel) SetClaudeAccountFile(path string) { m.claudeAccountFile = path }
+
+// SetClaudeAccounts stores the managed account list (excluding the implicit Default).
+func (m *MainMenuModel) SetClaudeAccounts(accounts []ClaudeAccount) { m.claudeAccounts = accounts }
+
+// SetClaudeAccountPaths records the list file and config-dir root for mutations.
+func (m *MainMenuModel) SetClaudeAccountPaths(listFile, dir string) {
+	m.claudeAccountsList = listFile
+	m.claudeAccountsDir = dir
+}
+
+// SetActiveClaudeAccount selects the entry matching dir ("" or no match = Default).
+func (m *MainMenuModel) SetActiveClaudeAccount(dir string) {
+	m.selectedAccount = 0
+	if dir == "" {
+		return
+	}
+	for i, a := range m.claudeAccounts {
+		if a.Dir == dir {
+			m.selectedAccount = i + 1
+			return
+		}
+	}
+}
+
+// CurrentClaudeAccountLabel returns the active account's display label.
+func (m *MainMenuModel) CurrentClaudeAccountLabel() string {
+	if m.selectedAccount <= 0 || m.selectedAccount > len(m.claudeAccounts) {
+		return "Default"
+	}
+	return m.claudeAccounts[m.selectedAccount-1].Label
+}
+
+// CurrentClaudeAccountDir returns the active account's dir name ("" for Default).
+func (m *MainMenuModel) CurrentClaudeAccountDir() string {
+	if m.selectedAccount <= 0 || m.selectedAccount > len(m.claudeAccounts) {
+		return ""
+	}
+	return m.claudeAccounts[m.selectedAccount-1].Dir
+}
+
+// accountFocusable reports whether the LOGIN/account row is a reachable focus
+// stop. It always is: even with no managed accounts the row hosts the
+// Enter-to-add-login affordance, so it must be reachable via ↑.
+func (m *MainMenuModel) accountFocusable() bool {
+	return true
+}
+
+// accountHasChoices reports whether there is a managed account to switch to
+// beyond the implicit Default — i.e. whether the cycle chevrons should render.
+func (m *MainMenuModel) accountHasChoices() bool {
+	return len(m.claudeAccounts) > 0
+}
+
+// CycleAccount moves through [Default, accounts...] and persists the choice.
+func (m *MainMenuModel) CycleAccount(direction string) {
+	n := len(m.claudeAccounts) + 1 // +1 for Default
+	if n <= 1 {
+		return
+	}
+	if direction == "prev" {
+		m.selectedAccount = (m.selectedAccount - 1 + n) % n
+	} else {
+		m.selectedAccount = (m.selectedAccount + 1) % n
+	}
+	m.persistClaudeAccount()
+}
+
+// persistClaudeAccount writes the active dir name to the pointer file. Default
+// (empty) removes the file so Claude falls back to the standard Keychain login.
+func (m *MainMenuModel) persistClaudeAccount() {
+	if m.claudeAccountFile == "" {
+		return
+	}
+	dir := m.CurrentClaudeAccountDir()
+	if dir == "" {
+		_ = os.Remove(m.claudeAccountFile)
+		return
+	}
+	_ = os.MkdirAll(filepath.Dir(m.claudeAccountFile), 0755)
+	_ = os.WriteFile(m.claudeAccountFile, []byte(dir+"\n"), 0644)
+}
+
 // syncOpenCode mirrors the current subscriptions into OpenCode's global config.
 // Best-effort: errors are swallowed inside opencodeconfig.Sync.
 func (m *MainMenuModel) syncOpenCode() {
@@ -1024,6 +1126,27 @@ func LoadClaudeConfigsList(path string) []ClaudeConfig {
 // ReadActiveClaudeConfig returns the active filename from the pointer file ("" if none/standard).
 func ReadActiveClaudeConfig(path string) string {
 	return claudeconfig.GetActive(path)
+}
+
+// LoadClaudeAccountsList parses a label:dir list file into ClaudeAccount entries.
+// It delegates to internal/claudeaccount (the single source of truth) and maps
+// to the local ClaudeAccount type.
+func LoadClaudeAccountsList(path string) []ClaudeAccount {
+	loaded := claudeaccount.Load(path)
+	if loaded == nil {
+		return nil
+	}
+	out := make([]ClaudeAccount, len(loaded))
+	for i, a := range loaded {
+		out[i] = ClaudeAccount{Label: a.Label, Dir: a.Dir}
+	}
+	return out
+}
+
+// ReadActiveClaudeAccount returns the active account dir from the pointer file
+// ("" if none/default).
+func ReadActiveClaudeAccount(path string) string {
+	return claudeaccount.GetActive(path)
 }
 
 // CycleGhostDisplay cycles through ghost display modes: animated -> static -> none -> animated.
@@ -1290,7 +1413,7 @@ func (m *MainMenuModel) CalculateLayout(width, height int) MenuLayout {
 	// 12 fixed chrome lines: top + title + tab-bar + sep + leading-blank +
 	// spacer-before-add + add-project + add-project-hint + sep-before-action +
 	// action-bar + bottom + help. Plus the optional subscription row (Claude only).
-	menuHeight := 12 + m.subscriptionRowCount() + projectRows + worktreeRows + addWorktreeRows + emptyStateRow
+	menuHeight := 12 + m.subscriptionRowCount() + m.accountRowCount() + projectRows + worktreeRows + addWorktreeRows + emptyStateRow
 	menuWidth := 58
 
 	ghostPosition := "hidden"
@@ -1316,6 +1439,7 @@ func (m *MainMenuModel) CalculateLayout(width, height int) MenuLayout {
 func (m *MainMenuModel) MapRowToItem(clickY int) int {
 	// Menu box row layout:
 	// Row 0: top border
+	// (optional) account/LOGIN row (very top, above the title)
 	// Row 1: title row
 	// (optional) subscription row (Claude only)
 	// switcher gap (blank row separating switchers from the tab bar)
@@ -1324,7 +1448,7 @@ func (m *MainMenuModel) MapRowToItem(clickY int) int {
 	// (optional) update notification row
 	// leading empty row
 	// Then project items start
-	startRow := 6 + m.subscriptionRowCount()
+	startRow := 6 + m.subscriptionRowCount() + m.accountRowCount()
 	if m.updateVersion != "" {
 		startRow++ // update notification takes a row
 	}
@@ -1719,8 +1843,12 @@ func (m *MainMenuModel) routeFocusKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // the body cursor is already at its first item, focus escapes to the tab bar.
 func (m *MainMenuModel) focusUp() tea.Cmd {
 	switch m.focus {
-	case FocusAI:
+	case FocusAccount:
 		// already the top stop
+	case FocusAI:
+		if m.accountFocusable() {
+			m.focus = FocusAccount
+		}
 	case FocusSubscription:
 		m.focus = FocusAI
 	case FocusTabs:
@@ -1757,6 +1885,8 @@ func (m *MainMenuModel) focusUp() tea.Cmd {
 // focusDown moves down the focus ring or down within the focused body region.
 func (m *MainMenuModel) focusDown() tea.Cmd {
 	switch m.focus {
+	case FocusAccount:
+		m.focus = FocusAI
 	case FocusAI:
 		if m.subscriptionFocusable() {
 			m.focus = FocusSubscription
@@ -1791,6 +1921,8 @@ func (m *MainMenuModel) focusDown() tea.Cmd {
 // the focused settings value.
 func (m *MainMenuModel) focusLeft() tea.Cmd {
 	switch m.focus {
+	case FocusAccount:
+		m.CycleAccount("prev")
 	case FocusAI:
 		m.CycleAITool("prev")
 	case FocusSubscription:
@@ -1811,6 +1943,8 @@ func (m *MainMenuModel) focusLeft() tea.Cmd {
 // focusRight mirrors focusLeft in the opposite direction.
 func (m *MainMenuModel) focusRight() tea.Cmd {
 	switch m.focus {
+	case FocusAccount:
+		m.CycleAccount("next")
 	case FocusAI:
 		m.CycleAITool("next")
 	case FocusSubscription:
@@ -1832,6 +1966,13 @@ func (m *MainMenuModel) focusRight() tea.Cmd {
 // or trigger the body item's primary action.
 func (m *MainMenuModel) focusEnter() (tea.Model, tea.Cmd) {
 	switch m.focus {
+	case FocusAccount:
+		// Enter on the LOGIN row launches the add-login flow: adding a native
+		// account requires interactive browser OAuth, which can't run inside the
+		// alt-screen TUI, so we exit with the "add-account" action and let
+		// wrapper.sh run `claude auth login` before reopening the menu.
+		m.setActionResult("add-account")
+		return m, tea.Quit
 	case FocusAI:
 		return m, nil
 	case FocusSubscription:

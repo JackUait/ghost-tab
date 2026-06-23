@@ -85,6 +85,54 @@ func (m *MainMenuModel) subscriptionRowCount() int {
 	return 0
 }
 
+// accountRowCount returns 1 — the LOGIN/account line is always shown as a peer
+// of the AGENT and PLAN rows (each of which renders even with a single choice).
+// It renders in every tab's header chrome, so all layout math (height, scroll
+// header, click mapping) adds it to keep the body rows aligned.
+func (m *MainMenuModel) accountRowCount() int {
+	return 1
+}
+
+// renderAccountRow renders the active native Claude login, left-aligned at the
+// very top of the header chrome — above the AGENT picker — mirroring the PLAN
+// row's chevron/focus styling. The "LOGIN" caption pads to the width of "AGENT "
+// so the chevrons line up vertically with the rows below.
+func (m *MainMenuModel) renderAccountRow(leftBorder, rightBorder string) string {
+	label := m.CurrentClaudeAccountLabel()
+	var valColor lipgloss.Color
+	if m.CurrentClaudeAccountDir() != "" {
+		valColor = lipgloss.Color("114") // green when a non-Default account is active
+	} else {
+		valColor = m.theme.Primary // orange for Default, mirroring the AGENT value
+	}
+	nameStyle := lipgloss.NewStyle().Foreground(valColor)
+	if m.focus == FocusAccount {
+		nameStyle = lipgloss.NewStyle().Foreground(m.theme.Bright).Bold(true)
+	}
+
+	labelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
+	acctLabel := labelStyle.Render("LOGIN ")
+	// Chevrons appear only when there is a managed account to switch to (mirrors
+	// the PLAN row, which hides them when only Standard exists). The row stays a
+	// focus stop regardless so Enter can launch the add-login flow.
+	var content string
+	if m.accountHasChoices() {
+		chevronStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
+		if m.focus == FocusAccount {
+			chevronStyle = lipgloss.NewStyle().Foreground(m.theme.Accent)
+		}
+		content = acctLabel + chevronStyle.Render("◂ ") + nameStyle.Render(label) + chevronStyle.Render(" ▸")
+	} else {
+		content = acctLabel + nameStyle.Render(label)
+	}
+
+	pad := menuContentWidth - lipgloss.Width(content) - 1 // -1 for leading space
+	if pad < 1 {
+		pad = 1
+	}
+	return leftBorder + " " + content + strings.Repeat(" ", pad) + rightBorder
+}
+
 // renderSubscriptionRow renders the current Claude subscription, left-aligned
 // directly beneath the agent picker in the title row.
 func (m *MainMenuModel) renderSubscriptionRow(leftBorder, rightBorder string) string {
@@ -506,6 +554,8 @@ func (m *MainMenuModel) renderHelpRow() string {
 // body; ←/→ act on whatever is focused.
 func (m *MainMenuModel) focusHint() string {
 	switch m.focus {
+	case FocusAccount:
+		return "←→ switch login · ↵ add login · ↓ agent"
 	case FocusAI:
 		return "←→ switch agent · ↓ sections"
 	case FocusSubscription:
@@ -537,6 +587,12 @@ func (m *MainMenuModel) renderMenuBox() string {
 
 	// Top border
 	lines = append(lines, top)
+
+	// Native login account switcher, at the very top above the agent picker
+	// (shown only once managed accounts exist).
+	if m.accountRowCount() > 0 {
+		lines = append(lines, m.renderAccountRow(leftBorder, rightBorder))
+	}
 
 	// Title row
 	lines = append(lines, m.renderTitleRow(leftBorder, rightBorder))
@@ -614,7 +670,7 @@ func (m *MainMenuModel) renderMenuBox() string {
 	// Scroll clipping when menu is taller than the available terminal height.
 	// Fixed header = top + title + switcher-gap + tab-bar + sep + leading-blank (6),
 	// plus the optional subscription and update rows.
-	headerEnd := 6 + m.subscriptionRowCount()
+	headerEnd := 6 + m.subscriptionRowCount() + m.accountRowCount()
 	if m.updateVersion != "" {
 		headerEnd++
 	}
