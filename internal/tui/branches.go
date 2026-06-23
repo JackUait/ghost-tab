@@ -29,6 +29,7 @@ type BranchPickerModel struct {
 	filtering      bool // whether filter mode is active (activated by '/')
 	filterText     string
 	cursor         int // index in filtered list
+	hover          int // filtered-list index under the pointer, or -1 (transient)
 	offset         int // scroll offset for visible window
 	selected       *string
 	quitting       bool
@@ -53,6 +54,7 @@ func NewBranchPicker(branches []string, theme AIToolTheme, projectPath string) B
 		filtered:    filtered,
 		theme:       theme,
 		projectPath: projectPath,
+		hover:       -1,
 	}
 }
 
@@ -271,6 +273,7 @@ func (m *BranchPickerModel) applyFilter() {
 	}
 	m.cursor = 0
 	m.offset = 0
+	m.hover = -1
 }
 
 func (m *BranchPickerModel) clampScroll() {
@@ -422,13 +425,20 @@ func (m BranchPickerModel) renderSelectBox() string {
 				}
 				row = leftBorder + selectedBgStyle.Render(content+strings.Repeat(" ", padding)) + rightBorder
 			} else {
+				// A hovered-but-unselected branch gets a faint wash so the pointer
+				// target is visible; it clears the moment the pointer leaves the row.
 				branchText := primaryStyle.Render(truncBranch)
 				content := "    " + branchText
 				padding := menuContentWidth - lipgloss.Width(content)
 				if padding < 0 {
 					padding = 0
 				}
-				row = leftBorder + content + strings.Repeat(" ", padding) + rightBorder
+				if i == m.hover {
+					hoverBgStyle := lipgloss.NewStyle().Background(lipgloss.Color("236"))
+					row = leftBorder + hoverBgStyle.Render(content+strings.Repeat(" ", padding)) + rightBorder
+				} else {
+					row = leftBorder + content + strings.Repeat(" ", padding) + rightBorder
+				}
 			}
 			lines = append(lines, row)
 		}
@@ -610,15 +620,14 @@ func (m BranchPickerModel) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	}
 
 	idx := m.mouseToFilteredIndex(msg.X, msg.Y)
-	if idx < 0 {
-		return m, nil
-	}
 	switch msg.Action {
 	case tea.MouseActionMotion:
-		m.cursor = idx
+		// Transient highlight only: idx is -1 when the pointer is off every branch
+		// row, clearing the hover; the keyboard cursor stays where it was.
+		m.hover = idx
 		return m, nil
 	case tea.MouseActionPress:
-		if msg.Button == tea.MouseButtonLeft {
+		if msg.Button == tea.MouseButtonLeft && idx >= 0 {
 			name := m.filtered[idx]
 			m.selected = &name
 			m.quitting = true

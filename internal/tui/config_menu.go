@@ -34,6 +34,7 @@ type ConfigMenuOptions struct {
 type ConfigMenuModel struct {
 	items    []ConfigMenuItem
 	cursor   int
+	hover    int // row under the pointer, or -1 (transient; never moves the cursor)
 	selected *ConfigMenuItem
 	quitting bool
 	width    int
@@ -58,6 +59,7 @@ func NewConfigMenu(opts ConfigMenuOptions) ConfigMenuModel {
 
 	return ConfigMenuModel{
 		items: items,
+		hover: -1,
 	}
 }
 
@@ -154,8 +156,10 @@ func (m ConfigMenuModel) configMenuItemAt(y int) int {
 	return -1
 }
 
-// handleMouse gives the config menu pointer parity: hover moves the cursor,
-// left-click selects the item under it (the Enter action), and the wheel scrolls.
+// handleMouse gives the config menu pointer parity: hover highlights the row
+// under the pointer (a transient layer that clears the moment the pointer leaves
+// a row and never moves the keyboard cursor), left-click selects the item under
+// it (the Enter action), and the wheel scrolls the cursor.
 func (m ConfigMenuModel) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	switch msg.Button {
 	case tea.MouseButtonWheelDown:
@@ -166,15 +170,12 @@ func (m ConfigMenuModel) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	i := m.configMenuItemAt(msg.Y)
-	if i < 0 {
-		return m, nil
-	}
 	switch msg.Action {
 	case tea.MouseActionMotion:
-		m.cursor = i
+		m.hover = i // i is -1 when the pointer is off every row, clearing the highlight
 		return m, nil
 	case tea.MouseActionPress:
-		if msg.Button == tea.MouseButtonLeft {
+		if msg.Button == tea.MouseButtonLeft && i >= 0 {
 			item := m.items[i]
 			m.selected = &item
 			m.quitting = true
@@ -210,11 +211,16 @@ func (m ConfigMenuModel) View() string {
 	dimStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
 
 	for i, item := range m.items {
-		// Cursor + title
+		// Cursor + title. The keyboard cursor shows a bright \u25b8; a hovered-but-not-
+		// cursor row shows a dim \u25b8 so the pointer target reads as clickable without
+		// masquerading as the keyboard selection.
 		var line string
-		if i == m.cursor {
+		switch {
+		case i == m.cursor:
 			line = selectedItemStyle.Render(fmt.Sprintf(" %s %s", "\u25b8", item.ItemTitle))
-		} else {
+		case i == m.hover:
+			line = dimStyle.Render(" \u25b8 ") + item.ItemTitle
+		default:
 			line = fmt.Sprintf("   %s", item.ItemTitle)
 		}
 

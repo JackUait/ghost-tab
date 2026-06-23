@@ -31,6 +31,7 @@ func (m *MainMenuModel) openModelMap() {
 	m.modelMapErr = nil
 	m.modelMapKeyMode = false
 	m.modelMapHover = -1
+	m.modelMapSlotHover = -1
 }
 
 // updateModelMap handles key events while the model mapping panel is open.
@@ -172,12 +173,19 @@ func (m *MainMenuModel) renderModelMapPanel() string {
 	lines = append(lines, separator)
 	lines = append(lines, emptyRow)
 
+	faintStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
 	models := m.modelMapModels
 	for i, alias := range claudeconfig.AnthropicAliases {
+		// The keyboard cursor shows a bright ▌; a hovered-but-not-cursor slot shows
+		// a faint ▌ so the pointer target reads as distinct, and it clears the moment
+		// the pointer leaves the slots.
 		var prefix string
-		if i == m.modelMapCursor {
+		switch {
+		case i == m.modelMapCursor:
 			prefix = " " + primaryBoldStyle.Render("▌")
-		} else {
+		case i == m.modelMapSlotHover:
+			prefix = " " + faintStyle.Render("▌")
+		default:
 			prefix = "    "
 		}
 		aliasLabel := primaryBoldStyle.Render(fmt.Sprintf("%-8s", alias))

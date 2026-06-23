@@ -20,6 +20,7 @@ type MultiSelectModel struct {
 	tools    []models.AITool
 	checked  []bool
 	cursor   int
+	hover    int // tool row under the pointer, or -1 (transient; never moves the cursor)
 	result   *MultiSelectResult
 	quitting bool
 	errorMsg string
@@ -46,6 +47,7 @@ func NewMultiSelect(tools []models.AITool) MultiSelectModel {
 		tools:   tools,
 		checked: checked,
 		cursor:  0,
+		hover:   -1,
 	}
 }
 
@@ -189,9 +191,9 @@ func (m MultiSelectModel) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	switch msg.Action {
 	case tea.MouseActionMotion:
 		m.btnHover = onConfirm
-		if toolIdx >= 0 {
-			m.cursor = toolIdx
-		}
+		// Transient highlight only: it clears (toolIdx == -1) the moment the pointer
+		// leaves the tool rows, and never moves the keyboard cursor.
+		m.hover = toolIdx
 		return m, nil
 	case tea.MouseActionPress:
 		if msg.Button != tea.MouseButtonLeft {
@@ -223,11 +225,17 @@ func (m MultiSelectModel) View() string {
 
 	installedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("220"))
 
+	dimStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
 	for i, tool := range m.tools {
-		// Cursor indicator
-		if i == m.cursor {
+		// Cursor indicator. The keyboard cursor is a bright ❯; a hovered-but-not-
+		// cursor row gets a dim ❯ so the pointer target reads as distinct from the
+		// keyboard selection. The marker clears once the pointer leaves the row.
+		switch {
+		case i == m.cursor:
 			b.WriteString(selectedItemStyle.Render("  ❯ "))
-		} else {
+		case i == m.hover:
+			b.WriteString(dimStyle.Render("  ❯ "))
+		default:
 			b.WriteString("    ")
 		}
 

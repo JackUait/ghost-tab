@@ -364,20 +364,19 @@ func (m *MainMenuModel) handleAccountMenuMouse(msg tea.MouseMsg) (tea.Model, tea
 	}
 
 	boxX := msg.X - m.menuOriginX
-	if boxX < 0 || boxX >= menuBoxWidth {
-		return m, nil
-	}
-	cursor := m.accountMenuRowToCursor(msg.Y - m.modalOriginY)
-	if cursor < 0 {
-		return m, nil
+	cursor := -1
+	if boxX >= 0 && boxX < menuBoxWidth {
+		cursor = m.accountMenuRowToCursor(msg.Y - m.modalOriginY)
 	}
 
 	switch msg.Action {
 	case tea.MouseActionMotion:
-		m.accountMenuCursor = cursor
+		// Transient highlight only: cursor is -1 when the pointer is off every login
+		// row, clearing the hover; the keyboard cursor stays where it was.
+		m.accountMenuHover = cursor
 		return m, nil
 	case tea.MouseActionPress:
-		if msg.Button == tea.MouseButtonLeft {
+		if msg.Button == tea.MouseButtonLeft && cursor >= 0 {
 			m.accountMenuCursor = cursor
 			if cursor == addRow {
 				return m, m.enterAccountAddInput()
@@ -466,12 +465,14 @@ func (m *MainMenuModel) handleModelMapMouse(msg tea.MouseMsg) (tea.Model, tea.Cm
 	return m, nil
 }
 
-// applyModelMapHover highlights the hovered element: slots move the cursor (its
-// own marker), the API-key row and buttons set modelMapHover.
+// applyModelMapHover highlights the hovered element with a transient layer that
+// never moves the keyboard cursor and clears the moment the pointer leaves it:
+// slots set modelMapSlotHover, the API-key row and buttons set modelMapHover.
 func (m *MainMenuModel) applyModelMapHover(kind, index int) {
+	m.modelMapSlotHover = -1
 	switch kind {
 	case mmModel:
-		m.modelMapCursor = index
+		m.modelMapSlotHover = index
 		m.modelMapHover = -1
 	case mmKey:
 		m.modelMapHover = 4

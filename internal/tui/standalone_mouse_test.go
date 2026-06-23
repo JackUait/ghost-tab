@@ -44,13 +44,32 @@ func TestConfigMenu_clickSelectsItem(t *testing.T) {
 	}
 }
 
-func TestConfigMenu_hoverMovesCursor(t *testing.T) {
+func TestConfigMenu_hoverSetsHoverNotCursor(t *testing.T) {
 	m := NewConfigMenu(ConfigMenuOptions{})
 	m.width = 80
 	upd, _ := m.Update(tea.MouseMsg{X: 5, Y: 5, Action: tea.MouseActionMotion})
 	got := upd.(ConfigMenuModel)
-	if got.Cursor() != 1 {
-		t.Errorf("hover moved cursor to %d, want 1", got.Cursor())
+	if got.hover != 1 {
+		t.Errorf("hover set hover index to %d, want 1", got.hover)
+	}
+	if got.Cursor() != 0 {
+		t.Errorf("hover must not move the keyboard cursor; got %d, want 0", got.Cursor())
+	}
+}
+
+func TestConfigMenu_hoverClearsWhenPointerLeaves(t *testing.T) {
+	m := NewConfigMenu(ConfigMenuOptions{})
+	m.width = 80
+	// Hover an item, then move onto the spacer row between items (no item there).
+	upd, _ := m.Update(tea.MouseMsg{X: 5, Y: 2, Action: tea.MouseActionMotion})
+	m = upd.(ConfigMenuModel)
+	if m.hover != 0 {
+		t.Fatalf("precondition: hover should be 0, got %d", m.hover)
+	}
+	upd, _ = m.Update(tea.MouseMsg{X: 5, Y: 4, Action: tea.MouseActionMotion}) // spacer row
+	got := upd.(ConfigMenuModel)
+	if got.hover != -1 {
+		t.Errorf("moving the pointer off the rows should clear hover to -1, got %d", got.hover)
 	}
 }
 
@@ -79,13 +98,32 @@ func TestMultiSelect_clickTogglesAndConfirm(t *testing.T) {
 	}
 }
 
-func TestMultiSelect_hoverMovesCursor(t *testing.T) {
+func TestMultiSelect_hoverSetsHoverNotCursor(t *testing.T) {
 	tools := []models.AITool{{Name: "claude", Installed: true}, {Name: "opencode"}}
 	m := NewMultiSelect(tools)
 	upd, _ := m.Update(tea.MouseMsg{X: 6, Y: 3, Action: tea.MouseActionMotion})
 	got := upd.(MultiSelectModel)
-	if got.Cursor() != 1 {
-		t.Errorf("hover moved cursor to %d, want 1", got.Cursor())
+	if got.hover != 1 {
+		t.Errorf("hover set hover index to %d, want 1", got.hover)
+	}
+	if got.Cursor() != 0 {
+		t.Errorf("hover must not move the keyboard cursor; got %d, want 0", got.Cursor())
+	}
+}
+
+func TestMultiSelect_hoverClearsWhenPointerLeaves(t *testing.T) {
+	tools := []models.AITool{{Name: "claude", Installed: true}, {Name: "opencode"}}
+	m := NewMultiSelect(tools)
+	upd, _ := m.Update(tea.MouseMsg{X: 6, Y: 3, Action: tea.MouseActionMotion})
+	m = upd.(MultiSelectModel)
+	if m.hover != 1 {
+		t.Fatalf("precondition: hover should be 1, got %d", m.hover)
+	}
+	// Move onto the title row (Y=0), which has no tool.
+	upd, _ = m.Update(tea.MouseMsg{X: 6, Y: 0, Action: tea.MouseActionMotion})
+	got := upd.(MultiSelectModel)
+	if got.hover != -1 {
+		t.Errorf("moving the pointer off the tool rows should clear hover to -1, got %d", got.hover)
 	}
 }
 
@@ -103,13 +141,32 @@ func TestClaudeConfigMenu_clickAddRowStartsAdd(t *testing.T) {
 	}
 }
 
-func TestClaudeConfigMenu_hoverMovesCursor(t *testing.T) {
+func TestClaudeConfigMenu_hoverSetsHoverNotCursor(t *testing.T) {
 	configs := []ClaudeConfig{{Name: "Work", File: "work.json"}, {Name: "Personal", File: "personal.json"}}
 	m := NewClaudeConfigMenu(configs)
 	upd, _ := m.Update(tea.MouseMsg{X: 5, Y: 3, Action: tea.MouseActionMotion}) // second config (row 3)
 	got := upd.(ClaudeConfigMenuModel)
-	if got.cursor != 1 {
-		t.Errorf("hover moved cursor to %d, want 1", got.cursor)
+	if got.hover != 1 {
+		t.Errorf("hover set hover index to %d, want 1", got.hover)
+	}
+	if got.cursor != 0 {
+		t.Errorf("hover must not move the keyboard cursor; got %d, want 0", got.cursor)
+	}
+}
+
+func TestClaudeConfigMenu_hoverClearsWhenPointerLeaves(t *testing.T) {
+	configs := []ClaudeConfig{{Name: "Work", File: "work.json"}, {Name: "Personal", File: "personal.json"}}
+	m := NewClaudeConfigMenu(configs)
+	upd, _ := m.Update(tea.MouseMsg{X: 5, Y: 3, Action: tea.MouseActionMotion})
+	m = upd.(ClaudeConfigMenuModel)
+	if m.hover != 1 {
+		t.Fatalf("precondition: hover should be 1, got %d", m.hover)
+	}
+	// Move onto the top border row (Y=0), off every list row.
+	upd, _ = m.Update(tea.MouseMsg{X: 5, Y: 0, Action: tea.MouseActionMotion})
+	got := upd.(ClaudeConfigMenuModel)
+	if got.hover != -1 {
+		t.Errorf("moving the pointer off the rows should clear hover to -1, got %d", got.hover)
 	}
 }
 

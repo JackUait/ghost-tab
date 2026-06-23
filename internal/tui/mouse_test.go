@@ -30,13 +30,13 @@ func TestHitTest_tabBar_mapsColumnsToTabs(t *testing.T) {
 		region mouseRegion
 		index  int
 	}{
-		{2, regionTab, 0},  // Projects start
-		{11, regionTab, 0}, // Projects end
+		{2, regionTab, 0},   // Projects start
+		{11, regionTab, 0},  // Projects end
 		{13, regionNone, 0}, // separator gap
-		{14, regionTab, 1}, // Settings start
-		{23, regionTab, 1}, // Settings end
-		{26, regionTab, 2}, // Stats start
-		{32, regionTab, 2}, // Stats end
+		{14, regionTab, 1},  // Settings start
+		{23, regionTab, 1},  // Settings end
+		{26, regionTab, 2},  // Stats start
+		{32, regionTab, 2},  // Stats end
 		{40, regionNone, 0}, // trailing padding
 	}
 	for _, c := range cases {
@@ -249,7 +249,7 @@ func TestUpdate_clickAccountRow_switchesAndCloses(t *testing.T) {
 	}
 }
 
-func TestUpdate_hoverAccountRow_movesCursor(t *testing.T) {
+func TestUpdate_hoverAccountRow_setsHoverNotCursor(t *testing.T) {
 	m := NewMainMenu(nil, []string{"claude"}, "claude", "none")
 	m.SetClaudeAccounts([]ClaudeAccount{{Label: "Work", Dir: "work"}, {Label: "Personal", Dir: "personal"}})
 	m.width = 100
@@ -265,11 +265,35 @@ func TestUpdate_hoverAccountRow_movesCursor(t *testing.T) {
 	}
 	updated, _ := m.Update(msg)
 	mm := updated.(*MainMenuModel)
-	if mm.accountMenuCursor != 2 {
-		t.Errorf("hover moved accountMenuCursor to %d, want 2", mm.accountMenuCursor)
+	if mm.accountMenuHover != 2 {
+		t.Errorf("hover set accountMenuHover to %d, want 2", mm.accountMenuHover)
+	}
+	if mm.accountMenuCursor != 0 {
+		t.Errorf("hover must not move accountMenuCursor; got %d, want 0", mm.accountMenuCursor)
 	}
 	if !mm.accountMenuOpen {
 		t.Error("hover must not close the account modal")
+	}
+}
+
+func TestUpdate_hoverAccountRow_clearsWhenPointerLeaves(t *testing.T) {
+	m := NewMainMenu(nil, []string{"claude"}, "claude", "none")
+	m.SetClaudeAccounts([]ClaudeAccount{{Label: "Work", Dir: "work"}, {Label: "Personal", Dir: "personal"}})
+	m.width = 100
+	m.height = 60
+	m.accountMenuOpen = true
+	_ = m.View()
+
+	upd, _ := m.Update(tea.MouseMsg{X: m.menuOriginX + 5, Y: m.modalOriginY + 6, Action: tea.MouseActionMotion})
+	mm := upd.(*MainMenuModel)
+	if mm.accountMenuHover != 2 {
+		t.Fatalf("precondition: accountMenuHover should be 2, got %d", mm.accountMenuHover)
+	}
+	// Move onto the blank separator row (panel row 7), off every login row.
+	upd, _ = mm.Update(tea.MouseMsg{X: mm.menuOriginX + 5, Y: mm.modalOriginY + 7, Action: tea.MouseActionMotion})
+	got := upd.(*MainMenuModel)
+	if got.accountMenuHover != -1 {
+		t.Errorf("moving off the login rows should clear accountMenuHover to -1, got %d", got.accountMenuHover)
 	}
 }
 
@@ -290,18 +314,38 @@ func TestBranchPicker_clickSelectsBranch(t *testing.T) {
 	}
 }
 
-func TestBranchPicker_hoverMovesCursor(t *testing.T) {
+func TestBranchPicker_hoverSetsHoverNotCursor(t *testing.T) {
 	m := NewBranchPicker([]string{"main", "dev", "feature"}, ThemeForTool("claude"), "/p")
 	m.width = 100
 	m.height = 40
 	msg := tea.MouseMsg{X: 20, Y: 21, Action: tea.MouseActionMotion} // "feature" (index 2)
 	upd, _ := m.Update(msg)
 	got := upd.(BranchPickerModel)
-	if got.cursor != 2 {
-		t.Errorf("hover moved cursor to %d, want 2", got.cursor)
+	if got.hover != 2 {
+		t.Errorf("hover set hover index to %d, want 2", got.hover)
+	}
+	if got.cursor != 0 {
+		t.Errorf("hover must not move the keyboard cursor; got %d, want 0", got.cursor)
 	}
 	if got.Selected() != nil {
 		t.Error("hover must not select a branch")
+	}
+}
+
+func TestBranchPicker_hoverClearsWhenPointerLeaves(t *testing.T) {
+	m := NewBranchPicker([]string{"main", "dev", "feature"}, ThemeForTool("claude"), "/p")
+	m.width = 100
+	m.height = 40
+	upd, _ := m.Update(tea.MouseMsg{X: 20, Y: 21, Action: tea.MouseActionMotion})
+	m = upd.(BranchPickerModel)
+	if m.hover != 2 {
+		t.Fatalf("precondition: hover should be 2, got %d", m.hover)
+	}
+	// Move onto the title row (well above the items), off every branch row.
+	upd, _ = m.Update(tea.MouseMsg{X: 20, Y: 0, Action: tea.MouseActionMotion})
+	got := upd.(BranchPickerModel)
+	if got.hover != -1 {
+		t.Errorf("moving off the branch rows should clear hover to -1, got %d", got.hover)
 	}
 }
 

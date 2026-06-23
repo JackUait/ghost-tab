@@ -44,7 +44,6 @@ func key(t *testing.T, m *MainMenuModel, msg tea.KeyMsg) *MainMenuModel {
 	return got
 }
 
-
 func TestModelMap_EnterOnNonStandardOpensPanel(t *testing.T) {
 	m, _, _ := newPanelMenu(t)
 	m.CycleClaudeConfig("next")
@@ -132,10 +131,10 @@ func TestModelMapTarget_mapsCoordinates(t *testing.T) {
 		wantKind     int
 		wantIndex    int
 	}{
-		{5, 4, mmModel, 0},  // first slot
-		{5, 7, mmModel, 3},  // last slot
-		{5, 8, mmNone, 0},   // blank
-		{5, 9, mmKey, 0},    // API key row
+		{5, 4, mmModel, 0}, // first slot
+		{5, 7, mmModel, 3}, // last slot
+		{5, 8, mmNone, 0},  // blank
+		{5, 9, mmKey, 0},   // API key row
 		{saveStart, 10, mmSave, 0},
 		{cancelStart, 10, mmCancel, 0},
 	}
@@ -220,7 +219,7 @@ func TestUpdate_clickPlanSettingsRow_opensModelMap(t *testing.T) {
 	}
 }
 
-func TestUpdate_hoverModelSlot_movesCursor(t *testing.T) {
+func TestUpdate_hoverModelSlot_setsHoverNotCursor(t *testing.T) {
 	m, _, _ := newPanelMenu(t)
 	m.CycleClaudeConfig("next")
 	m.openModelMap()
@@ -230,11 +229,33 @@ func TestUpdate_hoverModelSlot_movesCursor(t *testing.T) {
 	msg := tea.MouseMsg{X: m.menuOriginX + 5, Y: m.modalOriginY + 6, Action: tea.MouseActionMotion}
 	upd, _ := m.Update(msg)
 	got := upd.(*MainMenuModel)
-	if got.modelMapCursor != 2 {
-		t.Errorf("hover moved modelMapCursor to %d, want 2", got.modelMapCursor)
+	if got.modelMapSlotHover != 2 {
+		t.Errorf("hover set modelMapSlotHover to %d, want 2", got.modelMapSlotHover)
+	}
+	if got.modelMapCursor != 0 {
+		t.Errorf("hover must not move modelMapCursor; got %d, want 0", got.modelMapCursor)
 	}
 	if !got.modelMapOpen {
 		t.Error("hover must not close the model map")
+	}
+}
+
+func TestUpdate_hoverModelSlot_clearsWhenPointerLeaves(t *testing.T) {
+	m, _, _ := newPanelMenu(t)
+	m.CycleClaudeConfig("next")
+	m.openModelMap()
+	m.width, m.height = 100, 60
+	_ = m.View()
+	upd, _ := m.Update(tea.MouseMsg{X: m.menuOriginX + 5, Y: m.modalOriginY + 6, Action: tea.MouseActionMotion})
+	mm := upd.(*MainMenuModel)
+	if mm.modelMapSlotHover != 2 {
+		t.Fatalf("precondition: modelMapSlotHover should be 2, got %d", mm.modelMapSlotHover)
+	}
+	// Panel row 8 is the blank row between the slots and the API-key row.
+	upd, _ = mm.Update(tea.MouseMsg{X: mm.menuOriginX + 5, Y: mm.modalOriginY + 8, Action: tea.MouseActionMotion})
+	got := upd.(*MainMenuModel)
+	if got.modelMapSlotHover != -1 {
+		t.Errorf("moving off the slots should clear modelMapSlotHover to -1, got %d", got.modelMapSlotHover)
 	}
 }
 

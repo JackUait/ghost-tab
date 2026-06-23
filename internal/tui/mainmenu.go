@@ -231,8 +231,15 @@ type MainMenuModel struct {
 	modalOriginY int
 	// modelMapHover marks which non-cursor element of the model-map panel the
 	// pointer is over so it can highlight: -1 none, 4 = API key row, 5 = Save
-	// button, 6 = Cancel button. (Model-slot hover reuses modelMapCursor.)
+	// button, 6 = Cancel button.
 	modelMapHover int
+	// modelMapSlotHover is the model slot (0..3) under the pointer, or -1. It is a
+	// transient highlight separate from the keyboard cursor (modelMapCursor): it
+	// clears the moment the pointer leaves the slots and never moves the cursor.
+	modelMapSlotHover int
+	// accountMenuHover is the login row under the pointer in the account modal, or
+	// -1. Transient highlight, separate from the keyboard cursor (accountMenuCursor).
+	accountMenuHover int
 
 	// Inline input mode (add-project or open-once)
 	inputMode    string // "", "add-project", "open-once"
@@ -370,6 +377,8 @@ func NewMainMenu(projects []models.Project, aiTools []string, currentAI string, 
 		defaultAccountLabel:       "Default",
 		hoverTab:                  -1,
 		modelMapHover:             -1,
+		modelMapSlotHover:         -1,
+		accountMenuHover:          -1,
 	}
 }
 

@@ -37,6 +37,7 @@ func (m *MainMenuModel) openAccountMenu() {
 	m.accountMenuInputMode = false
 	m.accountMenuRenameRow = -1
 	m.accountMenuErr = nil
+	m.accountMenuHover = -1
 }
 
 // enterAccountAddInput opens the inline label text input for a new login.
@@ -344,14 +345,24 @@ func (m *MainMenuModel) renderAccountMenuPanel() string {
 		return leftBorder + " " + left + strings.Repeat(" ", gap) + right + rightBorder
 	}
 
-	// loginRow renders one selectable login with the cursor marker and a
-	// right-aligned status (the active tag, or the dim config-dir name).
-	loginRow := func(cursorOn, active bool, label, dirName string) string {
+	faintStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
+	// loginRow renders one selectable login. The keyboard cursor shows a bright ▌
+	// marker; a hovered-but-not-cursor row shows a faint ▌ so the pointer target
+	// reads as distinct, and it clears the moment the pointer leaves the row.
+	loginRow := func(cursorOn, hoverOn, active bool, label, dirName string) string {
 		var prefix, labelRendered string
-		if cursorOn {
+		switch {
+		case cursorOn:
 			prefix = " " + primaryBoldStyle.Render("▌")
 			labelRendered = primaryBoldStyle.Render(label)
-		} else {
+		case hoverOn:
+			prefix = " " + faintStyle.Render("▌")
+			if active {
+				labelRendered = greenStyle.Render(label)
+			} else {
+				labelRendered = label
+			}
+		default:
 			prefix = "    "
 			if active {
 				labelRendered = greenStyle.Render(label)
@@ -375,13 +386,15 @@ func (m *MainMenuModel) renderAccountMenuPanel() string {
 	lines = append(lines, separator)
 	lines = append(lines, emptyRow)
 
+	// hoverOn marks a transient pointer highlight that yields to the keyboard cursor.
+	hoverOn := func(idx int) bool { return m.accountMenuHover == idx && m.accountMenuCursor != idx }
 	// Default (implicit) login at index 0.
-	lines = append(lines, loginRow(m.accountMenuCursor == 0, m.selectedAccount == 0, m.DefaultAccountLabel(), "default"))
+	lines = append(lines, loginRow(m.accountMenuCursor == 0, hoverOn(0), m.selectedAccount == 0, m.DefaultAccountLabel(), "default"))
 	// Managed logins.
 	for i, acc := range m.claudeAccounts {
 		cursorOn := m.accountMenuCursor == i+1
 		active := m.selectedAccount == i+1
-		lines = append(lines, loginRow(cursorOn, active, acc.Label, acc.Dir))
+		lines = append(lines, loginRow(cursorOn, hoverOn(i+1), active, acc.Label, acc.Dir))
 	}
 
 	lines = append(lines, emptyRow)
@@ -409,9 +422,12 @@ func (m *MainMenuModel) renderAccountMenuPanel() string {
 		// Add row.
 		addRow := m.accountMenuAddRow()
 		var addContent string
-		if m.accountMenuCursor == addRow {
+		switch {
+		case m.accountMenuCursor == addRow:
 			addContent = " " + primaryBoldStyle.Render("▌") + primaryBoldStyle.Render("+ Add new login…")
-		} else {
+		case hoverOn(addRow):
+			addContent = " " + faintStyle.Render("▌") + helpStyle.Render("+ Add new login…")
+		default:
 			addContent = "    " + helpStyle.Render("+ Add new login…")
 		}
 		lines = append(lines, row(addContent, ""))

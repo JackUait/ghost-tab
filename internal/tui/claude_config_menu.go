@@ -29,6 +29,7 @@ const (
 type ClaudeConfigMenuModel struct {
 	configs  []ClaudeConfig // managed configs (no Standard)
 	cursor   int            // 0..len(configs)-1 = configs; len = "Add new config…"
+	hover    int            // row under the pointer, or -1 (transient; never moves the cursor)
 	mode     ccmMode
 	input    textinput.Model
 	result   *ClaudeConfigMenuResult
@@ -40,7 +41,7 @@ type ClaudeConfigMenuModel struct {
 func NewClaudeConfigMenu(configs []ClaudeConfig) ClaudeConfigMenuModel {
 	ti := textinput.New()
 	ti.Placeholder = "config name"
-	return ClaudeConfigMenuModel{configs: configs, input: ti}
+	return ClaudeConfigMenuModel{configs: configs, input: ti, hover: -1}
 }
 
 // Init implements tea.Model.
@@ -174,15 +175,14 @@ func (m ClaudeConfigMenuModel) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd
 		return m, nil
 	}
 	row := m.ccmRowAt(msg.Y)
-	if row < 0 {
-		return m, nil
-	}
 	switch msg.Action {
 	case tea.MouseActionMotion:
-		m.cursor = row
+		// Transient highlight only: row is -1 when the pointer is off every row,
+		// clearing the hover; the keyboard cursor stays where it was.
+		m.hover = row
 		return m, nil
 	case tea.MouseActionPress:
-		if msg.Button == tea.MouseButtonLeft {
+		if msg.Button == tea.MouseButtonLeft && row >= 0 {
 			m.cursor = row
 			if row == m.addRowIndex() {
 				m.mode = ccmAddInput
@@ -247,12 +247,18 @@ func renderClaudeConfigMenu(m ClaudeConfigMenuModel) string {
 		return renderBox(content.String(), boxWidth, borderColor, " Manage Configs ")
 	}
 
-	// ccmList: render config rows + add row + help footer
+	// ccmList: render config rows + add row + help footer. The keyboard cursor is
+	// a bright ▸; a hovered-but-not-cursor row gets a dim ▸ so the pointer target
+	// reads as distinct, and it clears the moment the pointer leaves the row.
+	dimStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
 	for i, cfg := range m.configs {
 		var line string
-		if i == m.cursor {
+		switch {
+		case i == m.cursor:
 			line = selectedItemStyle.Render(fmt.Sprintf(" ▸ %s", cfg.Name))
-		} else {
+		case i == m.hover:
+			line = dimStyle.Render(" ▸ ") + cfg.Name
+		default:
 			line = fmt.Sprintf("   %s", cfg.Name)
 		}
 
@@ -272,10 +278,13 @@ func renderClaudeConfigMenu(m ClaudeConfigMenuModel) string {
 
 	// Add row
 	addIdx := m.addRowIndex()
-	if m.cursor == addIdx {
-		content.WriteString(selectedItemStyle.Render(fmt.Sprintf(" ▸ Add new config…")))
-	} else {
-		content.WriteString(fmt.Sprintf("   Add new config…"))
+	switch {
+	case m.cursor == addIdx:
+		content.WriteString(selectedItemStyle.Render(" ▸ Add new config…"))
+	case m.hover == addIdx:
+		content.WriteString(dimStyle.Render(" ▸ ") + "Add new config…")
+	default:
+		content.WriteString("   Add new config…")
 	}
 
 	// Help footer
