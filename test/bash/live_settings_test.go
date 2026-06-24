@@ -111,6 +111,88 @@ func TestLiveSettings_apply_session_theme_repaints_spare_chip(t *testing.T) {
 	assertContains(t, got, "colour141")
 }
 
+// --- apply_theme_to_all_sessions: repaint EVERY active session ---
+
+// A theme change must reach every running ghost-tab session, not only those
+// whose watcher loop was started with the live-theme code. apply_theme_to_all_sessions
+// addresses each session externally: it enumerates tmux sessions, skips non
+// ghost-tab ones, and resolves each session's accent from its own AI tool (the
+// GHOST_TAB_TOOL env captured at launch) so an "auto"/unset theme still picks the
+// right hue per session.
+const allSessionsTmux = `#!/bin/bash
+printf '%s\n' "$*" >> "$GT_REC"
+case "$1" in
+  list-sessions) printf '%s\n' "dev-alpha-1" "dev-beta-2" "plain-3" ;;
+  show-environment)
+    sess="$3"; var="$4"
+    [ "$sess" = "plain-3" ] && exit 1   # not a ghost-tab session
+    case "$var" in
+      GHOST_TAB) exit 0 ;;
+      GHOST_TAB_TOOL)
+        case "$sess" in
+          dev-alpha-1) echo "GHOST_TAB_TOOL=claude" ;;
+          dev-beta-2)  echo "GHOST_TAB_TOOL=opencode" ;;
+        esac ;;
+    esac ;;
+esac
+exit 0
+`
+
+func TestLiveSettings_apply_theme_to_all_sessions_per_tool(t *testing.T) {
+	dir := t.TempDir()
+	rec := filepath.Join(dir, "rec")
+	// theme unset -> resolve per tool: claude->orange(209), opencode->purple(141).
+	writeTempFile(t, dir, "settings", "animation=on\ntab_title=full\n")
+	settings := filepath.Join(dir, "settings")
+	binDir := mockCommand(t, dir, "tmux", allSessionsTmux)
+	env := buildEnv(t, []string{binDir}, "GT_REC="+rec)
+	tmuxPath := filepath.Join(binDir, "tmux")
+
+	root := projectRoot(t)
+	tuiPath := filepath.Join(root, "lib", "tui.sh")
+	themePath := filepath.Join(root, "lib", "theme.sh")
+	watcherPath := filepath.Join(root, "lib", "tab-title-watcher.sh")
+	snippet := fmt.Sprintf("source %q && source %q && source %q && apply_theme_to_all_sessions %q %q",
+		tuiPath, themePath, watcherPath, tmuxPath, settings)
+
+	_, code := runBashSnippet(t, snippet, env)
+	assertExitCode(t, code, 0)
+
+	data, _ := os.ReadFile(rec)
+	got := string(data)
+	assertContains(t, got, "set-option -t dev-alpha-1 pane-active-border-style fg=colour209")
+	assertContains(t, got, "set-option -t dev-beta-2 pane-active-border-style fg=colour141")
+	// The non-ghost-tab session must never be touched.
+	assertNotContains(t, got, "set-option -t plain-3")
+}
+
+func TestLiveSettings_apply_theme_to_all_sessions_named_preset(t *testing.T) {
+	dir := t.TempDir()
+	rec := filepath.Join(dir, "rec")
+	// A named preset wins for every session regardless of its tool.
+	writeTempFile(t, dir, "settings", "theme=purple\n")
+	settings := filepath.Join(dir, "settings")
+	binDir := mockCommand(t, dir, "tmux", allSessionsTmux)
+	env := buildEnv(t, []string{binDir}, "GT_REC="+rec)
+	tmuxPath := filepath.Join(binDir, "tmux")
+
+	root := projectRoot(t)
+	tuiPath := filepath.Join(root, "lib", "tui.sh")
+	themePath := filepath.Join(root, "lib", "theme.sh")
+	watcherPath := filepath.Join(root, "lib", "tab-title-watcher.sh")
+	snippet := fmt.Sprintf("source %q && source %q && source %q && apply_theme_to_all_sessions %q %q",
+		tuiPath, themePath, watcherPath, tmuxPath, settings)
+
+	_, code := runBashSnippet(t, snippet, env)
+	assertExitCode(t, code, 0)
+
+	data, _ := os.ReadFile(rec)
+	got := string(data)
+	assertContains(t, got, "set-option -t dev-alpha-1 pane-active-border-style fg=colour141")
+	assertContains(t, got, "set-option -t dev-beta-2 pane-active-border-style fg=colour141")
+	assertNotContains(t, got, "set-option -t plain-3")
+}
+
 // --- spare_tabs_status_left: the reusable status-left builder ---
 
 func TestSpareTabs_status_left_uses_accent(t *testing.T) {

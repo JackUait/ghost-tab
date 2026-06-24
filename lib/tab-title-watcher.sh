@@ -28,6 +28,31 @@ apply_session_theme() {
   fi
 }
 
+# Repaint EVERY active ghost-tab session's chrome to the theme accent currently
+# saved in the settings file. The per-session watcher only reaches sessions whose
+# loop was started with the live-theme code, so a theme change misses sessions
+# whose watcher predates the feature. This addresses each running session
+# externally instead: it enumerates tmux sessions, skips non ghost-tab ones (only
+# ghost-tab sessions export GHOST_TAB=1), and resolves each session's accent from
+# its own AI tool (the GHOST_TAB_TOOL env captured at launch) so an "auto"/unset
+# theme still picks the right hue per session.
+# Usage: apply_theme_to_all_sessions <tmux_cmd> <settings_file>
+apply_theme_to_all_sessions() {
+  local tmux_cmd="$1" settings_file="$2"
+  local theme_pref
+  theme_pref="$(read_settings_value "$settings_file" theme)"
+  # Pipe (not process substitution): the wrapper sources libs under bash --posix,
+  # where `< <(...)` is disabled. A subshell is fine — we mutate tmux, not vars.
+  "$tmux_cmd" list-sessions -F '#{session_name}' 2>/dev/null | while IFS= read -r session; do
+    [ -z "$session" ] && continue
+    "$tmux_cmd" show-environment -t "$session" GHOST_TAB >/dev/null 2>&1 || continue
+    local tool accent
+    tool="$("$tmux_cmd" show-environment -t "$session" GHOST_TAB_TOOL 2>/dev/null | cut -d= -f2-)"
+    accent="$(get_theme_accent "$(gt_resolve_theme "$theme_pref" "$tool")")"
+    apply_session_theme "$tmux_cmd" "$session" "$accent"
+  done
+}
+
 # Return the age of the marker file in seconds.
 # Usage: marker_age <file>
 # Outputs the number of seconds since the file was last modified.
