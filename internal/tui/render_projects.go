@@ -17,6 +17,12 @@ const (
 	iconLogin = "\U000F0004" // nf-md-account — which Claude login is active
 	iconAgent = "\U000F06A9" // nf-md-robot   — the AI agent (Claude Code / OpenCode)
 	iconPlan  = "\U000F0148" // nf-md-crown   — the Claude subscription tier
+
+	// Switcher prev/next buttons. Material Design chevrons from the same nerd-font
+	// family as the caption icons above; both are one-cell glyphs so the
+	// caption/value/HitTest column math is unchanged.
+	iconChevronLeft  = "\U000F0141" // nf-md-chevron_left
+	iconChevronRight = "\U000F0142" // nf-md-chevron_right
 )
 
 // settingsCaption renders a header-row caption glyph. Idle it is neutral gray;
@@ -87,11 +93,11 @@ func (m *MainMenuModel) renderTitleRow(leftBorder, rightBorder string) string {
 	agentLabel := m.settingsCaption(iconAgent, m.focus == FocusAI || m.isHovered(regionAI))
 	var aiPart string
 	if len(m.aiTools) > 1 {
-		aiPart = agentLabel + chevronStyle.Render("◄ ") + nameStyle.Render(aiDisplay) + chevronStyle.Render(" ►")
+		aiPart = agentLabel + chevronStyle.Render(iconChevronLeft+" ") + nameStyle.Render(aiDisplay) + chevronStyle.Render(" "+iconChevronRight)
 	} else {
 		aiPart = agentLabel + nameStyle.Render(aiDisplay)
 	}
-	// Switcher on the left, "Ghost Tab" right-aligned: "AGENT ◄ Claude Code ►" left, "Ghost Tab" right
+	// Switcher on the left, "Ghost Tab" right-aligned: "AGENT ‹chevron› Claude Code ‹chevron›" left, "Ghost Tab" right
 	aiPadding := menuContentWidth - lipgloss.Width(title) - lipgloss.Width(aiPart) - 1 // -1 for leading space
 	if aiPadding < 1 {
 		aiPadding = 1
@@ -145,7 +151,7 @@ func (m *MainMenuModel) renderAccountRow(leftBorder, rightBorder string) string 
 	if m.focus == FocusAccount || m.isHovered(regionAccount) {
 		chevronStyle = lipgloss.NewStyle().Foreground(m.theme.Accent)
 	}
-	content := acctLabel + chevronStyle.Render("◄ ") + nameStyle.Render(label) + chevronStyle.Render(" ►")
+	content := acctLabel + chevronStyle.Render(iconChevronLeft+" ") + nameStyle.Render(label) + chevronStyle.Render(" "+iconChevronRight)
 
 	pad := menuContentWidth - lipgloss.Width(content) - 1 // -1 for leading space
 	if pad < 1 {
@@ -182,7 +188,7 @@ func (m *MainMenuModel) renderSubscriptionRow(leftBorder, rightBorder string) st
 		if m.focus == FocusSubscription || m.isHovered(regionSubscription) {
 			chevronStyle = lipgloss.NewStyle().Foreground(m.theme.Accent)
 		}
-		content = planLabel + chevronStyle.Render("◄ ") + nameStyle.Render(name) + chevronStyle.Render(" ►")
+		content = planLabel + chevronStyle.Render(iconChevronLeft+" ") + nameStyle.Render(name) + chevronStyle.Render(" "+iconChevronRight)
 	} else {
 		content = planLabel + nameStyle.Render(name)
 	}
