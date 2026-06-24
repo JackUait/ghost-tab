@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-// projectRoot returns the absolute path to the ghost-tab repo root.
+// projectRoot returns the absolute path to the wisp-deck repo root.
 func projectRoot(t *testing.T) string {
 	t.Helper()
 	// test/npx/ is two levels below root
@@ -24,7 +24,7 @@ func projectRoot(t *testing.T) string {
 func runLauncher(t *testing.T, env []string, args ...string) (string, string, int) {
 	t.Helper()
 	root := projectRoot(t)
-	launcher := filepath.Join(root, "bin", "npx-ghost-tab.js")
+	launcher := filepath.Join(root, "bin", "npx-wisp-deck.js")
 	cmdArgs := append([]string{launcher}, args...)
 	cmd := exec.Command("node", cmdArgs...)
 	cmd.Env = env

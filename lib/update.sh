@@ -1,17 +1,17 @@
 #!/bin/bash
-# npm-based update check for ghost-tab.
+# npm-based update check for wisp-deck.
 
 # Show update-available notification if a previous background check found a newer version.
 # Deletes the flag after displaying.
 notify_if_update_available() {
   local config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
-  local flag="${config_home}/ghost-tab/update-available"
+  local flag="${config_home}/wisp-deck/update-available"
   [ -f "$flag" ] || return 0
 
   local version
   version="$(cat "$flag")"
   rm -f "$flag"
-  echo "  ↑ Update available: v${version} — run 'npx ghost-tab' to update"
+  echo "  ↑ Update available: v${version} — run 'npx wisp-deck' to update"
 }
 
 # Run a background check against the npm registry.
@@ -21,8 +21,8 @@ notify_if_update_available() {
 check_for_update() {
   local install_dir="$1"
   local config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
-  local flag="${config_home}/ghost-tab/update-available"
-  local ts_file="${config_home}/ghost-tab/last-update-check"
+  local flag="${config_home}/wisp-deck/update-available"
+  local ts_file="${config_home}/wisp-deck/last-update-check"
 
   # Need npm and a local version to compare
   command -v npm &>/dev/null || return 0
@@ -45,10 +45,10 @@ check_for_update() {
 
   (
     local remote_version
-    remote_version="$(npm view ghost-tab version 2>/dev/null | tr -d '[:space:]')" || return
+    remote_version="$(npm view wisp-deck version 2>/dev/null | tr -d '[:space:]')" || return
     [ -n "$remote_version" ] || return
 
-    mkdir -p "${config_home}/ghost-tab"
+    mkdir -p "${config_home}/wisp-deck"
     # Always update the timestamp (even when up to date) so we throttle correctly
     date +%s > "$ts_file"
 

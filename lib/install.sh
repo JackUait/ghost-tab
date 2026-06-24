@@ -115,36 +115,36 @@ ensure_lazygit() {
   fi
 }
 
-# Install or update ghost-tab-tui by downloading the pre-built binary from the ghost-tab release.
+# Install or update wisp-deck-tui by downloading the pre-built binary from the wisp-deck release.
 # Args: share_dir (to read VERSION from)
 # Checks installed binary version against VERSION file and re-downloads if mismatched.
-ensure_ghost_tab_tui() {
+ensure_wisp_deck_tui() {
   local share_dir="$1"
 
   local version
   version="$(tr -d '[:space:]' < "$share_dir/VERSION" 2>/dev/null)"
   if [[ -z "$version" ]]; then
-    error "Cannot determine ghost-tab-tui version: VERSION file missing in $share_dir"
+    error "Cannot determine wisp-deck-tui version: VERSION file missing in $share_dir"
     return 1
   fi
 
-  if command -v ghost-tab-tui &>/dev/null; then
+  if command -v wisp-deck-tui &>/dev/null; then
     # Check if installed version matches expected version
     local installed_version
-    installed_version="$(ghost-tab-tui --version 2>/dev/null | sed 's/.*version //' || echo "")"
+    installed_version="$(wisp-deck-tui --version 2>/dev/null | sed 's/.*version //' || echo "")"
     if [[ "$installed_version" == "$version" ]]; then
-      success "ghost-tab-tui is up to date ($version)"
+      success "wisp-deck-tui is up to date ($version)"
       return 0
     fi
-    info "Updating ghost-tab-tui ($installed_version -> $version)..."
+    info "Updating wisp-deck-tui ($installed_version -> $version)..."
   fi
 
   local arch url
   arch="$(detect_arch)" || return 1
-  url="https://github.com/JackUait/ghost-tab/releases/download/v${version}/ghost-tab-tui-darwin-${arch}"
+  url="https://github.com/JackUait/wisp-deck/releases/download/v${version}/wisp-deck-tui-darwin-${arch}"
 
   mkdir -p "$HOME/.local/bin"
-  install_binary "$url" "$HOME/.local/bin/ghost-tab-tui" "ghost-tab-tui" || return 1
+  install_binary "$url" "$HOME/.local/bin/wisp-deck-tui" "wisp-deck-tui" || return 1
 }
 
 # Install base CLI requirements.

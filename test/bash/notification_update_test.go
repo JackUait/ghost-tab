@@ -299,7 +299,7 @@ notify_if_update_available
 
 func TestUpdate_notify_if_update_available_shows_version_and_deletes_flag(t *testing.T) {
 	dir := t.TempDir()
-	configDir := filepath.Join(dir, "config", "ghost-tab")
+	configDir := filepath.Join(dir, "config", "wisp-deck")
 	os.MkdirAll(configDir, 0755)
 	writeTempFile(t, configDir, "update-available", "2.7.0")
 
@@ -310,7 +310,7 @@ notify_if_update_available
 	out, code := runBashSnippet(t, snippet, nil)
 	assertExitCode(t, code, 0)
 	assertContains(t, out, "2.7.0")
-	assertContains(t, out, "npx ghost-tab")
+	assertContains(t, out, "npx wisp-deck")
 	flagFile := filepath.Join(configDir, "update-available")
 	if _, err := os.Stat(flagFile); !os.IsNotExist(err) {
 		t.Errorf("expected flag file to be deleted after notify_if_update_available")
@@ -336,7 +336,7 @@ check_for_update %q
 `, installDir))
 	_, code := runBashSnippet(t, snippet, env)
 	assertExitCode(t, code, 0)
-	flagFile := filepath.Join(dir, "config", "ghost-tab", "update-available")
+	flagFile := filepath.Join(dir, "config", "wisp-deck", "update-available")
 	if _, err := os.Stat(flagFile); !os.IsNotExist(err) {
 		t.Errorf("expected no flag file when npm not available")
 	}
@@ -355,7 +355,7 @@ sleep 0.3
 	env := buildEnv(t, nil, "XDG_CONFIG_HOME="+filepath.Join(dir, "config"))
 	_, code := runBashSnippet(t, snippet, env)
 	assertExitCode(t, code, 0)
-	flagFile := filepath.Join(dir, "config", "ghost-tab", "update-available")
+	flagFile := filepath.Join(dir, "config", "wisp-deck", "update-available")
 	if _, err := os.Stat(flagFile); !os.IsNotExist(err) {
 		t.Errorf("expected no flag file when .version missing")
 	}
@@ -369,7 +369,7 @@ func TestUpdate_check_for_update_writes_flag_when_newer_version_exists(t *testin
 
 	// Mock npm to return a newer version
 	npmBody := `
-if [ "$1" = "view" ] && [ "$2" = "ghost-tab" ] && [ "$3" = "version" ]; then
+if [ "$1" = "view" ] && [ "$2" = "wisp-deck" ] && [ "$3" = "version" ]; then
   echo "2.7.0"
   exit 0
 fi
@@ -385,7 +385,7 @@ sleep 0.3
 `, installDir))
 	_, code := runBashSnippet(t, snippet, env)
 	assertExitCode(t, code, 0)
-	flagFile := filepath.Join(dir, "config", "ghost-tab", "update-available")
+	flagFile := filepath.Join(dir, "config", "wisp-deck", "update-available")
 	data, err := os.ReadFile(flagFile)
 	if err != nil {
 		t.Fatalf("expected flag file to be written, got error: %v", err)
@@ -403,7 +403,7 @@ func TestUpdate_check_for_update_does_nothing_when_up_to_date(t *testing.T) {
 
 	// Mock npm to return same version
 	npmBody := `
-if [ "$1" = "view" ] && [ "$2" = "ghost-tab" ] && [ "$3" = "version" ]; then
+if [ "$1" = "view" ] && [ "$2" = "wisp-deck" ] && [ "$3" = "version" ]; then
   echo "2.6.0"
   exit 0
 fi
@@ -419,7 +419,7 @@ sleep 0.3
 `, installDir))
 	_, code := runBashSnippet(t, snippet, env)
 	assertExitCode(t, code, 0)
-	flagFile := filepath.Join(dir, "config", "ghost-tab", "update-available")
+	flagFile := filepath.Join(dir, "config", "wisp-deck", "update-available")
 	if _, err := os.Stat(flagFile); !os.IsNotExist(err) {
 		t.Errorf("expected no flag file when already up to date")
 	}
@@ -432,7 +432,7 @@ func TestUpdate_check_for_update_skips_when_checked_recently(t *testing.T) {
 	writeTempFile(t, installDir, ".version", "2.6.0")
 
 	// Write last-update-check with timestamp 1 hour ago (recent — should be skipped)
-	configDir := filepath.Join(dir, "config", "ghost-tab")
+	configDir := filepath.Join(dir, "config", "wisp-deck")
 	os.MkdirAll(configDir, 0755)
 	recentTS := strconv.FormatInt(time.Now().Unix()-3600, 10)
 	writeTempFile(t, configDir, "last-update-check", recentTS)
@@ -440,7 +440,7 @@ func TestUpdate_check_for_update_skips_when_checked_recently(t *testing.T) {
 	// Mock npm to return a newer version — if throttle works, npm must NOT be called
 	// and no update-available flag should be written.
 	npmBody := `
-if [ "$1" = "view" ] && [ "$2" = "ghost-tab" ] && [ "$3" = "version" ]; then
+if [ "$1" = "view" ] && [ "$2" = "wisp-deck" ] && [ "$3" = "version" ]; then
   echo "2.7.0"
   exit 0
 fi
@@ -472,14 +472,14 @@ func TestUpdate_check_for_update_runs_when_last_check_is_stale(t *testing.T) {
 	writeTempFile(t, installDir, ".version", "2.6.0")
 
 	// Write last-update-check with timestamp 25 hours ago (stale — check must run)
-	configDir := filepath.Join(dir, "config", "ghost-tab")
+	configDir := filepath.Join(dir, "config", "wisp-deck")
 	os.MkdirAll(configDir, 0755)
 	staleTS := strconv.FormatInt(time.Now().Unix()-90000, 10)
 	writeTempFile(t, configDir, "last-update-check", staleTS)
 
 	// Mock npm to return a newer version
 	npmBody := `
-if [ "$1" = "view" ] && [ "$2" = "ghost-tab" ] && [ "$3" = "version" ]; then
+if [ "$1" = "view" ] && [ "$2" = "wisp-deck" ] && [ "$3" = "version" ]; then
   echo "2.7.0"
   exit 0
 fi
@@ -530,14 +530,14 @@ func TestUpdate_check_for_update_runs_when_timestamp_is_in_future(t *testing.T) 
 	writeTempFile(t, installDir, ".version", "2.6.0")
 
 	// Write a last-update-check timestamp that is 1 hour IN THE FUTURE
-	configDir := filepath.Join(dir, "config", "ghost-tab")
+	configDir := filepath.Join(dir, "config", "wisp-deck")
 	os.MkdirAll(configDir, 0755)
 	futureTs := fmt.Sprintf("%d", time.Now().Unix()+3600) // 1 hour from now
 	writeTempFile(t, configDir, "last-update-check", futureTs)
 
 	// Mock npm to return a newer version — it MUST be called (future ts should not throttle)
 	npmBody := `
-if [ "$1" = "view" ] && [ "$2" = "ghost-tab" ] && [ "$3" = "version" ]; then
+if [ "$1" = "view" ] && [ "$2" = "wisp-deck" ] && [ "$3" = "version" ]; then
   echo "2.7.0"
   exit 0
 fi
@@ -555,7 +555,7 @@ sleep 0.3
 	assertExitCode(t, code, 0)
 
 	// Flag MUST be written — future timestamp should not suppress the check
-	flagFile := filepath.Join(dir, "config", "ghost-tab", "update-available")
+	flagFile := filepath.Join(dir, "config", "wisp-deck", "update-available")
 	data, err := os.ReadFile(flagFile)
 	if err != nil {
 		t.Fatalf("expected flag file when future timestamp was present: %v", err)
@@ -572,12 +572,12 @@ func TestUpdate_check_for_update_writes_timestamp_after_check(t *testing.T) {
 	writeTempFile(t, installDir, ".version", "2.6.0")
 
 	// No last-update-check file (first run)
-	configDir := filepath.Join(dir, "config", "ghost-tab")
+	configDir := filepath.Join(dir, "config", "wisp-deck")
 	os.MkdirAll(configDir, 0755)
 
 	// Mock npm to return same version (no update)
 	npmBody := `
-if [ "$1" = "view" ] && [ "$2" = "ghost-tab" ] && [ "$3" = "version" ]; then
+if [ "$1" = "view" ] && [ "$2" = "wisp-deck" ] && [ "$3" = "version" ]; then
   echo "2.6.0"
   exit 0
 fi

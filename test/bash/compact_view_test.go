@@ -504,12 +504,12 @@ func TestOpenDiffPopup_quotes_path_with_spaces(t *testing.T) {
 }
 
 // The diff pager themes itself from --ai-tool. open_diff_popup must forward the
-// active tool (exported as GHOST_TAB_TOOL on the session) so OpenCode sessions
+// active tool (exported as WISP_DECK_TOOL on the session) so OpenCode sessions
 // render the purple chrome instead of falling back to Claude's orange.
 func TestOpenDiffPopup_forwards_opencode_tool(t *testing.T) {
 	dir := t.TempDir()
 	binDir := mockCommand(t, dir, "tmux", `echo "$@"`)
-	env := buildEnv(t, []string{binDir}, "GHOST_TAB_TOOL=opencode")
+	env := buildEnv(t, []string{binDir}, "WISP_DECK_TOOL=opencode")
 	root := projectRoot(t)
 	module := filepath.Join(root, "lib", "compact-view.sh")
 	script := "source " + module + " && open_diff_popup /proj lib/x.sh"
@@ -525,7 +525,7 @@ func TestOpenDiffPopup_forwards_opencode_tool(t *testing.T) {
 func TestOpenDiffPopup_defaults_tool_to_claude(t *testing.T) {
 	dir := t.TempDir()
 	binDir := mockCommand(t, dir, "tmux", `echo "$@"`)
-	// No GHOST_TAB_TOOL in the environment — the pager should default to claude.
+	// No WISP_DECK_TOOL in the environment — the pager should default to claude.
 	env := buildEnv(t, []string{binDir})
 	root := projectRoot(t)
 	module := filepath.Join(root, "lib", "compact-view.sh")
@@ -540,7 +540,7 @@ func TestOpenDiffPopup_defaults_tool_to_claude(t *testing.T) {
 }
 
 // The diff popup runs FULL-SCREEN and BORDERLESS: the rounded orange box and its
-// click-to-close margin are drawn by the ghost-tab-tui diff-view pager (tmux
+// click-to-close margin are drawn by the wisp-deck-tui diff-view pager (tmux
 // swallows clicks outside a smaller popup, so the pager must own the whole
 // window). The redundant header block (diff --git / index / --- / +++ / the hunk
 // @@ line) is still stripped so content starts at the top; the filename is
@@ -570,7 +570,7 @@ func TestOpenDiffPopup_uses_diff_viewer(t *testing.T) {
 	assertContains(t, got, "/@@/")
 
 	// Rendered by the Go pager (closes on Esc), with the file as its title.
-	assertContains(t, got, "ghost-tab-tui diff-view")
+	assertContains(t, got, "wisp-deck-tui diff-view")
 	assertContains(t, got, "--title")
 
 	// A screen snapshot is captured and handed to the pager so it can show what's
@@ -945,7 +945,7 @@ func TestCompactView_header_shows_changed_file_count(t *testing.T) {
 	}
 }
 
-// The branch heading must show the active subscription/plan (GHOST_TAB_PLAN)
+// The branch heading must show the active subscription/plan (WISP_DECK_PLAN)
 // inline next to the branch name, so the ledger always states which plan the
 // session is running on. Shown even with no working-tree changes.
 func TestCompactView_header_shows_active_plan(t *testing.T) {
@@ -982,7 +982,7 @@ func TestCompactView_header_shows_active_plan(t *testing.T) {
 		}
 		env = append(env, e)
 	}
-	cmd.Env = append(env, "COMPACT_VIEW_INTERVAL=0.1", "TERM=xterm", "GHOST_TAB_PLAN=Work Max")
+	cmd.Env = append(env, "COMPACT_VIEW_INTERVAL=0.1", "TERM=xterm", "WISP_DECK_PLAN=Work Max")
 	out, _ := cmd.CombinedOutput()
 
 	if !strings.Contains(string(out), "Work Max") {
@@ -1264,12 +1264,12 @@ func TestCompactView_sizes_to_own_pane_not_active_pane(t *testing.T) {
 	t.Cleanup(func() { _, _ = tmux("kill-session", "-t", session) })
 
 	// Pane 0 (left) runs the panel; it will be the NARROW, INACTIVE pane.
-	pane0Cmd := "source " + module + " && GHOST_TAB_PLAN='Standard Claude' compact_view " + dir
+	pane0Cmd := "source " + module + " && WISP_DECK_PLAN='Standard Claude' compact_view " + dir
 	if out, err := tmux("new-session", "-d", "-s", session, "-x", "160", "-y", "24",
 		pane0Cmd); err != nil {
 		t.Fatalf("new-session: %v\n%s", err, out)
 	}
-	// Split off a WIDE pane on the right and focus it, mirroring ghost-tab's
+	// Split off a WIDE pane on the right and focus it, mirroring wisp-deck's
 	// layout where the AI pane is active and wider than the compact view.
 	widePane, err := tmux("split-window", "-h", "-t", session, "-l", "120",
 		"-P", "-F", "#{pane_id}", "sleep", "30")

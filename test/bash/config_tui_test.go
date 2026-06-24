@@ -18,7 +18,7 @@ func configTuiSnippet(t *testing.T, body string) string {
 
 func TestConfigMenuInteractive_dispatches_quit(t *testing.T) {
 	dir := t.TempDir()
-	binDir := mockCommand(t, dir, "ghost-tab-tui", `echo '{"action":"quit"}'`)
+	binDir := mockCommand(t, dir, "wisp-deck-tui", `echo '{"action":"quit"}'`)
 	mockCommand(t, dir, "jq", `
 		if [ "$1" = "-r" ] && [ "$2" = ".action" ]; then
 			read -r input
@@ -41,7 +41,7 @@ func TestConfigMenuInteractive_returns_1_when_binary_missing(t *testing.T) {
 	if err := os.MkdirAll(emptyBin, 0755); err != nil {
 		t.Fatal(err)
 	}
-	// Minimal PATH that excludes ~/.local/bin where ghost-tab-tui lives
+	// Minimal PATH that excludes ~/.local/bin where wisp-deck-tui lives
 	env := buildEnv(t, nil, "PATH="+emptyBin+":/usr/bin:/bin:/usr/sbin:/sbin")
 
 	snippet := configTuiSnippet(t, `config_menu_interactive`)
@@ -49,12 +49,12 @@ func TestConfigMenuInteractive_returns_1_when_binary_missing(t *testing.T) {
 	if code == 0 {
 		t.Error("expected non-zero exit when binary missing")
 	}
-	assertContains(t, out, "ghost-tab-tui")
+	assertContains(t, out, "wisp-deck-tui")
 }
 
 func TestConfigMenuInteractive_returns_1_on_tui_failure(t *testing.T) {
 	dir := t.TempDir()
-	binDir := mockCommand(t, dir, "ghost-tab-tui", `exit 1`)
+	binDir := mockCommand(t, dir, "wisp-deck-tui", `exit 1`)
 	env := buildEnv(t, []string{binDir})
 
 	snippet := configTuiSnippet(t, `config_menu_interactive`)
@@ -67,7 +67,7 @@ func TestConfigMenuInteractive_returns_1_on_tui_failure(t *testing.T) {
 func TestConfigMenuInteractive_passes_version(t *testing.T) {
 	dir := t.TempDir()
 	argsFile := filepath.Join(dir, "captured_args")
-	binDir := mockCommand(t, dir, "ghost-tab-tui", fmt.Sprintf(`
+	binDir := mockCommand(t, dir, "wisp-deck-tui", fmt.Sprintf(`
 echo "$*" > %q
 echo '{"action":"quit"}'
 `, argsFile))

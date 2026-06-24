@@ -1,6 +1,6 @@
-# Ghost Tab
+# Wisp Deck
 
-Launch a ready-to-go AI coding session in one command. Ghost Tab opens a three-pane terminal workspace — your AI assistant, a live view of your git changes, and a spare terminal — and cleans everything up the moment you close the window.
+Launch a ready-to-go AI coding session in one command. Wisp Deck opens a three-pane terminal workspace — your AI assistant, a live view of your git changes, and a spare terminal — and cleans everything up the moment you close the window.
 
 <p>
   <img src="docs/screenshot-selector.png" width="49%" />
@@ -12,7 +12,7 @@ Launch a ready-to-go AI coding session in one command. Ghost Tab opens a three-p
 ## Quick Start
 
 ```sh
-npx ghost-tab
+npx wisp-deck
 ```
 
 That's it. The only requirements are **macOS** and **Node.js 16+**. Everything else — the terminal, your AI tool, and the supporting tools — is installed for you automatically the first time you run it.
@@ -23,13 +23,13 @@ On first launch you'll pick your AI assistant and add your projects. After that,
 
 ## What You Get
 
-Pick a project and Ghost Tab drops you into a three-pane workspace:
+Pick a project and Wisp Deck drops you into a three-pane workspace:
 
 - **AI assistant** — Claude Code or OpenCode, focused and ready. Just start typing your prompt.
 - **Changes view** — a live, auto-refreshing summary of what's changed in your branch (added/removed lines per file), or the full **lazygit** interface if you prefer.
 - **Spare terminal** — a tabbed shell for running commands, with its own tab bar so you can open as many as you need.
 
-Close the window and Ghost Tab shuts down every process it started — no leftover AI processes quietly running in the background.
+Close the window and Wisp Deck shuts down every process it started — no leftover AI processes quietly running in the background.
 
 > [!CAUTION]
 > Closing the window force-stops everything in the session. Save your work first.
@@ -41,7 +41,7 @@ Close the window and Ghost Tab shuts down every process it started — no leftov
 Open a new window and you're greeted by the selector:
 
 ```
-⬡  Ghost Tab
+⬡  Wisp Deck
 ──────────────────────────────────────
 
  1❯ my-app
@@ -82,7 +82,7 @@ Press **S** in the selector to open Settings. Changes apply immediately and reac
 - **Sound** — play a chime when the AI finishes and is waiting on you. Off by default; choose from the built-in macOS sounds.
 - **Panel** — use the lightweight live **Changes** view or the full **lazygit** interface.
 - **Tab title** — what the window tab shows: the project name, the AI tool's own title, or both.
-- **Default projects folder** — the folder Ghost Tab starts in when you add a new project.
+- **Default projects folder** — the folder Wisp Deck starts in when you add a new project.
 - **AI tool** — switch between Claude Code and OpenCode.
 
 ---
@@ -103,7 +103,7 @@ Press **T** in the selector for a usage dashboard. It breaks down your Claude us
 
 ## Dropping Screenshots & Videos into the AI
 
-Drag a screenshot or video from Finder or your desktop onto the AI pane and Ghost Tab hands it straight to your assistant — no copying paths by hand.
+Drag a screenshot or video from Finder or your desktop onto the AI pane and Wisp Deck hands it straight to your assistant — no copying paths by hand.
 
 If a drag doesn't land where you expect, press **`Ctrl+b` then `i`** inside the session to inject your most recent screenshot directly into the AI pane.
 
@@ -111,7 +111,7 @@ If a drag doesn't land where you expect, press **`Ctrl+b` then `i`** inside the 
 
 ## Status Line
 
-For Claude Code, Ghost Tab sets up a compact status line so you always know where you stand:
+For Claude Code, Wisp Deck sets up a compact status line so you always know where you stand:
 
 ```
 my-project | main | S: 0 | U: 2 | A: 1 | 23.5%
@@ -152,14 +152,14 @@ my-project | main | S: 0 | U: 2 | A: 1 | 23.5%
 
 ## Picking Up Where You Left Off
 
-Reopen a project that's still running and Ghost Tab continues your last conversation instead of starting over. And after a reboot, the first time you launch it offers to bring back the projects you had open before — so a restart doesn't cost you your workspace.
+Reopen a project that's still running and Wisp Deck continues your last conversation instead of starting over. And after a reboot, the first time you launch it offers to bring back the projects you had open before — so a restart doesn't cost you your workspace.
 
 ---
 
 ## Staying Up to Date
 
-Ghost Tab quietly checks for new versions and lets you know when one is available. To update, just run it again:
+Wisp Deck quietly checks for new versions and lets you know when one is available. To update, just run it again:
 
 ```sh
-npx ghost-tab
+npx wisp-deck
 ```

@@ -30,7 +30,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/jackuait/ghost-tab/internal/tui"
+	"github.com/jackuait/wisp-deck/internal/tui"
 )
 
 func TestPathSuggestionProvider_EmptyDefaultsToHome(t *testing.T) {
@@ -180,7 +180,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/jackuait/ghost-tab/internal/util"
+	"github.com/jackuait/wisp-deck/internal/util"
 )
 
 // SuggestionProvider is a function that returns suggestions for a given input.
@@ -832,7 +832,7 @@ package tui_test
 import (
 	"testing"
 
-	"github.com/jackuait/ghost-tab/internal/tui"
+	"github.com/jackuait/wisp-deck/internal/tui"
 )
 
 func TestZzzAnimation_InitialFrame(t *testing.T) {
@@ -1134,7 +1134,7 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/jackuait/ghost-tab/internal/tui"
+	"github.com/jackuait/wisp-deck/internal/tui"
 )
 
 func TestLogo_InitialFrame(t *testing.T) {

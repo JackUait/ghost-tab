@@ -3,7 +3,7 @@ package tui
 import (
 	"testing"
 
-	"github.com/jackuait/ghost-tab/internal/models"
+	"github.com/jackuait/wisp-deck/internal/models"
 )
 
 func TestContract_actionStringsUnchanged(t *testing.T) {

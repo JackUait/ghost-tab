@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/jackuait/ghost-tab/internal/tui"
+	"github.com/jackuait/wisp-deck/internal/tui"
 )
 
 func TestConfigMenuItems(t *testing.T) {
@@ -135,7 +135,7 @@ func TestConfigMenu_ViewContainsBorder(t *testing.T) {
 		Version: "2.6.0",
 	})
 	view := m.View()
-	if !strings.Contains(view, "Ghost Tab Configuration") {
+	if !strings.Contains(view, "Wisp Deck Configuration") {
 		t.Error("View should contain title")
 	}
 	if !strings.Contains(view, "Manage Claude configs") {

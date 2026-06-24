@@ -2,19 +2,19 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** When a Ghost Tab subscription is added or changed on the Settings tab, mirror it into OpenCode's global config as a custom provider so the same key/models work in OpenCode too.
+**Goal:** When a Wisp Deck subscription is added or changed on the Settings tab, mirror it into OpenCode's global config as a custom provider so the same key/models work in OpenCode too.
 
-**Architecture:** A new `internal/opencodeconfig` package with a pure `MergeSubscriptions` core (rebuilds only `ghost-tab-*` providers in an existing `opencode.json`, preserving everything else) plus a `Sync` IO wrapper. `Sync` is called after every subscription mutation: the CLI `claude-config add/rename/delete`, the inline TUI panel (`WriteAPIKey`/`WriteModelMappings`), and the active-config switch (`persistClaudeConfig`). Base URLs come from a provider-name lookup table in `claudeconfig`.
+**Architecture:** A new `internal/opencodeconfig` package with a pure `MergeSubscriptions` core (rebuilds only `wisp-deck-*` providers in an existing `opencode.json`, preserving everything else) plus a `Sync` IO wrapper. `Sync` is called after every subscription mutation: the CLI `claude-config add/rename/delete`, the inline TUI panel (`WriteAPIKey`/`WriteModelMappings`), and the active-config switch (`persistClaudeConfig`). Base URLs come from a provider-name lookup table in `claudeconfig`.
 
 **Tech Stack:** Go (`encoding/json`, `cobra`), bash (`lib/config-tui.sh`), Go test suite + `test/bash` integration tests.
 
 ## Global Constraints
 
-- Go module path: `github.com/jackuait/ghost-tab`.
+- Go module path: `github.com/jackuait/wisp-deck`.
 - TDD, no exceptions: write the failing test, run it red, implement, run it green, commit.
 - Run `shellcheck` on any modified `lib/*.sh` before committing that task.
 - Run the full suite `./run-tests.sh` before declaring the whole plan done; `git push` to `main` (this repo pushes straight to main — no PR).
-- OpenCode provider ownership namespace prefix: `ghost-tab-` (exact string).
+- OpenCode provider ownership namespace prefix: `wisp-deck-` (exact string).
 - OpenCode `$schema` value: `https://opencode.ai/config.json` (exact string).
 - All mirrored providers use `npm: "@ai-sdk/anthropic"` (subscriptions speak the `ANTHROPIC_*` protocol).
 - `apiKey` is written inline (plaintext), matching how the token is already stored in the Claude config JSON.
@@ -109,7 +109,7 @@ git commit -m "feat(claudeconfig): add ProviderBaseURL lookup for OpenCode mirro
 - Produces:
   - `type Subscription struct { Name, File, APIKey, BaseURL, OpusModel string; Models []string; Active bool }`
   - `func MergeSubscriptions(existing []byte, subs []Subscription) ([]byte, bool)` — returns the new `opencode.json` bytes and `true` on success; returns `(nil, false)` when `existing` is non-empty but not valid JSON (e.g. JSONC with comments), meaning "do not write".
-  - `const ProviderPrefix = "ghost-tab-"`
+  - `const ProviderPrefix = "wisp-deck-"`
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -154,10 +154,10 @@ func TestMerge_creates_provider_from_empty(t *testing.T) {
 	if m["$schema"] != "https://opencode.ai/config.json" {
 		t.Errorf("missing/wrong $schema: %v", m["$schema"])
 	}
-	if m["model"] != "ghost-tab-work-glm/glm-4.6" {
-		t.Errorf("model = %v, want ghost-tab-work-glm/glm-4.6", m["model"])
+	if m["model"] != "wisp-deck-work-glm/glm-4.6" {
+		t.Errorf("model = %v, want wisp-deck-work-glm/glm-4.6", m["model"])
 	}
-	prov := m["provider"].(map[string]any)["ghost-tab-work-glm"].(map[string]any)
+	prov := m["provider"].(map[string]any)["wisp-deck-work-glm"].(map[string]any)
 	if prov["npm"] != "@ai-sdk/anthropic" {
 		t.Errorf("npm = %v", prov["npm"])
 	}
@@ -199,31 +199,31 @@ func TestMerge_preserves_user_keys_and_providers(t *testing.T) {
 	if _, ok := prov["myown"]; !ok {
 		t.Errorf("user provider 'myown' was dropped: %v", prov)
 	}
-	if _, ok := prov["ghost-tab-work-glm"]; !ok {
-		t.Errorf("ghost-tab provider not added: %v", prov)
+	if _, ok := prov["wisp-deck-work-glm"]; !ok {
+		t.Errorf("wisp-deck provider not added: %v", prov)
 	}
 }
 
-func TestMerge_rebuild_removes_stale_ghost_tab_providers(t *testing.T) {
-	existing := []byte(`{"provider":{"ghost-tab-old":{"name":"Old"},"keep":{"name":"Keep"}}}`)
+func TestMerge_rebuild_removes_stale_wisp_deck_providers(t *testing.T) {
+	existing := []byte(`{"provider":{"wisp-deck-old":{"name":"Old"},"keep":{"name":"Keep"}}}`)
 	out, ok := MergeSubscriptions(existing, []Subscription{glmSub(true)})
 	if !ok {
 		t.Fatal("expected ok=true")
 	}
 	prov := parse(t, out)["provider"].(map[string]any)
-	if _, ok := prov["ghost-tab-old"]; ok {
-		t.Errorf("stale ghost-tab-old not removed: %v", prov)
+	if _, ok := prov["wisp-deck-old"]; ok {
+		t.Errorf("stale wisp-deck-old not removed: %v", prov)
 	}
 	if _, ok := prov["keep"]; !ok {
 		t.Errorf("user provider 'keep' was dropped: %v", prov)
 	}
-	if _, ok := prov["ghost-tab-work-glm"]; !ok {
-		t.Errorf("current ghost-tab provider missing: %v", prov)
+	if _, ok := prov["wisp-deck-work-glm"]; !ok {
+		t.Errorf("current wisp-deck provider missing: %v", prov)
 	}
 }
 
 func TestMerge_delete_removes_provider(t *testing.T) {
-	existing := []byte(`{"provider":{"ghost-tab-work-glm":{"name":"Work GLM"}}}`)
+	existing := []byte(`{"provider":{"wisp-deck-work-glm":{"name":"Work GLM"}}}`)
 	out, ok := MergeSubscriptions(existing, nil)
 	if !ok {
 		t.Fatal("expected ok=true")
@@ -270,13 +270,13 @@ func TestMerge_default_model_falls_back_to_first_model(t *testing.T) {
 	s := glmSub(true)
 	s.OpusModel = "" // no opus slot mapped
 	out, _ := MergeSubscriptions(nil, []Subscription{s})
-	if got := parse(t, out)["model"]; got != "ghost-tab-work-glm/glm-4.6" {
-		t.Errorf("fallback model = %v, want ghost-tab-work-glm/glm-4.6", got)
+	if got := parse(t, out)["model"]; got != "wisp-deck-work-glm/glm-4.6" {
+		t.Errorf("fallback model = %v, want wisp-deck-work-glm/glm-4.6", got)
 	}
 }
 
 func TestProviderPrefixConst(t *testing.T) {
-	if !strings.HasPrefix("ghost-tab-work-glm", ProviderPrefix) {
+	if !strings.HasPrefix("wisp-deck-work-glm", ProviderPrefix) {
 		t.Errorf("ProviderPrefix = %q", ProviderPrefix)
 	}
 }
@@ -292,7 +292,7 @@ Expected: FAIL — package/symbols undefined.
 Create `internal/opencodeconfig/opencodeconfig.go`:
 
 ```go
-// Package opencodeconfig mirrors Ghost Tab subscriptions (custom Claude configs)
+// Package opencodeconfig mirrors Wisp Deck subscriptions (custom Claude configs)
 // into OpenCode's global config as custom providers. MergeSubscriptions is the
 // pure core; Sync (sync.go) wires it to disk.
 package opencodeconfig
@@ -301,16 +301,16 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/jackuait/ghost-tab/internal/claudeconfig"
+	"github.com/jackuait/wisp-deck/internal/claudeconfig"
 )
 
-// ProviderPrefix namespaces every provider Ghost Tab owns in opencode.json, so a
+// ProviderPrefix namespaces every provider Wisp Deck owns in opencode.json, so a
 // rebuild can remove and re-add only these without touching user-authored ones.
-const ProviderPrefix = "ghost-tab-"
+const ProviderPrefix = "wisp-deck-"
 
 const schemaURL = "https://opencode.ai/config.json"
 
-// Subscription is the resolved view of a Ghost Tab subscription that OpenCode
+// Subscription is the resolved view of a Wisp Deck subscription that OpenCode
 // needs. BaseURL is pre-resolved by the caller (empty -> not mirrorable).
 type Subscription struct {
 	Name      string
@@ -343,7 +343,7 @@ func (s Subscription) defaultModel() string {
 	return s.providerID() + "/" + model
 }
 
-// MergeSubscriptions rebuilds the ghost-tab-* providers in existing opencode.json
+// MergeSubscriptions rebuilds the wisp-deck-* providers in existing opencode.json
 // bytes from subs, preserving every other key. Returns (nil, false) when existing
 // is non-empty but not valid JSON (e.g. JSONC), meaning the caller must not write.
 func MergeSubscriptions(existing []byte, subs []Subscription) ([]byte, bool) {
@@ -429,7 +429,7 @@ git commit -m "feat(opencodeconfig): pure MergeSubscriptions core"
   - `type Inputs struct { ListFile, ConfigsDir, PointerFile, Home string }`
   - `func Sync(in Inputs) error` — best-effort; resolves the OpenCode config path under `Home` (or `os.UserHomeDir()` if `Home==""`), builds subscriptions, merges, writes. Logs and returns nil on recoverable failure.
   - `func ConfigPath(home string) string` — resolves `<XDG_CONFIG_HOME|~/.config>/opencode/<first existing of opencode.jsonc, opencode.json, config.json | opencode.json>`.
-  - `func BuildSubscriptions(in Inputs) []Subscription` — pure-ish builder from the ghost-tab config files (exported for direct testing).
+  - `func BuildSubscriptions(in Inputs) []Subscription` — pure-ish builder from the wisp-deck config files (exported for direct testing).
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -445,10 +445,10 @@ import (
 	"testing"
 )
 
-// seed writes a minimal ghost-tab config tree under root and returns Inputs.
+// seed writes a minimal wisp-deck config tree under root and returns Inputs.
 func seed(t *testing.T, home string, active string) Inputs {
 	t.Helper()
-	cfgRoot := filepath.Join(home, ".config", "ghost-tab")
+	cfgRoot := filepath.Join(home, ".config", "wisp-deck")
 	configsDir := filepath.Join(cfgRoot, "claude-configs")
 	if err := os.MkdirAll(configsDir, 0755); err != nil {
 		t.Fatal(err)
@@ -479,10 +479,10 @@ func TestSync_writes_opencode_config(t *testing.T) {
 	if err := json.Unmarshal(data, &m); err != nil {
 		t.Fatalf("invalid JSON: %v", err)
 	}
-	if m["model"] != "ghost-tab-work-glm-zhipu/glm-4.6" {
+	if m["model"] != "wisp-deck-work-glm-zhipu/glm-4.6" {
 		t.Errorf("model = %v", m["model"])
 	}
-	prov, ok := m["provider"].(map[string]any)["ghost-tab-work-glm-zhipu"].(map[string]any)
+	prov, ok := m["provider"].(map[string]any)["wisp-deck-work-glm-zhipu"].(map[string]any)
 	if !ok {
 		t.Fatalf("provider missing: %v", m["provider"])
 	}
@@ -566,10 +566,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/jackuait/ghost-tab/internal/claudeconfig"
+	"github.com/jackuait/wisp-deck/internal/claudeconfig"
 )
 
-// Inputs are the ghost-tab config paths plus the home dir used to locate the
+// Inputs are the wisp-deck config paths plus the home dir used to locate the
 // OpenCode global config.
 type Inputs struct {
 	ListFile    string
@@ -599,7 +599,7 @@ func ConfigPath(home string) string {
 	return filepath.Join(dir, "opencode.json")
 }
 
-// BuildSubscriptions reads the ghost-tab config files and resolves each config
+// BuildSubscriptions reads the wisp-deck config files and resolves each config
 // into a Subscription (api key, mapped models, base URL, active flag).
 func BuildSubscriptions(in Inputs) []Subscription {
 	configs := claudeconfig.Load(in.ListFile)
@@ -633,7 +633,7 @@ func BuildSubscriptions(in Inputs) []Subscription {
 	return subs
 }
 
-// Sync rebuilds the ghost-tab-* providers in OpenCode's global config. It is
+// Sync rebuilds the wisp-deck-* providers in OpenCode's global config. It is
 // best-effort: recoverable failures log a warning and return nil so a Claude-side
 // mutation is never blocked.
 func Sync(in Inputs) error {
@@ -648,29 +648,29 @@ func Sync(in Inputs) error {
 
 	existing, err := os.ReadFile(path)
 	if err != nil && !os.IsNotExist(err) {
-		fmt.Fprintf(os.Stderr, "ghost-tab: opencode sync: read %s: %v\n", path, err)
+		fmt.Fprintf(os.Stderr, "wisp-deck: opencode sync: read %s: %v\n", path, err)
 		return nil
 	}
 
 	subs := BuildSubscriptions(in)
 	for _, s := range subs {
 		if s.APIKey != "" && len(s.Models) > 0 && s.BaseURL == "" {
-			fmt.Fprintf(os.Stderr, "ghost-tab: opencode sync: no base URL for %q; skipped\n", s.Name)
+			fmt.Fprintf(os.Stderr, "wisp-deck: opencode sync: no base URL for %q; skipped\n", s.Name)
 		}
 	}
 
 	out, ok := MergeSubscriptions(existing, subs)
 	if !ok {
-		fmt.Fprintf(os.Stderr, "ghost-tab: opencode sync: %s is not plain JSON; left unchanged\n", path)
+		fmt.Fprintf(os.Stderr, "wisp-deck: opencode sync: %s is not plain JSON; left unchanged\n", path)
 		return nil
 	}
 
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-		fmt.Fprintf(os.Stderr, "ghost-tab: opencode sync: mkdir: %v\n", err)
+		fmt.Fprintf(os.Stderr, "wisp-deck: opencode sync: mkdir: %v\n", err)
 		return nil
 	}
 	if err := os.WriteFile(path, out, 0644); err != nil {
-		fmt.Fprintf(os.Stderr, "ghost-tab: opencode sync: write %s: %v\n", path, err)
+		fmt.Fprintf(os.Stderr, "wisp-deck: opencode sync: write %s: %v\n", path, err)
 		return nil
 	}
 	return nil
@@ -718,7 +718,7 @@ import (
 func TestSyncOpenCode_writes_config_from_model_paths(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", "")
-	cfgRoot := filepath.Join(home, ".config", "ghost-tab")
+	cfgRoot := filepath.Join(home, ".config", "wisp-deck")
 	configsDir := filepath.Join(cfgRoot, "claude-configs")
 	os.MkdirAll(configsDir, 0755)
 	os.WriteFile(filepath.Join(cfgRoot, "claude-configs.list"),
@@ -748,7 +748,7 @@ Expected: FAIL — `m.syncOpenCode undefined`.
 
 - [ ] **Step 3: Write minimal implementation**
 
-In `internal/tui/mainmenu.go`, confirm the import block includes `"os"` (it does — used at line 1453) and add `"github.com/jackuait/ghost-tab/internal/opencodeconfig"` to the imports. Then add this helper directly after `persistClaudeConfig` (after line 935):
+In `internal/tui/mainmenu.go`, confirm the import block includes `"os"` (it does — used at line 1453) and add `"github.com/jackuait/wisp-deck/internal/opencodeconfig"` to the imports. Then add this helper directly after `persistClaudeConfig` (after line 935):
 
 ```go
 // syncOpenCode mirrors the current subscriptions into OpenCode's global config.
@@ -827,7 +827,7 @@ git commit -m "feat(tui): sync OpenCode after API-key/model-map edits and config
 ### Task 5: Hook Sync into the CLI mutations (add/rename/delete) + bash
 
 **Files:**
-- Modify: `cmd/ghost-tab-tui/claude_config.go` (call Sync after each mutation; add `--pointer` flag to add & rename)
+- Modify: `cmd/wisp-deck-tui/claude_config.go` (call Sync after each mutation; add `--pointer` flag to add & rename)
 - Modify: `lib/config-tui.sh:34,39` (pass `--pointer "$pointer_file"` to add & rename)
 - Test: `test/bash/opencode_sync_test.go` (create)
 
@@ -851,11 +851,11 @@ import (
 	"testing"
 )
 
-// buildTUI compiles ghost-tab-tui once into a temp dir and returns its path.
+// buildTUI compiles wisp-deck-tui once into a temp dir and returns its path.
 func buildTUI(t *testing.T) string {
 	t.Helper()
-	bin := filepath.Join(t.TempDir(), "ghost-tab-tui")
-	cmd := exec.Command("go", "build", "-o", bin, "./cmd/ghost-tab-tui")
+	bin := filepath.Join(t.TempDir(), "wisp-deck-tui")
+	cmd := exec.Command("go", "build", "-o", bin, "./cmd/wisp-deck-tui")
 	cmd.Dir = repoRoot(t)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("build failed: %v\n%s", err, out)
@@ -882,7 +882,7 @@ func repoRoot(t *testing.T) string {
 func TestCLIAdd_then_key_mirrors_into_opencode(t *testing.T) {
 	bin := buildTUI(t)
 	home := t.TempDir()
-	cfgRoot := filepath.Join(home, ".config", "ghost-tab")
+	cfgRoot := filepath.Join(home, ".config", "wisp-deck")
 	configsDir := filepath.Join(cfgRoot, "claude-configs")
 	os.MkdirAll(configsDir, 0755)
 	list := filepath.Join(cfgRoot, "claude-configs.list")
@@ -912,17 +912,17 @@ func TestCLIAdd_then_key_mirrors_into_opencode(t *testing.T) {
 	}
 	var m map[string]any
 	json.Unmarshal(data, &m)
-	if !strings.Contains(string(data), "ghost-tab-work-glm-zhipu") {
+	if !strings.Contains(string(data), "wisp-deck-work-glm-zhipu") {
 		t.Errorf("provider not mirrored:\n%s", data)
 	}
-	if m["model"] != "ghost-tab-work-glm-zhipu/glm-4.6" {
+	if m["model"] != "wisp-deck-work-glm-zhipu/glm-4.6" {
 		t.Errorf("model = %v", m["model"])
 	}
 
 	// delete removes the provider again.
 	run("claude-config", "delete", "--list", list, "--dir", configsDir, "--pointer", pointer, "--file", "work-glm-zhipu.json")
 	data, _ = os.ReadFile(filepath.Join(home, ".config", "opencode", "opencode.json"))
-	if strings.Contains(string(data), "ghost-tab-work-glm-zhipu") {
+	if strings.Contains(string(data), "wisp-deck-work-glm-zhipu") {
 		t.Errorf("provider not removed after delete:\n%s", data)
 	}
 }
@@ -935,7 +935,7 @@ Expected: FAIL — `--pointer` unknown flag on add, and no opencode.json written
 
 - [ ] **Step 3: Write minimal implementation**
 
-In `cmd/ghost-tab-tui/claude_config.go`, add the import `"github.com/jackuait/ghost-tab/internal/opencodeconfig"`, a shared helper, and `--pointer` flags. Replace the three `RunE` bodies and the `init()` flag block:
+In `cmd/wisp-deck-tui/claude_config.go`, add the import `"github.com/jackuait/wisp-deck/internal/opencodeconfig"`, a shared helper, and `--pointer` flags. Replace the three `RunE` bodies and the `init()` flag block:
 
 ```go
 func syncOpenCode() {
@@ -997,13 +997,13 @@ In `init()`, add `--pointer` to add and rename (delete already has it). Note `cc
 In `lib/config-tui.sh`, pass the new flags. Line 34 (add) becomes:
 
 ```bash
-        [ -n "$name" ] && [ "$name" != "null" ] && ghost-tab-tui claude-config add --list "$list_file" --dir "$configs_dir" --pointer "$pointer_file" --name "$name" >/dev/null
+        [ -n "$name" ] && [ "$name" != "null" ] && wisp-deck-tui claude-config add --list "$list_file" --dir "$configs_dir" --pointer "$pointer_file" --name "$name" >/dev/null
 ```
 
 Line 39 (rename) becomes:
 
 ```bash
-        [ -n "$file" ] && [ "$file" != "null" ] && [ -n "$name" ] && [ "$name" != "null" ] && ghost-tab-tui claude-config rename --list "$list_file" --dir "$configs_dir" --pointer "$pointer_file" --file "$file" --name "$name"
+        [ -n "$file" ] && [ "$file" != "null" ] && [ -n "$name" ] && [ "$name" != "null" ] && wisp-deck-tui claude-config rename --list "$list_file" --dir "$configs_dir" --pointer "$pointer_file" --file "$file" --name "$name"
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
@@ -1016,7 +1016,7 @@ Expected: no warnings.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add cmd/ghost-tab-tui/claude_config.go lib/config-tui.sh test/bash/opencode_sync_test.go
+git add cmd/wisp-deck-tui/claude_config.go lib/config-tui.sh test/bash/opencode_sync_test.go
 git commit -m "feat(cli): mirror subscriptions into OpenCode on add/rename/delete"
 ```
 
@@ -1031,12 +1031,12 @@ Expected: all pass.
 
 - [ ] **Step 2: shellcheck all touched/auxiliary scripts**
 
-Run: `shellcheck lib/*.sh lib/terminals/*.sh bin/ghost-tab wrapper.sh`
+Run: `shellcheck lib/*.sh lib/terminals/*.sh bin/wisp-deck wrapper.sh`
 Expected: no warnings (config-tui.sh is the only one this plan changes).
 
 - [ ] **Step 3: Manual smoke (optional but recommended)**
 
-Build and run a real add+key flow against a scratch HOME, then inspect `~/.config/opencode/opencode.json` to confirm the `ghost-tab-*` provider and `model` appear.
+Build and run a real add+key flow against a scratch HOME, then inspect `~/.config/opencode/opencode.json` to confirm the `wisp-deck-*` provider and `model` appear.
 
 - [ ] **Step 4: Push**
 
@@ -1052,4 +1052,4 @@ git status   # MUST show "up to date with origin"
 
 - **Spec coverage:** full provider mirror (Tasks 2-3), re-sync on every change (Tasks 4-5 cover all four mutation entry points + active switch), merge into global config preserving user keys (Task 2 tests 2/3 + Task 3 preserve test), base URL derived from provider name (Task 1), JSONC abort (Task 2 test 6), MiMo skipped (no `mimo` table entry → `ProviderBaseURL` returns "" → non-mirrorable). Out-of-scope items (cost/limit, base-URL UI field, env-ref apiKey, Codex) correctly omitted.
 - **Type consistency:** `Subscription{Name,File,APIKey,BaseURL,OpusModel,Models,Active}`, `MergeSubscriptions(existing []byte, subs []Subscription) ([]byte, bool)`, `Inputs{ListFile,ConfigsDir,PointerFile,Home}`, `Sync(Inputs) error`, `BuildSubscriptions(Inputs) []Subscription`, `ConfigPath(string) string`, `ProviderPrefix` const, `claudeconfig.ProviderBaseURL(string) string` — all used consistently across tasks.
-- **Refinement vs spec:** spec wrote `Sync(home)`; plan refines to `Sync(Inputs)` since the ghost-tab config paths must be passed in (the model/CLI already hold them). Behavior is unchanged.
+- **Refinement vs spec:** spec wrote `Sync(home)`; plan refines to `Sync(Inputs)` since the wisp-deck config paths must be passed in (the model/CLI already hold them). Behavior is unchanged.

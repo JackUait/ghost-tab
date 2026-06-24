@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/jackuait/ghost-tab/internal/models"
+	"github.com/jackuait/wisp-deck/internal/models"
 )
 
 // newReorderMenu creates a MainMenuModel with three projects and no worktrees,

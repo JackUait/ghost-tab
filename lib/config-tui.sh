@@ -1,6 +1,6 @@
 #!/bin/bash
 # Config menu TUI dispatcher
-# Uses ghost-tab-tui config-menu subcommand in a loop
+# Uses wisp-deck-tui config-menu subcommand in a loop
 
 # Source dependencies if not already loaded
 _config_tui_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -11,32 +11,32 @@ _config_tui_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Interactive Claude config management loop.
 manage_claude_configs_interactive() {
-  if ! command -v ghost-tab-tui &>/dev/null; then
-    error "ghost-tab-tui binary not found. Please reinstall."
+  if ! command -v wisp-deck-tui &>/dev/null; then
+    error "wisp-deck-tui binary not found. Please reinstall."
     return 1
   fi
-  local config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/ghost-tab"
+  local config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/wisp-deck"
   local list_file="$config_dir/claude-configs.list"
   local configs_dir="$config_dir/claude-configs"
   local pointer_file="$config_dir/claude-config"
 
   while true; do
     local result action file name
-    result="$(ghost-tab-tui claude-config-menu --configs-list "$list_file" 2>/dev/null)" || return 1
+    result="$(wisp-deck-tui claude-config-menu --configs-list "$list_file" 2>/dev/null)" || return 1
     action="$(echo "$result" | jq -r '.action' 2>/dev/null)"
     case "$action" in
       add)
         name="$(echo "$result" | jq -r '.name' 2>/dev/null)"
-        [ -n "$name" ] && [ "$name" != "null" ] && ghost-tab-tui claude-config add --list "$list_file" --dir "$configs_dir" --pointer "$pointer_file" --name "$name" >/dev/null
+        [ -n "$name" ] && [ "$name" != "null" ] && wisp-deck-tui claude-config add --list "$list_file" --dir "$configs_dir" --pointer "$pointer_file" --name "$name" >/dev/null
         ;;
       rename)
         file="$(echo "$result" | jq -r '.file' 2>/dev/null)"
         name="$(echo "$result" | jq -r '.name' 2>/dev/null)"
-        [ -n "$file" ] && [ "$file" != "null" ] && [ -n "$name" ] && [ "$name" != "null" ] && ghost-tab-tui claude-config rename --list "$list_file" --dir "$configs_dir" --pointer "$pointer_file" --file "$file" --name "$name"
+        [ -n "$file" ] && [ "$file" != "null" ] && [ -n "$name" ] && [ "$name" != "null" ] && wisp-deck-tui claude-config rename --list "$list_file" --dir "$configs_dir" --pointer "$pointer_file" --file "$file" --name "$name"
         ;;
       delete)
         file="$(echo "$result" | jq -r '.file' 2>/dev/null)"
-        [ -n "$file" ] && [ "$file" != "null" ] && ghost-tab-tui claude-config delete --list "$list_file" --dir "$configs_dir" --pointer "$pointer_file" --file "$file"
+        [ -n "$file" ] && [ "$file" != "null" ] && wisp-deck-tui claude-config delete --list "$list_file" --dir "$configs_dir" --pointer "$pointer_file" --file "$file"
         ;;
       quit|""|null)
         return 0
@@ -50,10 +50,10 @@ manage_claude_configs_interactive() {
 }
 
 # Interactive config menu loop.
-# Calls ghost-tab-tui config-menu, dispatches on action, loops until quit.
+# Calls wisp-deck-tui config-menu, dispatches on action, loops until quit.
 config_menu_interactive() {
-  if ! command -v ghost-tab-tui &>/dev/null; then
-    error "ghost-tab-tui binary not found. Please reinstall."
+  if ! command -v wisp-deck-tui &>/dev/null; then
+    error "wisp-deck-tui binary not found. Please reinstall."
     return 1
   fi
 
@@ -66,7 +66,7 @@ config_menu_interactive() {
 
   while true; do
     local result
-    if ! result=$(ghost-tab-tui config-menu --version "$version" 2>/dev/null); then
+    if ! result=$(wisp-deck-tui config-menu --version "$version" 2>/dev/null); then
       return 1
     fi
 
@@ -80,8 +80,8 @@ config_menu_interactive() {
       reinstall)
         local script_dir
         script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-        if [ -f "$script_dir/bin/ghost-tab" ]; then
-          exec bash "$script_dir/bin/ghost-tab"
+        if [ -f "$script_dir/bin/wisp-deck" ]; then
+          exec bash "$script_dir/bin/wisp-deck"
         else
           error "Installer not found. Re-clone the repository."
           echo ""

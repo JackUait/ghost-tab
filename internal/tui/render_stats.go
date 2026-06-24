@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/jackuait/ghost-tab/internal/usage"
+	"github.com/jackuait/wisp-deck/internal/usage"
 )
 
 // renderStatsRows renders the stats content as box rows using leftBorder/rightBorder,

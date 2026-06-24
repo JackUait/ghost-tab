@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/jackuait/ghost-tab/internal/models"
+	"github.com/jackuait/wisp-deck/internal/models"
 )
 
 func TestCyclePanelMode_compactToLazygit(t *testing.T) {

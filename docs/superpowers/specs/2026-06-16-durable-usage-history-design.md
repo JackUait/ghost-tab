@@ -11,7 +11,7 @@ Code prunes transcript files older than `cleanupPeriodDays` (default 30). Once a
 stops re-adding it to the cache, so that month's tokens disappear from the view.
 
 We want monthly usage history to persist for as long as the user keeps using
-ghost-tab, surviving Claude Code's transcript pruning.
+wisp-deck, surviving Claude Code's transcript pruning.
 
 ## Scope
 

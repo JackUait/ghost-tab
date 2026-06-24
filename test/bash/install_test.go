@@ -174,26 +174,26 @@ exit 0
 }
 
 // ============================================================
-// ensure_ghost_tab_tui tests (binary download, not build from source)
+// ensure_wisp_deck_tui tests (binary download, not build from source)
 // ============================================================
 
-func TestEnsureGhostTabTui_skips_when_binary_version_matches(t *testing.T) {
+func TestEnsureWispDeckTui_skips_when_binary_version_matches(t *testing.T) {
 	dir := t.TempDir()
 	shareDir := t.TempDir()
 	writeTempFile(t, shareDir, "VERSION", "2.4.0")
 	// Mock binary that reports matching version
-	binDir := mockCommand(t, dir, "ghost-tab-tui", `
-if [ "$1" = "--version" ]; then echo "ghost-tab-tui version 2.4.0"; exit 0; fi
+	binDir := mockCommand(t, dir, "wisp-deck-tui", `
+if [ "$1" = "--version" ]; then echo "wisp-deck-tui version 2.4.0"; exit 0; fi
 echo "I exist"
 `)
-	snippet := installSnippet(t, fmt.Sprintf(`ensure_ghost_tab_tui %q`, shareDir))
+	snippet := installSnippet(t, fmt.Sprintf(`ensure_wisp_deck_tui %q`, shareDir))
 	env := buildEnv(t, []string{binDir})
 	out, code := runBashSnippet(t, snippet, env)
 	assertExitCode(t, code, 0)
-	assertContains(t, out, "ghost-tab-tui is up to date")
+	assertContains(t, out, "wisp-deck-tui is up to date")
 }
 
-func TestEnsureGhostTabTui_updates_when_version_mismatch(t *testing.T) {
+func TestEnsureWispDeckTui_updates_when_version_mismatch(t *testing.T) {
 	dir := t.TempDir()
 	fakeHome := filepath.Join(dir, "home")
 	os.MkdirAll(filepath.Join(fakeHome, ".local", "bin"), 0755)
@@ -202,8 +202,8 @@ func TestEnsureGhostTabTui_updates_when_version_mismatch(t *testing.T) {
 
 	curlCalls := filepath.Join(dir, "curl_calls")
 	// Mock binary that reports old version
-	binDir := mockCommand(t, dir, "ghost-tab-tui", `
-if [ "$1" = "--version" ]; then echo "ghost-tab-tui version 2.4.0"; exit 0; fi
+	binDir := mockCommand(t, dir, "wisp-deck-tui", `
+if [ "$1" = "--version" ]; then echo "wisp-deck-tui version 2.4.0"; exit 0; fi
 echo "I exist"
 `)
 	mockCommand(t, dir, "curl", fmt.Sprintf(`
@@ -212,16 +212,16 @@ if [ "$1" = "-fsSL" ]; then echo "binary" > "$3"; exit 0; fi
 exit 0
 `, curlCalls))
 	mockCommand(t, dir, "uname", `echo "arm64"`)
-	snippet := installSnippet(t, fmt.Sprintf(`ensure_ghost_tab_tui %q`, shareDir))
+	snippet := installSnippet(t, fmt.Sprintf(`ensure_wisp_deck_tui %q`, shareDir))
 	env := buildEnv(t, nil, "HOME="+fakeHome, "PATH="+binDir+":/usr/bin:/bin")
 	out, code := runBashSnippet(t, snippet, env)
 	assertExitCode(t, code, 0)
-	assertContains(t, out, "Updating ghost-tab-tui")
+	assertContains(t, out, "Updating wisp-deck-tui")
 	calls, _ := os.ReadFile(curlCalls)
 	assertContains(t, string(calls), "2.5.0")
 }
 
-func TestEnsureGhostTabTui_updates_when_no_version_flag(t *testing.T) {
+func TestEnsureWispDeckTui_updates_when_no_version_flag(t *testing.T) {
 	dir := t.TempDir()
 	fakeHome := filepath.Join(dir, "home")
 	os.MkdirAll(filepath.Join(fakeHome, ".local", "bin"), 0755)
@@ -230,7 +230,7 @@ func TestEnsureGhostTabTui_updates_when_no_version_flag(t *testing.T) {
 
 	curlCalls := filepath.Join(dir, "curl_calls")
 	// Mock old binary that doesn't support --version (exits non-zero)
-	binDir := mockCommand(t, dir, "ghost-tab-tui", `
+	binDir := mockCommand(t, dir, "wisp-deck-tui", `
 if [ "$1" = "--version" ]; then echo "Error: unknown flag: --version" >&2; exit 1; fi
 echo "I exist"
 `)
@@ -240,16 +240,16 @@ if [ "$1" = "-fsSL" ]; then echo "binary" > "$3"; exit 0; fi
 exit 0
 `, curlCalls))
 	mockCommand(t, dir, "uname", `echo "arm64"`)
-	snippet := installSnippet(t, fmt.Sprintf(`ensure_ghost_tab_tui %q`, shareDir))
+	snippet := installSnippet(t, fmt.Sprintf(`ensure_wisp_deck_tui %q`, shareDir))
 	env := buildEnv(t, nil, "HOME="+fakeHome, "PATH="+binDir+":/usr/bin:/bin")
 	out, code := runBashSnippet(t, snippet, env)
 	assertExitCode(t, code, 0)
-	assertContains(t, out, "Updating ghost-tab-tui")
+	assertContains(t, out, "Updating wisp-deck-tui")
 	calls, _ := os.ReadFile(curlCalls)
 	assertContains(t, string(calls), "2.5.0")
 }
 
-func TestEnsureGhostTabTui_downloads_binary_for_correct_arch(t *testing.T) {
+func TestEnsureWispDeckTui_downloads_binary_for_correct_arch(t *testing.T) {
 	dir := t.TempDir()
 	fakeHome := filepath.Join(dir, "home")
 	os.MkdirAll(filepath.Join(fakeHome, ".local", "bin"), 0755)
@@ -263,18 +263,18 @@ if [ "$1" = "-fsSL" ]; then echo "binary" > "$3"; exit 0; fi
 exit 0
 `, curlCalls))
 	unameDir := mockCommand(t, dir, "uname", `echo "arm64"`)
-	snippet := installSnippet(t, fmt.Sprintf(`ensure_ghost_tab_tui %q`, shareDir))
-	// Use explicit PATH so the real ghost-tab-tui (if installed) is not found.
+	snippet := installSnippet(t, fmt.Sprintf(`ensure_wisp_deck_tui %q`, shareDir))
+	// Use explicit PATH so the real wisp-deck-tui (if installed) is not found.
 	env := buildEnv(t, nil, "HOME="+fakeHome, "PATH="+binDir+":"+unameDir+":/usr/bin:/bin")
 	out, code := runBashSnippet(t, snippet, env)
 	assertExitCode(t, code, 0)
-	assertContains(t, out, "ghost-tab-tui")
+	assertContains(t, out, "wisp-deck-tui")
 	calls, _ := os.ReadFile(curlCalls)
-	assertContains(t, string(calls), "ghost-tab-tui-darwin-arm64")
+	assertContains(t, string(calls), "wisp-deck-tui-darwin-arm64")
 	assertContains(t, string(calls), "2.2.0")
 }
 
-func TestEnsureGhostTabTui_fails_when_download_fails(t *testing.T) {
+func TestEnsureWispDeckTui_fails_when_download_fails(t *testing.T) {
 	dir := t.TempDir()
 	fakeHome := filepath.Join(dir, "home")
 	os.MkdirAll(filepath.Join(fakeHome, ".local", "bin"), 0755)
@@ -283,7 +283,7 @@ func TestEnsureGhostTabTui_fails_when_download_fails(t *testing.T) {
 
 	binDir := mockCommand(t, dir, "curl", `exit 1`)
 	unameDir := mockCommand(t, dir, "uname", `echo "arm64"`)
-	snippet := installSnippet(t, fmt.Sprintf(`ensure_ghost_tab_tui %q`, shareDir))
+	snippet := installSnippet(t, fmt.Sprintf(`ensure_wisp_deck_tui %q`, shareDir))
 	env := buildEnv(t, []string{binDir, unameDir}, "HOME="+fakeHome, "PATH="+binDir+":"+unameDir+":/usr/bin:/bin")
 	out, code := runBashSnippet(t, snippet, env)
 	if code == 0 {

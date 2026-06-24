@@ -19,7 +19,7 @@ func TestLoading_get_loading_art_returns_nonempty(t *testing.T) {
 	}
 }
 
-func TestLoading_get_loading_art_contains_ghost_tab_box(t *testing.T) {
+func TestLoading_get_loading_art_contains_wisp_deck_box(t *testing.T) {
 	out, code := runBashFunc(t, "lib/loading.sh", "get_loading_art", nil, nil)
 	assertExitCode(t, code, 0)
 	assertContains(t, out, "+---")

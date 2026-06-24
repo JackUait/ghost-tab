@@ -7,10 +7,10 @@ import (
 	"testing"
 )
 
-// seed writes a minimal ghost-tab config tree under root and returns Inputs.
+// seed writes a minimal wisp-deck config tree under root and returns Inputs.
 func seed(t *testing.T, home string, active string) Inputs {
 	t.Helper()
-	cfgRoot := filepath.Join(home, ".config", "ghost-tab")
+	cfgRoot := filepath.Join(home, ".config", "wisp-deck")
 	configsDir := filepath.Join(cfgRoot, "claude-configs")
 	if err := os.MkdirAll(configsDir, 0755); err != nil {
 		t.Fatal(err)
@@ -41,10 +41,10 @@ func TestSync_writes_opencode_config(t *testing.T) {
 	if err := json.Unmarshal(data, &m); err != nil {
 		t.Fatalf("invalid JSON: %v", err)
 	}
-	if m["model"] != "ghost-tab-work-glm-zhipu/glm-4.6" {
+	if m["model"] != "wisp-deck-work-glm-zhipu/glm-4.6" {
 		t.Errorf("model = %v", m["model"])
 	}
-	prov, ok := m["provider"].(map[string]any)["ghost-tab-work-glm-zhipu"].(map[string]any)
+	prov, ok := m["provider"].(map[string]any)["wisp-deck-work-glm-zhipu"].(map[string]any)
 	if !ok {
 		t.Fatalf("provider missing: %v", m["provider"])
 	}

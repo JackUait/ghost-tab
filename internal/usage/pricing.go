@@ -3,7 +3,7 @@ package usage
 import (
 	"strings"
 
-	"github.com/jackuait/ghost-tab/internal/claudeconfig"
+	"github.com/jackuait/wisp-deck/internal/claudeconfig"
 )
 
 type modelRate struct{ inPerMTok, outPerMTok float64 }

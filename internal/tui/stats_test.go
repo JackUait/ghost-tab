@@ -6,7 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/jackuait/ghost-tab/internal/usage"
+	"github.com/jackuait/wisp-deck/internal/usage"
 )
 
 func TestHumanizeTokens(t *testing.T) {
@@ -93,7 +93,7 @@ func TestStatsView_isBoxedWithGhostBorder(t *testing.T) {
 	view := NewStatsModelWithData(twoMonths()).View()
 	for _, glyph := range []string{"╭", "╮", "╰", "╯", "│"} {
 		if !strings.Contains(view, glyph) {
-			t.Errorf("view missing box glyph %q (ghost-tab look):\n%s", glyph, view)
+			t.Errorf("view missing box glyph %q (wisp-deck look):\n%s", glyph, view)
 		}
 	}
 }

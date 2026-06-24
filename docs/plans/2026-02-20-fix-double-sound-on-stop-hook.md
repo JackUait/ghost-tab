@@ -2,9 +2,9 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Prevent two sounds from playing when Claude Code's Stop hook fires, by setting `preferredNotifChannel` to `terminal_bell` when ghost-tab's sound hook is active.
+**Goal:** Prevent two sounds from playing when Claude Code's Stop hook fires, by setting `preferredNotifChannel` to `terminal_bell` when wisp-deck's sound hook is active.
 
-**Architecture:** Two new helper functions (`set_claude_notif_channel` and `restore_claude_notif_channel`) in `notification-setup.sh` manage Claude Code's `preferredNotifChannel` config. They are called from `setup_sound_notification()` on enable and `remove_sound_notification()` on disable. The previous channel value is stored in `~/.config/ghost-tab/prev-notif-channel` for restoration.
+**Architecture:** Two new helper functions (`set_claude_notif_channel` and `restore_claude_notif_channel`) in `notification-setup.sh` manage Claude Code's `preferredNotifChannel` config. They are called from `setup_sound_notification()` on enable and `remove_sound_notification()` on disable. The previous channel value is stored in `~/.config/wisp-deck/prev-notif-channel` for restoration.
 
 **Tech Stack:** Bash, `claude` CLI (`CLAUDECODE="" claude config set/get`)
 
@@ -127,7 +127,7 @@ Add to `lib/notification-setup.sh` after the `setup_sound_notification` function
 
 ```bash
 # Set Claude Code's preferredNotifChannel to terminal_bell to prevent
-# double sounds (ghost-tab hook + built-in notification).
+# double sounds (wisp-deck hook + built-in notification).
 # Saves the previous value to <config_dir>/prev-notif-channel for restoration.
 # Usage: set_claude_notif_channel <config_dir>
 set_claude_notif_channel() {

@@ -12,12 +12,12 @@ import (
 )
 
 // ============================================================
-// TestGhostTab_* — migrated from test/ghost-tab.bats (13 tests)
+// TestWispDeck_* — migrated from test/wisp-deck.bats (13 tests)
 // ============================================================
 
 // ---------- Section 1: OS Check ----------
 
-func TestGhostTab_OsCheck_rejects_non_Darwin_platform(t *testing.T) {
+func TestWispDeck_OsCheck_rejects_non_Darwin_platform(t *testing.T) {
 	root := projectRoot(t)
 	script := fmt.Sprintf(`
 source %q
@@ -36,7 +36,7 @@ fi
 
 // ---------- Section 2: Supporting Files Validation ----------
 
-func TestGhostTab_SupportingFiles_fails_when_files_missing(t *testing.T) {
+func TestWispDeck_SupportingFiles_fails_when_files_missing(t *testing.T) {
 	dir := t.TempDir()
 	shareDir := filepath.Join(dir, "empty-share")
 	if err := os.MkdirAll(shareDir, 0755); err != nil {
@@ -58,7 +58,7 @@ fi
 	assertContains(t, out, "Re-clone")
 }
 
-func TestGhostTab_SupportingFiles_passes_when_all_present(t *testing.T) {
+func TestWispDeck_SupportingFiles_passes_when_all_present(t *testing.T) {
 	dir := t.TempDir()
 	shareDir := filepath.Join(dir, "full-share")
 	os.MkdirAll(filepath.Join(shareDir, "templates"), 0755)
@@ -84,11 +84,11 @@ echo "ok"
 
 // ---------- Section 3: Config Migration ----------
 
-func TestGhostTab_Migration_renames_vibecode_editor_to_ghost_tab(t *testing.T) {
+func TestWispDeck_Migration_renames_vibecode_editor_to_wisp_deck(t *testing.T) {
 	dir := t.TempDir()
 	configHome := filepath.Join(dir, "config")
 	oldDir := filepath.Join(configHome, "vibecode-editor")
-	newDir := filepath.Join(configHome, "ghost-tab")
+	newDir := filepath.Join(configHome, "wisp-deck")
 	os.MkdirAll(oldDir, 0755)
 	writeTempFile(t, oldDir, "projects", "proj:path")
 
@@ -109,18 +109,18 @@ cat %q
 
 	// Verify old dir gone, new dir exists
 	if _, err := os.Stat(newDir); os.IsNotExist(err) {
-		t.Error("expected ghost-tab dir to exist")
+		t.Error("expected wisp-deck dir to exist")
 	}
 	if _, err := os.Stat(oldDir); !os.IsNotExist(err) {
 		t.Error("expected vibecode-editor dir to be gone")
 	}
 }
 
-func TestGhostTab_Migration_skips_when_ghost_tab_already_exists(t *testing.T) {
+func TestWispDeck_Migration_skips_when_wisp_deck_already_exists(t *testing.T) {
 	dir := t.TempDir()
 	configHome := filepath.Join(dir, "config")
 	oldDir := filepath.Join(configHome, "vibecode-editor")
-	newDir := filepath.Join(configHome, "ghost-tab")
+	newDir := filepath.Join(configHome, "wisp-deck")
 	os.MkdirAll(oldDir, 0755)
 	os.MkdirAll(newDir, 0755)
 	writeTempFile(t, oldDir, "projects", "old")
@@ -146,13 +146,13 @@ cat %q
 		t.Error("expected vibecode-editor dir to still exist")
 	}
 	if _, err := os.Stat(newDir); os.IsNotExist(err) {
-		t.Error("expected ghost-tab dir to still exist")
+		t.Error("expected wisp-deck dir to still exist")
 	}
 }
 
 // ---------- Section 4: Ghostty Config ----------
 
-func TestGhostTab_GhosttyConfig_merge_option_adds_command_line(t *testing.T) {
+func TestWispDeck_GhosttyConfig_merge_option_adds_command_line(t *testing.T) {
 	dir := t.TempDir()
 	configFile := writeTempFile(t, dir, "config", "font-size = 14\n")
 
@@ -161,7 +161,7 @@ func TestGhostTab_GhosttyConfig_merge_option_adds_command_line(t *testing.T) {
 	script := fmt.Sprintf(`
 source %q
 source %q
-merge_ghostty_config %q "command = ~/.config/ghost-tab/wrapper.sh"
+merge_ghostty_config %q "command = ~/.config/wisp-deck/wrapper.sh"
 `, filepath.Join(root, "lib/tui.sh"), filepath.Join(root, "lib/ghostty-config.sh"), configFile)
 
 	out, code := runBashSnippet(t, script, nil)
@@ -173,10 +173,10 @@ merge_ghostty_config %q "command = ~/.config/ghost-tab/wrapper.sh"
 		t.Fatalf("failed to read config: %v", err)
 	}
 	assertContains(t, string(content), "font-size = 14")
-	assertContains(t, string(content), "command = ~/.config/ghost-tab/wrapper.sh")
+	assertContains(t, string(content), "command = ~/.config/wisp-deck/wrapper.sh")
 }
 
-func TestGhostTab_GhosttyConfig_backup_replace_creates_backup(t *testing.T) {
+func TestWispDeck_GhosttyConfig_backup_replace_creates_backup(t *testing.T) {
 	dir := t.TempDir()
 	configFile := writeTempFile(t, dir, "config", "old content\n")
 	templateFile := writeTempFile(t, dir, "template", "new template content\n")
@@ -210,7 +210,7 @@ backup_replace_ghostty_config %q %q
 	}
 }
 
-func TestGhostTab_GhosttyConfig_invalid_choice_warns_and_skips(t *testing.T) {
+func TestWispDeck_GhosttyConfig_invalid_choice_warns_and_skips(t *testing.T) {
 	dir := t.TempDir()
 	configFile := writeTempFile(t, dir, "config", "original content\n")
 
@@ -239,10 +239,10 @@ esac
 	}
 }
 
-func TestGhostTab_GhosttyConfig_creates_new_when_none_exists(t *testing.T) {
+func TestWispDeck_GhosttyConfig_creates_new_when_none_exists(t *testing.T) {
 	dir := t.TempDir()
 	configFile := filepath.Join(dir, "ghostty-config")
-	templateFile := writeTempFile(t, dir, "template-config", "command = ~/.config/ghost-tab/wrapper.sh\n")
+	templateFile := writeTempFile(t, dir, "template-config", "command = ~/.config/wisp-deck/wrapper.sh\n")
 
 	// Verify config doesn't exist yet
 	if _, err := os.Stat(configFile); !os.IsNotExist(err) {
@@ -257,14 +257,14 @@ func TestGhostTab_GhosttyConfig_creates_new_when_none_exists(t *testing.T) {
 	if _, err := os.Stat(configFile); os.IsNotExist(err) {
 		t.Error("expected config file to exist after copy")
 	}
-	assertContains(t, out, "command = ~/.config/ghost-tab/wrapper.sh")
+	assertContains(t, out, "command = ~/.config/wisp-deck/wrapper.sh")
 }
 
 // ---------- Section 5: Project Addition ----------
 
-func TestGhostTab_Projects_writes_entry_to_file(t *testing.T) {
+func TestWispDeck_Projects_writes_entry_to_file(t *testing.T) {
 	dir := t.TempDir()
-	projectsDir := filepath.Join(dir, "ghost-tab")
+	projectsDir := filepath.Join(dir, "wisp-deck")
 	os.MkdirAll(projectsDir, 0755)
 	projectsFile := filepath.Join(projectsDir, "projects")
 
@@ -290,9 +290,9 @@ cat "$projects_file"
 	}
 }
 
-func TestGhostTab_Projects_adds_nonexistent_path_with_warning(t *testing.T) {
+func TestWispDeck_Projects_adds_nonexistent_path_with_warning(t *testing.T) {
 	dir := t.TempDir()
-	projectsDir := filepath.Join(dir, "ghost-tab")
+	projectsDir := filepath.Join(dir, "wisp-deck")
 	os.MkdirAll(projectsDir, 0755)
 	projectsFile := filepath.Join(projectsDir, "projects")
 
@@ -328,15 +328,15 @@ fi
 
 // ---------- Section 6: Summary ----------
 
-func TestGhostTab_Summary_shows_all_installed_components(t *testing.T) {
+func TestWispDeck_Summary_shows_all_installed_components(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".claude"), 0755)
-	os.MkdirAll(filepath.Join(dir, ".config/ghost-tab"), 0755)
+	os.MkdirAll(filepath.Join(dir, ".config/wisp-deck"), 0755)
 
 	writeTempFile(t, dir, ".claude/statusline-wrapper.sh", "")
 	writeTempFile(t, dir, ".claude/settings.json",
-		`{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"GHOST_TAB_MARKER_FILE"}]}]}}`)
-	writeTempFile(t, dir, ".config/ghost-tab/ai-tool", "claude")
+		`{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"WISP_DECK_MARKER_FILE"}]}]}}`)
+	writeTempFile(t, dir, ".config/wisp-deck/ai-tool", "claude")
 
 	root := projectRoot(t)
 	script := fmt.Sprintf(`
@@ -345,7 +345,7 @@ source %q
 if [ -f "$HOME/.claude/statusline-wrapper.sh" ]; then
   success "Status line:     ~/.claude/statusline-wrapper.sh"
 fi
-if grep -q "GHOST_TAB_MARKER_FILE" "$HOME/.claude/settings.json" 2>/dev/null; then
+if grep -q "WISP_DECK_MARKER_FILE" "$HOME/.claude/settings.json" 2>/dev/null; then
   success "Sound:           Waiting indicator hooks"
 fi
 `, dir, filepath.Join(root, "lib/tui.sh"))
@@ -357,7 +357,7 @@ fi
 	assertContains(t, out, "Sound")
 }
 
-func TestGhostTab_Summary_omits_missing_components(t *testing.T) {
+func TestWispDeck_Summary_omits_missing_components(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".claude"), 0755)
 
@@ -368,7 +368,7 @@ source %q
 if [ -f "$HOME/.claude/statusline-wrapper.sh" ]; then
   success "Status line:     ~/.claude/statusline-wrapper.sh"
 fi
-if grep -q "GHOST_TAB_MARKER_FILE" "$HOME/.claude/settings.json" 2>/dev/null; then
+if grep -q "WISP_DECK_MARKER_FILE" "$HOME/.claude/settings.json" 2>/dev/null; then
   success "Sound:           Waiting indicator hooks"
 fi
 echo "done"
@@ -383,21 +383,21 @@ echo "done"
 }
 
 // ============================================================
-// TestGhostTab_Flags_* — argument parsing (terminal selection removed)
+// TestWispDeck_Flags_* — argument parsing (terminal selection removed)
 // ============================================================
 
-func TestGhostTab_Flags_unknown_flag_shows_usage(t *testing.T) {
+func TestWispDeck_Flags_unknown_flag_shows_usage(t *testing.T) {
 	root := projectRoot(t)
 	dir := t.TempDir()
 
-	// Mirror bin/ghost-tab's arg-parsing case (Ghostty-only: no terminal flag).
+	// Mirror bin/wisp-deck's arg-parsing case (Ghostty-only: no terminal flag).
 	scriptContent := fmt.Sprintf(`#!/bin/bash
 source %q
 
 case "${1:-}" in
   --*)
     error "Unknown flag: $1"
-    echo "Usage: ghost-tab"
+    echo "Usage: wisp-deck"
     exit 1
     ;;
 esac
@@ -425,7 +425,7 @@ func TestTerminalSupport_removed_files_do_not_exist(t *testing.T) {
 		"lib/terminals/adapter.sh",
 		"lib/terminals/registry.sh",
 		"lib/terminal-select-tui.sh",
-		"cmd/ghost-tab-tui/select_terminal.go",
+		"cmd/wisp-deck-tui/select_terminal.go",
 		"internal/tui/terminal_selector.go",
 		"internal/models/terminal.go",
 	}
@@ -439,11 +439,11 @@ func TestTerminalSupport_removed_files_do_not_exist(t *testing.T) {
 	}
 }
 
-func TestGhostTab_does_not_reference_terminal_selection(t *testing.T) {
+func TestWispDeck_does_not_reference_terminal_selection(t *testing.T) {
 	root := projectRoot(t)
-	data, err := os.ReadFile(filepath.Join(root, "bin", "ghost-tab"))
+	data, err := os.ReadFile(filepath.Join(root, "bin", "wisp-deck"))
 	if err != nil {
-		t.Fatalf("failed to read bin/ghost-tab: %v", err)
+		t.Fatalf("failed to read bin/wisp-deck: %v", err)
 	}
 	content := string(data)
 	for _, ref := range []string{
@@ -454,7 +454,7 @@ func TestGhostTab_does_not_reference_terminal_selection(t *testing.T) {
 		"--terminal",
 	} {
 		if strings.Contains(content, ref) {
-			t.Errorf("bin/ghost-tab still references %q — terminal selection was removed", ref)
+			t.Errorf("bin/wisp-deck still references %q — terminal selection was removed", ref)
 		}
 	}
 }
@@ -494,7 +494,7 @@ func createWrapperTestEnv(t *testing.T) (tmpDir, wrapperDir, binDir, shareDir st
 
 	os.MkdirAll(filepath.Join(wrapperDir, "lib"), 0755)
 	os.MkdirAll(binDir, 0755)
-	os.MkdirAll(filepath.Join(shareDir, "cmd/ghost-tab-tui"), 0755)
+	os.MkdirAll(filepath.Join(shareDir, "cmd/wisp-deck-tui"), 0755)
 
 	root := projectRoot(t)
 
@@ -516,16 +516,16 @@ func createWrapperTestEnv(t *testing.T) (tmpDir, wrapperDir, binDir, shareDir st
 		}
 	}
 
-	// Create minimal ghost-tab-tui source for testing builds
-	writeTempFile(t, shareDir, "cmd/ghost-tab-tui/main.go", `package main
+	// Create minimal wisp-deck-tui source for testing builds
+	writeTempFile(t, shareDir, "cmd/wisp-deck-tui/main.go", `package main
 import "fmt"
 func main() {
-  fmt.Println("ghost-tab-tui test version")
+  fmt.Println("wisp-deck-tui test version")
 }
 `)
 
 	// Create minimal go.mod at SHARE_DIR root
-	writeTempFile(t, shareDir, "go.mod", `module github.com/user/ghost-tab
+	writeTempFile(t, shareDir, "go.mod", `module github.com/user/wisp-deck
 
 go 1.21
 `)
@@ -534,27 +534,27 @@ go 1.21
 	wrapperScript := fmt.Sprintf(`#!/bin/bash
 export PATH="$PATH"
 
-# Self-healing: Check if ghost-tab-tui exists, rebuild if missing
-TUI_BIN="$HOME/.local/bin/ghost-tab-tui"
-if ! command -v ghost-tab-tui &>/dev/null; then
+# Self-healing: Check if wisp-deck-tui exists, rebuild if missing
+TUI_BIN="$HOME/.local/bin/wisp-deck-tui"
+if ! command -v wisp-deck-tui &>/dev/null; then
   # Simple inline rebuild without TUI functions (not loaded yet)
   if command -v go &>/dev/null; then
-    printf 'Rebuilding ghost-tab-tui...\n' >&2
+    printf 'Rebuilding wisp-deck-tui...\n' >&2
     mkdir -p "$HOME/.local/bin"
     # Build from module root with relative path to cmd
-    if (cd "$SHARE_DIR" && go build -o "$HOME/.local/bin/ghost-tab-tui" ./cmd/ghost-tab-tui) 2>/dev/null; then
-      printf 'ghost-tab-tui rebuilt successfully\n' >&2
+    if (cd "$SHARE_DIR" && go build -o "$HOME/.local/bin/wisp-deck-tui" ./cmd/wisp-deck-tui) 2>/dev/null; then
+      printf 'wisp-deck-tui rebuilt successfully\n' >&2
       export PATH="$HOME/.local/bin:$PATH"
     else
-      printf '\033[31mError:\033[0m Failed to rebuild ghost-tab-tui\n' >&2
-      printf 'Run \033[1mghost-tab\033[0m to reinstall.\n' >&2
+      printf '\033[31mError:\033[0m Failed to rebuild wisp-deck-tui\n' >&2
+      printf 'Run \033[1mwisp-deck\033[0m to reinstall.\n' >&2
       printf 'Press any key to exit...\n' >&2
       read -rsn1
       exit 1
     fi
   else
-    printf '\033[31mError:\033[0m ghost-tab-tui binary not found and Go not installed\n' >&2
-    printf 'Run \033[1mghost-tab\033[0m to reinstall.\n' >&2
+    printf '\033[31mError:\033[0m wisp-deck-tui binary not found and Go not installed\n' >&2
+    printf 'Run \033[1mwisp-deck\033[0m to reinstall.\n' >&2
     printf 'Press any key to exit...\n' >&2
     read -rsn1
     exit 1
@@ -565,7 +565,7 @@ fi
 _WRAPPER_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 if [ ! -d "$_WRAPPER_DIR/lib" ]; then
-  printf '\033[31mError:\033[0m Ghost Tab libraries not found\n' >&2
+  printf '\033[31mError:\033[0m Wisp Deck libraries not found\n' >&2
   exit 1
 fi
 
@@ -576,7 +576,7 @@ for _gt_lib in tui; do
 done
 
 success "Wrapper started successfully"
-echo "tui-command: $(command -v ghost-tab-tui)"
+echo "tui-command: $(command -v wisp-deck-tui)"
 `)
 	wrapperPath := filepath.Join(wrapperDir, "test-wrapper.sh")
 	if err := os.WriteFile(wrapperPath, []byte(wrapperScript), 0755); err != nil {
@@ -586,12 +586,12 @@ echo "tui-command: $(command -v ghost-tab-tui)"
 	return tmpDir, wrapperDir, binDir, shareDir
 }
 
-func TestClaudeWrapper_SelfHealing_continues_normally_when_ghost_tab_tui_exists(t *testing.T) {
+func TestClaudeWrapper_SelfHealing_continues_normally_when_wisp_deck_tui_exists(t *testing.T) {
 	_, wrapperDir, binDir, shareDir := createWrapperTestEnv(t)
 
-	// Create a fake ghost-tab-tui binary
-	writeTempFile(t, binDir, "ghost-tab-tui", "#!/bin/bash\necho \"ghost-tab-tui v1.0.0\"\n")
-	os.Chmod(filepath.Join(binDir, "ghost-tab-tui"), 0755)
+	// Create a fake wisp-deck-tui binary
+	writeTempFile(t, binDir, "wisp-deck-tui", "#!/bin/bash\necho \"wisp-deck-tui v1.0.0\"\n")
+	os.Chmod(filepath.Join(binDir, "wisp-deck-tui"), 0755)
 
 	env := buildEnv(t, []string{binDir}, fmt.Sprintf("SHARE_DIR=%s", shareDir))
 	out, code := runBashSnippet(t,
@@ -604,7 +604,7 @@ func TestClaudeWrapper_SelfHealing_continues_normally_when_ghost_tab_tui_exists(
 	assertNotContains(t, out, "Rebuilding")
 }
 
-func TestClaudeWrapper_SelfHealing_rebuilds_ghost_tab_tui_when_missing_and_Go_available(t *testing.T) {
+func TestClaudeWrapper_SelfHealing_rebuilds_wisp_deck_tui_when_missing_and_Go_available(t *testing.T) {
 	// Skip if Go not installed on test system
 	if _, err := exec.LookPath("go"); err != nil {
 		t.Skip("Go not installed on test system")
@@ -612,14 +612,14 @@ func TestClaudeWrapper_SelfHealing_rebuilds_ghost_tab_tui_when_missing_and_Go_av
 
 	tmpDir, wrapperDir, _, shareDir := createWrapperTestEnv(t)
 
-	// Create isolated environment without ghost-tab-tui
+	// Create isolated environment without wisp-deck-tui
 	homeDir := filepath.Join(tmpDir, "home-rebuild")
 	os.MkdirAll(filepath.Join(homeDir, ".local/bin"), 0755)
 
 	goPath, _ := exec.LookPath("go")
 	goBinDir := filepath.Dir(goPath)
 
-	// Minimal PATH with go but not ghost-tab-tui
+	// Minimal PATH with go but not wisp-deck-tui
 	minimalPath := fmt.Sprintf("/usr/local/bin:/usr/bin:/bin:%s", goBinDir)
 
 	env := buildEnv(t, nil,
@@ -634,24 +634,24 @@ func TestClaudeWrapper_SelfHealing_rebuilds_ghost_tab_tui_when_missing_and_Go_av
 	)
 
 	assertExitCode(t, code, 0)
-	assertContains(t, out, "Rebuilding ghost-tab-tui")
-	assertContains(t, out, "ghost-tab-tui rebuilt successfully")
+	assertContains(t, out, "Rebuilding wisp-deck-tui")
+	assertContains(t, out, "wisp-deck-tui rebuilt successfully")
 	assertContains(t, out, "Wrapper started successfully")
 
 	// Verify binary was created
-	builtBin := filepath.Join(homeDir, ".local/bin/ghost-tab-tui")
+	builtBin := filepath.Join(homeDir, ".local/bin/wisp-deck-tui")
 	if _, err := os.Stat(builtBin); os.IsNotExist(err) {
-		t.Error("expected ghost-tab-tui binary to be created")
+		t.Error("expected wisp-deck-tui binary to be created")
 	}
 }
 
-func TestClaudeWrapper_SelfHealing_fails_gracefully_when_ghost_tab_tui_missing_and_Go_not_installed(t *testing.T) {
+func TestClaudeWrapper_SelfHealing_fails_gracefully_when_wisp_deck_tui_missing_and_Go_not_installed(t *testing.T) {
 	tmpDir, wrapperDir, _, shareDir := createWrapperTestEnv(t)
 
 	homeDir := filepath.Join(tmpDir, "home-no-go")
 	os.MkdirAll(filepath.Join(homeDir, ".local/bin"), 0755)
 
-	// Minimal PATH without go or ghost-tab-tui
+	// Minimal PATH without go or wisp-deck-tui
 	env := buildEnv(t, nil,
 		fmt.Sprintf("PATH=%s", "/usr/local/bin:/usr/bin:/bin"),
 		fmt.Sprintf("SHARE_DIR=%s", shareDir),
@@ -663,8 +663,8 @@ func TestClaudeWrapper_SelfHealing_fails_gracefully_when_ghost_tab_tui_missing_a
 	out, code := runBashSnippet(t, script, env)
 
 	assertExitCode(t, code, 1)
-	assertContains(t, out, "ghost-tab-tui binary not found and Go not installed")
-	assertContains(t, out, "ghost-tab")
+	assertContains(t, out, "wisp-deck-tui binary not found and Go not installed")
+	assertContains(t, out, "wisp-deck")
 	assertContains(t, out, "reinstall")
 }
 
@@ -678,12 +678,12 @@ func TestClaudeWrapper_SelfHealing_fails_gracefully_when_rebuild_fails(t *testin
 
 	// Create a separate share dir with invalid Go source
 	shareBad := filepath.Join(tmpDir, "share-bad")
-	os.MkdirAll(filepath.Join(shareBad, "cmd/ghost-tab-tui"), 0755)
-	writeTempFile(t, shareBad, "go.mod", `module github.com/user/ghost-tab
+	os.MkdirAll(filepath.Join(shareBad, "cmd/wisp-deck-tui"), 0755)
+	writeTempFile(t, shareBad, "go.mod", `module github.com/user/wisp-deck
 
 go 1.21
 `)
-	writeTempFile(t, shareBad, "cmd/ghost-tab-tui/main.go", `package main
+	writeTempFile(t, shareBad, "cmd/wisp-deck-tui/main.go", `package main
 this is invalid go code!
 `)
 
@@ -705,8 +705,8 @@ this is invalid go code!
 	out, code := runBashSnippet(t, script, env)
 
 	assertExitCode(t, code, 1)
-	assertContains(t, out, "Failed to rebuild ghost-tab-tui")
-	assertContains(t, out, "ghost-tab")
+	assertContains(t, out, "Failed to rebuild wisp-deck-tui")
+	assertContains(t, out, "wisp-deck")
 	assertContains(t, out, "reinstall")
 }
 
@@ -737,21 +737,21 @@ func TestClaudeWrapper_SelfHealing_adds_rebuilt_binary_to_PATH(t *testing.T) {
 	)
 
 	assertExitCode(t, code, 0)
-	assertContains(t, out, "Rebuilding ghost-tab-tui")
+	assertContains(t, out, "Rebuilding wisp-deck-tui")
 
-	// Check that the tui-command output contains .local/bin/ghost-tab-tui
-	re := regexp.MustCompile(`tui-command:.*\.local/bin/ghost-tab-tui`)
+	// Check that the tui-command output contains .local/bin/wisp-deck-tui
+	re := regexp.MustCompile(`tui-command:.*\.local/bin/wisp-deck-tui`)
 	if !re.MatchString(out) {
-		t.Errorf("expected tui-command to contain .local/bin/ghost-tab-tui, got:\n%s", out)
+		t.Errorf("expected tui-command to contain .local/bin/wisp-deck-tui, got:\n%s", out)
 	}
 }
 
 func TestClaudeWrapper_SelfHealing_does_not_add_noticeable_latency_when_binary_exists(t *testing.T) {
 	_, wrapperDir, binDir, shareDir := createWrapperTestEnv(t)
 
-	// Create a fake ghost-tab-tui binary
-	writeTempFile(t, binDir, "ghost-tab-tui", "#!/bin/bash\necho \"ghost-tab-tui v1.0.0\"\n")
-	os.Chmod(filepath.Join(binDir, "ghost-tab-tui"), 0755)
+	// Create a fake wisp-deck-tui binary
+	writeTempFile(t, binDir, "wisp-deck-tui", "#!/bin/bash\necho \"wisp-deck-tui v1.0.0\"\n")
+	os.Chmod(filepath.Join(binDir, "wisp-deck-tui"), 0755)
 
 	env := buildEnv(t, []string{binDir}, fmt.Sprintf("SHARE_DIR=%s", shareDir))
 
@@ -772,21 +772,21 @@ func TestClaudeWrapper_SelfHealing_does_not_add_noticeable_latency_when_binary_e
 }
 
 // ============================================================
-// TestGhostTab_NativeInstall_* — Task 4: no Homebrew in main flow
+// TestWispDeck_NativeInstall_* — Task 4: no Homebrew in main flow
 // ============================================================
 
-func TestGhostTab_does_not_reference_homebrew_in_main_flow(t *testing.T) {
+func TestWispDeck_does_not_reference_homebrew_in_main_flow(t *testing.T) {
 	root := projectRoot(t)
-	data, err := os.ReadFile(filepath.Join(root, "bin", "ghost-tab"))
+	data, err := os.ReadFile(filepath.Join(root, "bin", "wisp-deck"))
 	if err != nil {
-		t.Fatalf("failed to read bin/ghost-tab: %v", err)
+		t.Fatalf("failed to read bin/wisp-deck: %v", err)
 	}
 	content := string(data)
 	if strings.Contains(content, "Homebrew/install/HEAD/install.sh") {
-		t.Errorf("bin/ghost-tab still references Homebrew installer URL")
+		t.Errorf("bin/wisp-deck still references Homebrew installer URL")
 	}
 	if strings.Contains(content, "ensure_brew_pkg") {
-		t.Errorf("bin/ghost-tab still calls ensure_brew_pkg")
+		t.Errorf("bin/wisp-deck still calls ensure_brew_pkg")
 	}
 }
 
@@ -829,21 +829,21 @@ func TestGhosttyConfig_template_uses_new_wrapper_path(t *testing.T) {
 	}
 	content := string(data)
 	if strings.Contains(content, "claude-wrapper.sh") {
-		t.Errorf("ghostty/config template still references claude-wrapper.sh — update to ~/.config/ghost-tab/wrapper.sh")
+		t.Errorf("ghostty/config template still references claude-wrapper.sh — update to ~/.config/wisp-deck/wrapper.sh")
 	}
-	if !strings.Contains(content, "ghost-tab/wrapper.sh") {
-		t.Errorf("ghostty/config template must use ~/.config/ghost-tab/wrapper.sh as the command")
+	if !strings.Contains(content, "wisp-deck/wrapper.sh") {
+		t.Errorf("ghostty/config template must use ~/.config/wisp-deck/wrapper.sh as the command")
 	}
 }
 
-func TestGhostTab_does_not_reference_claude_wrapper_migration(t *testing.T) {
+func TestWispDeck_does_not_reference_claude_wrapper_migration(t *testing.T) {
 	root := projectRoot(t)
-	data, err := os.ReadFile(filepath.Join(root, "bin", "ghost-tab"))
+	data, err := os.ReadFile(filepath.Join(root, "bin", "wisp-deck"))
 	if err != nil {
-		t.Fatalf("failed to read bin/ghost-tab: %v", err)
+		t.Fatalf("failed to read bin/wisp-deck: %v", err)
 	}
 	if strings.Contains(string(data), "claude-wrapper.sh") {
-		t.Errorf("bin/ghost-tab still contains legacy claude-wrapper.sh migration code — remove it")
+		t.Errorf("bin/wisp-deck still contains legacy claude-wrapper.sh migration code — remove it")
 	}
 }
 
@@ -858,7 +858,7 @@ func TestWrapper_uses_go_tui_for_project_selection(t *testing.T) {
 		t.Errorf("wrapper.sh should use select_project_interactive (Go TUI), not a bash draw_menu")
 	}
 	if strings.Contains(content, "draw_menu()") {
-		t.Errorf("wrapper.sh should not contain a bash draw_menu function — use ghost-tab-tui main-menu instead")
+		t.Errorf("wrapper.sh should not contain a bash draw_menu function — use wisp-deck-tui main-menu instead")
 	}
 }
 
@@ -900,7 +900,7 @@ func TestSettingsMenu_go_source_files_do_not_exist(t *testing.T) {
 	root := projectRoot(t)
 	deletedFiles := []string{
 		"internal/tui/settings.go",
-		"cmd/ghost-tab-tui/settings_menu.go",
+		"cmd/wisp-deck-tui/settings_menu.go",
 		"test/internal/tui/settings_test.go",
 		"lib/settings-menu-tui.sh",
 	}

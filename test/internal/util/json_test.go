@@ -3,7 +3,7 @@ package util_test
 import (
 	"testing"
 
-	"github.com/jackuait/ghost-tab/internal/util"
+	"github.com/jackuait/wisp-deck/internal/util"
 )
 
 func TestOutputJSON(t *testing.T) {

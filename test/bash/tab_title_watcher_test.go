@@ -102,7 +102,7 @@ func TestTabTitleWatcher_check_ai_tool_state_claude_suppresses_when_pane_shows_w
 		"────────────────────────────\n" +
 		"❯ \n" +
 		"────────────────────────────\n" +
-		"  ghost-tab | Opus 4.8 (1M context) [high]\n"
+		"  wisp-deck | Opus 4.8 (1M context) [high]\n"
 
 	binDir := mockCommand(t, tmpDir, "tmux", claudePaneMock(working))
 	env := buildEnv(t, []string{binDir})
@@ -131,7 +131,7 @@ func TestTabTitleWatcher_check_ai_tool_state_claude_waiting_when_marker_and_pane
 		"────────────────────────────\n" +
 		"❯ \n" +
 		"────────────────────────────\n" +
-		"  ghost-tab | Opus 4.8 (1M context) [high]\n"
+		"  wisp-deck | Opus 4.8 (1M context) [high]\n"
 
 	binDir := mockCommand(t, tmpDir, "tmux", claudePaneMock(idle))
 	env := buildEnv(t, []string{binDir})
@@ -160,7 +160,7 @@ func TestTabTitleWatcher_claude_pane_working_detects_indicators(t *testing.T) {
 		{"esc to interrupt", "Working (esc to interrupt)", "0"},
 		{"idle response prose", "⏺ Here are the results, all done.", "1"},
 		{"empty prompt", "❯ ", "1"},
-		{"statusline", "  ghost-tab | 10.0% | Opus 4.8 (1M context) [high]", "1"},
+		{"statusline", "  wisp-deck | 10.0% | Opus 4.8 (1M context) [high]", "1"},
 		// Regression: idle prose must not match. The ellipsis-then-paren and
 		// bare down-arrow patterns appear naturally in idle summaries; matching
 		// them would silence the sound forever (worst-case false negative).
@@ -596,14 +596,14 @@ func TestTabTitleWatcher_wrapper_disables_tmux_set_titles(t *testing.T) {
 	content := string(data)
 
 	// The tmux new-session command must keep set-titles off so tmux never
-	// overwrites the tab title: Ghost Tab's watcher owns it in every mode,
+	// overwrites the tab title: Wisp Deck's watcher owns it in every mode,
 	// including model mode where the watcher mirrors the AI pane's own title.
 	if !strings.Contains(content, "set-option set-titles off") {
-		t.Error("wrapper.sh must contain 'set-option set-titles off' so tmux does not overwrite Ghost Tab's tab title")
+		t.Error("wrapper.sh must contain 'set-option set-titles off' so tmux does not overwrite Wisp Deck's tab title")
 	}
 }
 
-// --- wrapper.sh: GHOST_TAB_MARKER_FILE passed to tmux via -e ---
+// --- wrapper.sh: WISP_DECK_MARKER_FILE passed to tmux via -e ---
 
 func TestTabTitleWatcher_wrapper_passes_marker_file_to_tmux(t *testing.T) {
 	root := projectRoot(t)
@@ -614,10 +614,10 @@ func TestTabTitleWatcher_wrapper_passes_marker_file_to_tmux(t *testing.T) {
 	}
 	content := string(data)
 
-	// The tmux new-session command must pass GHOST_TAB_MARKER_FILE via -e flag
+	// The tmux new-session command must pass WISP_DECK_MARKER_FILE via -e flag
 	// so that hooks inside tmux panes can access the marker file path
-	if !strings.Contains(content, `-e "GHOST_TAB_MARKER_FILE=$GHOST_TAB_MARKER_FILE"`) {
-		t.Error("wrapper.sh must pass GHOST_TAB_MARKER_FILE to tmux new-session via -e flag")
+	if !strings.Contains(content, `-e "WISP_DECK_MARKER_FILE=$WISP_DECK_MARKER_FILE"`) {
+		t.Error("wrapper.sh must pass WISP_DECK_MARKER_FILE to tmux new-session via -e flag")
 	}
 
 	// Verify the variable is defined BEFORE the tmux new-session command
@@ -625,21 +625,21 @@ func TestTabTitleWatcher_wrapper_passes_marker_file_to_tmux(t *testing.T) {
 	definitionLine := -1
 	tmuxNewSessionLine := -1
 	for i, line := range lines {
-		if strings.Contains(line, `GHOST_TAB_MARKER_FILE="/tmp/ghost-tab-waiting-`) && !strings.HasPrefix(strings.TrimSpace(line), "#") {
+		if strings.Contains(line, `WISP_DECK_MARKER_FILE="/tmp/wisp-deck-waiting-`) && !strings.HasPrefix(strings.TrimSpace(line), "#") {
 			definitionLine = i
 		}
-		if strings.Contains(line, "new-session") && strings.Contains(line, "GHOST_TAB_MARKER_FILE") {
+		if strings.Contains(line, "new-session") && strings.Contains(line, "WISP_DECK_MARKER_FILE") {
 			tmuxNewSessionLine = i
 		}
 	}
 	if definitionLine == -1 {
-		t.Fatal("wrapper.sh must define GHOST_TAB_MARKER_FILE variable")
+		t.Fatal("wrapper.sh must define WISP_DECK_MARKER_FILE variable")
 	}
 	if tmuxNewSessionLine == -1 {
-		t.Fatal("wrapper.sh must use GHOST_TAB_MARKER_FILE in tmux new-session command")
+		t.Fatal("wrapper.sh must use WISP_DECK_MARKER_FILE in tmux new-session command")
 	}
 	if definitionLine >= tmuxNewSessionLine {
-		t.Errorf("GHOST_TAB_MARKER_FILE must be defined (line %d) before tmux new-session (line %d)", definitionLine+1, tmuxNewSessionLine+1)
+		t.Errorf("WISP_DECK_MARKER_FILE must be defined (line %d) before tmux new-session (line %d)", definitionLine+1, tmuxNewSessionLine+1)
 	}
 
 	// Cleanup should also remove cooldown file
@@ -746,8 +746,8 @@ func TestTabTitleWatcher_wrapper_passes_config_dir_to_watcher(t *testing.T) {
 
 	for _, line := range strings.Split(content, "\n") {
 		if strings.Contains(line, "start_tab_title_watcher") && !strings.HasPrefix(strings.TrimSpace(line), "#") {
-			if !strings.Contains(line, "ghost-tab") {
-				t.Errorf("start_tab_title_watcher call should pass ghost-tab config dir, got: %s", line)
+			if !strings.Contains(line, "wisp-deck") {
+				t.Errorf("start_tab_title_watcher call should pass wisp-deck config dir, got: %s", line)
 			}
 			return
 		}
@@ -828,8 +828,8 @@ func TestTabTitleWatcher_hook_commands_manage_marker_file_correctly(t *testing.T
 	tmpDir := t.TempDir()
 	markerFile := filepath.Join(tmpDir, "marker")
 
-	stopCmd := fmt.Sprintf(`GHOST_TAB_MARKER_FILE=%q; if [ -n "$GHOST_TAB_MARKER_FILE" ]; then touch "$GHOST_TAB_MARKER_FILE"; fi`, markerFile)
-	clearCmd := fmt.Sprintf(`GHOST_TAB_MARKER_FILE=%q; if [ -n "$GHOST_TAB_MARKER_FILE" ]; then rm -f "$GHOST_TAB_MARKER_FILE"; fi`, markerFile)
+	stopCmd := fmt.Sprintf(`WISP_DECK_MARKER_FILE=%q; if [ -n "$WISP_DECK_MARKER_FILE" ]; then touch "$WISP_DECK_MARKER_FILE"; fi`, markerFile)
+	clearCmd := fmt.Sprintf(`WISP_DECK_MARKER_FILE=%q; if [ -n "$WISP_DECK_MARKER_FILE" ]; then rm -f "$WISP_DECK_MARKER_FILE"; fi`, markerFile)
 
 	// Step 1: Notification command creates marker file
 	_, code := runBashSnippet(t, stopCmd, nil)
@@ -863,8 +863,8 @@ func TestTabTitleWatcher_hook_commands_manage_marker_file_correctly(t *testing.T
 	_, code = runBashSnippet(t, clearCmd, nil)
 	assertExitCode(t, code, 0)
 
-	// Step 6: Clear command is a noop when GHOST_TAB_MARKER_FILE is empty
-	noopCmd := `GHOST_TAB_MARKER_FILE=""; if [ -n "$GHOST_TAB_MARKER_FILE" ]; then rm -f "$GHOST_TAB_MARKER_FILE"; fi`
+	// Step 6: Clear command is a noop when WISP_DECK_MARKER_FILE is empty
+	noopCmd := `WISP_DECK_MARKER_FILE=""; if [ -n "$WISP_DECK_MARKER_FILE" ]; then rm -f "$WISP_DECK_MARKER_FILE"; fi`
 	_, code = runBashSnippet(t, noopCmd, nil)
 	assertExitCode(t, code, 0)
 }

@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/jackuait/ghost-tab/internal/models"
+	"github.com/jackuait/wisp-deck/internal/models"
 )
 
 // writeKeyedConfig writes a config JSON containing an API key so the config

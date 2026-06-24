@@ -76,7 +76,7 @@ func TestAddProjectToFile_writes_name_colon_path_format(t *testing.T) {
 	projectsFile := filepath.Join(dir, "projects")
 
 	_, code := runBashFunc(t, "lib/project-actions.sh", "add_project_to_file",
-		[]string{"ghost-tab", "/Users/dev/ghost-tab", projectsFile}, nil)
+		[]string{"wisp-deck", "/Users/dev/wisp-deck", projectsFile}, nil)
 	assertExitCode(t, code, 0)
 
 	data, err := os.ReadFile(projectsFile)
@@ -85,7 +85,7 @@ func TestAddProjectToFile_writes_name_colon_path_format(t *testing.T) {
 	}
 	content := string(data)
 	// The exact line should be "name:path" followed by a newline
-	expected := "ghost-tab:/Users/dev/ghost-tab\n"
+	expected := "wisp-deck:/Users/dev/wisp-deck\n"
 	if content != expected {
 		t.Errorf("expected exact content %q, got %q", expected, content)
 	}

@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/jackuait/ghost-tab/internal/models"
+	"github.com/jackuait/wisp-deck/internal/models"
 	"github.com/muesli/termenv"
 )
 
@@ -33,10 +33,10 @@ func TestMenuBox_AIToolRightAligned(t *testing.T) {
 	}
 	titleRow := lines[1]
 
-	// The AGENT switcher sits on the left and "Ghost Tab" is right-aligned, with
+	// The AGENT switcher sits on the left and "Wisp Deck" is right-aligned, with
 	// padding between the switcher cluster and the title.
-	if !strings.Contains(titleRow, "Ghost Tab") {
-		t.Error("title row missing 'Ghost Tab'")
+	if !strings.Contains(titleRow, "Wisp Deck") {
+		t.Error("title row missing 'Wisp Deck'")
 	}
 	if !strings.Contains(titleRow, "Claude Code") {
 		t.Error("title row missing 'Claude Code'")
@@ -45,28 +45,28 @@ func TestMenuBox_AIToolRightAligned(t *testing.T) {
 	// Strip ANSI codes to check raw layout
 	raw := stripAnsi(titleRow)
 	agentIdx := strings.Index(raw, iconAgent)
-	ghostIdx := strings.Index(raw, "Ghost Tab")
+	ghostIdx := strings.Index(raw, "Wisp Deck")
 	if agentIdx < 0 || ghostIdx < 0 {
-		t.Fatal("could not find AGENT icon or Ghost Tab in stripped title row")
+		t.Fatal("could not find AGENT icon or Wisp Deck in stripped title row")
 	}
-	// AGENT switcher comes first (left), Ghost Tab after it (right).
+	// AGENT switcher comes first (left), Wisp Deck after it (right).
 	if agentIdx > ghostIdx {
-		t.Errorf("expected AGENT switcher left of Ghost Tab, got agent=%d ghost=%d in %q", agentIdx, ghostIdx, raw)
+		t.Errorf("expected AGENT switcher left of Wisp Deck, got agent=%d ghost=%d in %q", agentIdx, ghostIdx, raw)
 	}
 	// There should be significant whitespace padding between the switcher's last
 	// chevron and the right-aligned title. The title now leads with the ghost icon,
-	// so the gap runs up to that icon (not the "Ghost Tab" wordmark).
+	// so the gap runs up to that icon (not the "Wisp Deck" wordmark).
 	titleStart := strings.Index(raw, iconGhost)
 	if titleStart < 0 {
 		titleStart = ghostIdx
 	}
 	lastArrow := strings.LastIndex(raw, iconChevronRight)
 	if lastArrow < 0 || lastArrow > titleStart {
-		t.Fatalf("could not find switcher chevron left of Ghost Tab in %q", raw)
+		t.Fatalf("could not find switcher chevron left of Wisp Deck in %q", raw)
 	}
 	gap := raw[lastArrow+len(iconChevronRight) : titleStart]
 	if len(strings.TrimSpace(gap)) != 0 {
-		t.Errorf("expected only whitespace between the switcher and Ghost Tab, got %q", gap)
+		t.Errorf("expected only whitespace between the switcher and Wisp Deck, got %q", gap)
 	}
 	if len(gap) < 5 {
 		t.Errorf("expected at least 5 chars padding for right-alignment, got %d: %q", len(gap), gap)
@@ -96,29 +96,29 @@ func TestMenuBox_TitleHasGhostIcon(t *testing.T) {
 	}
 	raw := stripAnsi(lines[1]) // title row
 
-	ghostIdx := strings.Index(raw, "Ghost Tab")
+	ghostIdx := strings.Index(raw, "Wisp Deck")
 	iconIdx := strings.Index(raw, iconGhost)
 	if iconIdx < 0 {
 		t.Fatalf("expected ghost icon in title row, got: %q", raw)
 	}
 	if ghostIdx < 0 || iconIdx > ghostIdx {
-		t.Fatalf("expected ghost icon left of 'Ghost Tab', got icon=%d ghost=%d in %q", iconIdx, ghostIdx, raw)
+		t.Fatalf("expected ghost icon left of 'Wisp Deck', got icon=%d ghost=%d in %q", iconIdx, ghostIdx, raw)
 	}
 	// The icon captions the wordmark directly: only a single space separates them.
 	between := raw[iconIdx+len(iconGhost) : ghostIdx]
 	if between != " " {
-		t.Errorf("expected exactly one space between ghost icon and 'Ghost Tab', got %q", between)
+		t.Errorf("expected exactly one space between ghost icon and 'Wisp Deck', got %q", between)
 	}
 	// The title (icon + wordmark) is still right-aligned against the border.
 	borderChar := strings.LastIndex(raw, "│")
-	trailing := raw[ghostIdx+len("Ghost Tab") : borderChar]
+	trailing := raw[ghostIdx+len("Wisp Deck") : borderChar]
 	if len(strings.TrimSpace(trailing)) != 0 || len(trailing) < 1 {
-		t.Errorf("expected only whitespace between 'Ghost Tab' and border, got: %q", trailing)
+		t.Errorf("expected only whitespace between 'Wisp Deck' and border, got: %q", trailing)
 	}
 }
 
 func TestMenuBox_TitleOnTopAccountRow(t *testing.T) {
-	// When a managed account row renders at the very top, the "Ghost Tab"
+	// When a managed account row renders at the very top, the "Wisp Deck"
 	// wordmark must sit on THAT top row (beside the login), not on the AGENT row.
 	m := newTestMenu()
 	m.SetClaudeAccounts([]ClaudeAccount{{Label: "Work", Dir: "work"}})
@@ -130,21 +130,21 @@ func TestMenuBox_TitleOnTopAccountRow(t *testing.T) {
 	accountRow := stripAnsi(lines[1]) // top header row, after the top border
 	agentRow := stripAnsi(lines[2])   // AGENT switcher row, below it
 
-	if !strings.Contains(accountRow, "Ghost Tab") {
-		t.Errorf("expected 'Ghost Tab' on the top account row, got: %q", accountRow)
+	if !strings.Contains(accountRow, "Wisp Deck") {
+		t.Errorf("expected 'Wisp Deck' on the top account row, got: %q", accountRow)
 	}
 	if !strings.Contains(accountRow, iconGhost) {
 		t.Errorf("expected ghost icon on the top account row, got: %q", accountRow)
 	}
-	if strings.Contains(agentRow, "Ghost Tab") {
-		t.Errorf("did not expect 'Ghost Tab' on the AGENT row, got: %q", agentRow)
+	if strings.Contains(agentRow, "Wisp Deck") {
+		t.Errorf("did not expect 'Wisp Deck' on the AGENT row, got: %q", agentRow)
 	}
 	// Still right-aligned against the border on the account row.
-	ghostIdx := strings.LastIndex(accountRow, "Ghost Tab")
+	ghostIdx := strings.LastIndex(accountRow, "Wisp Deck")
 	borderChar := strings.LastIndex(accountRow, "│")
-	trailing := accountRow[ghostIdx+len("Ghost Tab") : borderChar]
+	trailing := accountRow[ghostIdx+len("Wisp Deck") : borderChar]
 	if len(strings.TrimSpace(trailing)) != 0 || len(trailing) < 1 {
-		t.Errorf("expected only whitespace between 'Ghost Tab' and border, got: %q", trailing)
+		t.Errorf("expected only whitespace between 'Wisp Deck' and border, got: %q", trailing)
 	}
 }
 
@@ -177,16 +177,16 @@ func TestMenuBox_TitleRightAligned(t *testing.T) {
 		t.Fatal("renderMenuBox produced fewer than 2 lines")
 	}
 	raw := stripAnsi(lines[1]) // title row
-	// "Ghost Tab" is right-aligned: only whitespace (the box's right padding)
+	// "Wisp Deck" is right-aligned: only whitespace (the box's right padding)
 	// sits between the end of the title and the trailing border.
-	ghostIdx := strings.LastIndex(raw, "Ghost Tab")
+	ghostIdx := strings.LastIndex(raw, "Wisp Deck")
 	borderChar := strings.LastIndex(raw, "│")
 	if ghostIdx < 0 || borderChar < 0 || borderChar <= ghostIdx {
-		t.Errorf("expected right-aligned 'Ghost Tab' before the trailing border, got: %q", raw)
+		t.Errorf("expected right-aligned 'Wisp Deck' before the trailing border, got: %q", raw)
 	}
-	trailing := raw[ghostIdx+len("Ghost Tab") : borderChar]
+	trailing := raw[ghostIdx+len("Wisp Deck") : borderChar]
 	if len(strings.TrimSpace(trailing)) != 0 || len(trailing) < 1 {
-		t.Errorf("expected only whitespace between Ghost Tab and border, got: %q", trailing)
+		t.Errorf("expected only whitespace between Wisp Deck and border, got: %q", trailing)
 	}
 }
 
@@ -421,8 +421,8 @@ func TestSoundNameForResult_ChangedReturnsValue(t *testing.T) {
 func TestMenuBox_WorktreeCountIndicator(t *testing.T) {
 	projects := []models.Project{
 		{
-			Name: "ghost-tab",
-			Path: "/tmp/ghost-tab",
+			Name: "wisp-deck",
+			Path: "/tmp/wisp-deck",
 			Worktrees: []models.Worktree{
 				{Path: "/tmp/wt1", Branch: "feature/auth"},
 				{Path: "/tmp/wt2", Branch: "fix/bug"},
@@ -443,8 +443,8 @@ func TestMenuBox_WorktreeCountIndicator(t *testing.T) {
 func TestMenuBox_ExpandedWorktreeEntries(t *testing.T) {
 	projects := []models.Project{
 		{
-			Name: "ghost-tab",
-			Path: "/tmp/ghost-tab",
+			Name: "wisp-deck",
+			Path: "/tmp/wisp-deck",
 			Worktrees: []models.Worktree{
 				{Path: "/tmp/wt1", Branch: "feature/auth"},
 				{Path: "/tmp/wt2", Branch: "fix/bug"},
@@ -1100,7 +1100,7 @@ func TestMenuBox_ScrollsWithExpandedWorktrees(t *testing.T) {
 		{Name: "blok", Path: "/tmp/blok"},
 		{Name: "elen", Path: "/tmp/elen"},
 		{Name: "knowledgebase", Path: "/tmp/knowledgebase", Worktrees: wts},
-		{Name: "ghost-tab", Path: "/tmp/ghost-tab"},
+		{Name: "wisp-deck", Path: "/tmp/wisp-deck"},
 		{Name: "agent-desk", Path: "/tmp/agent-desk"},
 	}
 	m := NewMainMenu(projects, []string{"claude"}, "claude", "animated")

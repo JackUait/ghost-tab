@@ -11,11 +11,11 @@ import (
 // TestConfirmTui — tests for confirm_tui
 // ---------------------------------------------------------------------------
 
-func TestConfirmTui_calls_ghost_tab_tui_confirm_with_message(t *testing.T) {
+func TestConfirmTui_calls_wisp_deck_tui_confirm_with_message(t *testing.T) {
 	dir := t.TempDir()
 
-	// Mock ghost-tab-tui: verify args and return JSON
-	mockCommand(t, dir, "ghost-tab-tui", `
+	// Mock wisp-deck-tui: verify args and return JSON
+	mockCommand(t, dir, "wisp-deck-tui", `
 if [[ "$1" == "confirm" && "$2" == "Delete this?" ]]; then
   echo '{"confirmed":true}'
   exit 0
@@ -44,7 +44,7 @@ exit 1
 func TestConfirmTui_returns_failure_when_user_cancels(t *testing.T) {
 	dir := t.TempDir()
 
-	mockCommand(t, dir, "ghost-tab-tui", `
+	mockCommand(t, dir, "wisp-deck-tui", `
 if [[ "$1" == "confirm" ]]; then
   echo '{"confirmed":false}'
   exit 0
@@ -71,7 +71,7 @@ exit 1
 func TestConfirmTui_handles_jq_parse_failure(t *testing.T) {
 	dir := t.TempDir()
 
-	mockCommand(t, dir, "ghost-tab-tui", `
+	mockCommand(t, dir, "wisp-deck-tui", `
 if [[ "$1" == "confirm" ]]; then
   echo '{"confirmed":true}'
   exit 0
@@ -94,7 +94,7 @@ exit 1
 func TestConfirmTui_validates_against_null_string(t *testing.T) {
 	dir := t.TempDir()
 
-	mockCommand(t, dir, "ghost-tab-tui", `
+	mockCommand(t, dir, "wisp-deck-tui", `
 if [[ "$1" == "confirm" ]]; then
   echo '{"confirmed":"null"}'
   exit 0

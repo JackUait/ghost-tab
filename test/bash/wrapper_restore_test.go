@@ -26,7 +26,7 @@ func TestWrapperRestore_skips_picker_and_resumes(t *testing.T) {
 		"tmux":          "#!/bin/bash\nif [ \"$1\" = \"new-session\" ]; then printf '%s\\n' \"$*\" > \"$GT_REC\"; exit 0; fi\nexit 0\n",
 		"claude":        "#!/bin/bash\nexit 0\n",
 		"lazygit":       "#!/bin/bash\nexit 0\n",
-		"ghost-tab-tui": "#!/bin/bash\nexit 0\n",
+		"wisp-deck-tui": "#!/bin/bash\nexit 0\n",
 	}
 	for name, body := range mocks {
 		p := filepath.Join(binDir, name)
@@ -50,8 +50,8 @@ func TestWrapperRestore_skips_picker_and_resumes(t *testing.T) {
 		t.Fatalf("new-session was never invoked (no record): %v", err)
 	}
 	got := string(data)
-	assertContains(t, got, "GHOST_TAB=1")
-	assertContains(t, got, "GHOST_TAB_TOOL=claude")
-	assertContains(t, got, "GHOST_TAB_PATH="+projDir)
+	assertContains(t, got, "WISP_DECK=1")
+	assertContains(t, got, "WISP_DECK_TOOL=claude")
+	assertContains(t, got, "WISP_DECK_PATH="+projDir)
 	assertContains(t, got, "claude -c")
 }

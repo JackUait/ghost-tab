@@ -5,7 +5,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/jackuait/ghost-tab/internal/models"
+	"github.com/jackuait/wisp-deck/internal/models"
 	"github.com/muesli/termenv"
 )
 
@@ -64,7 +64,7 @@ func TestHitTest_aiRow_directionByX(t *testing.T) {
 }
 
 func TestHitTest_aiRow_titleAndGapAreNotSwitcher(t *testing.T) {
-	// The AGENT switcher shares its row with the right-aligned "Ghost Tab" title.
+	// The AGENT switcher shares its row with the right-aligned "Wisp Deck" title.
 	// Hovering the empty gap or the title must NOT register as the switcher — only
 	// the control span (caption + ◂ value ▸) counts.
 	m := NewMainMenu(nil, []string{"claude", "opencode"}, "claude", "none")

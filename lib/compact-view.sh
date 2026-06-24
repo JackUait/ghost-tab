@@ -225,7 +225,7 @@ split_content() {
 # when tmux is unavailable. The path is shell-quoted so spaces survive.
 #
 # Presentation: the popup runs FULL-SCREEN and BORDERLESS (-B). The rounded
-# ORANGE-bordered modal box and its margin are drawn by the ghost-tab-tui
+# ORANGE-bordered modal box and its margin are drawn by the wisp-deck-tui
 # diff-view pager itself — this is deliberate: tmux 3.6 swallows mouse clicks
 # that land outside a sub-full-screen popup, so to make a click OUTSIDE the box
 # close it, the pager must own the whole window and treat margin clicks as close.
@@ -243,9 +243,9 @@ open_diff_popup() {
   qd=$(printf '%q' "$dir")
   qf=$(printf '%q' "$file")
   # The pager themes its chrome (border, rule, tabs) from --ai-tool. Forward the
-  # session's active tool (exported as GHOST_TAB_TOOL) so OpenCode sessions get
+  # session's active tool (exported as WISP_DECK_TOOL) so OpenCode sessions get
   # the purple chrome; default to claude (the pager's own default) otherwise.
-  qtool=$(printf '%q' "${GHOST_TAB_TOOL:-claude}")
+  qtool=$(printf '%q' "${WISP_DECK_TOOL:-claude}")
 
   # Print every line only AFTER the first @@ hunk header (which the @@ rule then
   # marks); the header line itself is not printed. /@@/ matches even when the
@@ -279,7 +279,7 @@ open_diff_popup() {
   # outside a smaller popup). No -T title — the pager's header already shows the
   # path + added/deleted counts.
   tmux display-popup -E -B -w 100% -h 100% \
-    "git -C ${qd} --no-pager diff HEAD -U999999 --color=always -- ${qf} | ${strip} | ghost-tab-tui diff-view --ai-tool ${qtool} --title ${qf} ${backdrop_arg}"
+    "git -C ${qd} --no-pager diff HEAD -U999999 --color=always -- ${qf} | ${strip} | wisp-deck-tui diff-view --ai-tool ${qtool} --title ${qf} ${backdrop_arg}"
 
   [ -n "$backdrop" ] && rm -f "$backdrop"
 }
@@ -464,7 +464,7 @@ compact_view() {
       # tput may return wrong values in tmux; query tmux directly when attached.
       if [ -n "${TMUX:-}" ] && command -v tmux &>/dev/null; then
         # Target THIS pane ($TMUX_PANE). Without -t, display-message reports the
-        # *active* pane's size — and in ghost-tab the AI pane is active and far
+        # *active* pane's size — and in wisp-deck the AI pane is active and far
         # wider than this (left) one, so the heading/separator got sized for the
         # wide pane and wrapped into extra rows here.
         w=$(tmux display-message -p -t "${TMUX_PANE:-}" '#{pane_width}' 2>/dev/null || tput cols 2>/dev/null || echo 80)
@@ -541,7 +541,7 @@ compact_view() {
       # the ledger always states which plan the session runs on. The " · "
       # separator is 3 columns wide; reserve them (plus the name) in the pad so
       # the right-aligned stamp can't collide with it.
-      local plan="${GHOST_TAB_PLAN:-}"
+      local plan="${WISP_DECK_PLAN:-}"
       local plan_w=0
       [ -n "$plan" ] && plan_w=$(( ${#plan} + 3 ))
 

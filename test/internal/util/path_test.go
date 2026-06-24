@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jackuait/ghost-tab/internal/util"
+	"github.com/jackuait/wisp-deck/internal/util"
 )
 
 func TestExpandPath(t *testing.T) {

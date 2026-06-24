@@ -10,14 +10,14 @@ import (
 
 // These tests pin the notification-channel silencing to direct settings.json
 // writes. Claude Code 2.1.190 removed the `claude config` subcommand, so the
-// old `claude config set preferredNotifChannel` approach is dead — ghost-tab
+// old `claude config set preferredNotifChannel` approach is dead — wisp-deck
 // must write preferredNotifChannel into ~/.claude/settings.json itself.
 //
 // Why this matters: in a fresh session Claude emits its own audible idle
-// notification (preferredNotifChannel unset → audible default). ghost-tab's
-// "off" flag only gates ghost-tab's own afplay, so without silencing Claude's
-// channel the sound plays even when ghost-tab sound is Off. Forcing
-// terminal_bell (silent in Ghostty) leaves ghost-tab's afplay as the single
+// notification (preferredNotifChannel unset → audible default). wisp-deck's
+// "off" flag only gates wisp-deck's own afplay, so without silencing Claude's
+// channel the sound plays even when wisp-deck sound is Off. Forcing
+// terminal_bell (silent in Ghostty) leaves wisp-deck's afplay as the single
 // audible source, so Off is truly silent.
 
 // settingsNotifChannel reads preferredNotifChannel from a settings.json file,

@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/jackuait/ghost-tab/internal/tui"
+	"github.com/jackuait/wisp-deck/internal/tui"
 )
 
 func TestConfirmModel(t *testing.T) {

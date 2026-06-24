@@ -8,8 +8,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/jackuait/ghost-tab/internal/claudeconfig"
-	"github.com/jackuait/ghost-tab/internal/models"
+	"github.com/jackuait/wisp-deck/internal/claudeconfig"
+	"github.com/jackuait/wisp-deck/internal/models"
 	"github.com/muesli/termenv"
 )
 

@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jackuait/ghost-tab/internal/models"
-	"github.com/jackuait/ghost-tab/internal/tui"
+	"github.com/jackuait/wisp-deck/internal/models"
+	"github.com/jackuait/wisp-deck/internal/tui"
 )
 
 // --- AppendProject tests ---
@@ -342,7 +342,7 @@ func TestIsDuplicateProject_empty_list(t *testing.T) {
 
 func TestIsDuplicateName(t *testing.T) {
 	projects := []models.Project{
-		{Name: "ghost-tab", Path: "/path/a"},
+		{Name: "wisp-deck", Path: "/path/a"},
 		{Name: "web", Path: "/path/b"},
 	}
 
@@ -350,10 +350,10 @@ func TestIsDuplicateName(t *testing.T) {
 		name string
 		want bool
 	}{
-		{"ghost-tab", true},
+		{"wisp-deck", true},
 		{"web", true},
 		{"api", false},
-		{"Ghost-Tab", false}, // case-sensitive
+		{"Wisp-Deck", false}, // case-sensitive
 		{"", false},
 	}
 	for _, tt := range tests {

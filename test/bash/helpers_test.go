@@ -162,16 +162,16 @@ func writeTempFile(t *testing.T, dir string, name string, content string) string
 // buildEnv creates an environment slice with PATH prepended with mockDirs.
 // Inherits current environment and overrides/adds the provided key=value pairs.
 //
-// Ghost Tab runtime vars (GHOST_TAB_*) are stripped from the inherited base so
+// Wisp Deck runtime vars (WISP_DECK_*) are stripped from the inherited base so
 // tests are isolated from the surrounding session: running the suite from
-// inside a live Ghost Tab tab would otherwise leak e.g. GHOST_TAB_CLAUDE_FILTER
-// or GHOST_TAB_RESUME into the bash under test. Tests that need such a var set
+// inside a live Wisp Deck tab would otherwise leak e.g. WISP_DECK_CLAUDE_FILTER
+// or WISP_DECK_RESUME into the bash under test. Tests that need such a var set
 // it explicitly via extra (re-added after the strip).
 func buildEnv(t *testing.T, mockDirs []string, extra ...string) []string {
 	t.Helper()
 	env := make([]string, 0, len(os.Environ()))
 	for _, e := range os.Environ() {
-		if strings.HasPrefix(e, "GHOST_TAB") {
+		if strings.HasPrefix(e, "WISP_DECK") {
 			continue
 		}
 		env = append(env, e)

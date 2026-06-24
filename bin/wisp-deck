@@ -1,0 +1,261 @@
+#!/bin/bash
+set -e
+
+# Wrap everything in a function so `curl | bash` reads the entire
+# script into memory before executing.  Without this, bash reads
+# line-by-line from the pipe and `read` consumes script lines as input.
+main() {
+
+# Ensure ~/.local/bin is in PATH (where wisp-deck-tui gets installed)
+export PATH="$HOME/.local/bin:$PATH"
+
+# Determine where supporting files live
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SHARE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+source "$SHARE_DIR/lib/tui.sh"
+source "$SHARE_DIR/lib/install.sh"
+source "$SHARE_DIR/lib/terminals/ghostty.sh"
+source "$SHARE_DIR/lib/settings-json.sh"
+source "$SHARE_DIR/lib/ai-select-tui.sh"
+source "$SHARE_DIR/lib/statusline-setup.sh"
+source "$SHARE_DIR/lib/project-actions.sh"
+source "$SHARE_DIR/lib/project-actions-tui.sh"
+source "$SHARE_DIR/lib/update.sh"
+
+# ---------- Argument parsing ----------
+case "${1:-}" in
+  --*)
+    error "Unknown flag: $1"
+    echo "Usage: wisp-deck"
+    exit 1
+    ;;
+esac
+
+# ---------- OS check ----------
+header "Checking platform..."
+if [ "$(uname)" != "Darwin" ]; then
+  error "This setup script only supports macOS."
+  exit 1
+fi
+success "macOS detected"
+notify_if_update_available
+
+# ---------- Dependencies ----------
+header "Installing dependencies..."
+ensure_base_requirements
+
+# ---------- TUI Binary ----------
+header "Checking TUI binary..."
+if ! ensure_wisp_deck_tui "$SHARE_DIR"; then
+  exit 1
+fi
+
+# ---------- AI Coding Tools ----------
+header "Setting up AI coding tools..."
+echo ""
+echo -e "  Wisp Deck supports multiple AI coding assistants."
+echo -e "  Select your preferred AI tool:"
+echo ""
+
+# Use TUI to select AI tool
+if select_ai_tool_interactive; then
+  # Variable set by select_ai_tool_interactive: _selected_ai_tool
+  if [[ -z "$_selected_ai_tool" ]]; then
+    error "Internal error: TUI did not set AI tool"
+    exit 1
+  fi
+  SELECTED_AI_TOOL="$_selected_ai_tool"
+
+  # Save preference
+  AI_TOOL_PREF_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/wisp-deck"
+  mkdir -p "$AI_TOOL_PREF_DIR"
+  echo "$SELECTED_AI_TOOL" > "$AI_TOOL_PREF_DIR/ai-tool"
+
+  echo ""
+  success "Selected AI tool: $SELECTED_AI_TOOL"
+
+  # Install the selected tool
+  case "$SELECTED_AI_TOOL" in
+    claude)
+      ensure_command "claude" "curl -fsSL https://claude.ai/install.sh | bash" \
+        "Run 'claude' to authenticate before launching Wisp Deck." "Claude Code"
+      ;;
+    opencode)
+      ensure_opencode
+      ;;
+  esac
+else
+  info "AI tool selection cancelled"
+  exit 1
+fi
+
+# ---------- Terminal Installation ----------
+header "Checking Ghostty..."
+if ! terminal_install; then
+  error "Terminal installation failed. Install Ghostty manually and re-run: wisp-deck"
+  exit 1
+fi
+
+# Verify supporting files exist
+if [ ! -f "$SHARE_DIR/wrapper.sh" ] || [ ! -d "$SHARE_DIR/templates" ]; then
+  error "Supporting files not found in $SHARE_DIR. Re-clone the repo and try again."
+  exit 1
+fi
+
+# ---------- Wrapper Script ----------
+header "Setting up wrapper script..."
+WRAPPER_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/wisp-deck"
+mkdir -p "$WRAPPER_DIR"
+ln -sf "$SHARE_DIR/wrapper.sh" "$WRAPPER_DIR/wrapper.sh"
+success "Linked wrapper.sh in $WRAPPER_DIR/"
+
+# Symlink shared libraries (remove old copies if present)
+if [ -d "$SHARE_DIR/lib" ]; then
+  [ -d "$WRAPPER_DIR/lib" ] && [ ! -L "$WRAPPER_DIR/lib" ] && rm -rf "${WRAPPER_DIR:?}/lib"
+  ln -sfn "$SHARE_DIR/lib" "$WRAPPER_DIR/lib"
+  success "Linked shared libraries to $WRAPPER_DIR/lib/"
+fi
+
+# ---------- Wisp Deck CLI Command ----------
+header "Setting up wisp-deck command..."
+ln -sf "$SHARE_DIR/bin/wisp-deck-config" "$HOME/.local/bin/wisp-deck"
+success "Created wisp-deck command at ~/.local/bin/wisp-deck"
+
+# ---------- Terminal Config ----------
+header "Setting up Ghostty config..."
+TERMINAL_CONFIG="$(terminal_get_config_path)"
+WRAPPER_PATH="$(terminal_get_wrapper_path)"
+
+if [ -f "$TERMINAL_CONFIG" ]; then
+  warn "Existing config found at $TERMINAL_CONFIG"
+  echo ""
+  echo -e "  ${_BOLD}1)${_NC} Merge — add the wrapper command to your existing config"
+  echo -e "  ${_BOLD}2)${_NC} Skip — don't modify the config (manual setup required)"
+  echo ""
+  read -rn1 -p "$(echo -e "${_BLUE}Choose (1/2):${_NC} ")" config_choice </dev/tty
+  echo ""
+
+  case "$config_choice" in
+    1) terminal_setup_config "$TERMINAL_CONFIG" "$WRAPPER_PATH" ;;
+    *) info "Skipped config modification. Add the wrapper manually." ;;
+  esac
+else
+  mkdir -p "$(dirname "$TERMINAL_CONFIG")"
+  terminal_setup_config "$TERMINAL_CONFIG" "$WRAPPER_PATH"
+fi
+
+# Migrate from old config location
+OLD_PROJECTS_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/vibecode-editor"
+NEW_PROJECTS_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/wisp-deck"
+if [ -d "$OLD_PROJECTS_DIR" ] && [ ! -d "$NEW_PROJECTS_DIR" ]; then
+  mv "$OLD_PROJECTS_DIR" "$NEW_PROJECTS_DIR"
+  info "Migrated config from vibecode-editor to wisp-deck"
+fi
+
+# ---------- Claude Configs (defaults) ----------
+CONFIGS_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/wisp-deck"
+if [ -d "$SHARE_DIR/defaults/claude-configs" ]; then
+  mkdir -p "$CONFIGS_DIR/claude-configs"
+  for _cfg_file in "$SHARE_DIR/defaults/claude-configs/"*.json; do
+    [ -f "$_cfg_file" ] || continue
+    _cfg_name="$(basename "$_cfg_file")"
+    if [ ! -f "$CONFIGS_DIR/claude-configs/$_cfg_name" ]; then
+      cp "$_cfg_file" "$CONFIGS_DIR/claude-configs/$_cfg_name"
+    fi
+  done
+fi
+if [ -f "$SHARE_DIR/defaults/claude-configs.list" ]; then
+  if [ ! -f "$CONFIGS_DIR/claude-configs.list" ]; then
+    cp "$SHARE_DIR/defaults/claude-configs.list" "$CONFIGS_DIR/claude-configs.list"
+  else
+    # Append new entries from defaults that aren't already in the user's list
+    while IFS= read -r _line; do
+      [[ -z "$_line" || "$_line" == \#* ]] && continue
+      _cfg_key="${_line%%:*}"
+      if ! grep -q "^${_cfg_key}:" "$CONFIGS_DIR/claude-configs.list" 2>/dev/null; then
+        echo "$_line" >> "$CONFIGS_DIR/claude-configs.list"
+      fi
+    done < "$SHARE_DIR/defaults/claude-configs.list"
+  fi
+fi
+
+# ---------- Projects ----------
+header "Setting up projects..."
+PROJECTS_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/wisp-deck"
+PROJECTS_FILE="$PROJECTS_DIR/projects"
+mkdir -p "$PROJECTS_DIR"
+
+echo ""
+read -rn1 -p "$(echo -e "${_BLUE}Add a project? (y/n):${_NC} ")" add_project </dev/tty
+echo ""
+
+while [[ "$add_project" =~ ^[yY]$ ]]; do
+  if add_project_interactive; then
+    # shellcheck disable=SC2154  # _add_project_name and _add_project_path are set by add_project_interactive
+    add_project_to_file "$_add_project_name" "$_add_project_path" "$PROJECTS_FILE"
+    success "Added project: $_add_project_name"
+  else
+    info "Cancelled"
+  fi
+
+  echo ""
+  read -rn1 -p "$(echo -e "${_BLUE}Add another? (y/n):${_NC} ")" add_project </dev/tty
+  echo ""
+done
+
+if [ -f "$PROJECTS_FILE" ] && [ -s "$PROJECTS_FILE" ]; then
+  success "Projects saved to $PROJECTS_FILE"
+else
+  info "No projects added. Add them later to $PROJECTS_FILE"
+fi
+
+# ---------- Claude Code Status Line ----------
+if [ "$SELECTED_AI_TOOL" = "claude" ]; then
+  header "Setting up Claude Code status line..."
+  CLAUDE_SETTINGS="$HOME/.claude/settings.json"
+  setup_statusline "$SHARE_DIR" "$CLAUDE_SETTINGS" "$HOME"
+  # The status line uses Nerd Font glyphs for the context/memory/CPU metrics;
+  # install the Symbols Nerd Font so they render in kitty and iTerm2.
+  ensure_nerd_font
+else
+  header "Skipping Claude Code status line..."
+  info "Status line features are only available with Claude Code"
+fi
+
+# OpenCode plugin (install/upgrade for idle notification debounce)
+if [ "$SELECTED_AI_TOOL" = "opencode" ]; then
+  header "Setting up OpenCode plugin..."
+  _oc_plugin_dir="${XDG_CONFIG_HOME:-$HOME/.config}/opencode/plugins"
+  _oc_plugin_src="$SHARE_DIR/templates/opencode-plugin.ts"
+  _oc_plugin_dst="$_oc_plugin_dir/wisp-deck.ts"
+  if [ -f "$_oc_plugin_src" ]; then
+    mkdir -p "$_oc_plugin_dir"
+    cp "$_oc_plugin_src" "$_oc_plugin_dst"
+    success "OpenCode plugin installed at $_oc_plugin_dst"
+  else
+    warn "OpenCode plugin template not found at $_oc_plugin_src"
+  fi
+fi
+
+# ---------- Summary ----------
+header "Setup complete!"
+echo ""
+success "Wrapper script:  ~/.config/wisp-deck/wrapper.sh (symlink)"
+success "Terminal:        Ghostty"
+_ai_default="$(cat "${XDG_CONFIG_HOME:-$HOME/.config}/wisp-deck/ai-tool" 2>/dev/null)"
+success "AI tool:         $(echo "$_ai_default" | sed 's/claude/Claude Code/;s/opencode/OpenCode/')"
+success "Projects file:   $PROJECTS_FILE"
+success "Config command:  wisp-deck (in ~/.local/bin/)"
+if [ -f ~/.claude/statusline-wrapper.sh ]; then
+  success "Status line:     ~/.claude/statusline-wrapper.sh"
+fi
+if [ -f "${XDG_CONFIG_HOME:-$HOME/.config}/opencode/plugins/wisp-deck.ts" ]; then
+  success "OpenCode plugin: ~/.config/opencode/plugins/wisp-deck.ts"
+fi
+echo ""
+info "Run 'wisp-deck' to manage configuration, or open a new Ghostty window to start coding."
+
+} # end main
+
+main "$@"

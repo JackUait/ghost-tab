@@ -3,7 +3,7 @@ package models_test
 import (
 	"testing"
 
-	"github.com/jackuait/ghost-tab/internal/models"
+	"github.com/jackuait/wisp-deck/internal/models"
 )
 
 func TestParseWorktreeListPorcelain(t *testing.T) {
@@ -14,19 +14,19 @@ func TestParseWorktreeListPorcelain(t *testing.T) {
 	}{
 		{
 			name:   "no worktrees (main only)",
-			output: "worktree /Users/jack/ghost-tab\nHEAD abc123\nbranch refs/heads/main\n\n",
+			output: "worktree /Users/jack/wisp-deck\nHEAD abc123\nbranch refs/heads/main\n\n",
 			want:   0,
 		},
 		{
 			name: "two additional worktrees",
-			output: "worktree /Users/jack/ghost-tab\nHEAD abc123\nbranch refs/heads/main\n\n" +
+			output: "worktree /Users/jack/wisp-deck\nHEAD abc123\nbranch refs/heads/main\n\n" +
 				"worktree /Users/jack/wt/feature-auth\nHEAD def456\nbranch refs/heads/feature/auth\n\n" +
 				"worktree /Users/jack/wt/fix-cleanup\nHEAD 789abc\nbranch refs/heads/fix/cleanup\n\n",
 			want: 2,
 		},
 		{
 			name: "worktree with detached HEAD",
-			output: "worktree /Users/jack/ghost-tab\nHEAD abc123\nbranch refs/heads/main\n\n" +
+			output: "worktree /Users/jack/wisp-deck\nHEAD abc123\nbranch refs/heads/main\n\n" +
 				"worktree /Users/jack/wt/detached\nHEAD def456\ndetached\n\n",
 			want: 1,
 		},
@@ -48,7 +48,7 @@ func TestParseWorktreeListPorcelain(t *testing.T) {
 }
 
 func TestParseWorktreeListPorcelain_BranchNames(t *testing.T) {
-	output := "worktree /Users/jack/ghost-tab\nHEAD abc123\nbranch refs/heads/main\n\n" +
+	output := "worktree /Users/jack/wisp-deck\nHEAD abc123\nbranch refs/heads/main\n\n" +
 		"worktree /Users/jack/wt/feature-auth\nHEAD def456\nbranch refs/heads/feature/auth\n\n" +
 		"worktree /Users/jack/wt/fix-cleanup\nHEAD 789abc\nbranch refs/heads/fix/cleanup\n\n"
 
@@ -226,7 +226,7 @@ func TestParseMainBranch(t *testing.T) {
 	}{
 		{
 			name:   "main branch",
-			output: "worktree /Users/jack/ghost-tab\nHEAD abc123\nbranch refs/heads/main\n\n",
+			output: "worktree /Users/jack/wisp-deck\nHEAD abc123\nbranch refs/heads/main\n\n",
 			want:   "main",
 		},
 		{
@@ -236,7 +236,7 @@ func TestParseMainBranch(t *testing.T) {
 		},
 		{
 			name: "with additional worktrees returns first",
-			output: "worktree /Users/jack/ghost-tab\nHEAD abc\nbranch refs/heads/main\n\n" +
+			output: "worktree /Users/jack/wisp-deck\nHEAD abc\nbranch refs/heads/main\n\n" +
 				"worktree /wt/feature\nHEAD def\nbranch refs/heads/feature\n\n",
 			want: "main",
 		},

@@ -4,7 +4,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/jackuait/ghost-tab/internal/claudeconfig"
+	"github.com/jackuait/wisp-deck/internal/claudeconfig"
 )
 
 // This file holds the mouse layer for the main menu: hover (motion) and click
@@ -129,7 +129,7 @@ const switcherControlStart = 2
 // switcherSpanEnd is the exclusive box column where a switcher's control ends.
 // Layout after the caption: ‹(col 8) space(9) value(10..10+w) then " ›"(2 cols),
 // so the control occupies [switcherControlStart, 12+w). Hovering past it — the
-// gap and the right-aligned "Ghost Tab" title — is not the switcher.
+// gap and the right-aligned "Wisp Deck" title — is not the switcher.
 func (m *MainMenuModel) switcherSpanEnd(region mouseRegion) int {
 	return 12 + lipgloss.Width(m.switcherName(region))
 }
@@ -145,7 +145,7 @@ func (m *MainMenuModel) onSwitcherControl(boxX int, region mouseRegion) bool {
 func (m *MainMenuModel) HitTest(boxX, boxY int) hitTarget {
 	// Switcher rows (only clickable when there is actually something to switch).
 	// The hit is bounded to the control span so the empty remainder of the row —
-	// and, on the title row, the right-aligned "Ghost Tab" — never registers.
+	// and, on the title row, the right-aligned "Wisp Deck" — never registers.
 	if boxY == m.accountRowIndex() && m.onSwitcherControl(boxX, regionAccount) {
 		return hitTarget{region: regionAccount, prev: m.switcherPrev(boxX, regionAccount)}
 	}

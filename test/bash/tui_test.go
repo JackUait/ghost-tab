@@ -120,11 +120,11 @@ func TestTui_tui_init_interactive_sets_HIDE_CURSOR_non_empty(t *testing.T) {
 func TestTui_set_tab_title_includes_project_and_tool_separated_by_middot(t *testing.T) {
 	root := projectRoot(t)
 	modulePath := filepath.Join(root, "lib/tui.sh")
-	script := fmt.Sprintf(`source %q && set_tab_title "ghost-tab" "claude"`, modulePath)
+	script := fmt.Sprintf(`source %q && set_tab_title "wisp-deck" "claude"`, modulePath)
 
 	out, code := runBashSnippet(t, script, nil)
 	assertExitCode(t, code, 0)
-	assertContains(t, out, "ghost-tab \u00b7 claude") // · is \u00b7
+	assertContains(t, out, "wisp-deck \u00b7 claude") // · is \u00b7
 }
 
 func TestTui_set_tab_title_outputs_OSC_escape_sequence(t *testing.T) {
@@ -163,11 +163,11 @@ func TestTui_set_tab_title_omits_tool_name_when_empty(t *testing.T) {
 func TestTui_set_tab_title_waiting_has_no_dot_with_project_and_tool(t *testing.T) {
 	root := projectRoot(t)
 	modulePath := filepath.Join(root, "lib/tui.sh")
-	script := fmt.Sprintf(`source %q && set_tab_title_waiting "ghost-tab" "claude"`, modulePath)
+	script := fmt.Sprintf(`source %q && set_tab_title_waiting "wisp-deck" "claude"`, modulePath)
 
 	out, code := runBashSnippet(t, script, nil)
 	assertExitCode(t, code, 0)
-	assertContains(t, out, "ghost-tab · claude")
+	assertContains(t, out, "wisp-deck · claude")
 	assertNotContains(t, out, "●")
 }
 
@@ -201,11 +201,11 @@ func TestTui_set_tab_title_waiting_omits_tool_when_empty(t *testing.T) {
 
 // --- draw_logo ---
 
-func TestTui_draw_logo_calls_ghost_tab_tui_show_logo(t *testing.T) {
+func TestTui_draw_logo_calls_wisp_deck_tui_show_logo(t *testing.T) {
 	dir := t.TempDir()
 
-	// Create a mock ghost-tab-tui that outputs MOCK_LOGO_OUTPUT when called with show-logo
-	binDir := mockCommand(t, dir, "ghost-tab-tui", `
+	// Create a mock wisp-deck-tui that outputs MOCK_LOGO_OUTPUT when called with show-logo
+	binDir := mockCommand(t, dir, "wisp-deck-tui", `
 if [ "$1" = "show-logo" ]; then
   echo "MOCK_LOGO_OUTPUT"
   exit 0

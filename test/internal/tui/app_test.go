@@ -5,7 +5,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/jackuait/ghost-tab/internal/tui"
+	"github.com/jackuait/wisp-deck/internal/tui"
 )
 
 // minimalModel is a stub tea.Model for use in AppModel tests.

@@ -6,18 +6,18 @@ import (
 	"testing"
 )
 
-// The dispatcher delegates mutations to `ghost-tab-tui claude-config <action>`
+// The dispatcher delegates mutations to `wisp-deck-tui claude-config <action>`
 // (the single Go source of truth). This test mocks the binary and asserts the
 // dispatcher invokes it with the right action and arguments.
 func TestConfigMenu_dispatch_add_invokes_binary_then_quits(t *testing.T) {
 	dir := t.TempDir()
-	cfgRoot := filepath.Join(dir, "ghost-tab")
+	cfgRoot := filepath.Join(dir, "wisp-deck")
 	_ = os.MkdirAll(cfgRoot, 0o755)
 	calls := filepath.Join(dir, "calls.log")
 
-	// Mock ghost-tab-tui: claude-config-menu returns add once then quit;
+	// Mock wisp-deck-tui: claude-config-menu returns add once then quit;
 	// claude-config records its arguments.
-	bin := mockCommand(t, dir, "ghost-tab-tui", `
+	bin := mockCommand(t, dir, "wisp-deck-tui", `
 state="`+dir+`/n"
 n=$(cat "$state" 2>/dev/null || echo 0)
 echo $((n+1)) > "$state"

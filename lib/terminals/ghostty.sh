@@ -8,7 +8,7 @@ terminal_get_config_path() {
 
 # Return the path where the wrapper script should be.
 terminal_get_wrapper_path() {
-  echo "$HOME/.config/ghost-tab/wrapper.sh"
+  echo "$HOME/.config/wisp-deck/wrapper.sh"
 }
 
 # Install Ghostty: check for the app, open download page if missing.
@@ -28,7 +28,7 @@ terminal_install() {
 
   if [ ! -d "$app_path" ]; then
     error "Ghostty still not found at $app_path"
-    info "Install Ghostty and re-run: ghost-tab"
+    info "Install Ghostty and re-run: wisp-deck"
     return 1
   fi
   success "Ghostty installed"
@@ -55,12 +55,12 @@ terminal_setup_config() {
   fi
 }
 
-# Remove ghost-tab command line from Ghostty config.
-# Matches only ghost-tab's own wrapper line so a user-written command survives.
+# Remove wisp-deck command line from Ghostty config.
+# Matches only wisp-deck's own wrapper line so a user-written command survives.
 terminal_cleanup_config() {
   local config_path="$1"
   if [ -f "$config_path" ]; then
-    sed -i '' '/^command[[:space:]]*=.*ghost-tab\/wrapper\.sh/d' "$config_path"
+    sed -i '' '/^command[[:space:]]*=.*wisp-deck\/wrapper\.sh/d' "$config_path"
   fi
 }
 

@@ -2,18 +2,18 @@
 
 # Build the Go binary
 build:
-	@echo "Building ghost-tab-tui..."
-	go build -o bin/ghost-tab-tui ./cmd/ghost-tab-tui
-	@codesign --sign - --force bin/ghost-tab-tui
-	@echo "✓ Built bin/ghost-tab-tui"
+	@echo "Building wisp-deck-tui..."
+	go build -o bin/wisp-deck-tui ./cmd/wisp-deck-tui
+	@codesign --sign - --force bin/wisp-deck-tui
+	@echo "✓ Built bin/wisp-deck-tui"
 
 # Install to local bin
 install: build
 	@echo "Installing to ~/.local/bin..."
 	mkdir -p $(HOME)/.local/bin
-	cp bin/ghost-tab-tui $(HOME)/.local/bin/
-	@codesign --sign - --force $(HOME)/.local/bin/ghost-tab-tui
-	@echo "✓ Installed ghost-tab-tui"
+	cp bin/wisp-deck-tui $(HOME)/.local/bin/
+	@codesign --sign - --force $(HOME)/.local/bin/wisp-deck-tui
+	@echo "✓ Installed wisp-deck-tui"
 
 # Run tests
 test:
@@ -32,7 +32,7 @@ test-bash:
 
 # Clean build artifacts
 clean:
-	rm -f bin/ghost-tab-tui
+	rm -f bin/wisp-deck-tui
 	go clean
 
 # Lint Go code
@@ -52,7 +52,7 @@ sync-version:
 
 # Show help
 help:
-	@echo "Ghost Tab Build Targets:"
+	@echo "Wisp Deck Build Targets:"
 	@echo "  make build   - Build the Go binary"
 	@echo "  make install - Install to ~/.local/bin"
 	@echo "  make test    - Run all tests (Go + bash)"

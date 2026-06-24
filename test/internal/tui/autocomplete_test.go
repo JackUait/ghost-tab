@@ -8,7 +8,7 @@ import (
 	"testing"
 
 
-	"github.com/jackuait/ghost-tab/internal/tui"
+	"github.com/jackuait/wisp-deck/internal/tui"
 )
 
 func TestPathSuggestionProvider_EmptyDefaultsToHome(t *testing.T) {

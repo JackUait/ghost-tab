@@ -4,24 +4,24 @@
 
 When Claude Code's agent stops, two sounds play simultaneously:
 
-1. Ghost-tab's `Stop` hook plays `afplay /System/Library/Sounds/<sound>.aiff &`
+1. Wisp-deck's `Stop` hook plays `afplay /System/Library/Sounds/<sound>.aiff &`
 2. Claude Code's built-in macOS notification plays the system alert sound and shows a banner
 
-Ghost-tab adds its own sound hook but never disables Claude Code's default notification, so both fire on the same event.
+Wisp-deck adds its own sound hook but never disables Claude Code's default notification, so both fire on the same event.
 
 ## Root Cause
 
-Claude Code has a built-in notification system (`preferredNotifChannel`) that defaults to macOS notifications. When ghost-tab adds a Stop hook for custom sound, both the hook and the built-in notification trigger independently.
+Claude Code has a built-in notification system (`preferredNotifChannel`) that defaults to macOS notifications. When wisp-deck adds a Stop hook for custom sound, both the hook and the built-in notification trigger independently.
 
 ## Solution
 
-When ghost-tab enables its Stop sound hook, also set Claude Code's `preferredNotifChannel` to `terminal_bell`. When it disables the hook, restore the original value.
+When wisp-deck enables its Stop sound hook, also set Claude Code's `preferredNotifChannel` to `terminal_bell`. When it disables the hook, restore the original value.
 
 ### Why `terminal_bell`
 
 - In Ghostty (default config), terminal bell produces no audio -- only dock bounce and badge icon
 - User retains visual notification feedback (dock bounce signals Claude finished)
-- Only ghost-tab's custom sound plays as audio
+- Only wisp-deck's custom sound plays as audio
 - Works correctly across all supported terminals
 
 ### Why not `notifications_disabled`
@@ -33,7 +33,7 @@ When ghost-tab enables its Stop sound hook, also set Claude Code's `preferredNot
 
 ### `lib/settings-json.sh`
 
-- `add_sound_notification_hook()`: After adding the Stop hook, run `claude config set --global preferredNotifChannel terminal_bell` to suppress the built-in audio notification. Store the previous value in `~/.config/ghost-tab/prev-notif-channel` for restoration.
+- `add_sound_notification_hook()`: After adding the Stop hook, run `claude config set --global preferredNotifChannel terminal_bell` to suppress the built-in audio notification. Store the previous value in `~/.config/wisp-deck/prev-notif-channel` for restoration.
 - `remove_sound_notification_hook()`: After removing the Stop hook, restore the previous `preferredNotifChannel` value from the stored file. If no previous value was stored, reset to default by unsetting the config.
 
 ### `lib/notification-setup.sh`

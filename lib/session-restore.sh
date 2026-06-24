@@ -1,5 +1,5 @@
 #!/bin/bash
-# Session restore — snapshot alive Ghost Tab tmux sessions and reopen them
+# Session restore — snapshot alive Wisp Deck tmux sessions and reopen them
 # after a reboot. Depends on: terminals/ghostty.sh (terminal_launch_restore).
 
 # Print the current macOS boot id (the kern.boottime sec value).
@@ -10,9 +10,9 @@ current_boot_id() {
   echo "$out" | sed -n 's/.*[^u]sec = \([0-9][0-9]*\).*/\1/p'
 }
 
-# Re-derive the live snapshot from alive Ghost Tab tmux sessions.
+# Re-derive the live snapshot from alive Wisp Deck tmux sessions.
 # Usage: write_session_snapshot <tmux_cmd> <snapshot_file>
-# A session is "ours" iff its session environment contains GHOST_TAB=1.
+# A session is "ours" iff its session environment contains WISP_DECK=1.
 # Writes atomically (temp + mv). One line per session:
 #   boot_id|project|path|tool|terminal
 # Field delimiter is '|' — project paths containing '|' are not supported.
@@ -28,12 +28,12 @@ write_session_snapshot() {
   while IFS= read -r s; do
     [ -n "$s" ] || continue
     env="$("$tmux_cmd" show-environment -t "$s" 2>/dev/null)" || continue
-    echo "$env" | grep -q '^GHOST_TAB=1$' || continue
-    boot="$(echo "$env" | sed -n 's/^GHOST_TAB_BOOT=//p')"
-    proj="$(echo "$env" | sed -n 's/^GHOST_TAB_PROJECT=//p')"
-    path="$(echo "$env" | sed -n 's/^GHOST_TAB_PATH=//p')"
-    tool="$(echo "$env" | sed -n 's/^GHOST_TAB_TOOL=//p')"
-    term="$(echo "$env" | sed -n 's/^GHOST_TAB_TERMINAL=//p')"
+    echo "$env" | grep -q '^WISP_DECK=1$' || continue
+    boot="$(echo "$env" | sed -n 's/^WISP_DECK_BOOT=//p')"
+    proj="$(echo "$env" | sed -n 's/^WISP_DECK_PROJECT=//p')"
+    path="$(echo "$env" | sed -n 's/^WISP_DECK_PATH=//p')"
+    tool="$(echo "$env" | sed -n 's/^WISP_DECK_TOOL=//p')"
+    term="$(echo "$env" | sed -n 's/^WISP_DECK_TERMINAL=//p')"
     echo "${boot}|${proj}|${path}|${tool}|${term}" >> "$tmp"
   done <<< "$sessions"
   mv "$tmp" "$snap_file"

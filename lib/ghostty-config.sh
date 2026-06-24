@@ -22,5 +22,5 @@ backup_replace_ghostty_config() {
   cp "$config_path" "$backup"
   success "Backed up existing config to $backup"
   cp "$source_config" "$config_path"
-  success "Replaced config with ghost-tab defaults"
+  success "Replaced config with wisp-deck defaults"
 }

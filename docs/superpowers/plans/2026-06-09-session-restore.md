@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** When the user opens Ghost Tab the first time after a reboot, silently reopen every tab that was open before the reboot, each resuming its AI conversation.
+**Goal:** When the user opens Wisp Deck the first time after a reboot, silently reopen every tab that was open before the reboot, each resuming its AI conversation.
 
-**Architecture:** A heartbeat loop in each running tab re-derives a snapshot of all alive Ghost Tab tmux sessions (identified by a `GHOST_TAB=1` session-env marker) into `~/.config/ghost-tab/last-session`. The tmux server dies at reboot, freezing the file. On the next interactive launch, a once-per-boot gate (keyed on `sysctl kern.boottime`) spawns one window per snapshot line via a per-terminal launch hook, in a non-interactive `wrapper.sh --restore` mode that launches the AI tool with its resume flag.
+**Architecture:** A heartbeat loop in each running tab re-derives a snapshot of all alive Wisp Deck tmux sessions (identified by a `WISP_DECK=1` session-env marker) into `~/.config/wisp-deck/last-session`. The tmux server dies at reboot, freezing the file. On the next interactive launch, a once-per-boot gate (keyed on `sysctl kern.boottime`) spawns one window per snapshot line via a per-terminal launch hook, in a non-interactive `wrapper.sh --restore` mode that launches the AI tool with its resume flag.
 
 **Tech Stack:** bash (sourced `lib/*.sh` modules), tmux, Go test harness in `test/bash/` (calls bash via `os/exec`), shellcheck.
 
@@ -14,13 +14,13 @@
 
 - **Create** `lib/session-restore.sh` — all restore logic as pure, dependency-injected functions: `current_boot_id`, `write_session_snapshot`, `launch_restore_window`, `maybe_restore_session`, `parse_restore_flag`.
 - **Create** `test/bash/session_restore_test.go` — behavior tests for the module.
-- **Modify** `lib/tmux-session.sh` — `build_ai_launch_cmd` honours `GHOST_TAB_RESUME=1`.
+- **Modify** `lib/tmux-session.sh` — `build_ai_launch_cmd` honours `WISP_DECK_RESUME=1`.
 - **Modify** `lib/terminals/{ghostty,iterm2,kitty,wezterm}.sh` — add `terminal_launch_restore`.
 - **Modify** `test/bash/terminal_{ghostty,iterm2,kitty,wezterm}_test.go` — tests for the new hook.
 - **Modify** `test/bash/tmux_session_test.go` (create if absent) — resume-flag test.
 - **Modify** `wrapper.sh` — source new modules, stamp session env, start heartbeat, gate restore, handle `--restore`.
 
-All snapshot/marker files live under `${XDG_CONFIG_HOME:-$HOME/.config}/ghost-tab/`:
+All snapshot/marker files live under `${XDG_CONFIG_HOME:-$HOME/.config}/wisp-deck/`:
 - `last-session` — `boot_id|project|path|tool|terminal` per alive session.
 - `last-restore-boot` — boot id of the most recent restore.
 
@@ -84,7 +84,7 @@ Create `lib/session-restore.sh`:
 
 ```bash
 #!/bin/bash
-# Session restore — snapshot alive Ghost Tab tmux sessions and reopen them
+# Session restore — snapshot alive Wisp Deck tmux sessions and reopen them
 # after a reboot. Depends on: terminals/adapter.sh (load_terminal_adapter).
 
 # Print the current macOS boot id (the kern.boottime sec value).
@@ -123,13 +123,13 @@ Append to `test/bash/session_restore_test.go`:
 ```go
 func TestWriteSessionSnapshot_writes_ghost_sessions_only(t *testing.T) {
 	dir := t.TempDir()
-	// Mock tmux: list two sessions; only dev-app-1 carries GHOST_TAB=1.
+	// Mock tmux: list two sessions; only dev-app-1 carries WISP_DECK=1.
 	tmuxBody := `
 case "$1" in
   list-sessions) echo "dev-app-1"; echo "other-sess" ;;
   show-environment)
     if [ "$3" = "dev-app-1" ]; then
-      printf 'GHOST_TAB=1\nGHOST_TAB_BOOT=111\nGHOST_TAB_PROJECT=app\nGHOST_TAB_PATH=/p/app\nGHOST_TAB_TOOL=claude\nGHOST_TAB_TERMINAL=ghostty\n'
+      printf 'WISP_DECK=1\nWISP_DECK_BOOT=111\nWISP_DECK_PROJECT=app\nWISP_DECK_PATH=/p/app\nWISP_DECK_TOOL=claude\nWISP_DECK_TERMINAL=ghostty\n'
     else
       printf 'SOMEVAR=1\n'
     fi ;;
@@ -183,9 +183,9 @@ Expected: FAIL — `write_session_snapshot` not found.
 Append to `lib/session-restore.sh`:
 
 ```bash
-# Re-derive the live snapshot from alive Ghost Tab tmux sessions.
+# Re-derive the live snapshot from alive Wisp Deck tmux sessions.
 # Usage: write_session_snapshot <tmux_cmd> <snapshot_file>
-# A session is "ours" iff its session environment contains GHOST_TAB=1.
+# A session is "ours" iff its session environment contains WISP_DECK=1.
 # Writes atomically (temp + mv). One line per session:
 #   boot_id|project|path|tool|terminal
 write_session_snapshot() {
@@ -195,12 +195,12 @@ write_session_snapshot() {
   local s env boot proj path tool term
   for s in $("$tmux_cmd" list-sessions -F '#{session_name}' 2>/dev/null); do
     env="$("$tmux_cmd" show-environment -t "$s" 2>/dev/null)" || continue
-    echo "$env" | grep -q '^GHOST_TAB=1$' || continue
-    boot="$(echo "$env" | sed -n 's/^GHOST_TAB_BOOT=//p')"
-    proj="$(echo "$env" | sed -n 's/^GHOST_TAB_PROJECT=//p')"
-    path="$(echo "$env" | sed -n 's/^GHOST_TAB_PATH=//p')"
-    tool="$(echo "$env" | sed -n 's/^GHOST_TAB_TOOL=//p')"
-    term="$(echo "$env" | sed -n 's/^GHOST_TAB_TERMINAL=//p')"
+    echo "$env" | grep -q '^WISP_DECK=1$' || continue
+    boot="$(echo "$env" | sed -n 's/^WISP_DECK_BOOT=//p')"
+    proj="$(echo "$env" | sed -n 's/^WISP_DECK_PROJECT=//p')"
+    path="$(echo "$env" | sed -n 's/^WISP_DECK_PATH=//p')"
+    tool="$(echo "$env" | sed -n 's/^WISP_DECK_TOOL=//p')"
+    term="$(echo "$env" | sed -n 's/^WISP_DECK_TERMINAL=//p')"
     echo "${boot}|${proj}|${path}|${tool}|${term}" >> "$tmp"
   done
   mv "$tmp" "$snap_file"
@@ -216,7 +216,7 @@ Expected: PASS (both cases).
 
 ```bash
 git add lib/session-restore.sh test/bash/session_restore_test.go
-git commit -m "feat: snapshot alive ghost-tab tmux sessions"
+git commit -m "feat: snapshot alive wisp-deck tmux sessions"
 ```
 
 ---
@@ -526,7 +526,7 @@ func aiCmd(t *testing.T, tool string, resume bool) string {
 	t.Helper()
 	var env []string
 	if resume {
-		env = buildEnv(t, nil, "GHOST_TAB_RESUME=1")
+		env = buildEnv(t, nil, "WISP_DECK_RESUME=1")
 	}
 	out, code := runBashFunc(t, "lib/tmux-session.sh", "build_ai_launch_cmd",
 		[]string{tool, "claude", "codex", "copilot", "npx opencode-ai@latest", "/p/app"}, env)
@@ -574,7 +574,7 @@ build_ai_launch_cmd() {
   local extra="$*"
 
   # Resume mode: relaunch into the most recent (cwd-scoped) conversation.
-  if [ "${GHOST_TAB_RESUME:-0}" = "1" ]; then
+  if [ "${WISP_DECK_RESUME:-0}" = "1" ]; then
     case "$tool" in
       codex)    echo "$codex_cmd resume --last" ;;
       copilot)  echo "$copilot_cmd --continue" ;;
@@ -900,7 +900,7 @@ Insert immediately after the libs loop (after line 54, before `TMUX_CMD=` is fin
 
 ```bash
 # Boot id (stable per uptime) for once-per-boot restore.
-GHOST_TAB_BOOT_ID="$(current_boot_id)"
+WISP_DECK_BOOT_ID="$(current_boot_id)"
 
 # Restore mode: wrapper.sh --restore <project_path> <ai_tool>
 RESTORE_MODE=0
@@ -928,10 +928,10 @@ elif [ -n "$1" ] && [ -d "$1" ]; then
 elif [ -z "$1" ]; then
   # First interactive launch after a reboot: reopen previous tabs.
   _gt_terminal_pref="$(load_terminal_preference "$SHARE_DIR/terminal")"
-  maybe_restore_session "$SHARE_DIR" "$GHOST_TAB_BOOT_ID" "$0"
+  maybe_restore_session "$SHARE_DIR" "$WISP_DECK_BOOT_ID" "$0"
 
   # Use TUI for project selection
-  printf '\033]0;👻 Ghost Tab\007'
+  printf '\033]0;👻 Wisp Deck\007'
   type stop_loading_screen &>/dev/null && stop_loading_screen
 
   while true; do
@@ -972,7 +972,7 @@ Immediately before the `# Build the AI tool launch command` block (line 201), ad
 
 ```bash
 if [ "$RESTORE_MODE" -eq 1 ]; then
-  export GHOST_TAB_RESUME=1
+  export WISP_DECK_RESUME=1
 fi
 ```
 
@@ -983,12 +983,12 @@ Read the current terminal preference and define the snapshot path; start the hea
 ```bash
 # Session-restore snapshot: stamp metadata into the tmux session env via -e
 # flags on new-session (below), and run a heartbeat that re-derives the
-# snapshot from all alive Ghost Tab sessions.
-GHOST_TAB_TERMINAL="$(load_terminal_preference "$SHARE_DIR/terminal")"
-GHOST_TAB_SNAPSHOT="$SHARE_DIR/last-session"
+# snapshot from all alive Wisp Deck sessions.
+WISP_DECK_TERMINAL="$(load_terminal_preference "$SHARE_DIR/terminal")"
+WISP_DECK_SNAPSHOT="$SHARE_DIR/last-session"
 (
   while true; do
-    write_session_snapshot "$TMUX_CMD" "$GHOST_TAB_SNAPSHOT"
+    write_session_snapshot "$TMUX_CMD" "$WISP_DECK_SNAPSHOT"
     sleep 10
   done
 ) &
@@ -997,10 +997,10 @@ HEARTBEAT_PID=$!
 
 - [ ] **Step 6: Add `-e` metadata flags to the `new-session` call (line 214)**
 
-Edit the `"$TMUX_CMD" new-session ...` line to add the Ghost Tab env flags right after the existing `-e` flags (before `-c "$PROJECT_DIR"`):
+Edit the `"$TMUX_CMD" new-session ...` line to add the Wisp Deck env flags right after the existing `-e` flags (before `-c "$PROJECT_DIR"`):
 
 ```bash
-"$TMUX_CMD" new-session -s "$SESSION_NAME" -e "PATH=$PATH" -e "GHOST_TAB_BASELINE_FILE=$GHOST_TAB_BASELINE_FILE" -e "GHOST_TAB_MARKER_FILE=$GHOST_TAB_MARKER_FILE" -e "GHOST_TAB=1" -e "GHOST_TAB_BOOT=$GHOST_TAB_BOOT_ID" -e "GHOST_TAB_PROJECT=$PROJECT_NAME" -e "GHOST_TAB_PATH=$PROJECT_DIR" -e "GHOST_TAB_TOOL=$SELECTED_AI_TOOL" -e "GHOST_TAB_TERMINAL=$GHOST_TAB_TERMINAL" -c "$PROJECT_DIR" \
+"$TMUX_CMD" new-session -s "$SESSION_NAME" -e "PATH=$PATH" -e "WISP_DECK_BASELINE_FILE=$WISP_DECK_BASELINE_FILE" -e "WISP_DECK_MARKER_FILE=$WISP_DECK_MARKER_FILE" -e "WISP_DECK=1" -e "WISP_DECK_BOOT=$WISP_DECK_BOOT_ID" -e "WISP_DECK_PROJECT=$PROJECT_NAME" -e "WISP_DECK_PATH=$PROJECT_DIR" -e "WISP_DECK_TOOL=$SELECTED_AI_TOOL" -e "WISP_DECK_TERMINAL=$WISP_DECK_TERMINAL" -c "$PROJECT_DIR" \
 ```
 
 - [ ] **Step 7: Kill the heartbeat in `cleanup()` (do NOT touch the snapshot file)**
@@ -1011,7 +1011,7 @@ In `cleanup()` (line 177), add a kill for the heartbeat near the top (after `sto
   [ -n "${HEARTBEAT_PID:-}" ] && kill "$HEARTBEAT_PID" 2>/dev/null || true
 ```
 
-Do not delete `$GHOST_TAB_SNAPSHOT` — leaving it is what keeps the file frozen across a reboot. Surviving tabs' heartbeats re-derive it without this session.
+Do not delete `$WISP_DECK_SNAPSHOT` — leaving it is what keeps the file frozen across a reboot. Surviving tabs' heartbeats re-derive it without this session.
 
 - [ ] **Step 8: shellcheck**
 
@@ -1026,9 +1026,9 @@ Expected: no warnings. Fix any (e.g. quote variables, `# shellcheck disable=SC20
 bash wrapper.sh --restore "$PWD" claude
 ```
 Expected: a tmux session opens directly in `$PWD` with the AI pane launching
-`claude -c` (no project picker). Confirm `~/.config/ghost-tab/last-session`
+`claude -c` (no project picker). Confirm `~/.config/wisp-deck/last-session`
 gains a `…|<project>|<path>|claude|<terminal>` line within ~10s
-(`cat ~/.config/ghost-tab/last-session`).
+(`cat ~/.config/wisp-deck/last-session`).
 
 - [ ] **Step 10: Commit**
 
@@ -1063,8 +1063,8 @@ git status   # MUST show "up to date with origin"
 
 ## Self-Review notes
 
-- **Spec coverage:** boot id (T1), live snapshot + GHOST_TAB marker (T2, T11 step 6), launch dispatcher (T3), once-per-boot gate + opened-window-stays-picker (T4, T11 step 3), restore mode (T5, T11 steps 2-4), resume flags per tool (T6), per-terminal launch hooks all four (T7-T10), heartbeat that freezes at reboot + cleanup not touching snapshot (T11 steps 5,7). All spec sections mapped.
+- **Spec coverage:** boot id (T1), live snapshot + WISP_DECK marker (T2, T11 step 6), launch dispatcher (T3), once-per-boot gate + opened-window-stays-picker (T4, T11 step 3), restore mode (T5, T11 steps 2-4), resume flags per tool (T6), per-terminal launch hooks all four (T7-T10), heartbeat that freezes at reboot + cleanup not touching snapshot (T11 steps 5,7). All spec sections mapped.
 - **Documented edge** (closing last tab then rebooting reopens it): inherent to the frozen-snapshot model; no task needed, behavior is acceptable per spec.
-- **Type/name consistency:** `terminal_launch_restore(wrapper, path, tool)`, `launch_restore_window(terminal, wrapper, path, tool)`, `maybe_restore_session(config_dir, boot_id, wrapper)`, `write_session_snapshot(tmux_cmd, snap_file)`, env keys `GHOST_TAB`/`GHOST_TAB_BOOT`/`GHOST_TAB_PROJECT`/`GHOST_TAB_PATH`/`GHOST_TAB_TOOL`/`GHOST_TAB_TERMINAL`, and `GHOST_TAB_RESUME=1` are used identically across all tasks.
+- **Type/name consistency:** `terminal_launch_restore(wrapper, path, tool)`, `launch_restore_window(terminal, wrapper, path, tool)`, `maybe_restore_session(config_dir, boot_id, wrapper)`, `write_session_snapshot(tmux_cmd, snap_file)`, env keys `WISP_DECK`/`WISP_DECK_BOOT`/`WISP_DECK_PROJECT`/`WISP_DECK_PATH`/`WISP_DECK_TOOL`/`WISP_DECK_TERMINAL`, and `WISP_DECK_RESUME=1` are used identically across all tasks.
 - **Real-tool caveat:** `open -na … --args -e` (Ghostty), `codex resume --last`, `copilot --continue` semantics are pinned by mocks here; verify against installed tool versions during T11 step 9 smoke test and adjust the single adapter/command line if a tool differs.
 ```

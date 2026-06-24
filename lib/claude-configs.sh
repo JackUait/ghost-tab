@@ -64,5 +64,5 @@ resolve_claude_config_path() {
 }
 
 # Mutations (add / rename / delete) live in Go — the single source of truth —
-# exposed as `ghost-tab-tui claude-config <action>` and called by config-tui.sh.
+# exposed as `wisp-deck-tui claude-config <action>` and called by config-tui.sh.
 # See internal/claudeconfig.

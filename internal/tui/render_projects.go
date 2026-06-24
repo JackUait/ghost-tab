@@ -17,7 +17,7 @@ const (
 	iconLogin = "\U000F0004" // nf-md-account — which Claude login is active
 	iconAgent = "\U000F06A9" // nf-md-robot   — the AI agent (Claude Code / OpenCode)
 	iconPlan  = "\U000F0148" // nf-md-crown   — the Claude subscription tier
-	iconGhost = "\U000F02A0" // nf-md-ghost   — captions the "Ghost Tab" wordmark
+	iconGhost = "\U000F02A0" // nf-md-ghost   — captions the "Wisp Deck" wordmark
 
 	// Switcher prev/next buttons. Material Design chevrons from the same nerd-font
 	// family as the caption icons above; both are one-cell glyphs so the
@@ -74,11 +74,11 @@ func (m *MainMenuModel) renderActionBar(leftBorder, rightBorder string) string {
 	return leftBorder + "  " + rendered + strings.Repeat(" ", gap) + rightBorder
 }
 
-// ghostWordmark renders the right-aligned "Ghost Tab" wordmark with its ghost
+// ghostWordmark renders the right-aligned "Wisp Deck" wordmark with its ghost
 // icon. It captions the header's topmost row — the account row when accounts
 // exist, otherwise the AGENT row.
 func (m *MainMenuModel) ghostWordmark() string {
-	return lipgloss.NewStyle().Foreground(m.theme.Primary).Bold(true).Render(iconGhost + " Ghost Tab")
+	return lipgloss.NewStyle().Foreground(m.theme.Primary).Bold(true).Render(iconGhost + " Wisp Deck")
 }
 
 // headerRow assembles a switcher row: left-aligned content, optional
@@ -93,7 +93,7 @@ func (m *MainMenuModel) headerRow(content, title, leftBorder, rightBorder string
 }
 
 // renderTitleRow renders the left-aligned AGENT tool chooser. It carries the
-// right-aligned "Ghost Tab" wordmark only when no account row sits above it;
+// right-aligned "Wisp Deck" wordmark only when no account row sits above it;
 // otherwise the wordmark lives on that top account row.
 func (m *MainMenuModel) renderTitleRow(leftBorder, rightBorder string) string {
 	primaryStyle := lipgloss.NewStyle().Foreground(m.theme.Primary)
@@ -174,7 +174,7 @@ func (m *MainMenuModel) renderAccountRow(leftBorder, rightBorder string) string 
 	content := acctLabel + chevronStyle.Render(iconChevronLeft+" ") + nameStyle.Render(label) + chevronStyle.Render(" "+iconChevronRight)
 
 	// This row only renders when accounts exist, so it is always the topmost
-	// header row — it hosts the right-aligned "Ghost Tab" wordmark.
+	// header row — it hosts the right-aligned "Wisp Deck" wordmark.
 	return m.headerRow(content, m.ghostWordmark(), leftBorder, rightBorder)
 }
 
@@ -222,7 +222,7 @@ func (m *MainMenuModel) renderSubscriptionRow(leftBorder, rightBorder string) st
 // renderUpdateRow renders the "Update available" notification row.
 func (m *MainMenuModel) renderUpdateRow(leftBorder, rightBorder string) string {
 	updateStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("220"))
-	updateMsg := fmt.Sprintf("Update available: %s (brew upgrade ghost-tab)", m.updateVersion)
+	updateMsg := fmt.Sprintf("Update available: %s (brew upgrade wisp-deck)", m.updateVersion)
 	updateContent := updateStyle.Render(updateMsg)
 	updatePadding := menuContentWidth - lipgloss.Width(updateContent) - 2 // leading 2 spaces
 	if updatePadding < 0 {

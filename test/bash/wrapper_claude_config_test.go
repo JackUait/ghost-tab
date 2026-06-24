@@ -20,11 +20,11 @@ func TestWrapperResolvesActiveConfigForClaude(t *testing.T) {
 source ` + libPath + `
 SELECTED_AI_TOOL=claude
 GT_CONFIG_DIR="` + dir + `"
-GHOST_TAB_CLAUDE_SETTINGS=""
+WISP_DECK_CLAUDE_SETTINGS=""
 if [ "$SELECTED_AI_TOOL" = "claude" ]; then
-  GHOST_TAB_CLAUDE_SETTINGS="$(resolve_claude_config_path "$GT_CONFIG_DIR/claude-configs" "$GT_CONFIG_DIR/claude-config")"
+  WISP_DECK_CLAUDE_SETTINGS="$(resolve_claude_config_path "$GT_CONFIG_DIR/claude-configs" "$GT_CONFIG_DIR/claude-config")"
 fi
-echo "RESULT=$GHOST_TAB_CLAUDE_SETTINGS"
+echo "RESULT=$WISP_DECK_CLAUDE_SETTINGS"
 `
 	out, code := runBashSnippet(t, script, nil)
 	assertExitCode(t, code, 0)
@@ -41,8 +41,8 @@ func TestWrapperNoConfigWhenStandard(t *testing.T) {
 source ` + libPath + `
 SELECTED_AI_TOOL=claude
 GT_CONFIG_DIR="` + dir + `"
-GHOST_TAB_CLAUDE_SETTINGS="$(resolve_claude_config_path "$GT_CONFIG_DIR/claude-configs" "$GT_CONFIG_DIR/claude-config")"
-echo "RESULT=[$GHOST_TAB_CLAUDE_SETTINGS]"
+WISP_DECK_CLAUDE_SETTINGS="$(resolve_claude_config_path "$GT_CONFIG_DIR/claude-configs" "$GT_CONFIG_DIR/claude-config")"
+echo "RESULT=[$WISP_DECK_CLAUDE_SETTINGS]"
 `
 	out, code := runBashSnippet(t, script, nil)
 	assertExitCode(t, code, 0)

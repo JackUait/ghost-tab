@@ -9,11 +9,11 @@ func aiCmd(t *testing.T, tool string, resume bool) string {
 	t.Helper()
 	var env []string
 	if resume {
-		env = buildEnv(t, nil, "GHOST_TAB_RESUME=1")
+		env = buildEnv(t, nil, "WISP_DECK_RESUME=1")
 	} else {
 		// Stay hermetic when the test itself runs inside a restored
-		// Ghost Tab session (which exports GHOST_TAB_RESUME=1).
-		env = buildEnv(t, nil, "GHOST_TAB_RESUME=0")
+		// Wisp Deck session (which exports WISP_DECK_RESUME=1).
+		env = buildEnv(t, nil, "WISP_DECK_RESUME=0")
 	}
 	out, code := runBashFunc(t, "lib/tmux-session.sh", "build_ai_launch_cmd",
 		[]string{tool, "claude", "npx opencode-ai@latest", "/p/app"}, env)
@@ -42,17 +42,17 @@ func TestBuildAiLaunchCmd_normal_unaffected(t *testing.T) {
 	}
 }
 
-// When GHOST_TAB_CLAUDE_FILTER is set (wrapper sets it after confirming the TUI
+// When WISP_DECK_CLAUDE_FILTER is set (wrapper sets it after confirming the TUI
 // binary supports the screenshot-drag filter), the Claude launch is prefixed
 // with it so a dropped screenshot's temp path is rewritten to a stable copy
 // before Claude reads it. OpenCode is never wrapped.
 func TestBuildAiLaunchCmd_wraps_claude_with_filter(t *testing.T) {
-	env := buildEnv(t, nil, "GHOST_TAB_RESUME=0",
-		"GHOST_TAB_CLAUDE_FILTER=ghost-tab-tui screenshot-filter -- ")
+	env := buildEnv(t, nil, "WISP_DECK_RESUME=0",
+		"WISP_DECK_CLAUDE_FILTER=wisp-deck-tui screenshot-filter -- ")
 	out, code := runBashFunc(t, "lib/tmux-session.sh", "build_ai_launch_cmd",
 		[]string{"claude", "claude", "npx opencode-ai@latest", "/p/app"}, env)
 	assertExitCode(t, code, 0)
-	if got := strings.TrimSpace(out); got != `ghost-tab-tui screenshot-filter -- claude /p/app` {
+	if got := strings.TrimSpace(out); got != `wisp-deck-tui screenshot-filter -- claude /p/app` {
 		t.Errorf("claude wrap: got %q", got)
 	}
 	out, _ = runBashFunc(t, "lib/tmux-session.sh", "build_ai_launch_cmd",
@@ -63,23 +63,23 @@ func TestBuildAiLaunchCmd_wraps_claude_with_filter(t *testing.T) {
 }
 
 func TestBuildAiLaunchCmd_wraps_claude_resume_with_filter(t *testing.T) {
-	env := buildEnv(t, nil, "GHOST_TAB_RESUME=1",
-		"GHOST_TAB_CLAUDE_FILTER=ghost-tab-tui screenshot-filter -- ")
+	env := buildEnv(t, nil, "WISP_DECK_RESUME=1",
+		"WISP_DECK_CLAUDE_FILTER=wisp-deck-tui screenshot-filter -- ")
 	out, code := runBashFunc(t, "lib/tmux-session.sh", "build_ai_launch_cmd",
 		[]string{"claude", "claude", "npx opencode-ai@latest", "/p/app"}, env)
 	assertExitCode(t, code, 0)
-	if got := strings.TrimSpace(out); got != `ghost-tab-tui screenshot-filter -- claude -c` {
+	if got := strings.TrimSpace(out); got != `wisp-deck-tui screenshot-filter -- claude -c` {
 		t.Errorf("claude resume wrap: got %q", got)
 	}
 }
 
 // When a non-Default native account is active, wrapper.sh exports
-// GHOST_TAB_CLAUDE_ACCOUNT_DIR and the Claude launch is prefixed with
+// WISP_DECK_CLAUDE_ACCOUNT_DIR and the Claude launch is prefixed with
 // CLAUDE_CONFIG_DIR=<dir> so `claude` runs under that account's isolated login.
 // The Default account leaves the env var unset (Keychain login, unchanged).
 func TestBuildAiLaunchCmd_prefixes_claude_config_dir(t *testing.T) {
-	env := buildEnv(t, nil, "GHOST_TAB_RESUME=0",
-		"GHOST_TAB_CLAUDE_ACCOUNT_DIR=/cfg/claude-accounts/work")
+	env := buildEnv(t, nil, "WISP_DECK_RESUME=0",
+		"WISP_DECK_CLAUDE_ACCOUNT_DIR=/cfg/claude-accounts/work")
 	out, code := runBashFunc(t, "lib/tmux-session.sh", "build_ai_launch_cmd",
 		[]string{"claude", "claude", "npx opencode-ai@latest", "/p/app"}, env)
 	assertExitCode(t, code, 0)
@@ -89,8 +89,8 @@ func TestBuildAiLaunchCmd_prefixes_claude_config_dir(t *testing.T) {
 }
 
 func TestBuildAiLaunchCmd_account_dir_not_applied_to_opencode(t *testing.T) {
-	env := buildEnv(t, nil, "GHOST_TAB_RESUME=0",
-		"GHOST_TAB_CLAUDE_ACCOUNT_DIR=/cfg/claude-accounts/work")
+	env := buildEnv(t, nil, "WISP_DECK_RESUME=0",
+		"WISP_DECK_CLAUDE_ACCOUNT_DIR=/cfg/claude-accounts/work")
 	out, _ := runBashFunc(t, "lib/tmux-session.sh", "build_ai_launch_cmd",
 		[]string{"opencode", "claude", "npx opencode-ai@latest", "/p/app"}, env)
 	if strings.Contains(out, "CLAUDE_CONFIG_DIR") {
@@ -101,13 +101,13 @@ func TestBuildAiLaunchCmd_account_dir_not_applied_to_opencode(t *testing.T) {
 // The account prefix composes ahead of the screenshot filter (env is inherited
 // by the child claude) and survives resume mode.
 func TestBuildAiLaunchCmd_account_dir_composes_with_filter_and_resume(t *testing.T) {
-	env := buildEnv(t, nil, "GHOST_TAB_RESUME=1",
-		"GHOST_TAB_CLAUDE_ACCOUNT_DIR=/cfg/claude-accounts/work",
-		"GHOST_TAB_CLAUDE_FILTER=ghost-tab-tui screenshot-filter -- ")
+	env := buildEnv(t, nil, "WISP_DECK_RESUME=1",
+		"WISP_DECK_CLAUDE_ACCOUNT_DIR=/cfg/claude-accounts/work",
+		"WISP_DECK_CLAUDE_FILTER=wisp-deck-tui screenshot-filter -- ")
 	out, code := runBashFunc(t, "lib/tmux-session.sh", "build_ai_launch_cmd",
 		[]string{"claude", "claude", "npx opencode-ai@latest", "/p/app"}, env)
 	assertExitCode(t, code, 0)
-	want := `CLAUDE_CONFIG_DIR="/cfg/claude-accounts/work" ghost-tab-tui screenshot-filter -- claude -c`
+	want := `CLAUDE_CONFIG_DIR="/cfg/claude-accounts/work" wisp-deck-tui screenshot-filter -- claude -c`
 	if got := strings.TrimSpace(out); got != want {
 		t.Errorf("claude account+filter+resume: got %q, want %q", got, want)
 	}

@@ -6,7 +6,7 @@
 ## Summary
 
 Let the user keep several Claude Code settings files and switch between them from
-Ghost Tab. A "config" is a settings JSON passed to Claude via `claude --settings <file>`.
+Wisp Deck. A "config" is a settings JSON passed to Claude via `claude --settings <file>`.
 Selection happens at launch via an inline cycle in the main menu (same pattern as the
 existing AI-tool and sound cycles), defaults to the last-used config, and always offers
 a "Standard Claude" entry (plain `claude`, no `--settings`). Configs are managed
@@ -30,7 +30,7 @@ a "Standard Claude" entry (plain `claude`, no `--settings`). Configs are managed
 
 ## Storage
 
-All under `${XDG_CONFIG_HOME:-$HOME/.config}/ghost-tab/`:
+All under `${XDG_CONFIG_HOME:-$HOME/.config}/wisp-deck/`:
 
 - `claude-configs/` — directory of settings JSON files (e.g. `work.json`, `personal.json`).
 - `claude-configs.list` — `name:filename` per line (display name decoupled from filename,
@@ -52,7 +52,7 @@ argument. When building the claude command and that path is non-empty, it append
    passes it into `build_ai_launch_cmd`.
 3. Otherwise (empty, `standard`, or missing file) launches plain Claude.
 
-Resume mode (`GHOST_TAB_RESUME=1`) keeps current behavior; the settings path also applies
+Resume mode (`WISP_DECK_RESUME=1`) keeps current behavior; the settings path also applies
 to the `claude -c` resume branch so a resumed session uses the same config.
 
 ## Inline switch in main menu (Approach A)
@@ -70,7 +70,7 @@ Mirror the existing sound cycle (`CycleSoundName`):
   to match existing keymap conventions, documented in the footer hints).
 
 Plumbing:
-- `cmd/ghost-tab-tui/main_menu.go` gains `--claude-config-file` and `--claude-configs-list`
+- `cmd/wisp-deck-tui/main_menu.go` gains `--claude-config-file` and `--claude-configs-list`
   flags, parsed into the model via setters (`SetClaudeConfigFile`, `SetClaudeConfigs`).
 - `lib/menu-tui.sh` passes those two paths when building `main-menu` args.
 
@@ -99,7 +99,7 @@ Bash (`test/bash/`):
 - List mutations: add appends `name:file`; rename changes name only; delete removes the line.
 - Delete of the active config resets the pointer to Standard.
 
-Go (`internal/tui/`, `cmd/ghost-tab-tui/`):
+Go (`internal/tui/`, `cmd/wisp-deck-tui/`):
 - `CycleClaudeConfig` order includes Standard at index 0, wraps around both directions, and
   persists the correct filename (empty for Standard) to the pointer file.
 - Config line hidden when tool ≠ claude, shown when claude.
@@ -115,7 +115,7 @@ full suite (`./run-tests.sh`) and `shellcheck` on modified scripts.
 - `lib/menu-tui.sh` — pass config flags to `main-menu`.
 - `lib/config-tui.sh` — `manage-claude-configs` action + list/file mutations.
 - `internal/tui/mainmenu.go` — config state, `CycleClaudeConfig`, render line, setters.
-- `cmd/ghost-tab-tui/main_menu.go` — new flags.
-- New `cmd/ghost-tab-tui/claude_config_menu.go` + `internal/tui/claude_config_menu.go`
+- `cmd/wisp-deck-tui/main_menu.go` — new flags.
+- New `cmd/wisp-deck-tui/claude_config_menu.go` + `internal/tui/claude_config_menu.go`
   (management selector).
 - Tests alongside each.

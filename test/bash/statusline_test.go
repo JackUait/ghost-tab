@@ -186,7 +186,7 @@ func TestStatusline_statusline_command_omits_diff_counts_even_with_baseline_set(
 	stdinData := fmt.Sprintf(`{"current_dir":"%s"}`, repoDir)
 	script := fmt.Sprintf(`echo '%s' | bash '%s'`, stdinData, cmdPath)
 
-	env := buildEnv(t, nil, "GHOST_TAB_BASELINE_FILE="+baselineFile)
+	env := buildEnv(t, nil, "WISP_DECK_BASELINE_FILE="+baselineFile)
 	out, code := runBashSnippet(t, script, env)
 	assertExitCode(t, code, 0)
 	assertContains(t, out, repoBasename)
@@ -201,8 +201,8 @@ func TestStatusline_statusline_command_falls_back_to_repo_branch_only_without_ba
 	root := projectRoot(t)
 	cmdPath := filepath.Join(root, "templates", "statusline-command.sh")
 	stdinData := fmt.Sprintf(`{"current_dir":"%s"}`, repoDir)
-	// Explicitly unset GHOST_TAB_BASELINE_FILE
-	script := fmt.Sprintf(`unset GHOST_TAB_BASELINE_FILE; echo '%s' | bash '%s'`, stdinData, cmdPath)
+	// Explicitly unset WISP_DECK_BASELINE_FILE
+	script := fmt.Sprintf(`unset WISP_DECK_BASELINE_FILE; echo '%s' | bash '%s'`, stdinData, cmdPath)
 
 	out, code := runBashSnippet(t, script, nil)
 	assertExitCode(t, code, 0)
@@ -220,7 +220,7 @@ func TestStatusline_statusline_command_falls_back_when_baseline_file_missing(t *
 	stdinData := fmt.Sprintf(`{"current_dir":"%s"}`, repoDir)
 	script := fmt.Sprintf(`echo '%s' | bash '%s'`, stdinData, cmdPath)
 
-	env := buildEnv(t, nil, "GHOST_TAB_BASELINE_FILE=/tmp/ghost-tab-nonexistent-baseline")
+	env := buildEnv(t, nil, "WISP_DECK_BASELINE_FILE=/tmp/wisp-deck-nonexistent-baseline")
 	out, code := runBashSnippet(t, script, env)
 	assertExitCode(t, code, 0)
 	assertContains(t, out, repoBasename)
@@ -269,7 +269,7 @@ func TestStatusline_statusline_command_omits_branch_name(t *testing.T) {
 	repoBasename := filepath.Base(repoDir)
 
 	// Check out a uniquely-named branch so its presence is unambiguous.
-	branchName := "ghost-tab-omit-branch-check"
+	branchName := "wisp-deck-omit-branch-check"
 	cmd := exec.Command("git", "-C", repoDir, "checkout", "-q", "-b", branchName)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("git checkout failed: %v\n%s", err, out)

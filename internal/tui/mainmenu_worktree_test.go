@@ -3,7 +3,7 @@ package tui
 import (
 	"testing"
 
-	"github.com/jackuait/ghost-tab/internal/models"
+	"github.com/jackuait/wisp-deck/internal/models"
 )
 
 // newWorktreeMenu creates a MainMenuModel with two projects each having worktrees,

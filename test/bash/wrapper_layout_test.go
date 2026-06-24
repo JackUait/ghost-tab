@@ -23,7 +23,7 @@ func TestWrapper_terminal_pane_is_45_percent(t *testing.T) {
 		"tmux":          "#!/bin/bash\nif [ \"$1\" = \"new-session\" ]; then printf '%s\\n' \"$*\" > \"$GT_REC\"; exit 0; fi\nexit 0\n",
 		"claude":        "#!/bin/bash\nexit 0\n",
 		"lazygit":       "#!/bin/bash\nexit 0\n",
-		"ghost-tab-tui": "#!/bin/bash\nexit 0\n",
+		"wisp-deck-tui": "#!/bin/bash\nexit 0\n",
 	}
 	for name, body := range mocks {
 		p := filepath.Join(binDir, name)
@@ -66,7 +66,7 @@ func recordWrapperNewSession(t *testing.T) string {
 		"tmux":          "#!/bin/bash\nif [ \"$1\" = \"new-session\" ]; then printf '%s\\n' \"$*\" > \"$GT_REC\"; exit 0; fi\nexit 0\n",
 		"claude":        "#!/bin/bash\nexit 0\n",
 		"lazygit":       "#!/bin/bash\nexit 0\n",
-		"ghost-tab-tui": "#!/bin/bash\nexit 0\n",
+		"wisp-deck-tui": "#!/bin/bash\nexit 0\n",
 	}
 	for name, body := range mocks {
 		p := filepath.Join(binDir, name)
@@ -102,7 +102,7 @@ func recordWrapperNewSessionForTool(t *testing.T, tool string) string {
 	mocks := map[string]string{
 		"tmux":          "#!/bin/bash\nif [ \"$1\" = \"new-session\" ]; then printf '%s\\n' \"$*\" > \"$GT_REC\"; exit 0; fi\nexit 0\n",
 		"lazygit":       "#!/bin/bash\nexit 0\n",
-		"ghost-tab-tui": "#!/bin/bash\nexit 0\n",
+		"wisp-deck-tui": "#!/bin/bash\nexit 0\n",
 		tool:            "#!/bin/bash\nexit 0\n",
 	}
 	for name, body := range mocks {

@@ -1,15 +1,15 @@
 #!/bin/bash
 # TUI wrapper for main menu
-# Uses ghost-tab-tui main-menu subcommand
+# Uses wisp-deck-tui main-menu subcommand
 
-# Interactive project selection using ghost-tab-tui main-menu
+# Interactive project selection using wisp-deck-tui main-menu
 # Returns 0 if an actionable item was selected, 1 if quit/cancelled
 # Sets: _selected_project_name, _selected_project_path, _selected_project_action, _selected_ai_tool
 select_project_interactive() {
   local projects_file="$1"
 
-  if ! command -v ghost-tab-tui &>/dev/null; then
-    error "ghost-tab-tui binary not found. Please reinstall."
+  if ! command -v wisp-deck-tui &>/dev/null; then
+    error "wisp-deck-tui binary not found. Please reinstall."
     return 1
   fi
 
@@ -17,7 +17,7 @@ select_project_interactive() {
   local ghost_display="animated"
   local panel_mode="compact"
   local tab_title="full"
-  local settings_file="${XDG_CONFIG_HOME:-$HOME/.config}/ghost-tab/settings"
+  local settings_file="${XDG_CONFIG_HOME:-$HOME/.config}/wisp-deck/settings"
   if [ -f "$settings_file" ]; then
     local saved_display
     saved_display=$(grep '^ghost_display=' "$settings_file" 2>/dev/null | cut -d= -f2)
@@ -38,7 +38,7 @@ select_project_interactive() {
 
   # Read sound notification state
   local sound_name=""
-  local gt_config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/ghost-tab"
+  local gt_config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/wisp-deck"
   if type get_sound_name &>/dev/null; then
     sound_name="$(get_sound_name "${SELECTED_AI_TOOL:-claude}" "$gt_config_dir")"
   fi
@@ -48,7 +48,7 @@ select_project_interactive() {
   ai_tools_csv=$(IFS=,; echo "${AI_TOOLS_AVAILABLE[*]}")
 
   # Build command args
-  local ai_tool_file="${XDG_CONFIG_HOME:-$HOME/.config}/ghost-tab/ai-tool"
+  local ai_tool_file="${XDG_CONFIG_HOME:-$HOME/.config}/wisp-deck/ai-tool"
   local projects_root_file="$gt_config_dir/projects-root"
   local cmd_args=("main-menu" "--projects-file" "$projects_file")
   cmd_args+=("--projects-root-file" "$projects_root_file")
@@ -76,7 +76,7 @@ select_project_interactive() {
   fi
 
   local result
-  if ! result=$(ghost-tab-tui "${cmd_args[@]}" 2>/dev/null); then
+  if ! result=$(wisp-deck-tui "${cmd_args[@]}" 2>/dev/null); then
     return 1
   fi
 
@@ -97,7 +97,7 @@ select_project_interactive() {
     _selected_ai_tool="$ai_tool"
     # Persist for next session if tool changed
     if [[ "$ai_tool" != "${SELECTED_AI_TOOL:-}" ]]; then
-      local ai_tool_file="${XDG_CONFIG_HOME:-$HOME/.config}/ghost-tab/ai-tool"
+      local ai_tool_file="${XDG_CONFIG_HOME:-$HOME/.config}/wisp-deck/ai-tool"
       mkdir -p "$(dirname "$ai_tool_file")"
       echo "$ai_tool" > "$ai_tool_file"
     fi

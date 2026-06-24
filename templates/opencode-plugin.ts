@@ -9,7 +9,7 @@ const COOLDOWN_WINDOW_MS = 30000
 
 const configPath = join(
   process.env.XDG_CONFIG_HOME || join(homedir(), ".config"),
-  "ghost-tab",
+  "wisp-deck",
   "opencode-features.json"
 )
 let features = { sound: false, spinner: false }
@@ -33,7 +33,7 @@ function getProject(): string {
 }
 
 function getPidFile(): string {
-  return join(tmpdir(), `ghost-tab-spinner-${getProject()}.pid`)
+  return join(tmpdir(), `wisp-deck-spinner-${getProject()}.pid`)
 }
 
 function resetTabTitle(): void {
@@ -107,7 +107,7 @@ function onIdle(): void {
   idleTimer = null
 }
 
-export const GhostTab = async () => {
+export const WispDeck = async () => {
   return {
     "tool.execute.after": async () => {
       lastToolCompleteTime = Date.now()

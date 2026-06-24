@@ -1,13 +1,13 @@
 #!/bin/bash
 # Input parsing helpers — no side effects on source.
 
-# Interactive confirmation using ghost-tab-tui
+# Interactive confirmation using wisp-deck-tui
 # Usage: confirm_tui "Delete project 'foo'?"
 # Returns: 0 if confirmed, 1 if cancelled
 confirm_tui() {
   local msg="$1"
 
-  if ! command -v ghost-tab-tui &>/dev/null; then
+  if ! command -v wisp-deck-tui &>/dev/null; then
     # Fallback to simple bash prompt
     read -rp "$msg (y/N) " response </dev/tty
     [[ "$response" =~ ^[Yy]$ ]]
@@ -15,7 +15,7 @@ confirm_tui() {
   fi
 
   local result
-  if ! result=$(ghost-tab-tui confirm "$msg" 2>/dev/null); then
+  if ! result=$(wisp-deck-tui confirm "$msg" 2>/dev/null); then
     return 1
   fi
 

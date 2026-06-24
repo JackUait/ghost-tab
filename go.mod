@@ -1,4 +1,4 @@
-module github.com/jackuait/ghost-tab
+module github.com/jackuait/wisp-deck
 
 go 1.25.0
 

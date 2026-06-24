@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/jackuait/ghost-tab/internal/util"
+	"github.com/jackuait/wisp-deck/internal/util"
 )
 
 // SuggestionProvider is a function that returns suggestions for a given input.

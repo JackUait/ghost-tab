@@ -83,7 +83,7 @@ func TestSettingsJson_add_waiting_indicator_hooks_creates_file_with_Stop_PreTool
 	assertContains(t, content, `"PreToolUse"`)
 	assertContains(t, content, `"PostToolUse"`)
 	assertContains(t, content, `"UserPromptSubmit"`)
-	assertContains(t, content, "GHOST_TAB_MARKER_FILE")
+	assertContains(t, content, "WISP_DECK_MARKER_FILE")
 	assertContains(t, content, `"AskUserQuestion"`)
 	// PostToolUse hook should touch cooldown file
 	assertContains(t, content, "cooldown")
@@ -123,7 +123,7 @@ func TestSettingsJson_add_waiting_indicator_hooks_adds_to_existing_settings(t *t
 	assertContains(t, content, `"Notification"`)
 	// Our hooks should use Stop, not Notification
 	assertContains(t, content, `"Stop"`)
-	assertContains(t, content, "GHOST_TAB_MARKER_FILE")
+	assertContains(t, content, "WISP_DECK_MARKER_FILE")
 	assertContains(t, content, `"PreToolUse"`)
 }
 
@@ -134,27 +134,27 @@ func TestSettingsJson_add_waiting_indicator_hooks_reports_exists_when_duplicate(
   "hooks": {
     "Stop": [
       {
-        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then touch \"$GHOST_TAB_MARKER_FILE\"; fi"}]
+        "hooks": [{"type": "command", "command": "if [ -n \"$WISP_DECK_MARKER_FILE\" ]; then touch \"$WISP_DECK_MARKER_FILE\"; fi"}]
       }
     ],
     "PreToolUse": [
       {
         "matcher": "AskUserQuestion",
-        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then touch \"$GHOST_TAB_MARKER_FILE\" \"${GHOST_TAB_MARKER_FILE}-ask\"; fi"}]
+        "hooks": [{"type": "command", "command": "if [ -n \"$WISP_DECK_MARKER_FILE\" ]; then touch \"$WISP_DECK_MARKER_FILE\" \"${WISP_DECK_MARKER_FILE}-ask\"; fi"}]
       },
       {
         "matcher": "^(?!AskUserQuestion$)",
-        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then rm -f \"$GHOST_TAB_MARKER_FILE\" \"${GHOST_TAB_MARKER_FILE}-ask\"; fi"}]
+        "hooks": [{"type": "command", "command": "if [ -n \"$WISP_DECK_MARKER_FILE\" ]; then rm -f \"$WISP_DECK_MARKER_FILE\" \"${WISP_DECK_MARKER_FILE}-ask\"; fi"}]
       }
     ],
     "PostToolUse": [
       {
-        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then touch \"${GHOST_TAB_MARKER_FILE}-cooldown\"; fi"}]
+        "hooks": [{"type": "command", "command": "if [ -n \"$WISP_DECK_MARKER_FILE\" ]; then touch \"${WISP_DECK_MARKER_FILE}-cooldown\"; fi"}]
       }
     ],
     "UserPromptSubmit": [
       {
-        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then rm -f \"$GHOST_TAB_MARKER_FILE\" \"${GHOST_TAB_MARKER_FILE}-ask\"; fi"}]
+        "hooks": [{"type": "command", "command": "if [ -n \"$WISP_DECK_MARKER_FILE\" ]; then rm -f \"$WISP_DECK_MARKER_FILE\" \"${WISP_DECK_MARKER_FILE}-ask\"; fi"}]
       }
     ]
   }
@@ -176,21 +176,21 @@ func TestSettingsJson_add_waiting_indicator_hooks_upgrades_format_without_PostTo
   "hooks": {
     "Stop": [
       {
-        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then touch \"$GHOST_TAB_MARKER_FILE\"; fi"}]
+        "hooks": [{"type": "command", "command": "if [ -n \"$WISP_DECK_MARKER_FILE\" ]; then touch \"$WISP_DECK_MARKER_FILE\"; fi"}]
       }
     ],
     "PreToolUse": [
       {
         "matcher": "AskUserQuestion",
-        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then touch \"$GHOST_TAB_MARKER_FILE\"; fi"}]
+        "hooks": [{"type": "command", "command": "if [ -n \"$WISP_DECK_MARKER_FILE\" ]; then touch \"$WISP_DECK_MARKER_FILE\"; fi"}]
       },
       {
-        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then rm -f \"$GHOST_TAB_MARKER_FILE\"; fi"}]
+        "hooks": [{"type": "command", "command": "if [ -n \"$WISP_DECK_MARKER_FILE\" ]; then rm -f \"$WISP_DECK_MARKER_FILE\"; fi"}]
       }
     ],
     "UserPromptSubmit": [
       {
-        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then rm -f \"$GHOST_TAB_MARKER_FILE\"; fi"}]
+        "hooks": [{"type": "command", "command": "if [ -n \"$WISP_DECK_MARKER_FILE\" ]; then rm -f \"$WISP_DECK_MARKER_FILE\"; fi"}]
       }
     ]
   }
@@ -226,17 +226,17 @@ func TestSettingsJson_add_waiting_indicator_hooks_upgrades_notification_format_t
   "hooks": {
     "Notification": [
       {
-        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then touch \"$GHOST_TAB_MARKER_FILE\"; fi"}]
+        "hooks": [{"type": "command", "command": "if [ -n \"$WISP_DECK_MARKER_FILE\" ]; then touch \"$WISP_DECK_MARKER_FILE\"; fi"}]
       }
     ],
     "PreToolUse": [
       {
-        "hooks": [{"type": "command", "command": "_gt_in=$(cat); if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then if [[ \"$_gt_in\" == *AskUserQuestion* ]]; then touch \"$GHOST_TAB_MARKER_FILE\"; else rm -f \"$GHOST_TAB_MARKER_FILE\"; fi; fi"}]
+        "hooks": [{"type": "command", "command": "_gt_in=$(cat); if [ -n \"$WISP_DECK_MARKER_FILE\" ]; then if [[ \"$_gt_in\" == *AskUserQuestion* ]]; then touch \"$WISP_DECK_MARKER_FILE\"; else rm -f \"$WISP_DECK_MARKER_FILE\"; fi; fi"}]
       }
     ],
     "UserPromptSubmit": [
       {
-        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then rm -f \"$GHOST_TAB_MARKER_FILE\"; fi"}]
+        "hooks": [{"type": "command", "command": "if [ -n \"$WISP_DECK_MARKER_FILE\" ]; then rm -f \"$WISP_DECK_MARKER_FILE\"; fi"}]
       }
     ]
   }
@@ -273,17 +273,17 @@ func TestSettingsJson_add_waiting_indicator_hooks_upgrades_v3_stop_ask_format_to
   "hooks": {
     "Stop": [
       {
-        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then touch \"$GHOST_TAB_MARKER_FILE\"; fi"}]
+        "hooks": [{"type": "command", "command": "if [ -n \"$WISP_DECK_MARKER_FILE\" ]; then touch \"$WISP_DECK_MARKER_FILE\"; fi"}]
       }
     ],
     "PreToolUse": [
       {
-        "hooks": [{"type": "command", "command": "_gt_in=$(cat); if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then if [[ \"$_gt_in\" == *AskUserQuestion* ]]; then touch \"$GHOST_TAB_MARKER_FILE\" \"$GHOST_TAB_MARKER_FILE.ask\"; else rm -f \"$GHOST_TAB_MARKER_FILE\" \"$GHOST_TAB_MARKER_FILE.ask\"; fi; fi"}]
+        "hooks": [{"type": "command", "command": "_gt_in=$(cat); if [ -n \"$WISP_DECK_MARKER_FILE\" ]; then if [[ \"$_gt_in\" == *AskUserQuestion* ]]; then touch \"$WISP_DECK_MARKER_FILE\" \"$WISP_DECK_MARKER_FILE.ask\"; else rm -f \"$WISP_DECK_MARKER_FILE\" \"$WISP_DECK_MARKER_FILE.ask\"; fi; fi"}]
       }
     ],
     "UserPromptSubmit": [
       {
-        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then rm -f \"$GHOST_TAB_MARKER_FILE\" \"$GHOST_TAB_MARKER_FILE.ask\"; fi"}]
+        "hooks": [{"type": "command", "command": "if [ -n \"$WISP_DECK_MARKER_FILE\" ]; then rm -f \"$WISP_DECK_MARKER_FILE\" \"$WISP_DECK_MARKER_FILE.ask\"; fi"}]
       }
     ]
   }
@@ -341,26 +341,26 @@ func TestSettingsJson_add_waiting_indicator_hooks_upgrades_catchall_without_matc
   "hooks": {
     "Stop": [
       {
-        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then touch \"$GHOST_TAB_MARKER_FILE\"; fi"}]
+        "hooks": [{"type": "command", "command": "if [ -n \"$WISP_DECK_MARKER_FILE\" ]; then touch \"$WISP_DECK_MARKER_FILE\"; fi"}]
       }
     ],
     "PreToolUse": [
       {
         "matcher": "AskUserQuestion",
-        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then touch \"$GHOST_TAB_MARKER_FILE\"; fi"}]
+        "hooks": [{"type": "command", "command": "if [ -n \"$WISP_DECK_MARKER_FILE\" ]; then touch \"$WISP_DECK_MARKER_FILE\"; fi"}]
       },
       {
-        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then rm -f \"$GHOST_TAB_MARKER_FILE\"; fi"}]
+        "hooks": [{"type": "command", "command": "if [ -n \"$WISP_DECK_MARKER_FILE\" ]; then rm -f \"$WISP_DECK_MARKER_FILE\"; fi"}]
       }
     ],
     "PostToolUse": [
       {
-        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then touch \"${GHOST_TAB_MARKER_FILE}-cooldown\"; fi"}]
+        "hooks": [{"type": "command", "command": "if [ -n \"$WISP_DECK_MARKER_FILE\" ]; then touch \"${WISP_DECK_MARKER_FILE}-cooldown\"; fi"}]
       }
     ],
     "UserPromptSubmit": [
       {
-        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then rm -f \"$GHOST_TAB_MARKER_FILE\"; fi"}]
+        "hooks": [{"type": "command", "command": "if [ -n \"$WISP_DECK_MARKER_FILE\" ]; then rm -f \"$WISP_DECK_MARKER_FILE\"; fi"}]
       }
     ]
   }
@@ -451,7 +451,7 @@ func TestSettingsJson_hook_commands_exit_zero_when_marker_env_var_empty(t *testi
 	for _, groups := range settings.Hooks {
 		for _, group := range groups {
 			for _, h := range group.Hooks {
-				if strings.Contains(h.Command, "GHOST_TAB_MARKER_FILE") {
+				if strings.Contains(h.Command, "WISP_DECK_MARKER_FILE") {
 					commands = append(commands, h.Command)
 				}
 			}
@@ -459,15 +459,15 @@ func TestSettingsJson_hook_commands_exit_zero_when_marker_env_var_empty(t *testi
 	}
 
 	if len(commands) == 0 {
-		t.Fatal("no GHOST_TAB_MARKER_FILE hook commands found in generated settings")
+		t.Fatal("no WISP_DECK_MARKER_FILE hook commands found in generated settings")
 	}
 
-	// Run each command with GHOST_TAB_MARKER_FILE="" — must exit 0
+	// Run each command with WISP_DECK_MARKER_FILE="" — must exit 0
 	for _, cmd := range commands {
-		bashScript := fmt.Sprintf(`GHOST_TAB_MARKER_FILE="" ; %s`, cmd)
+		bashScript := fmt.Sprintf(`WISP_DECK_MARKER_FILE="" ; %s`, cmd)
 		_, exitCode := runBashSnippet(t, bashScript, nil)
 		if exitCode != 0 {
-			t.Errorf("command should exit 0 when GHOST_TAB_MARKER_FILE is empty, got %d for: %s", exitCode, cmd)
+			t.Errorf("command should exit 0 when WISP_DECK_MARKER_FILE is empty, got %d for: %s", exitCode, cmd)
 		}
 	}
 }
@@ -507,7 +507,7 @@ func TestSettingsJson_hook_commands_exit_zero_when_marker_env_var_set(t *testing
 	for _, groups := range settings.Hooks {
 		for _, group := range groups {
 			for _, h := range group.Hooks {
-				if strings.Contains(h.Command, "GHOST_TAB_MARKER_FILE") {
+				if strings.Contains(h.Command, "WISP_DECK_MARKER_FILE") {
 					commands = append(commands, h.Command)
 				}
 			}
@@ -515,7 +515,7 @@ func TestSettingsJson_hook_commands_exit_zero_when_marker_env_var_set(t *testing
 	}
 
 	if len(commands) == 0 {
-		t.Fatal("no GHOST_TAB_MARKER_FILE hook commands found in generated settings")
+		t.Fatal("no WISP_DECK_MARKER_FILE hook commands found in generated settings")
 	}
 
 	markerFile := filepath.Join(tmpDir, "test-marker")
@@ -524,7 +524,7 @@ func TestSettingsJson_hook_commands_exit_zero_when_marker_env_var_set(t *testing
 	for _, cmd := range commands {
 		// Remove marker between each command so each starts fresh
 		os.Remove(markerFile)
-		bashScript := fmt.Sprintf(`export GHOST_TAB_MARKER_FILE=%q ; %s`, markerFile, cmd)
+		bashScript := fmt.Sprintf(`export WISP_DECK_MARKER_FILE=%q ; %s`, markerFile, cmd)
 		_, exitCode := runBashSnippet(t, bashScript, nil)
 		if exitCode != 0 {
 			t.Errorf("command should exit 0 when marker file does not exist, got %d for: %s", exitCode, cmd)
@@ -540,7 +540,7 @@ func TestSettingsJson_hook_commands_exit_zero_when_marker_env_var_set(t *testing
 		if err := os.WriteFile(markerFile, []byte(""), 0644); err != nil {
 			t.Fatalf("failed to re-create marker file: %v", err)
 		}
-		bashScript := fmt.Sprintf(`export GHOST_TAB_MARKER_FILE=%q ; %s`, markerFile, cmd)
+		bashScript := fmt.Sprintf(`export WISP_DECK_MARKER_FILE=%q ; %s`, markerFile, cmd)
 		_, exitCode := runBashSnippet(t, bashScript, nil)
 		if exitCode != 0 {
 			t.Errorf("command should exit 0 when marker file exists, got %d for: %s", exitCode, cmd)
@@ -557,22 +557,22 @@ func TestSettingsJson_remove_waiting_indicator_hooks_removes_old_stop_hooks(t *t
   "hooks": {
     "Stop": [
       {
-        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then touch \"$GHOST_TAB_MARKER_FILE\"; fi"}]
+        "hooks": [{"type": "command", "command": "if [ -n \"$WISP_DECK_MARKER_FILE\" ]; then touch \"$WISP_DECK_MARKER_FILE\"; fi"}]
       }
     ],
     "PreToolUse": [
       {
-        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then rm -f \"$GHOST_TAB_MARKER_FILE\"; fi"}]
+        "hooks": [{"type": "command", "command": "if [ -n \"$WISP_DECK_MARKER_FILE\" ]; then rm -f \"$WISP_DECK_MARKER_FILE\"; fi"}]
       }
     ],
     "PostToolUse": [
       {
-        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then touch \"${GHOST_TAB_MARKER_FILE}-cooldown\"; fi"}]
+        "hooks": [{"type": "command", "command": "if [ -n \"$WISP_DECK_MARKER_FILE\" ]; then touch \"${WISP_DECK_MARKER_FILE}-cooldown\"; fi"}]
       }
     ],
     "UserPromptSubmit": [
       {
-        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then rm -f \"$GHOST_TAB_MARKER_FILE\"; fi"}]
+        "hooks": [{"type": "command", "command": "if [ -n \"$WISP_DECK_MARKER_FILE\" ]; then rm -f \"$WISP_DECK_MARKER_FILE\"; fi"}]
       }
     ]
   }
@@ -590,7 +590,7 @@ func TestSettingsJson_remove_waiting_indicator_hooks_removes_old_stop_hooks(t *t
 	if err != nil {
 		t.Fatalf("failed to read settings.json: %v", err)
 	}
-	assertNotContains(t, string(data), "GHOST_TAB_MARKER_FILE")
+	assertNotContains(t, string(data), "WISP_DECK_MARKER_FILE")
 }
 
 func TestSettingsJson_remove_waiting_indicator_hooks_removes_notification_hooks(t *testing.T) {
@@ -600,17 +600,17 @@ func TestSettingsJson_remove_waiting_indicator_hooks_removes_notification_hooks(
   "hooks": {
     "Notification": [
       {
-        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then touch \"$GHOST_TAB_MARKER_FILE\"; fi"}]
+        "hooks": [{"type": "command", "command": "if [ -n \"$WISP_DECK_MARKER_FILE\" ]; then touch \"$WISP_DECK_MARKER_FILE\"; fi"}]
       }
     ],
     "PreToolUse": [
       {
-        "hooks": [{"type": "command", "command": "_gt_in=$(cat); if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then if [[ \"$_gt_in\" == *AskUserQuestion* ]]; then touch \"$GHOST_TAB_MARKER_FILE\"; else rm -f \"$GHOST_TAB_MARKER_FILE\"; fi; fi"}]
+        "hooks": [{"type": "command", "command": "_gt_in=$(cat); if [ -n \"$WISP_DECK_MARKER_FILE\" ]; then if [[ \"$_gt_in\" == *AskUserQuestion* ]]; then touch \"$WISP_DECK_MARKER_FILE\"; else rm -f \"$WISP_DECK_MARKER_FILE\"; fi; fi"}]
       }
     ],
     "UserPromptSubmit": [
       {
-        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then rm -f \"$GHOST_TAB_MARKER_FILE\"; fi"}]
+        "hooks": [{"type": "command", "command": "if [ -n \"$WISP_DECK_MARKER_FILE\" ]; then rm -f \"$WISP_DECK_MARKER_FILE\"; fi"}]
       }
     ]
   }
@@ -628,7 +628,7 @@ func TestSettingsJson_remove_waiting_indicator_hooks_removes_notification_hooks(
 	if err != nil {
 		t.Fatalf("failed to read settings.json: %v", err)
 	}
-	assertNotContains(t, string(data), "GHOST_TAB_MARKER_FILE")
+	assertNotContains(t, string(data), "WISP_DECK_MARKER_FILE")
 }
 
 func TestSettingsJson_remove_waiting_indicator_hooks_preserves_other_hooks(t *testing.T) {
@@ -640,12 +640,12 @@ func TestSettingsJson_remove_waiting_indicator_hooks_preserves_other_hooks(t *te
         "hooks": [{"type": "command", "command": "afplay /System/Library/Sounds/Bottle.aiff &"}]
       },
       {
-        "hooks": [{"type": "command", "command": "[ -n \"$GHOST_TAB_MARKER_FILE\" ] && touch \"$GHOST_TAB_MARKER_FILE\""}]
+        "hooks": [{"type": "command", "command": "[ -n \"$WISP_DECK_MARKER_FILE\" ] && touch \"$WISP_DECK_MARKER_FILE\""}]
       }
     ],
     "PreToolUse": [
       {
-        "hooks": [{"type": "command", "command": "[ -n \"$GHOST_TAB_MARKER_FILE\" ] && rm -f \"$GHOST_TAB_MARKER_FILE\""}]
+        "hooks": [{"type": "command", "command": "[ -n \"$WISP_DECK_MARKER_FILE\" ] && rm -f \"$WISP_DECK_MARKER_FILE\""}]
       }
     ]
   }
@@ -665,7 +665,7 @@ func TestSettingsJson_remove_waiting_indicator_hooks_preserves_other_hooks(t *te
 	}
 	content := string(data)
 	assertContains(t, content, "afplay")
-	assertNotContains(t, content, "GHOST_TAB_MARKER_FILE")
+	assertNotContains(t, content, "WISP_DECK_MARKER_FILE")
 }
 
 func TestSettingsJson_remove_waiting_indicator_hooks_returns_not_found_when_absent(t *testing.T) {
@@ -715,18 +715,18 @@ func TestSettingsJson_Stop_hook_creates_marker_file(t *testing.T) {
 	var stopCmd string
 	for _, group := range settings.Hooks["Stop"] {
 		for _, h := range group.Hooks {
-			if strings.Contains(h.Command, "GHOST_TAB_MARKER_FILE") {
+			if strings.Contains(h.Command, "WISP_DECK_MARKER_FILE") {
 				stopCmd = h.Command
 			}
 		}
 	}
 	if stopCmd == "" {
-		t.Fatal("no GHOST_TAB_MARKER_FILE Stop hook found")
+		t.Fatal("no WISP_DECK_MARKER_FILE Stop hook found")
 	}
 
 	// The Stop hook should touch (create) the marker file
 	markerFile := filepath.Join(tmpDir, "test-marker")
-	bashScript := fmt.Sprintf(`export GHOST_TAB_MARKER_FILE=%q; %s`, markerFile, stopCmd)
+	bashScript := fmt.Sprintf(`export WISP_DECK_MARKER_FILE=%q; %s`, markerFile, stopCmd)
 	_, exitCode := runBashSnippet(t, bashScript, nil)
 	assertExitCode(t, exitCode, 0)
 
@@ -773,7 +773,7 @@ func TestSettingsJson_PreToolUse_hook_creates_marker_for_AskUserQuestion(t *test
 	for _, group := range settings.Hooks["PreToolUse"] {
 		if group.Matcher == "AskUserQuestion" {
 			for _, h := range group.Hooks {
-				if strings.Contains(h.Command, "GHOST_TAB_MARKER_FILE") {
+				if strings.Contains(h.Command, "WISP_DECK_MARKER_FILE") {
 					askCmd = h.Command
 				}
 			}
@@ -785,7 +785,7 @@ func TestSettingsJson_PreToolUse_hook_creates_marker_for_AskUserQuestion(t *test
 
 	// The AskUserQuestion hook should touch (create) the marker
 	markerFile := filepath.Join(tmpDir, "test-marker")
-	bashScript := fmt.Sprintf(`export GHOST_TAB_MARKER_FILE=%q; %s`, markerFile, askCmd)
+	bashScript := fmt.Sprintf(`export WISP_DECK_MARKER_FILE=%q; %s`, markerFile, askCmd)
 	_, exitCode := runBashSnippet(t, bashScript, nil)
 	assertExitCode(t, exitCode, 0)
 
@@ -830,7 +830,7 @@ func TestSettingsJson_PreToolUse_hook_clears_marker_for_other_tools(t *testing.T
 	for _, group := range settings.Hooks["PreToolUse"] {
 		if group.Matcher != "" && group.Matcher != "AskUserQuestion" {
 			for _, h := range group.Hooks {
-				if strings.Contains(h.Command, "GHOST_TAB_MARKER_FILE") {
+				if strings.Contains(h.Command, "WISP_DECK_MARKER_FILE") {
 					clearCmd = h.Command
 				}
 			}
@@ -845,7 +845,7 @@ func TestSettingsJson_PreToolUse_hook_clears_marker_for_other_tools(t *testing.T
 	if err := os.WriteFile(markerFile, []byte(""), 0644); err != nil {
 		t.Fatalf("failed to create marker: %v", err)
 	}
-	bashScript := fmt.Sprintf(`export GHOST_TAB_MARKER_FILE=%q; %s`, markerFile, clearCmd)
+	bashScript := fmt.Sprintf(`export WISP_DECK_MARKER_FILE=%q; %s`, markerFile, clearCmd)
 	_, exitCode := runBashSnippet(t, bashScript, nil)
 	assertExitCode(t, exitCode, 0)
 
@@ -887,18 +887,18 @@ func TestSettingsJson_PostToolUse_hook_creates_cooldown_file(t *testing.T) {
 	var postToolCmd string
 	for _, group := range settings.Hooks["PostToolUse"] {
 		for _, h := range group.Hooks {
-			if strings.Contains(h.Command, "GHOST_TAB_MARKER_FILE") {
+			if strings.Contains(h.Command, "WISP_DECK_MARKER_FILE") {
 				postToolCmd = h.Command
 			}
 		}
 	}
 	if postToolCmd == "" {
-		t.Fatal("no GHOST_TAB_MARKER_FILE PostToolUse hook found")
+		t.Fatal("no WISP_DECK_MARKER_FILE PostToolUse hook found")
 	}
 
 	// The PostToolUse hook should create a cooldown file (marker-cooldown)
 	markerFile := filepath.Join(tmpDir, "test-marker")
-	bashScript := fmt.Sprintf(`export GHOST_TAB_MARKER_FILE=%q; %s`, markerFile, postToolCmd)
+	bashScript := fmt.Sprintf(`export WISP_DECK_MARKER_FILE=%q; %s`, markerFile, postToolCmd)
 	_, exitCode := runBashSnippet(t, bashScript, nil)
 	assertExitCode(t, exitCode, 0)
 
@@ -941,13 +941,13 @@ func TestSettingsJson_UserPromptSubmit_hook_clears_marker(t *testing.T) {
 	var userPromptCmd string
 	for _, group := range settings.Hooks["UserPromptSubmit"] {
 		for _, h := range group.Hooks {
-			if strings.Contains(h.Command, "GHOST_TAB_MARKER_FILE") {
+			if strings.Contains(h.Command, "WISP_DECK_MARKER_FILE") {
 				userPromptCmd = h.Command
 			}
 		}
 	}
 	if userPromptCmd == "" {
-		t.Fatal("no GHOST_TAB_MARKER_FILE UserPromptSubmit hook found")
+		t.Fatal("no WISP_DECK_MARKER_FILE UserPromptSubmit hook found")
 	}
 
 	markerFile := filepath.Join(tmpDir, "test-marker")
@@ -959,7 +959,7 @@ func TestSettingsJson_UserPromptSubmit_hook_clears_marker(t *testing.T) {
 
 	// Run the UserPromptSubmit command — marker should be REMOVED
 	bashScript := fmt.Sprintf(
-		`export GHOST_TAB_MARKER_FILE=%q; %s`,
+		`export WISP_DECK_MARKER_FILE=%q; %s`,
 		markerFile, userPromptCmd,
 	)
 	_, exitCode := runBashSnippet(t, bashScript, nil)
@@ -1024,7 +1024,7 @@ func cleanupHooksSnippet(t *testing.T, aiTool, settingsFile, markerDir string) s
 	return fmt.Sprintf(`source %q && source %q
 SELECTED_AI_TOOL=%q
 if [ "$SELECTED_AI_TOOL" = "claude" ]; then
-  if ! ls %s/ghost-tab-waiting-* &>/dev/null; then
+  if ! ls %s/wisp-deck-waiting-* &>/dev/null; then
     remove_waiting_indicator_hooks %q
   fi
 fi
@@ -1041,12 +1041,12 @@ func TestCleanupHooksRemoval_removes_hooks_when_claude_and_no_markers(t *testing
   "hooks": {
     "Stop": [
       {
-        "hooks": [{"type": "command", "command": "[ -n \"$GHOST_TAB_MARKER_FILE\" ] && touch \"$GHOST_TAB_MARKER_FILE\""}]
+        "hooks": [{"type": "command", "command": "[ -n \"$WISP_DECK_MARKER_FILE\" ] && touch \"$WISP_DECK_MARKER_FILE\""}]
       }
     ],
     "PreToolUse": [
       {
-        "hooks": [{"type": "command", "command": "[ -n \"$GHOST_TAB_MARKER_FILE\" ] && rm -f \"$GHOST_TAB_MARKER_FILE\""}]
+        "hooks": [{"type": "command", "command": "[ -n \"$WISP_DECK_MARKER_FILE\" ] && rm -f \"$WISP_DECK_MARKER_FILE\""}]
       }
     ]
   }
@@ -1063,7 +1063,7 @@ func TestCleanupHooksRemoval_removes_hooks_when_claude_and_no_markers(t *testing
 	if err != nil {
 		t.Fatalf("failed to read settings.json: %v", err)
 	}
-	assertNotContains(t, string(data), "GHOST_TAB_MARKER_FILE")
+	assertNotContains(t, string(data), "WISP_DECK_MARKER_FILE")
 }
 
 func TestCleanupHooksRemoval_skips_when_other_markers_exist(t *testing.T) {
@@ -1076,12 +1076,12 @@ func TestCleanupHooksRemoval_skips_when_other_markers_exist(t *testing.T) {
   "hooks": {
     "Stop": [
       {
-        "hooks": [{"type": "command", "command": "[ -n \"$GHOST_TAB_MARKER_FILE\" ] && touch \"$GHOST_TAB_MARKER_FILE\""}]
+        "hooks": [{"type": "command", "command": "[ -n \"$WISP_DECK_MARKER_FILE\" ] && touch \"$WISP_DECK_MARKER_FILE\""}]
       }
     ],
     "PreToolUse": [
       {
-        "hooks": [{"type": "command", "command": "[ -n \"$GHOST_TAB_MARKER_FILE\" ] && rm -f \"$GHOST_TAB_MARKER_FILE\""}]
+        "hooks": [{"type": "command", "command": "[ -n \"$WISP_DECK_MARKER_FILE\" ] && rm -f \"$WISP_DECK_MARKER_FILE\""}]
       }
     ]
   }
@@ -1089,7 +1089,7 @@ func TestCleanupHooksRemoval_skips_when_other_markers_exist(t *testing.T) {
 `)
 
 	// Create a marker file in the isolated marker dir to simulate another session
-	markerFile := filepath.Join(markerDir, "ghost-tab-waiting-99999")
+	markerFile := filepath.Join(markerDir, "wisp-deck-waiting-99999")
 	if err := os.WriteFile(markerFile, []byte(""), 0644); err != nil {
 		t.Fatalf("failed to create marker file: %v", err)
 	}
@@ -1103,7 +1103,7 @@ func TestCleanupHooksRemoval_skips_when_other_markers_exist(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to read settings.json: %v", err)
 	}
-	assertContains(t, string(data), "GHOST_TAB_MARKER_FILE")
+	assertContains(t, string(data), "WISP_DECK_MARKER_FILE")
 }
 
 func TestCleanupHooksRemoval_skips_when_not_claude(t *testing.T) {
@@ -1116,12 +1116,12 @@ func TestCleanupHooksRemoval_skips_when_not_claude(t *testing.T) {
   "hooks": {
     "Stop": [
       {
-        "hooks": [{"type": "command", "command": "[ -n \"$GHOST_TAB_MARKER_FILE\" ] && touch \"$GHOST_TAB_MARKER_FILE\""}]
+        "hooks": [{"type": "command", "command": "[ -n \"$WISP_DECK_MARKER_FILE\" ] && touch \"$WISP_DECK_MARKER_FILE\""}]
       }
     ],
     "PreToolUse": [
       {
-        "hooks": [{"type": "command", "command": "[ -n \"$GHOST_TAB_MARKER_FILE\" ] && rm -f \"$GHOST_TAB_MARKER_FILE\""}]
+        "hooks": [{"type": "command", "command": "[ -n \"$WISP_DECK_MARKER_FILE\" ] && rm -f \"$WISP_DECK_MARKER_FILE\""}]
       }
     ]
   }
@@ -1137,7 +1137,7 @@ func TestCleanupHooksRemoval_skips_when_not_claude(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to read settings.json: %v", err)
 	}
-	assertContains(t, string(data), "GHOST_TAB_MARKER_FILE")
+	assertContains(t, string(data), "WISP_DECK_MARKER_FILE")
 }
 
 func TestCleanupHooksRemoval_cleans_orphaned_markers_from_dead_pids(t *testing.T) {
@@ -1150,12 +1150,12 @@ func TestCleanupHooksRemoval_cleans_orphaned_markers_from_dead_pids(t *testing.T
   "hooks": {
     "Stop": [
       {
-        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then touch \"$GHOST_TAB_MARKER_FILE\"; fi"}]
+        "hooks": [{"type": "command", "command": "if [ -n \"$WISP_DECK_MARKER_FILE\" ]; then touch \"$WISP_DECK_MARKER_FILE\"; fi"}]
       }
     ],
     "PreToolUse": [
       {
-        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then rm -f \"$GHOST_TAB_MARKER_FILE\"; fi"}]
+        "hooks": [{"type": "command", "command": "if [ -n \"$WISP_DECK_MARKER_FILE\" ]; then rm -f \"$WISP_DECK_MARKER_FILE\"; fi"}]
       }
     ]
   }
@@ -1163,7 +1163,7 @@ func TestCleanupHooksRemoval_cleans_orphaned_markers_from_dead_pids(t *testing.T
 `)
 
 	// Create a marker with a PID that definitely doesn't exist
-	orphanedMarker := filepath.Join(markerDir, "ghost-tab-waiting-99999999")
+	orphanedMarker := filepath.Join(markerDir, "wisp-deck-waiting-99999999")
 	if err := os.WriteFile(orphanedMarker, []byte(""), 0644); err != nil {
 		t.Fatalf("failed to create orphaned marker: %v", err)
 	}
@@ -1174,14 +1174,14 @@ func TestCleanupHooksRemoval_cleans_orphaned_markers_from_dead_pids(t *testing.T
 	snippet := fmt.Sprintf(`source %q && source %q
 SELECTED_AI_TOOL="claude"
 # Clean up orphaned markers from dead sessions
-for marker in %s/ghost-tab-waiting-*; do
+for marker in %s/wisp-deck-waiting-*; do
   [ -f "$marker" ] || continue
   pid="${marker##*-}"
   if ! kill -0 "$pid" 2>/dev/null; then
     rm -f "$marker"
   fi
 done
-if ! ls %s/ghost-tab-waiting-* &>/dev/null; then
+if ! ls %s/wisp-deck-waiting-* &>/dev/null; then
   remove_waiting_indicator_hooks %q
 fi
 `, tuiPath, settingsJsonPath, markerDir, markerDir, settingsFile)
@@ -1199,7 +1199,7 @@ fi
 	if err != nil {
 		t.Fatalf("failed to read settings.json: %v", err)
 	}
-	assertNotContains(t, string(data), "GHOST_TAB_MARKER_FILE")
+	assertNotContains(t, string(data), "WISP_DECK_MARKER_FILE")
 }
 
 // --- ask sidecar file tests ---
@@ -1238,7 +1238,7 @@ func TestSettingsJson_AskUserQuestion_hook_creates_ask_sidecar_file(t *testing.T
 	for _, group := range settings.Hooks["PreToolUse"] {
 		if group.Matcher == "AskUserQuestion" {
 			for _, h := range group.Hooks {
-				if strings.Contains(h.Command, "GHOST_TAB_MARKER_FILE") {
+				if strings.Contains(h.Command, "WISP_DECK_MARKER_FILE") {
 					askCmd = h.Command
 				}
 			}
@@ -1250,7 +1250,7 @@ func TestSettingsJson_AskUserQuestion_hook_creates_ask_sidecar_file(t *testing.T
 
 	// The AskUserQuestion hook should create both the marker AND the -ask sidecar
 	markerFile := filepath.Join(tmpDir, "test-marker")
-	bashScript := fmt.Sprintf(`export GHOST_TAB_MARKER_FILE=%q; %s`, markerFile, askCmd)
+	bashScript := fmt.Sprintf(`export WISP_DECK_MARKER_FILE=%q; %s`, markerFile, askCmd)
 	_, exitCode := runBashSnippet(t, bashScript, nil)
 	assertExitCode(t, exitCode, 0)
 
@@ -1297,7 +1297,7 @@ func TestSettingsJson_catchall_PreToolUse_clears_ask_sidecar(t *testing.T) {
 	for _, group := range settings.Hooks["PreToolUse"] {
 		if group.Matcher != "" && group.Matcher != "AskUserQuestion" {
 			for _, h := range group.Hooks {
-				if strings.Contains(h.Command, "GHOST_TAB_MARKER_FILE") {
+				if strings.Contains(h.Command, "WISP_DECK_MARKER_FILE") {
 					clearCmd = h.Command
 				}
 			}
@@ -1313,7 +1313,7 @@ func TestSettingsJson_catchall_PreToolUse_clears_ask_sidecar(t *testing.T) {
 	os.WriteFile(markerFile, []byte(""), 0644)
 	os.WriteFile(askFile, []byte(""), 0644)
 
-	bashScript := fmt.Sprintf(`export GHOST_TAB_MARKER_FILE=%q; %s`, markerFile, clearCmd)
+	bashScript := fmt.Sprintf(`export WISP_DECK_MARKER_FILE=%q; %s`, markerFile, clearCmd)
 	_, exitCode := runBashSnippet(t, bashScript, nil)
 	assertExitCode(t, exitCode, 0)
 
@@ -1356,7 +1356,7 @@ func TestSettingsJson_UserPromptSubmit_clears_ask_sidecar(t *testing.T) {
 	var submitCmd string
 	for _, group := range settings.Hooks["UserPromptSubmit"] {
 		for _, h := range group.Hooks {
-			if strings.Contains(h.Command, "GHOST_TAB_MARKER_FILE") {
+			if strings.Contains(h.Command, "WISP_DECK_MARKER_FILE") {
 				submitCmd = h.Command
 			}
 		}
@@ -1371,7 +1371,7 @@ func TestSettingsJson_UserPromptSubmit_clears_ask_sidecar(t *testing.T) {
 	os.WriteFile(markerFile, []byte(""), 0644)
 	os.WriteFile(askFile, []byte(""), 0644)
 
-	bashScript := fmt.Sprintf(`export GHOST_TAB_MARKER_FILE=%q; %s`, markerFile, submitCmd)
+	bashScript := fmt.Sprintf(`export WISP_DECK_MARKER_FILE=%q; %s`, markerFile, submitCmd)
 	_, exitCode := runBashSnippet(t, bashScript, nil)
 	assertExitCode(t, exitCode, 0)
 
@@ -1390,27 +1390,27 @@ func TestSettingsJson_upgrades_AskUserQuestion_hook_without_ask_sidecar(t *testi
   "hooks": {
     "Stop": [
       {
-        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then touch \"$GHOST_TAB_MARKER_FILE\"; fi"}]
+        "hooks": [{"type": "command", "command": "if [ -n \"$WISP_DECK_MARKER_FILE\" ]; then touch \"$WISP_DECK_MARKER_FILE\"; fi"}]
       }
     ],
     "PreToolUse": [
       {
         "matcher": "AskUserQuestion",
-        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then touch \"$GHOST_TAB_MARKER_FILE\"; fi"}]
+        "hooks": [{"type": "command", "command": "if [ -n \"$WISP_DECK_MARKER_FILE\" ]; then touch \"$WISP_DECK_MARKER_FILE\"; fi"}]
       },
       {
         "matcher": "^(?!AskUserQuestion$)",
-        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then rm -f \"$GHOST_TAB_MARKER_FILE\"; fi"}]
+        "hooks": [{"type": "command", "command": "if [ -n \"$WISP_DECK_MARKER_FILE\" ]; then rm -f \"$WISP_DECK_MARKER_FILE\"; fi"}]
       }
     ],
     "PostToolUse": [
       {
-        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then touch \"${GHOST_TAB_MARKER_FILE}-cooldown\"; fi"}]
+        "hooks": [{"type": "command", "command": "if [ -n \"$WISP_DECK_MARKER_FILE\" ]; then touch \"${WISP_DECK_MARKER_FILE}-cooldown\"; fi"}]
       }
     ],
     "UserPromptSubmit": [
       {
-        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then rm -f \"$GHOST_TAB_MARKER_FILE\"; fi"}]
+        "hooks": [{"type": "command", "command": "if [ -n \"$WISP_DECK_MARKER_FILE\" ]; then rm -f \"$WISP_DECK_MARKER_FILE\"; fi"}]
       }
     ]
   }

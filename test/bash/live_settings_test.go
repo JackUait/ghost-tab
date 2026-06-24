@@ -113,11 +113,11 @@ func TestLiveSettings_apply_session_theme_repaints_spare_chip(t *testing.T) {
 
 // --- apply_theme_to_all_sessions: repaint EVERY active session ---
 
-// A theme change must reach every running ghost-tab session, not only those
+// A theme change must reach every running wisp-deck session, not only those
 // whose watcher loop was started with the live-theme code. apply_theme_to_all_sessions
 // addresses each session externally: it enumerates tmux sessions, skips non
-// ghost-tab ones, and resolves each session's accent from its own AI tool (the
-// GHOST_TAB_TOOL env captured at launch) so an "auto"/unset theme still picks the
+// wisp-deck ones, and resolves each session's accent from its own AI tool (the
+// WISP_DECK_TOOL env captured at launch) so an "auto"/unset theme still picks the
 // right hue per session.
 const allSessionsTmux = `#!/bin/bash
 printf '%s\n' "$*" >> "$GT_REC"
@@ -125,13 +125,13 @@ case "$1" in
   list-sessions) printf '%s\n' "dev-alpha-1" "dev-beta-2" "plain-3" ;;
   show-environment)
     sess="$3"; var="$4"
-    [ "$sess" = "plain-3" ] && exit 1   # not a ghost-tab session
+    [ "$sess" = "plain-3" ] && exit 1   # not a wisp-deck session
     case "$var" in
-      GHOST_TAB) exit 0 ;;
-      GHOST_TAB_TOOL)
+      WISP_DECK) exit 0 ;;
+      WISP_DECK_TOOL)
         case "$sess" in
-          dev-alpha-1) echo "GHOST_TAB_TOOL=claude" ;;
-          dev-beta-2)  echo "GHOST_TAB_TOOL=opencode" ;;
+          dev-alpha-1) echo "WISP_DECK_TOOL=claude" ;;
+          dev-beta-2)  echo "WISP_DECK_TOOL=opencode" ;;
         esac ;;
     esac ;;
 esac
@@ -162,7 +162,7 @@ func TestLiveSettings_apply_theme_to_all_sessions_per_tool(t *testing.T) {
 	got := string(data)
 	assertContains(t, got, "set-option -t dev-alpha-1 pane-active-border-style fg=colour209")
 	assertContains(t, got, "set-option -t dev-beta-2 pane-active-border-style fg=colour141")
-	// The non-ghost-tab session must never be touched.
+	// The non-wisp-deck session must never be touched.
 	assertNotContains(t, got, "set-option -t plain-3")
 }
 
@@ -301,9 +301,9 @@ case "$1" in
     sess="$3"; var="$4"
     [ "$sess" = "plain-2" ] && exit 1
     case "$var" in
-      GHOST_TAB)      exit 0 ;;
-      GHOST_TAB_TOOL) echo "GHOST_TAB_TOOL=claude" ;;
-      GHOST_TAB_PATH) echo "GHOST_TAB_PATH=/proj/alpha" ;;
+      WISP_DECK)      exit 0 ;;
+      WISP_DECK_TOOL) echo "WISP_DECK_TOOL=claude" ;;
+      WISP_DECK_PATH) echo "WISP_DECK_PATH=/proj/alpha" ;;
     esac ;;
   show-options)    echo "compact" ;;
   list-panes)      printf '%s\n' "0 0 0" "1 0 20" "2 47 0" ;;
@@ -333,12 +333,12 @@ func TestLiveSettings_apply_settings_to_all_sessions_theme_and_panel(t *testing.
 
 	data, _ := os.ReadFile(rec)
 	got := string(data)
-	// Theme accent applied to the ghost-tab session.
+	// Theme accent applied to the wisp-deck session.
 	assertContains(t, got, "set-option -t dev-alpha-1 pane-active-border-style fg=colour141")
 	// panel_mode=full respawned its ledger pane to lazygit.
 	assertContains(t, got, "respawn-pane")
 	assertContains(t, got, "lazygit")
-	// The non-ghost-tab session is probed but never acted on.
+	// The non-wisp-deck session is probed but never acted on.
 	assertNotContains(t, got, "set-option -t plain-2")
 	assertNotContains(t, got, "respawn-pane -k -t plain-2")
 }

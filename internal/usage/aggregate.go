@@ -186,5 +186,5 @@ func DefaultPaths(home string) (claudeDir, opencodeDir, cachePath string) {
 	}
 	return filepath.Join(home, ".claude", "projects"),
 		filepath.Join(dataDir, "storage", "message"),
-		filepath.Join(home, ".config", "ghost-tab", "usage-cache.json")
+		filepath.Join(home, ".config", "wisp-deck", "usage-cache.json")
 }

@@ -485,13 +485,13 @@ Expected: every package `ok` (notably `internal/usage`, `internal/tui`, `test/ba
 
 - [ ] **Step 2: Lint shell scripts (unchanged, but checklist-mandated)**
 
-Run: `shellcheck lib/*.sh lib/terminals/*.sh bin/ghost-tab wrapper.sh`
+Run: `shellcheck lib/*.sh lib/terminals/*.sh bin/wisp-deck wrapper.sh`
 Expected: no output (no scripts changed; confirms nothing regressed).
 
 - [ ] **Step 3: Rebuild and install the local binary**
 
 Run: `make install`
-Expected: `✓ Installed ghost-tab-tui`. The change is parsing/aggregation only; the stats screen will now accumulate history going forward as transcripts get pruned.
+Expected: `✓ Installed wisp-deck-tui`. The change is parsing/aggregation only; the stats screen will now accumulate history going forward as transcripts get pruned.
 
 - [ ] **Step 4: Push the branch**
 

@@ -288,7 +288,7 @@ func StableDir() string {
 	if base == "" {
 		base = filepath.Join(os.Getenv("HOME"), ".local", "share")
 	}
-	return filepath.Join(base, "ghost-tab", "screenshots")
+	return filepath.Join(base, "wisp-deck", "screenshots")
 }
 
 func copyToStable(src string) (string, error) {

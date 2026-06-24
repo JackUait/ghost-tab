@@ -268,7 +268,7 @@ func (m ConfigMenuModel) View() string {
 	box := borderStyle.Render(content.String())
 
 	// Overlay title on the top border
-	title := " Ghost Tab Configuration "
+	title := " Wisp Deck Configuration "
 	titleRendered := lipgloss.NewStyle().
 		Foreground(borderColor).
 		Bold(true).

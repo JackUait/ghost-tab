@@ -9,7 +9,7 @@ import (
 func TestSyncOpenCode_writes_config_from_model_paths(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", "")
-	cfgRoot := filepath.Join(home, ".config", "ghost-tab")
+	cfgRoot := filepath.Join(home, ".config", "wisp-deck")
 	configsDir := filepath.Join(cfgRoot, "claude-configs")
 	os.MkdirAll(configsDir, 0755)
 	os.WriteFile(filepath.Join(cfgRoot, "claude-configs.list"),

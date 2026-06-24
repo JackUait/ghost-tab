@@ -112,13 +112,13 @@ func TestMaybeRestore_skips_current_boot_lines(t *testing.T) {
 
 func TestWriteSessionSnapshot_writes_ghost_sessions_only(t *testing.T) {
 	dir := t.TempDir()
-	// Mock tmux: list two sessions; only dev-app-1 carries GHOST_TAB=1.
+	// Mock tmux: list two sessions; only dev-app-1 carries WISP_DECK=1.
 	tmuxBody := `
 case "$1" in
   list-sessions) echo "dev-app-1"; echo "other-sess" ;;
   show-environment)
     if [ "$3" = "dev-app-1" ]; then
-      printf 'GHOST_TAB=1\nGHOST_TAB_BOOT=111\nGHOST_TAB_PROJECT=app\nGHOST_TAB_PATH=/p/app\nGHOST_TAB_TOOL=claude\nGHOST_TAB_TERMINAL=ghostty\n'
+      printf 'WISP_DECK=1\nWISP_DECK_BOOT=111\nWISP_DECK_PROJECT=app\nWISP_DECK_PATH=/p/app\nWISP_DECK_TOOL=claude\nWISP_DECK_TERMINAL=ghostty\n'
     else
       printf 'SOMEVAR=1\n'
     fi ;;
@@ -227,7 +227,7 @@ case "$1" in
   list-sessions) echo "dev-My Project-1" ;;
   show-environment)
     if [ "$3" = "dev-My Project-1" ]; then
-      printf 'GHOST_TAB=1\nGHOST_TAB_BOOT=111\nGHOST_TAB_PROJECT=My Project\nGHOST_TAB_PATH=/p/app\nGHOST_TAB_TOOL=claude\nGHOST_TAB_TERMINAL=ghostty\n'
+      printf 'WISP_DECK=1\nWISP_DECK_BOOT=111\nWISP_DECK_PROJECT=My Project\nWISP_DECK_PATH=/p/app\nWISP_DECK_TOOL=claude\nWISP_DECK_TERMINAL=ghostty\n'
     else
       printf 'SOMEVAR=1\n'
     fi ;;

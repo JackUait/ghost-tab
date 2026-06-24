@@ -119,11 +119,11 @@ func TestOpencodePlugin_reads_features_from_config(t *testing.T) {
 
 // --- Plugin exports correct structure ---
 
-func TestOpencodePlugin_exports_GhostTab(t *testing.T) {
+func TestOpencodePlugin_exports_WispDeck(t *testing.T) {
 	content := readPluginTemplate(t)
 
-	if !strings.Contains(content, "export") && !strings.Contains(content, "GhostTab") {
-		t.Error("plugin should export GhostTab")
+	if !strings.Contains(content, "export") && !strings.Contains(content, "WispDeck") {
+		t.Error("plugin should export WispDeck")
 	}
 }
 

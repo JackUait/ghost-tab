@@ -47,7 +47,7 @@ func TestSpareTabs_socket_sanitizes(t *testing.T) {
 // the project label, and expose the three clickable user-ranges.
 func TestSpareTabs_config_core(t *testing.T) {
 	out, code := runBashFunc(t, "lib/spare-tabs.sh", "spare_tabs_config",
-		[]string{"ghost-tab", "/proj/dir", "/abs/lib/spare-tabs.sh", "gtspare_x"}, nil)
+		[]string{"wisp-deck", "/proj/dir", "/abs/lib/spare-tabs.sh", "gtspare_x"}, nil)
 	assertExitCode(t, code, 0)
 
 	for _, want := range []string{
@@ -66,7 +66,7 @@ func TestSpareTabs_config_core(t *testing.T) {
 		assertContains(t, out, want)
 	}
 	// The first tab shows its number, not the project name.
-	assertNotContains(t, out, "ghost-tab")
+	assertNotContains(t, out, "wisp-deck")
 }
 
 // The active-tab chip and the + button take their accent from the 5th arg so the
@@ -74,7 +74,7 @@ func TestSpareTabs_config_core(t *testing.T) {
 // OpenCode). A purple accent must replace every orange colour209 in the bar.
 func TestSpareTabs_config_uses_accent_colour(t *testing.T) {
 	out, code := runBashFunc(t, "lib/spare-tabs.sh", "spare_tabs_config",
-		[]string{"ghost-tab", "/proj/dir", "/abs/lib/spare-tabs.sh", "gtspare_x", "141"}, nil)
+		[]string{"wisp-deck", "/proj/dir", "/abs/lib/spare-tabs.sh", "gtspare_x", "141"}, nil)
 	assertExitCode(t, code, 0)
 	sl := lineWithPrefix(out, "set -g status-left ", "")
 	if sl == "" {
@@ -88,7 +88,7 @@ func TestSpareTabs_config_uses_accent_colour(t *testing.T) {
 // existing callers are unaffected.
 func TestSpareTabs_config_accent_defaults_to_orange(t *testing.T) {
 	out, code := runBashFunc(t, "lib/spare-tabs.sh", "spare_tabs_config",
-		[]string{"ghost-tab", "/proj/dir", "/abs/lib/spare-tabs.sh", "gtspare_x"}, nil)
+		[]string{"wisp-deck", "/proj/dir", "/abs/lib/spare-tabs.sh", "gtspare_x"}, nil)
 	assertExitCode(t, code, 0)
 	assertContains(t, out, "colour209")
 }
@@ -98,7 +98,7 @@ func TestSpareTabs_config_accent_defaults_to_orange(t *testing.T) {
 // no leading padding.
 func TestSpareTabs_config_flush_left(t *testing.T) {
 	out, code := runBashFunc(t, "lib/spare-tabs.sh", "spare_tabs_config",
-		[]string{"ghost-tab", "/proj/dir", "/abs/lib/spare-tabs.sh", "gtspare_x"}, nil)
+		[]string{"wisp-deck", "/proj/dir", "/abs/lib/spare-tabs.sh", "gtspare_x"}, nil)
 	assertExitCode(t, code, 0)
 	assertContains(t, out, `set -g status-left "#{W:`)
 }
@@ -108,7 +108,7 @@ func TestSpareTabs_config_flush_left(t *testing.T) {
 // list inside status-left.
 func TestSpareTabs_config_plus_follows_tabs(t *testing.T) {
 	out, code := runBashFunc(t, "lib/spare-tabs.sh", "spare_tabs_config",
-		[]string{"ghost-tab", "/proj/dir", "/abs/lib/spare-tabs.sh", "gtspare_x"}, nil)
+		[]string{"wisp-deck", "/proj/dir", "/abs/lib/spare-tabs.sh", "gtspare_x"}, nil)
 	assertExitCode(t, code, 0)
 	assertContains(t, out, `set -g status-right ""`)
 	sl := lineWithPrefix(out, "set -g status-left ", "")
@@ -122,7 +122,7 @@ func TestSpareTabs_config_plus_follows_tabs(t *testing.T) {
 // button float on the terminal background instead of a grey colour235 strip.
 func TestSpareTabs_config_transparent_bar(t *testing.T) {
 	out, code := runBashFunc(t, "lib/spare-tabs.sh", "spare_tabs_config",
-		[]string{"ghost-tab", "/proj/dir", "/abs/lib/spare-tabs.sh", "gtspare_x"}, nil)
+		[]string{"wisp-deck", "/proj/dir", "/abs/lib/spare-tabs.sh", "gtspare_x"}, nil)
 	assertExitCode(t, code, 0)
 	assertContains(t, out, `set -g status-style "fg=colour250,bg=default"`)
 	assertContains(t, out, `set -g window-status-style "bg=default"`)
@@ -151,7 +151,7 @@ func lineWithPrefix(out, prefix, forbidden string) string {
 // via prefix+w). Click-to-select (the sel range) is on every tab.
 func TestSpareTabs_config_inactive_tabs_are_plain(t *testing.T) {
 	out, code := runBashFunc(t, "lib/spare-tabs.sh", "spare_tabs_config",
-		[]string{"ghost-tab", "/proj/dir", "/abs/lib/spare-tabs.sh", "gtspare_x"}, nil)
+		[]string{"wisp-deck", "/proj/dir", "/abs/lib/spare-tabs.sh", "gtspare_x"}, nil)
 	assertExitCode(t, code, 0)
 
 	sl := lineWithPrefix(out, "set -g status-left ", "")
@@ -176,7 +176,7 @@ func TestSpareTabs_config_inactive_tabs_are_plain(t *testing.T) {
 // the + button is padded to match.
 func TestSpareTabs_config_tabs_are_padded(t *testing.T) {
 	out, code := runBashFunc(t, "lib/spare-tabs.sh", "spare_tabs_config",
-		[]string{"ghost-tab", "/proj/dir", "/abs/lib/spare-tabs.sh", "gtspare_x"}, nil)
+		[]string{"wisp-deck", "/proj/dir", "/abs/lib/spare-tabs.sh", "gtspare_x"}, nil)
 	assertExitCode(t, code, 0)
 
 	sl := lineWithPrefix(out, "set -g status-left ", "")
@@ -195,7 +195,7 @@ func TestSpareTabs_config_tabs_are_padded(t *testing.T) {
 // which pane has focus.
 func TestSpareTabs_config_keyboard_new_tab(t *testing.T) {
 	out, code := runBashFunc(t, "lib/spare-tabs.sh", "spare_tabs_config",
-		[]string{"ghost-tab", "/proj/dir", "/abs/lib/spare-tabs.sh", "gtspare_x"}, nil)
+		[]string{"wisp-deck", "/proj/dir", "/abs/lib/spare-tabs.sh", "gtspare_x"}, nil)
 	assertExitCode(t, code, 0)
 	assertContains(t, out, `bind t new-window -c "/proj/dir"`)
 }
@@ -244,7 +244,7 @@ func TestSpareTabs_prompt_zdotdir_zsh(t *testing.T) {
 	share := filepath.Join(dir, "share")
 	real := filepath.Join(dir, "home")
 	out, code := runBashFunc(t, "lib/spare-tabs.sh", "spare_prompt_zdotdir",
-		[]string{share, "dev-ghost-tab", "/bin/zsh", real}, nil)
+		[]string{share, "dev-wisp-deck", "/bin/zsh", real}, nil)
 	assertExitCode(t, code, 0)
 	target := strings.TrimSpace(out)
 	if target == "" {
@@ -272,12 +272,12 @@ func TestSpareTabs_prompt_zdotdir_nonzsh(t *testing.T) {
 	dir := t.TempDir()
 	share := filepath.Join(dir, "share")
 	out, code := runBashFunc(t, "lib/spare-tabs.sh", "spare_prompt_zdotdir",
-		[]string{share, "dev-ghost-tab", "/bin/bash", filepath.Join(dir, "home")}, nil)
+		[]string{share, "dev-wisp-deck", "/bin/bash", filepath.Join(dir, "home")}, nil)
 	assertExitCode(t, code, 0)
 	if strings.TrimSpace(out) != "" {
 		t.Errorf("non-zsh shell should yield no ZDOTDIR, got %q", out)
 	}
-	if _, err := os.Stat(filepath.Join(share, "spare-zdotdir-dev-ghost-tab")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(share, "spare-zdotdir-dev-wisp-deck")); !os.IsNotExist(err) {
 		t.Errorf("non-zsh shell should not create a zdotdir, but it exists")
 	}
 }
@@ -374,7 +374,7 @@ func TestCleanupTmuxSession_reaps_spare_server(t *testing.T) {
 	script := "source " + filepath.Join(root, "lib/process.sh") +
 		" && source " + filepath.Join(root, "lib/spare-tabs.sh") +
 		" && source " + filepath.Join(root, "lib/tmux-session.sh") +
-		" && cleanup_tmux_session dev-ghost-tab 99999 tmux"
+		" && cleanup_tmux_session dev-wisp-deck 99999 tmux"
 	out, code := runBashSnippet(t, script, env)
 	assertExitCode(t, code, 0)
 	_ = out
@@ -382,5 +382,5 @@ func TestCleanupTmuxSession_reaps_spare_server(t *testing.T) {
 	data, _ := os.ReadFile(rec)
 	got := string(data)
 	assertContains(t, got, "kill-server")
-	assertContains(t, got, "gtspare_dev-ghost-tab")
+	assertContains(t, got, "gtspare_dev-wisp-deck")
 }

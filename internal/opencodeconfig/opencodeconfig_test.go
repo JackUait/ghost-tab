@@ -36,10 +36,10 @@ func TestMerge_creates_provider_from_empty(t *testing.T) {
 	if m["$schema"] != "https://opencode.ai/config.json" {
 		t.Errorf("missing/wrong $schema: %v", m["$schema"])
 	}
-	if m["model"] != "ghost-tab-work-glm/glm-4.6" {
-		t.Errorf("model = %v, want ghost-tab-work-glm/glm-4.6", m["model"])
+	if m["model"] != "wisp-deck-work-glm/glm-4.6" {
+		t.Errorf("model = %v, want wisp-deck-work-glm/glm-4.6", m["model"])
 	}
-	prov := m["provider"].(map[string]any)["ghost-tab-work-glm"].(map[string]any)
+	prov := m["provider"].(map[string]any)["wisp-deck-work-glm"].(map[string]any)
 	if prov["npm"] != "@ai-sdk/anthropic" {
 		t.Errorf("npm = %v", prov["npm"])
 	}
@@ -81,31 +81,31 @@ func TestMerge_preserves_user_keys_and_providers(t *testing.T) {
 	if _, ok := prov["myown"]; !ok {
 		t.Errorf("user provider 'myown' was dropped: %v", prov)
 	}
-	if _, ok := prov["ghost-tab-work-glm"]; !ok {
-		t.Errorf("ghost-tab provider not added: %v", prov)
+	if _, ok := prov["wisp-deck-work-glm"]; !ok {
+		t.Errorf("wisp-deck provider not added: %v", prov)
 	}
 }
 
-func TestMerge_rebuild_removes_stale_ghost_tab_providers(t *testing.T) {
-	existing := []byte(`{"provider":{"ghost-tab-old":{"name":"Old"},"keep":{"name":"Keep"}}}`)
+func TestMerge_rebuild_removes_stale_wisp_deck_providers(t *testing.T) {
+	existing := []byte(`{"provider":{"wisp-deck-old":{"name":"Old"},"keep":{"name":"Keep"}}}`)
 	out, ok := MergeSubscriptions(existing, []Subscription{glmSub(true)})
 	if !ok {
 		t.Fatal("expected ok=true")
 	}
 	prov := parse(t, out)["provider"].(map[string]any)
-	if _, ok := prov["ghost-tab-old"]; ok {
-		t.Errorf("stale ghost-tab-old not removed: %v", prov)
+	if _, ok := prov["wisp-deck-old"]; ok {
+		t.Errorf("stale wisp-deck-old not removed: %v", prov)
 	}
 	if _, ok := prov["keep"]; !ok {
 		t.Errorf("user provider 'keep' was dropped: %v", prov)
 	}
-	if _, ok := prov["ghost-tab-work-glm"]; !ok {
-		t.Errorf("current ghost-tab provider missing: %v", prov)
+	if _, ok := prov["wisp-deck-work-glm"]; !ok {
+		t.Errorf("current wisp-deck provider missing: %v", prov)
 	}
 }
 
 func TestMerge_delete_removes_provider(t *testing.T) {
-	existing := []byte(`{"provider":{"ghost-tab-work-glm":{"name":"Work GLM"}}}`)
+	existing := []byte(`{"provider":{"wisp-deck-work-glm":{"name":"Work GLM"}}}`)
 	out, ok := MergeSubscriptions(existing, nil)
 	if !ok {
 		t.Fatal("expected ok=true")
@@ -152,22 +152,22 @@ func TestMerge_default_model_falls_back_to_first_model(t *testing.T) {
 	s := glmSub(true)
 	s.OpusModel = "" // no opus slot mapped
 	out, _ := MergeSubscriptions(nil, []Subscription{s})
-	if got := parse(t, out)["model"]; got != "ghost-tab-work-glm/glm-4.6" {
-		t.Errorf("fallback model = %v, want ghost-tab-work-glm/glm-4.6", got)
+	if got := parse(t, out)["model"]; got != "wisp-deck-work-glm/glm-4.6" {
+		t.Errorf("fallback model = %v, want wisp-deck-work-glm/glm-4.6", got)
 	}
 }
 
 func TestProviderPrefixConst(t *testing.T) {
-	if !strings.HasPrefix("ghost-tab-work-glm", ProviderPrefix) {
+	if !strings.HasPrefix("wisp-deck-work-glm", ProviderPrefix) {
 		t.Errorf("ProviderPrefix = %q", ProviderPrefix)
 	}
 }
 
-// modelsOf returns the models map of the single ghost-tab provider in out.
+// modelsOf returns the models map of the single wisp-deck provider in out.
 func modelsOf(t *testing.T, out []byte) map[string]any {
 	t.Helper()
 	m := parse(t, out)
-	prov := m["provider"].(map[string]any)["ghost-tab-work-glm"].(map[string]any)
+	prov := m["provider"].(map[string]any)["wisp-deck-work-glm"].(map[string]any)
 	return prov["models"].(map[string]any)
 }
 

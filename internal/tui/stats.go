@@ -9,7 +9,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/jackuait/ghost-tab/internal/usage"
+	"github.com/jackuait/wisp-deck/internal/usage"
 )
 
 const (
@@ -162,7 +162,7 @@ func statsSep(border lipgloss.Style) string {
 }
 
 // statsFrame wraps already-box-wrapped body lines with a titled rounded top
-// border and a bottom border, matching the ghost-tab look.
+// border and a bottom border, matching the wisp-deck look.
 func statsFrame(body []string) string {
 	border := lipgloss.NewStyle().Foreground(currentTheme.Dim)
 	title := lipgloss.NewStyle().Foreground(currentTheme.Primary).Bold(true).Render("⬡ Token Usage by Month")

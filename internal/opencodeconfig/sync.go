@@ -5,10 +5,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/jackuait/ghost-tab/internal/claudeconfig"
+	"github.com/jackuait/wisp-deck/internal/claudeconfig"
 )
 
-// Inputs are the ghost-tab config paths plus the home dir used to locate the
+// Inputs are the wisp-deck config paths plus the home dir used to locate the
 // OpenCode global config.
 type Inputs struct {
 	ListFile    string
@@ -38,7 +38,7 @@ func ConfigPath(home string) string {
 	return filepath.Join(dir, "opencode.json")
 }
 
-// BuildSubscriptions reads the ghost-tab config files and resolves each config
+// BuildSubscriptions reads the wisp-deck config files and resolves each config
 // into a Subscription (api key, mapped models, base URL, active flag).
 func BuildSubscriptions(in Inputs) []Subscription {
 	configs := claudeconfig.Load(in.ListFile)
@@ -72,7 +72,7 @@ func BuildSubscriptions(in Inputs) []Subscription {
 	return subs
 }
 
-// Sync rebuilds the ghost-tab-* providers in OpenCode's global config. It is
+// Sync rebuilds the wisp-deck-* providers in OpenCode's global config. It is
 // best-effort: recoverable failures log a warning and return nil so a Claude-side
 // mutation is never blocked.
 func Sync(in Inputs) error {
@@ -87,29 +87,29 @@ func Sync(in Inputs) error {
 
 	existing, err := os.ReadFile(path)
 	if err != nil && !os.IsNotExist(err) {
-		fmt.Fprintf(os.Stderr, "ghost-tab: opencode sync: read %s: %v\n", path, err)
+		fmt.Fprintf(os.Stderr, "wisp-deck: opencode sync: read %s: %v\n", path, err)
 		return nil
 	}
 
 	subs := BuildSubscriptions(in)
 	for _, s := range subs {
 		if s.APIKey != "" && len(s.Models) > 0 && s.BaseURL == "" {
-			fmt.Fprintf(os.Stderr, "ghost-tab: opencode sync: no base URL for %q; skipped\n", s.Name)
+			fmt.Fprintf(os.Stderr, "wisp-deck: opencode sync: no base URL for %q; skipped\n", s.Name)
 		}
 	}
 
 	out, ok := MergeSubscriptions(existing, subs)
 	if !ok {
-		fmt.Fprintf(os.Stderr, "ghost-tab: opencode sync: %s is not plain JSON; left unchanged\n", path)
+		fmt.Fprintf(os.Stderr, "wisp-deck: opencode sync: %s is not plain JSON; left unchanged\n", path)
 		return nil
 	}
 
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-		fmt.Fprintf(os.Stderr, "ghost-tab: opencode sync: mkdir: %v\n", err)
+		fmt.Fprintf(os.Stderr, "wisp-deck: opencode sync: mkdir: %v\n", err)
 		return nil
 	}
 	if err := os.WriteFile(path, out, 0600); err != nil {
-		fmt.Fprintf(os.Stderr, "ghost-tab: opencode sync: write %s: %v\n", path, err)
+		fmt.Fprintf(os.Stderr, "wisp-deck: opencode sync: write %s: %v\n", path, err)
 		return nil
 	}
 	// os.WriteFile only sets perms on creation; tighten an existing file too,

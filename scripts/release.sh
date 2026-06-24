@@ -109,22 +109,22 @@ main() {
     fi
   fi
 
-  # Build ghost-tab-tui binaries into a temp directory with correct filenames.
+  # Build wisp-deck-tui binaries into a temp directory with correct filenames.
   # gh release create uses the file's basename as the asset download name,
-  # so files must be named ghost-tab-tui-darwin-{arch} (not mktemp names).
-  echo "Building ghost-tab-tui binaries..."
+  # so files must be named wisp-deck-tui-darwin-{arch} (not mktemp names).
+  echo "Building wisp-deck-tui binaries..."
   build_dir="$(mktemp -d)"
 
   local ldflags="-X main.Version=$version"
-  (cd "$project_dir" && GOOS=darwin GOARCH=arm64 go build -ldflags "$ldflags" -o "$build_dir/ghost-tab-tui-darwin-arm64" ./cmd/ghost-tab-tui) || {
-    echo "Error: failed to build ghost-tab-tui for arm64" >&2; exit 1
+  (cd "$project_dir" && GOOS=darwin GOARCH=arm64 go build -ldflags "$ldflags" -o "$build_dir/wisp-deck-tui-darwin-arm64" ./cmd/wisp-deck-tui) || {
+    echo "Error: failed to build wisp-deck-tui for arm64" >&2; exit 1
   }
-  (cd "$project_dir" && GOOS=darwin GOARCH=amd64 go build -ldflags "$ldflags" -o "$build_dir/ghost-tab-tui-darwin-amd64" ./cmd/ghost-tab-tui) || {
-    echo "Error: failed to build ghost-tab-tui for amd64" >&2; exit 1
+  (cd "$project_dir" && GOOS=darwin GOARCH=amd64 go build -ldflags "$ldflags" -o "$build_dir/wisp-deck-tui-darwin-amd64" ./cmd/wisp-deck-tui) || {
+    echo "Error: failed to build wisp-deck-tui for amd64" >&2; exit 1
   }
-  codesign --sign - --force "$build_dir/ghost-tab-tui-darwin-arm64"
-  codesign --sign - --force "$build_dir/ghost-tab-tui-darwin-amd64"
-  echo "  ✓ Built ghost-tab-tui for darwin/arm64 and darwin/amd64"
+  codesign --sign - --force "$build_dir/wisp-deck-tui-darwin-arm64"
+  codesign --sign - --force "$build_dir/wisp-deck-tui-darwin-amd64"
+  echo "  ✓ Built wisp-deck-tui for darwin/arm64 and darwin/amd64"
 
   # Tag and push
   echo ""
@@ -140,8 +140,8 @@ main() {
   local notes
   notes="$(bash "$script_dir/generate-release-notes.sh" "$prev_tag" "$tag")"
   gh release create "$tag" --notes "$notes" \
-    "$build_dir/ghost-tab-tui-darwin-arm64" \
-    "$build_dir/ghost-tab-tui-darwin-amd64"
+    "$build_dir/wisp-deck-tui-darwin-arm64" \
+    "$build_dir/wisp-deck-tui-darwin-amd64"
 
   # Sync version to package.json and publish to npm
   if [[ -f "$project_dir/package.json" ]] && command -v npm &>/dev/null; then
@@ -155,15 +155,15 @@ main() {
       publish_cmd="npm publish --//registry.npmjs.org/:_authToken=$npm_token"
     fi
     (cd "$project_dir" && npm version "$version" --no-git-tag-version --allow-same-version && $publish_cmd) && \
-      echo "  ✓ Published ghost-tab@$version to npm" || \
+      echo "  ✓ Published wisp-deck@$version to npm" || \
       echo "  ⚠ npm publish failed (GitHub release still succeeded)"
   fi
 
   # Update local binary so the developer sees changes immediately
   echo "Updating local binary..."
-  local local_bin="$HOME/.local/bin/ghost-tab-tui"
+  local local_bin="$HOME/.local/bin/wisp-deck-tui"
   if [[ -d "$(dirname "$local_bin")" ]]; then
-    (cd "$project_dir" && go build -ldflags "$ldflags" -o "$local_bin" ./cmd/ghost-tab-tui) && \
+    (cd "$project_dir" && go build -ldflags "$ldflags" -o "$local_bin" ./cmd/wisp-deck-tui) && \
       codesign --sign - --force "$local_bin" && \
       echo "  ✓ Updated $local_bin" || \
       echo "  ⚠ Failed to update local binary (release still succeeded)"
@@ -171,8 +171,8 @@ main() {
 
   echo ""
   echo "✓ Release $tag complete!"
-  echo "  GitHub: https://github.com/JackUait/ghost-tab/releases/tag/$tag"
-  echo "  Binaries: ghost-tab-tui-darwin-arm64, ghost-tab-tui-darwin-amd64"
+  echo "  GitHub: https://github.com/JackUait/wisp-deck/releases/tag/$tag"
+  echo "  Binaries: wisp-deck-tui-darwin-arm64, wisp-deck-tui-darwin-amd64"
 }
 
 # Only run main when executed directly (not sourced for testing)

@@ -1,12 +1,12 @@
-# Mirror Ghost Tab subscriptions into OpenCode
+# Mirror Wisp Deck subscriptions into OpenCode
 
 **Date:** 2026-06-21
 **Status:** Approved design, pending implementation plan
 
 ## Problem
 
-A Ghost Tab "subscription" (the PLAN / Subscription row on the Settings tab) is a custom
-Claude config: a settings JSON under `~/.config/ghost-tab/claude-configs/` holding an
+A Wisp Deck "subscription" (the PLAN / Subscription row on the Settings tab) is a custom
+Claude config: a settings JSON under `~/.config/wisp-deck/claude-configs/` holding an
 `ANTHROPIC_AUTH_TOKEN` and model-alias remaps
 (`ANTHROPIC_DEFAULT_{OPUS,SONNET,HAIKU,FABLE}_MODEL` → provider models such as
 `glm-4.6`). Today this configures **only Claude Code** (launched via
@@ -24,7 +24,7 @@ OpenCode so the same provider/key/models are usable there too.
 2. **Trigger: re-sync on every change.** Add / edit-key / edit-mappings / rename / delete /
    active-switch all re-run one idempotent sync.
 3. **Config ownership: merge into the global config.** Read/merge
-   `~/.config/opencode/opencode.json` (XDG-respecting), touching only Ghost Tab's own
+   `~/.config/opencode/opencode.json` (XDG-respecting), touching only Wisp Deck's own
    provider blocks and leaving every other key the user has set untouched.
 4. **Base URL source: derive from provider name.** A subscription stores no base URL, so
    it is looked up from a provider table keyed off the config name (same substring match as
@@ -66,7 +66,7 @@ A small package with a **pure, fully-unit-tested merge core** and a thin IO wrap
 #### Pure core (no IO)
 
 ```go
-// Subscription is the minimal view of a Ghost Tab subscription that OpenCode needs.
+// Subscription is the minimal view of a Wisp Deck subscription that OpenCode needs.
 type Subscription struct {
     Name     string   // display name -> provider "name"
     File     string   // config filename -> slug -> provider id
@@ -78,7 +78,7 @@ type Subscription struct {
 
 // MergeSubscriptions takes the existing opencode.json bytes (may be nil/empty) and the
 // current subscription set, and returns the new bytes. It:
-//   - removes every provider whose id is prefixed "ghost-tab-"
+//   - removes every provider whose id is prefixed "wisp-deck-"
 //   - re-adds one provider per mirrorable subscription
 //   - sets top-level "model" to the active subscription's default, only if a custom
 //     subscription is active; otherwise leaves "model" untouched
@@ -89,8 +89,8 @@ type Subscription struct {
 func MergeSubscriptions(existing []byte, subs []Subscription) ([]byte, bool)
 ```
 
-- **Provider id:** `"ghost-tab-" + claudeconfig.Slugify(strings.TrimSuffix(file, ".json"))`.
-  The `ghost-tab-` prefix is the ownership namespace: sync removes/re-adds only these,
+- **Provider id:** `"wisp-deck-" + claudeconfig.Slugify(strings.TrimSuffix(file, ".json"))`.
+  The `wisp-deck-` prefix is the ownership namespace: sync removes/re-adds only these,
   never user-authored providers.
 - **`npm`:** `@ai-sdk/anthropic` for all entries (subscriptions speak the `ANTHROPIC_*`
   protocol, which is how Claude Code reaches these gateways).
@@ -128,7 +128,7 @@ guessed endpoint).
 #### IO wrapper
 
 ```go
-// Sync rebuilds the ghost-tab-* providers in OpenCode's global config from the current
+// Sync rebuilds the wisp-deck-* providers in OpenCode's global config from the current
 // subscription set. Best-effort: a read/parse/write failure logs a warning and returns
 // nil so it never blocks a Claude-side mutation.
 func Sync(home string) error
@@ -152,7 +152,7 @@ holds regardless of whether the change came from the inline TUI panel or the CLI
 
 - After `claudeconfig.Add`, `Rename`, `Delete`, `WriteAPIKey`, `WriteModelMappings`
   (added at the call sites in `internal/tui/claude_config_panel.go`,
-  `internal/tui/claude_config_menu.go`, and `cmd/ghost-tab-tui/claude_config.go`).
+  `internal/tui/claude_config_menu.go`, and `cmd/wisp-deck-tui/claude_config.go`).
 - After the active-config switch (`persistClaudeConfig` in `internal/tui/mainmenu.go`).
 
 A single private helper (e.g. `syncOpenCode()` in the TUI package) resolves `home` and
@@ -163,21 +163,21 @@ surfaced as a blocking error — mirroring must not break Claude-side editing.
 
 | Case | Behavior |
 | --- | --- |
-| `opencode.json` missing | Create it with `$schema` + ghost-tab providers. |
+| `opencode.json` missing | Create it with `$schema` + wisp-deck providers. |
 | Existing `opencode.jsonc` / `config.json` | Write back to whichever exists (resolution order). |
 | Existing file has comments (JSONC) | `MergeSubscriptions` returns `ok=false`; Sync logs a warning, writes nothing. |
-| User-authored providers / other keys present | Preserved; only `ghost-tab-*` providers and (conditionally) `model` change. |
-| Delete last subscription / switch to Standard | All `ghost-tab-*` providers removed; `model` left as-is. |
+| User-authored providers / other keys present | Preserved; only `wisp-deck-*` providers and (conditionally) `model` change. |
+| Delete last subscription / switch to Standard | All `wisp-deck-*` providers removed; `model` left as-is. |
 | Subscription with no API key / no models / unresolved base URL | Skipped (no provider written); unresolved base URL logs a warning. |
 | MiMo subscription (endpoint not yet in table) | Skipped with warning until `ProviderBaseURLs["mimo"]` is filled. |
 
 ## Testing (TDD — tests first, watch them fail, then implement)
 
 ### Go unit tests — `internal/opencodeconfig/opencodeconfig_test.go`
-1. Merge into nil/empty input → valid `opencode.json` with `$schema`, one `ghost-tab-*`
+1. Merge into nil/empty input → valid `opencode.json` with `$schema`, one `wisp-deck-*`
    provider, correct `npm`/`baseURL`/inline `apiKey`/`models`.
 2. Preserve unrelated user `provider` entries and other top-level keys.
-3. Idempotent rebuild: a stale `ghost-tab-old` provider is removed; current ones re-added.
+3. Idempotent rebuild: a stale `wisp-deck-old` provider is removed; current ones re-added.
 4. Delete: subscription dropped from the set → its provider disappears.
 5. Default `model` = active subscription's `"<id>/<opusModel>"`; **not** set when no
    subscription is active; left untouched when Standard active.

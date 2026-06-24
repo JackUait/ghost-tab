@@ -10,14 +10,14 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/jackuait/ghost-tab/internal/models"
-	"github.com/jackuait/ghost-tab/internal/tui"
+	"github.com/jackuait/wisp-deck/internal/models"
+	"github.com/jackuait/wisp-deck/internal/tui"
 	"github.com/muesli/termenv"
 )
 
 func testProjects() []models.Project {
 	return []models.Project{
-		{Name: "ghost-tab", Path: "/Users/jack/ghost-tab"},
+		{Name: "wisp-deck", Path: "/Users/jack/wisp-deck"},
 		{Name: "my-app", Path: "/Users/jack/my-app"},
 		{Name: "website", Path: "/Users/jack/website"},
 	}
@@ -131,7 +131,7 @@ func TestMainMenu_AIToolCycling(t *testing.T) {
 
 func TestMainMenu_CycleAITool_PersistsToFile(t *testing.T) {
 	dir := t.TempDir()
-	aiToolFile := filepath.Join(dir, "config", "ghost-tab", "ai-tool")
+	aiToolFile := filepath.Join(dir, "config", "wisp-deck", "ai-tool")
 
 	m := tui.NewMainMenu(testProjects(), testAITools(), "claude", "animated")
 	m.SetAIToolFile(aiToolFile)
@@ -158,7 +158,7 @@ func TestMainMenu_CycleAITool_PersistsToFile(t *testing.T) {
 
 func TestMainMenu_CycleAITool_DoesNotPersistWithoutFile(t *testing.T) {
 	dir := t.TempDir()
-	aiToolFile := filepath.Join(dir, "config", "ghost-tab", "ai-tool")
+	aiToolFile := filepath.Join(dir, "config", "wisp-deck", "ai-tool")
 
 	m := tui.NewMainMenu(testProjects(), testAITools(), "claude", "animated")
 	// Do NOT call SetAIToolFile
@@ -322,11 +322,11 @@ func TestMainMenu_SelectProject(t *testing.T) {
 	if result.Action != "select-project" {
 		t.Errorf("Expected action 'select-project', got %q", result.Action)
 	}
-	if result.Name != "ghost-tab" {
-		t.Errorf("Expected name 'ghost-tab', got %q", result.Name)
+	if result.Name != "wisp-deck" {
+		t.Errorf("Expected name 'wisp-deck', got %q", result.Name)
 	}
-	if result.Path != "/Users/jack/ghost-tab" {
-		t.Errorf("Expected path '/Users/jack/ghost-tab', got %q", result.Path)
+	if result.Path != "/Users/jack/wisp-deck" {
+		t.Errorf("Expected path '/Users/jack/wisp-deck', got %q", result.Path)
 	}
 	if result.AITool != "claude" {
 		t.Errorf("Expected ai_tool 'claude', got %q", result.AITool)
@@ -693,8 +693,8 @@ func TestMainMenu_ViewContainsBorders(t *testing.T) {
 	if !strings.Contains(view, "\u256d") || !strings.Contains(view, "\u256f") {
 		t.Error("view should contain rounded box-drawing borders")
 	}
-	if !strings.Contains(view, "Ghost Tab") {
-		t.Error("view should contain 'Ghost Tab' title")
+	if !strings.Contains(view, "Wisp Deck") {
+		t.Error("view should contain 'Wisp Deck' title")
 	}
 	if !strings.Contains(view, "test") {
 		t.Error("view should contain project name")
@@ -797,7 +797,7 @@ func TestMainMenu_ViewGhostHiddenWhenNone(t *testing.T) {
 	m.SetSize(100, 40)
 	view := m.View()
 	// Ghost should not appear -- but menu should still render
-	if !strings.Contains(view, "Ghost Tab") {
+	if !strings.Contains(view, "Wisp Deck") {
 		t.Error("menu should still render when ghost is hidden")
 	}
 }
@@ -869,7 +869,7 @@ func TestMainMenu_ViewGhostAbove(t *testing.T) {
 	if !strings.Contains(view, "\u2588") {
 		t.Error("view should contain ghost art block characters in above layout")
 	}
-	if !strings.Contains(view, "Ghost Tab") {
+	if !strings.Contains(view, "Wisp Deck") {
 		t.Error("view should contain menu title in above layout")
 	}
 }
@@ -2855,7 +2855,7 @@ func TestMainMenu_DeleteProject_JKNavigation(t *testing.T) {
 func TestMainMenu_DeleteProject_ConfirmDeletes(t *testing.T) {
 	dir := t.TempDir()
 	projFile := filepath.Join(dir, "projects")
-	os.WriteFile(projFile, []byte("ghost-tab:/Users/jack/ghost-tab\nmy-app:/Users/jack/my-app\nwebsite:/Users/jack/website\n"), 0644)
+	os.WriteFile(projFile, []byte("wisp-deck:/Users/jack/wisp-deck\nmy-app:/Users/jack/my-app\nwebsite:/Users/jack/website\n"), 0644)
 
 	m := tui.NewMainMenu(testProjects(), testAITools(), "claude", "animated")
 	m.SetProjectsFile(projFile)
@@ -2886,7 +2886,7 @@ func TestMainMenu_DeleteProject_ConfirmDeletes(t *testing.T) {
 	if strings.Contains(string(data), "my-app") {
 		t.Error("Deleted project should be removed from file")
 	}
-	if !strings.Contains(string(data), "ghost-tab") {
+	if !strings.Contains(string(data), "wisp-deck") {
 		t.Error("Other projects should remain")
 	}
 	if !strings.Contains(string(data), "website") {
@@ -3120,7 +3120,7 @@ func TestMainMenu_View_DeleteMode_SelectedItemUsesMarker(t *testing.T) {
 
 	view := mm.View()
 
-	// Selected item (index 0, "ghost-tab") should have the █ delete cursor marker
+	// Selected item (index 0, "wisp-deck") should have the █ delete cursor marker
 	if !strings.Contains(view, "█") {
 		t.Error("Delete mode selected item should contain the █ delete cursor marker")
 	}
@@ -3214,7 +3214,7 @@ func TestMainMenu_View_FeedbackMessage(t *testing.T) {
 	lipgloss.SetColorProfile(termenv.Ascii)
 	dir := t.TempDir()
 	projFile := filepath.Join(dir, "projects")
-	os.WriteFile(projFile, []byte("ghost-tab:/Users/jack/ghost-tab\nmy-app:/Users/jack/my-app\nwebsite:/Users/jack/website\n"), 0644)
+	os.WriteFile(projFile, []byte("wisp-deck:/Users/jack/wisp-deck\nmy-app:/Users/jack/my-app\nwebsite:/Users/jack/website\n"), 0644)
 
 	m := tui.NewMainMenu(testProjects(), testAITools(), "claude", "animated")
 	m.SetProjectsFile(projFile)
@@ -3542,7 +3542,7 @@ func TestMainMenu_CycleTabTitle_PersistsToFile(t *testing.T) {
 
 func TestMainMenu_CycleGhostDisplay_CreatesParentDirs(t *testing.T) {
 	dir := t.TempDir()
-	settingsFile := filepath.Join(dir, "config", "ghost-tab", "settings")
+	settingsFile := filepath.Join(dir, "config", "wisp-deck", "settings")
 
 	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
 	m.SetSettingsFile(settingsFile)
@@ -3676,7 +3676,7 @@ func TestMainMenu_CycleSoundName_does_not_persist_without_file(t *testing.T) {
 
 func TestMainMenu_CycleSoundName_creates_parent_dirs(t *testing.T) {
 	dir := t.TempDir()
-	soundFile := filepath.Join(dir, "config", "ghost-tab", "claude-features.json")
+	soundFile := filepath.Join(dir, "config", "wisp-deck", "claude-features.json")
 
 	m := tui.NewMainMenu(nil, []string{"claude"}, "claude", "animated")
 	m.SetSoundFile(soundFile)
@@ -3695,8 +3695,8 @@ func TestMainMenu_CycleSoundName_creates_parent_dirs(t *testing.T) {
 func testProjectsWithWorktrees() []models.Project {
 	return []models.Project{
 		{
-			Name: "ghost-tab",
-			Path: "/Users/jack/ghost-tab",
+			Name: "wisp-deck",
+			Path: "/Users/jack/wisp-deck",
 			Worktrees: []models.Worktree{
 				{Path: "/Users/jack/wt/feature-auth", Branch: "feature/auth"},
 				{Path: "/Users/jack/wt/fix-cleanup", Branch: "fix/cleanup"},
@@ -3809,7 +3809,7 @@ func TestMainMenu_WKeyTogglesAllWorktrees(t *testing.T) {
 	m.SetSize(100, 40)
 
 	// 'w' is now cursor-scoped: it only toggles the project under the cursor.
-	// Cursor starts at index 0 (project "ghost-tab"), so pressing 'w' expands
+	// Cursor starts at index 0 (project "wisp-deck"), so pressing 'w' expands
 	// only project 0 and leaves project 2 collapsed.
 	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'w'}}
 	m.Update(msg)
@@ -3857,8 +3857,8 @@ func TestMainMenu_SelectWorktree(t *testing.T) {
 	if result.Path != "/Users/jack/wt/feature-auth" {
 		t.Errorf("path: got %q, want %q", result.Path, "/Users/jack/wt/feature-auth")
 	}
-	if result.Name != "ghost-tab" {
-		t.Errorf("name: got %q, want %q", result.Name, "ghost-tab")
+	if result.Name != "wisp-deck" {
+		t.Errorf("name: got %q, want %q", result.Name, "wisp-deck")
 	}
 }
 

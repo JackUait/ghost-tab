@@ -8,16 +8,16 @@ import (
 
 // --- AI Select Tests (from test/ai-select.bats) ---
 
-// buildAiSelectScript builds a bash script that mocks ghost-tab-tui, jq, and
+// buildAiSelectScript builds a bash script that mocks wisp-deck-tui, jq, and
 // the error function, then sources ai-select-tui.sh and calls select_ai_tool_interactive.
 // After the function call, it prints the values of _selected_ai_tool and _selected_ai_tools
 // so we can assert on them from Go.
-func buildAiSelectScript(t *testing.T, tmpDir string, ghostTabTuiBody string, jqBody string, extraSetup string) string {
+func buildAiSelectScript(t *testing.T, tmpDir string, wispDeckTuiBody string, jqBody string, extraSetup string) string {
 	t.Helper()
 	root := projectRoot(t)
 
-	// Create mock ghost-tab-tui
-	mockCommand(t, tmpDir, "ghost-tab-tui", ghostTabTuiBody)
+	// Create mock wisp-deck-tui
+	mockCommand(t, tmpDir, "wisp-deck-tui", wispDeckTuiBody)
 
 	// Create mock jq - use stateful counter approach
 	mockCommand(t, tmpDir, "jq", jqBody)
@@ -44,10 +44,10 @@ exit $result
 `, tmpDir, tmpDir, extraSetup, root+"/lib/ai-select-tui.sh")
 }
 
-func TestAiSelect_CallsGhostTabTuiMultiSelectAiTool(t *testing.T) {
+func TestAiSelect_CallsWispDeckTuiMultiSelectAiTool(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	ghostTabTuiBody := `
+	wispDeckTuiBody := `
 if [ "$1" = "multi-select-ai-tool" ]; then
     echo '{"tools":["claude","opencode"],"confirmed":true}'
     exit 0
@@ -71,7 +71,7 @@ exit 0
 
 	// Write the jq mock directly since buildAiSelectScript uses mockCommand
 	mockCommand(t, tmpDir, "jq", jqBody)
-	mockCommand(t, tmpDir, "ghost-tab-tui", ghostTabTuiBody)
+	mockCommand(t, tmpDir, "wisp-deck-tui", wispDeckTuiBody)
 
 	script := fmt.Sprintf(`
 set -euo pipefail
@@ -98,7 +98,7 @@ exit $result
 func TestAiSelect_SetsSelectedAiTools(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	ghostTabTuiBody := `
+	wispDeckTuiBody := `
 if [ "$1" = "multi-select-ai-tool" ]; then
     echo '{"tools":["claude","opencode"],"confirmed":true}'
     exit 0
@@ -119,7 +119,7 @@ fi
 exit 0
 `, tmpDir)
 
-	mockCommand(t, tmpDir, "ghost-tab-tui", ghostTabTuiBody)
+	mockCommand(t, tmpDir, "wisp-deck-tui", wispDeckTuiBody)
 	mockCommand(t, tmpDir, "jq", jqBody)
 
 	script := fmt.Sprintf(`
@@ -148,7 +148,7 @@ exit $result
 func TestAiSelect_PicksClaudeByPriority(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	ghostTabTuiBody := `
+	wispDeckTuiBody := `
 if [ "$1" = "multi-select-ai-tool" ]; then
     echo '{"tools":["opencode","claude"],"confirmed":true}'
     exit 0
@@ -169,7 +169,7 @@ fi
 exit 0
 `, tmpDir)
 
-	mockCommand(t, tmpDir, "ghost-tab-tui", ghostTabTuiBody)
+	mockCommand(t, tmpDir, "wisp-deck-tui", wispDeckTuiBody)
 	mockCommand(t, tmpDir, "jq", jqBody)
 
 	script := fmt.Sprintf(`
@@ -197,7 +197,7 @@ exit $result
 func TestAiSelect_PicksOpencodeWhenClaudeNotSelected(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	ghostTabTuiBody := `
+	wispDeckTuiBody := `
 if [ "$1" = "multi-select-ai-tool" ]; then
     echo '{"tools":["opencode"],"confirmed":true}'
     exit 0
@@ -218,7 +218,7 @@ fi
 exit 0
 `, tmpDir)
 
-	mockCommand(t, tmpDir, "ghost-tab-tui", ghostTabTuiBody)
+	mockCommand(t, tmpDir, "wisp-deck-tui", wispDeckTuiBody)
 	mockCommand(t, tmpDir, "jq", jqBody)
 
 	script := fmt.Sprintf(`
@@ -245,7 +245,7 @@ exit $result
 func TestAiSelect_ReturnsFailureWhenCancelled(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	ghostTabTuiBody := `
+	wispDeckTuiBody := `
 if [ "$1" = "multi-select-ai-tool" ]; then
     echo '{"confirmed":false}'
     exit 0
@@ -258,7 +258,7 @@ if [ "$2" = ".confirmed" ]; then
 fi
 exit 0
 `
-	mockCommand(t, tmpDir, "ghost-tab-tui", ghostTabTuiBody)
+	mockCommand(t, tmpDir, "wisp-deck-tui", wispDeckTuiBody)
 	mockCommand(t, tmpDir, "jq", jqBody)
 
 	script := fmt.Sprintf(`
@@ -280,8 +280,8 @@ select_ai_tool_interactive
 func TestAiSelect_HandlesBinaryMissing(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	// Don't create a ghost-tab-tui mock - simulate it being missing
-	// We need PATH to NOT contain ghost-tab-tui, so we override PATH to only contain essentials
+	// Don't create a wisp-deck-tui mock - simulate it being missing
+	// We need PATH to NOT contain wisp-deck-tui, so we override PATH to only contain essentials
 	script := fmt.Sprintf(`
 export PATH="%s/bin:/usr/bin:/bin"
 
@@ -296,20 +296,20 @@ select_ai_tool_interactive
 	if code == 0 {
 		t.Error("expected non-zero exit code when binary missing, got 0")
 	}
-	assertContains(t, out, "ghost-tab-tui binary not found")
+	assertContains(t, out, "wisp-deck-tui binary not found")
 }
 
 func TestAiSelect_HandlesJqParseFailureForConfirmed(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	ghostTabTuiBody := `
+	wispDeckTuiBody := `
 echo '{"tools":["claude"],"confirmed":true}'
 exit 0
 `
 	// jq always fails
 	jqBody := `exit 1`
 
-	mockCommand(t, tmpDir, "ghost-tab-tui", ghostTabTuiBody)
+	mockCommand(t, tmpDir, "wisp-deck-tui", wispDeckTuiBody)
 	mockCommand(t, tmpDir, "jq", jqBody)
 
 	script := fmt.Sprintf(`
@@ -332,7 +332,7 @@ select_ai_tool_interactive
 func TestAiSelect_HandlesJqParseFailureForTools(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	ghostTabTuiBody := `
+	wispDeckTuiBody := `
 echo '{"tools":["claude"],"confirmed":true}'
 exit 0
 `
@@ -350,7 +350,7 @@ fi
 exit 1
 `, tmpDir)
 
-	mockCommand(t, tmpDir, "ghost-tab-tui", ghostTabTuiBody)
+	mockCommand(t, tmpDir, "wisp-deck-tui", wispDeckTuiBody)
 	mockCommand(t, tmpDir, "jq", jqBody)
 
 	script := fmt.Sprintf(`
@@ -374,7 +374,7 @@ select_ai_tool_interactive
 func TestAiSelect_ValidatesAgainstNullConfirmed(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	ghostTabTuiBody := `
+	wispDeckTuiBody := `
 echo '{"confirmed":"null"}'
 exit 0
 `
@@ -384,7 +384,7 @@ if [ "$2" = ".confirmed" ]; then
 fi
 exit 0
 `
-	mockCommand(t, tmpDir, "ghost-tab-tui", ghostTabTuiBody)
+	mockCommand(t, tmpDir, "wisp-deck-tui", wispDeckTuiBody)
 	mockCommand(t, tmpDir, "jq", jqBody)
 
 	script := fmt.Sprintf(`
@@ -407,7 +407,7 @@ select_ai_tool_interactive
 func TestAiSelect_ValidatesAgainstEmptyTools(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	ghostTabTuiBody := `
+	wispDeckTuiBody := `
 echo '{"tools":[],"confirmed":true}'
 exit 0
 `
@@ -426,7 +426,7 @@ fi
 exit 0
 `, tmpDir)
 
-	mockCommand(t, tmpDir, "ghost-tab-tui", ghostTabTuiBody)
+	mockCommand(t, tmpDir, "wisp-deck-tui", wispDeckTuiBody)
 	mockCommand(t, tmpDir, "jq", jqBody)
 
 	script := fmt.Sprintf(`

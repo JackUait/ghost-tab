@@ -5,7 +5,7 @@
 
 ## Summary
 
-Add a Stats screen to the Ghost Tab TUI showing how many tokens were spent each
+Add a Stats screen to the Wisp Deck TUI showing how many tokens were spent each
 month, broken down by type. Reached from the main menu with the `T` key. Data
 comes from Claude Code session transcripts. Parsing is cached and incremental so
 launch stays fast.
@@ -110,7 +110,7 @@ production caller resolves `~/.claude/projects` via `os.UserHomeDir`.
 
 ### 2. `internal/usage/cache.go` — incremental cache
 
-- File: `~/.config/ghost-tab/usage-cache.json`.
+- File: `~/.config/wisp-deck/usage-cache.json`.
 - Shape:
 
 ```json
@@ -157,7 +157,7 @@ production caller resolves `~/.claude/projects` via `os.UserHomeDir`.
 - `internal/tui/mainmenu.go`:
   - Add a `T: Stats` action item to the action list and a footer hint.
   - Handle the `t`/`T` key → return `PushScreenMsg{ NewStatsModel(...) }`.
-- `cmd/ghost-tab-tui/stats.go`:
+- `cmd/wisp-deck-tui/stats.go`:
   - A standalone `stats` Cobra subcommand that runs `StatsModel` directly. Used
     for manual inspection and easier testing. It is interactive (no JSON output
     to bash — unlike the selector subcommands — because Stats is a viewer).
@@ -168,7 +168,7 @@ production caller resolves `~/.claude/projects` via `os.UserHomeDir`.
 T pressed in MainMenu
   └─ PushScreenMsg{StatsModel}
        └─ StatsModel.Init() → tea.Cmd → usage.Aggregate(~/.claude/projects)
-            ├─ LoadCache(~/.config/ghost-tab/usage-cache.json)
+            ├─ LoadCache(~/.config/wisp-deck/usage-cache.json)
             ├─ walk *.jsonl: reuse cached or ParseFile changed
             ├─ SaveCache(...)
             └─ statsLoadedMsg{months}
@@ -213,7 +213,7 @@ Parallel subagents for implementation (independent files, no shared state):
 - Agent A: `internal/usage/{usage.go,cache.go}` + tests.
 - Agent B: `internal/tui/stats.go` + tests (depends on the `MonthlyUsage` type
   contract above; can stub it until A lands, then integrate).
-- Agent C: wiring in `mainmenu.go` + `cmd/ghost-tab-tui/stats.go` (depends on
+- Agent C: wiring in `mainmenu.go` + `cmd/wisp-deck-tui/stats.go` (depends on
   `NewStatsModel`).
 
 Run order: A and B in parallel against the agreed type contract; C after B.

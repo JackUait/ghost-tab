@@ -3,7 +3,7 @@ package tui_test
 import (
 	"testing"
 
-	"github.com/jackuait/ghost-tab/internal/tui"
+	"github.com/jackuait/wisp-deck/internal/tui"
 )
 
 func TestTranslateRune_Russian(t *testing.T) {

@@ -12,7 +12,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/jackuait/ghost-tab/internal/claudeaccount"
+	"github.com/jackuait/wisp-deck/internal/claudeaccount"
 )
 
 // The login-management panel mirrors the Plan model-map panel: an inline box

@@ -9,11 +9,11 @@
 
 The current add-project UX has three concrete problems:
 
-1. **Two inconsistent flows.** The main menu inline mode and the standalone `ghost-tab-tui add-project` subcommand collect different fields, apply different validation, and derive the project name differently. A user who adds a project one way gets different behaviour than the other.
+1. **Two inconsistent flows.** The main menu inline mode and the standalone `wisp-deck-tui add-project` subcommand collect different fields, apply different validation, and derive the project name differently. A user who adds a project one way gets different behaviour than the other.
 
 2. **No smart path pre-fill.** Users must type the full path every time. Developers who keep all projects under a common root (e.g. `~/Projects/`) retype that prefix on every add.
 
-3. **Stale paths fail silently.** When a project's directory is deleted or moved, the project stays in the list with no warning. Selecting it fails with a raw shell error (`cd: No such file or directory`) rather than a helpful Ghost Tab message.
+3. **Stale paths fail silently.** When a project's directory is deleted or moved, the project stays in the list with no warning. Selecting it fails with a raw shell error (`cd: No such file or directory`) rather than a helpful Wisp Deck message.
 
 ---
 
@@ -23,7 +23,7 @@ The current add-project UX has three concrete problems:
 
 A new optional setting stores a root directory that is pre-filled into the path field whenever the user adds a project.
 
-**Storage:** `~/.config/ghost-tab/projects-root` — a single line containing an absolute (tilde-expanded) path. Follows the existing pattern of `~/.config/ghost-tab/ai-tool` and `~/.config/ghost-tab/terminal`. Tilde is expanded on write so the stored value is always an absolute path (e.g. `/Users/jack/Projects`, never `~/Projects`).
+**Storage:** `~/.config/wisp-deck/projects-root` — a single line containing an absolute (tilde-expanded) path. Follows the existing pattern of `~/.config/wisp-deck/ai-tool` and `~/.config/wisp-deck/terminal`. Tilde is expanded on write so the stored value is always an absolute path (e.g. `/Users/jack/Projects`, never `~/Projects`).
 
 **Bash module:** `lib/settings-json.sh` is not used for this; the value is read/written as a plain file, consistent with other single-value settings. Two new helpers in `lib/projects.sh`:
 - `get_projects_root` — reads the file; prints empty string if absent
@@ -44,7 +44,7 @@ A new optional setting stores a root directory that is pre-filled into the path 
 
 ### 2. Consolidated Add-Project Form
 
-The standalone `ghost-tab-tui add-project` subcommand is deleted. All add-project logic moves into the main menu inline form. `cmd/ghost-tab-tui/add_project.go`, `internal/tui/input.go` (`ProjectInputModel`), and `lib/project-actions-tui.sh` are deleted; all callers are updated. The `add-project` subcommand registration is removed from `cmd/ghost-tab-tui/root.go`.
+The standalone `wisp-deck-tui add-project` subcommand is deleted. All add-project logic moves into the main menu inline form. `cmd/wisp-deck-tui/add_project.go`, `internal/tui/input.go` (`ProjectInputModel`), and `lib/project-actions-tui.sh` are deleted; all callers are updated. The `add-project` subcommand registration is removed from `cmd/wisp-deck-tui/root.go`.
 
 The main menu inline form is upgraded to a two-field form implemented entirely within `MainMenuModel` in `internal/tui/mainmenu.go` (specifically `enterInputMode`, `updateInputMode`, `submitInputMode`, and `renderInputBox`).
 
@@ -54,7 +54,7 @@ The main menu inline form is upgraded to a two-field form implemented entirely w
 Add New Project
 
 Path:  ~/Projects/█
-Name:  ghost-tab  (auto)
+Name:  wisp-deck  (auto)
 ```
 
 **Path field** (focused first):
@@ -99,7 +99,7 @@ When the main menu loads (or reloads) its project list, it tags each project as 
 **In the project list**, stale projects display a warning marker rendered in muted yellow. The project name remains at normal brightness:
 
 ```
-  ghost-tab        /Users/jack/Packages/ghost-tab
+  wisp-deck        /Users/jack/Packages/wisp-deck
 ⚠ old-project      /Users/jack/deleted-dir
   web              /Users/jack/code/web
 ```
@@ -138,10 +138,10 @@ Default is `N`. The user must press `y` explicitly to proceed (covers temporaril
 | `internal/tui/mainmenu.go` | (1) Settings panel: new "Default projects dir" item with Enter-to-edit input. (2) Add-project: upgrade inline form to two-field (path + reactive name), pre-fill, Tab/Shift+Tab nav, unified validation, soft-warn. (3) Stale: staleness check on load, stale marker render, stale launch confirmation. |
 | `internal/tui/projectfile.go` | Add `IsDuplicateName` alongside existing `IsDuplicateProject` |
 | `internal/models/project.go` | Add `Stale bool` field; populate via `os.Stat` in `LoadProjects` |
-| `cmd/ghost-tab-tui/add_project.go` | **Delete** |
+| `cmd/wisp-deck-tui/add_project.go` | **Delete** |
 | `internal/tui/input.go` | **Delete** `ProjectInputModel` (dead code once subcommand is gone). Move `GetPathSuggestions` and its tests to `internal/tui/autocomplete.go` / `test/internal/tui/autocomplete_test.go` before deleting the file. |
 | `lib/project-actions-tui.sh` | **Delete** (callers updated — see below) |
-| `cmd/ghost-tab-tui/root.go` | Remove `add-project` subcommand registration |
+| `cmd/wisp-deck-tui/root.go` | Remove `add-project` subcommand registration |
 | `wrapper.sh` | Remove `project-actions-tui` from the lib sources array |
 | `test/bash/entrypoints_test.go` | Remove `project-actions-tui.sh` from the expected-lib-files list |
 | `test/bash/ai_select_test.go` | Delete the two tests that call `add_project_interactive` (subject no longer exists) |

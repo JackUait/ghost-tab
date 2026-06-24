@@ -9,11 +9,11 @@ import (
 	"testing"
 )
 
-// buildTUI compiles ghost-tab-tui once into a temp dir and returns its path.
+// buildTUI compiles wisp-deck-tui once into a temp dir and returns its path.
 func buildTUI(t *testing.T) string {
 	t.Helper()
-	bin := filepath.Join(t.TempDir(), "ghost-tab-tui")
-	cmd := exec.Command("go", "build", "-o", bin, "./cmd/ghost-tab-tui")
+	bin := filepath.Join(t.TempDir(), "wisp-deck-tui")
+	cmd := exec.Command("go", "build", "-o", bin, "./cmd/wisp-deck-tui")
 	cmd.Dir = repoRoot(t)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("build failed: %v\n%s", err, out)
@@ -40,7 +40,7 @@ func repoRoot(t *testing.T) string {
 func TestCLIAdd_then_key_mirrors_into_opencode(t *testing.T) {
 	bin := buildTUI(t)
 	home := t.TempDir()
-	cfgRoot := filepath.Join(home, ".config", "ghost-tab")
+	cfgRoot := filepath.Join(home, ".config", "wisp-deck")
 	configsDir := filepath.Join(cfgRoot, "claude-configs")
 	os.MkdirAll(configsDir, 0755)
 	list := filepath.Join(cfgRoot, "claude-configs.list")
@@ -70,17 +70,17 @@ func TestCLIAdd_then_key_mirrors_into_opencode(t *testing.T) {
 	}
 	var m map[string]any
 	json.Unmarshal(data, &m)
-	if !strings.Contains(string(data), "ghost-tab-work-glm-zhipu") {
+	if !strings.Contains(string(data), "wisp-deck-work-glm-zhipu") {
 		t.Errorf("provider not mirrored:\n%s", data)
 	}
-	if m["model"] != "ghost-tab-work-glm-zhipu/glm-4.6" {
+	if m["model"] != "wisp-deck-work-glm-zhipu/glm-4.6" {
 		t.Errorf("model = %v", m["model"])
 	}
 
 	// delete removes the provider again.
 	run("claude-config", "delete", "--list", list, "--dir", configsDir, "--pointer", pointer, "--file", "work-glm-zhipu.json")
 	data, _ = os.ReadFile(filepath.Join(home, ".config", "opencode", "opencode.json"))
-	if strings.Contains(string(data), "ghost-tab-work-glm-zhipu") {
+	if strings.Contains(string(data), "wisp-deck-work-glm-zhipu") {
 		t.Errorf("provider not removed after delete:\n%s", data)
 	}
 }

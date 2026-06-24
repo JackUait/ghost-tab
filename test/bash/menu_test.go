@@ -12,7 +12,7 @@ import (
 
 func TestMenu_selects_project_and_parses_JSON(t *testing.T) {
 	dir := t.TempDir()
-	binDir := mockCommand(t, dir, "ghost-tab-tui", `echo '{"action":"select-project","name":"proj1","path":"/tmp/p1","ai_tool":"claude"}'`)
+	binDir := mockCommand(t, dir, "wisp-deck-tui", `echo '{"action":"select-project","name":"proj1","path":"/tmp/p1","ai_tool":"claude"}'`)
 	projectsFile := writeTempFile(t, dir, "projects", "proj1:/tmp/p1\n")
 	root := projectRoot(t)
 	env := buildEnv(t, []string{binDir},
@@ -44,17 +44,17 @@ echo "action=$_selected_project_action"
 func TestMenu_passes_correct_flags_to_main_menu(t *testing.T) {
 	dir := t.TempDir()
 	argsFile := filepath.Join(dir, "captured_args")
-	binDir := mockCommand(t, dir, "ghost-tab-tui", fmt.Sprintf(`
+	binDir := mockCommand(t, dir, "wisp-deck-tui", fmt.Sprintf(`
 echo "$*" > %q
 echo '{"action":"quit"}'
 `, argsFile))
 	projectsFile := writeTempFile(t, dir, "projects", "proj1:/tmp/p1\n")
 
-	configDir := filepath.Join(dir, "config", "ghost-tab")
+	configDir := filepath.Join(dir, "config", "wisp-deck")
 	if err := os.MkdirAll(configDir, 0755); err != nil {
 		t.Fatal(err)
 	}
-	writeTempFile(t, dir, "config/ghost-tab/settings", "ghost_display=static\n")
+	writeTempFile(t, dir, "config/wisp-deck/settings", "ghost_display=static\n")
 
 	root := projectRoot(t)
 	env := buildEnv(t, []string{binDir},
@@ -94,7 +94,7 @@ select_project_interactive %q || true
 
 func TestMenu_handles_AI_tool_change(t *testing.T) {
 	dir := t.TempDir()
-	binDir := mockCommand(t, dir, "ghost-tab-tui", `echo '{"action":"select-project","name":"proj1","path":"/tmp/p1","ai_tool":"opencode"}'`)
+	binDir := mockCommand(t, dir, "wisp-deck-tui", `echo '{"action":"select-project","name":"proj1","path":"/tmp/p1","ai_tool":"opencode"}'`)
 	projectsFile := writeTempFile(t, dir, "projects", "proj1:/tmp/p1\n")
 	root := projectRoot(t)
 	env := buildEnv(t, []string{binDir},
@@ -121,7 +121,7 @@ echo "ai_tool=$_selected_ai_tool"
 
 func TestMenu_handles_quit_action(t *testing.T) {
 	dir := t.TempDir()
-	binDir := mockCommand(t, dir, "ghost-tab-tui", `echo '{"action":"quit"}'`)
+	binDir := mockCommand(t, dir, "wisp-deck-tui", `echo '{"action":"quit"}'`)
 	projectsFile := writeTempFile(t, dir, "projects", "proj1:/tmp/p1\n")
 	root := projectRoot(t)
 	env := buildEnv(t, []string{binDir},
@@ -148,7 +148,7 @@ select_project_interactive %q
 
 func TestMenu_handles_open_once_action(t *testing.T) {
 	dir := t.TempDir()
-	binDir := mockCommand(t, dir, "ghost-tab-tui", `echo '{"action":"open-once","name":"temp","path":"/tmp/temp","ai_tool":"claude"}'`)
+	binDir := mockCommand(t, dir, "wisp-deck-tui", `echo '{"action":"open-once","name":"temp","path":"/tmp/temp","ai_tool":"claude"}'`)
 	projectsFile := writeTempFile(t, dir, "projects", "proj1:/tmp/p1\n")
 	root := projectRoot(t)
 	env := buildEnv(t, []string{binDir},
@@ -179,7 +179,7 @@ echo "path=$_selected_project_path"
 
 func TestMenu_handles_plain_terminal_action(t *testing.T) {
 	dir := t.TempDir()
-	binDir := mockCommand(t, dir, "ghost-tab-tui", `echo '{"action":"plain-terminal","ai_tool":"claude"}'`)
+	binDir := mockCommand(t, dir, "wisp-deck-tui", `echo '{"action":"plain-terminal","ai_tool":"claude"}'`)
 	projectsFile := writeTempFile(t, dir, "projects", "proj1:/tmp/p1\n")
 	root := projectRoot(t)
 	env := buildEnv(t, []string{binDir},
@@ -206,7 +206,7 @@ echo "action=$_selected_project_action"
 
 func TestMenu_handles_settings_action(t *testing.T) {
 	dir := t.TempDir()
-	binDir := mockCommand(t, dir, "ghost-tab-tui", `echo '{"action":"settings","ai_tool":"claude"}'`)
+	binDir := mockCommand(t, dir, "wisp-deck-tui", `echo '{"action":"settings","ai_tool":"claude"}'`)
 	projectsFile := writeTempFile(t, dir, "projects", "proj1:/tmp/p1\n")
 	root := projectRoot(t)
 	env := buildEnv(t, []string{binDir},
@@ -234,13 +234,13 @@ echo "action=$_selected_project_action"
 func TestMenu_reads_ghost_display_from_settings(t *testing.T) {
 	dir := t.TempDir()
 	argsFile := filepath.Join(dir, "captured_args")
-	binDir := mockCommand(t, dir, "ghost-tab-tui", fmt.Sprintf(`
+	binDir := mockCommand(t, dir, "wisp-deck-tui", fmt.Sprintf(`
 echo "$*" > %q
 echo '{"action":"quit"}'
 `, argsFile))
 	projectsFile := writeTempFile(t, dir, "projects", "proj1:/tmp/p1\n")
 
-	writeTempFile(t, dir, "config/ghost-tab/settings", "ghost_display=none\n")
+	writeTempFile(t, dir, "config/wisp-deck/settings", "ghost_display=none\n")
 
 	root := projectRoot(t)
 	env := buildEnv(t, []string{binDir},
@@ -273,7 +273,7 @@ select_project_interactive %q || true
 func TestMenu_defaults_ghost_display_to_animated(t *testing.T) {
 	dir := t.TempDir()
 	argsFile := filepath.Join(dir, "captured_args")
-	binDir := mockCommand(t, dir, "ghost-tab-tui", fmt.Sprintf(`
+	binDir := mockCommand(t, dir, "wisp-deck-tui", fmt.Sprintf(`
 echo "$*" > %q
 echo '{"action":"quit"}'
 `, argsFile))
@@ -311,7 +311,7 @@ select_project_interactive %q || true
 func TestMenu_defaults_panel_mode_to_compact(t *testing.T) {
 	dir := t.TempDir()
 	argsFile := filepath.Join(dir, "captured_args")
-	binDir := mockCommand(t, dir, "ghost-tab-tui", fmt.Sprintf(`
+	binDir := mockCommand(t, dir, "wisp-deck-tui", fmt.Sprintf(`
 echo "$*" > %q
 echo '{"action":"quit"}'
 `, argsFile))
@@ -347,13 +347,13 @@ select_project_interactive %q || true
 func TestMenu_reads_panel_mode_from_settings(t *testing.T) {
 	dir := t.TempDir()
 	argsFile := filepath.Join(dir, "captured_args")
-	binDir := mockCommand(t, dir, "ghost-tab-tui", fmt.Sprintf(`
+	binDir := mockCommand(t, dir, "wisp-deck-tui", fmt.Sprintf(`
 echo "$*" > %q
 echo '{"action":"quit"}'
 `, argsFile))
 	projectsFile := writeTempFile(t, dir, "projects", "proj1:/tmp/p1\n")
 
-	writeTempFile(t, dir, "config/ghost-tab/settings", "panel_mode=lazygit\n")
+	writeTempFile(t, dir, "config/wisp-deck/settings", "panel_mode=lazygit\n")
 
 	root := projectRoot(t)
 	env := buildEnv(t, []string{binDir},
@@ -383,7 +383,7 @@ select_project_interactive %q || true
 
 func TestMenu_validates_null_name_on_select_project(t *testing.T) {
 	dir := t.TempDir()
-	binDir := mockCommand(t, dir, "ghost-tab-tui", `echo '{"action":"select-project","name":null,"path":"/tmp/p1","ai_tool":"claude"}'`)
+	binDir := mockCommand(t, dir, "wisp-deck-tui", `echo '{"action":"select-project","name":null,"path":"/tmp/p1","ai_tool":"claude"}'`)
 	projectsFile := writeTempFile(t, dir, "projects", "proj1:/tmp/p1\n")
 	root := projectRoot(t)
 	env := buildEnv(t, []string{binDir},
@@ -411,7 +411,7 @@ select_project_interactive %q
 
 func TestMenu_validates_null_path_on_select_project(t *testing.T) {
 	dir := t.TempDir()
-	binDir := mockCommand(t, dir, "ghost-tab-tui", `echo '{"action":"select-project","name":"proj1","path":null,"ai_tool":"claude"}'`)
+	binDir := mockCommand(t, dir, "wisp-deck-tui", `echo '{"action":"select-project","name":"proj1","path":null,"ai_tool":"claude"}'`)
 	projectsFile := writeTempFile(t, dir, "projects", "proj1:/tmp/p1\n")
 	root := projectRoot(t)
 	env := buildEnv(t, []string{binDir},
@@ -439,8 +439,8 @@ select_project_interactive %q
 
 func TestMenu_handles_jq_parse_failure(t *testing.T) {
 	dir := t.TempDir()
-	// ghost-tab-tui outputs invalid JSON
-	binDir := mockCommand(t, dir, "ghost-tab-tui", `echo 'not json at all'`)
+	// wisp-deck-tui outputs invalid JSON
+	binDir := mockCommand(t, dir, "wisp-deck-tui", `echo 'not json at all'`)
 	// Mock jq to fail
 	mockCommand(t, dir, "jq", `cat > /dev/null; exit 1`)
 	projectsFile := writeTempFile(t, dir, "projects", "proj1:/tmp/p1\n")
@@ -470,8 +470,8 @@ select_project_interactive %q
 
 func TestMenu_handles_binary_missing(t *testing.T) {
 	dir := t.TempDir()
-	// Don't put ghost-tab-tui in PATH at all
-	// Create a bin dir with no ghost-tab-tui
+	// Don't put wisp-deck-tui in PATH at all
+	// Create a bin dir with no wisp-deck-tui
 	binDir := filepath.Join(dir, "emptybin")
 	if err := os.MkdirAll(binDir, 0755); err != nil {
 		t.Fatal(err)
@@ -479,10 +479,10 @@ func TestMenu_handles_binary_missing(t *testing.T) {
 	projectsFile := writeTempFile(t, dir, "projects", "proj1:/tmp/p1\n")
 	root := projectRoot(t)
 
-	// Use a PATH that does NOT include ghost-tab-tui, but does include jq, bash, etc.
+	// Use a PATH that does NOT include wisp-deck-tui, but does include jq, bash, etc.
 	env := buildEnv(t, nil,
 		"XDG_CONFIG_HOME="+filepath.Join(dir, "config"),
-		// Override PATH to remove any real ghost-tab-tui but keep system commands
+		// Override PATH to remove any real wisp-deck-tui but keep system commands
 		"PATH="+binDir+":/usr/bin:/bin:/usr/sbin:/sbin",
 	)
 
@@ -502,12 +502,12 @@ select_project_interactive %q
 	if code == 0 {
 		t.Error("expected non-zero exit code for missing binary")
 	}
-	assertContains(t, out, "ghost-tab-tui binary not found")
+	assertContains(t, out, "wisp-deck-tui binary not found")
 }
 
-func TestMenu_handles_ghost_tab_tui_failure(t *testing.T) {
+func TestMenu_handles_wisp_deck_tui_failure(t *testing.T) {
 	dir := t.TempDir()
-	binDir := mockCommand(t, dir, "ghost-tab-tui", `exit 1`)
+	binDir := mockCommand(t, dir, "wisp-deck-tui", `exit 1`)
 	projectsFile := writeTempFile(t, dir, "projects", "proj1:/tmp/p1\n")
 	root := projectRoot(t)
 	env := buildEnv(t, []string{binDir},
@@ -528,14 +528,14 @@ select_project_interactive %q
 
 	_, code := runBashSnippet(t, script, env)
 	if code == 0 {
-		t.Error("expected non-zero exit code for ghost-tab-tui failure")
+		t.Error("expected non-zero exit code for wisp-deck-tui failure")
 	}
 }
 
 func TestMenu_omits_update_version_flag_when_empty(t *testing.T) {
 	dir := t.TempDir()
 	argsFile := filepath.Join(dir, "captured_args")
-	binDir := mockCommand(t, dir, "ghost-tab-tui", fmt.Sprintf(`
+	binDir := mockCommand(t, dir, "wisp-deck-tui", fmt.Sprintf(`
 echo "$*" > %q
 echo '{"action":"quit"}'
 `, argsFile))
@@ -569,13 +569,13 @@ select_project_interactive %q || true
 func TestMenu_reads_tab_title_from_settings(t *testing.T) {
 	dir := t.TempDir()
 	argsFile := filepath.Join(dir, "captured_args")
-	binDir := mockCommand(t, dir, "ghost-tab-tui", fmt.Sprintf(`
+	binDir := mockCommand(t, dir, "wisp-deck-tui", fmt.Sprintf(`
 echo "$*" > %q
 echo '{"action":"quit"}'
 `, argsFile))
 	projectsFile := writeTempFile(t, dir, "projects", "proj1:/tmp/p1\n")
 
-	writeTempFile(t, dir, "config/ghost-tab/settings", "tab_title=project\n")
+	writeTempFile(t, dir, "config/wisp-deck/settings", "tab_title=project\n")
 
 	root := projectRoot(t)
 	env := buildEnv(t, []string{binDir},
@@ -606,7 +606,7 @@ select_project_interactive %q || true
 func TestMenu_defaults_tab_title_to_full(t *testing.T) {
 	dir := t.TempDir()
 	argsFile := filepath.Join(dir, "captured_args")
-	binDir := mockCommand(t, dir, "ghost-tab-tui", fmt.Sprintf(`
+	binDir := mockCommand(t, dir, "wisp-deck-tui", fmt.Sprintf(`
 echo "$*" > %q
 echo '{"action":"quit"}'
 `, argsFile))
@@ -643,10 +643,10 @@ select_project_interactive %q || true
 
 func TestMenu_persists_ai_tool_change_to_file(t *testing.T) {
 	dir := t.TempDir()
-	binDir := mockCommand(t, dir, "ghost-tab-tui", `echo '{"action":"select-project","name":"proj1","path":"/tmp/p1","ai_tool":"opencode"}'`)
+	binDir := mockCommand(t, dir, "wisp-deck-tui", `echo '{"action":"select-project","name":"proj1","path":"/tmp/p1","ai_tool":"opencode"}'`)
 	projectsFile := writeTempFile(t, dir, "projects", "proj1:/tmp/p1\n")
 
-	configDir := filepath.Join(dir, "config", "ghost-tab")
+	configDir := filepath.Join(dir, "config", "wisp-deck")
 	if err := os.MkdirAll(configDir, 0755); err != nil {
 		t.Fatal(err)
 	}
@@ -671,7 +671,7 @@ select_project_interactive %q
 	_, code := runBashSnippet(t, script, env)
 	assertExitCode(t, code, 0)
 
-	aiToolFile := filepath.Join(dir, "config", "ghost-tab", "ai-tool")
+	aiToolFile := filepath.Join(dir, "config", "wisp-deck", "ai-tool")
 	data, err := os.ReadFile(aiToolFile)
 	if err != nil {
 		t.Fatalf("ai-tool file not created: %v", err)
@@ -683,10 +683,10 @@ select_project_interactive %q
 
 func TestMenu_does_not_write_ai_tool_file_when_unchanged(t *testing.T) {
 	dir := t.TempDir()
-	binDir := mockCommand(t, dir, "ghost-tab-tui", `echo '{"action":"select-project","name":"proj1","path":"/tmp/p1","ai_tool":"claude"}'`)
+	binDir := mockCommand(t, dir, "wisp-deck-tui", `echo '{"action":"select-project","name":"proj1","path":"/tmp/p1","ai_tool":"claude"}'`)
 	projectsFile := writeTempFile(t, dir, "projects", "proj1:/tmp/p1\n")
 
-	configDir := filepath.Join(dir, "config", "ghost-tab")
+	configDir := filepath.Join(dir, "config", "wisp-deck")
 	if err := os.MkdirAll(configDir, 0755); err != nil {
 		t.Fatal(err)
 	}
@@ -711,7 +711,7 @@ select_project_interactive %q
 	_, code := runBashSnippet(t, script, env)
 	assertExitCode(t, code, 0)
 
-	aiToolFile := filepath.Join(dir, "config", "ghost-tab", "ai-tool")
+	aiToolFile := filepath.Join(dir, "config", "wisp-deck", "ai-tool")
 	if _, err := os.Stat(aiToolFile); err == nil {
 		t.Error("ai-tool file should not exist when tool is unchanged")
 	}
@@ -719,7 +719,7 @@ select_project_interactive %q
 
 func TestMenu_sets_selected_ai_tool_for_settings_action(t *testing.T) {
 	dir := t.TempDir()
-	binDir := mockCommand(t, dir, "ghost-tab-tui", `echo '{"action":"settings","ai_tool":"opencode"}'`)
+	binDir := mockCommand(t, dir, "wisp-deck-tui", `echo '{"action":"settings","ai_tool":"opencode"}'`)
 	projectsFile := writeTempFile(t, dir, "projects", "proj1:/tmp/p1\n")
 	root := projectRoot(t)
 	env := buildEnv(t, []string{binDir},
@@ -746,7 +746,7 @@ echo "ai_tool=$_selected_ai_tool"
 
 func TestMenu_ai_tool_persists_between_sessions(t *testing.T) {
 	dir := t.TempDir()
-	configDir := filepath.Join(dir, "config", "ghost-tab")
+	configDir := filepath.Join(dir, "config", "wisp-deck")
 	if err := os.MkdirAll(configDir, 0755); err != nil {
 		t.Fatal(err)
 	}
@@ -755,7 +755,7 @@ func TestMenu_ai_tool_persists_between_sessions(t *testing.T) {
 	projectsFile := writeTempFile(t, dir, "projects", "proj1:/tmp/p1\n")
 
 	// Session 1: user cycles to opencode and selects a project
-	binDir := mockCommand(t, dir, "ghost-tab-tui", `echo '{"action":"select-project","name":"proj1","path":"/tmp/p1","ai_tool":"opencode"}'`)
+	binDir := mockCommand(t, dir, "wisp-deck-tui", `echo '{"action":"select-project","name":"proj1","path":"/tmp/p1","ai_tool":"opencode"}'`)
 	env := buildEnv(t, []string{binDir},
 		"XDG_CONFIG_HOME="+filepath.Join(dir, "config"),
 	)
@@ -776,7 +776,7 @@ select_project_interactive %q
 	assertExitCode(t, code, 0)
 
 	// Verify file was written
-	aiToolFile := filepath.Join(dir, "config", "ghost-tab", "ai-tool")
+	aiToolFile := filepath.Join(dir, "config", "wisp-deck", "ai-tool")
 	data, err := os.ReadFile(aiToolFile)
 	if err != nil {
 		t.Fatalf("ai-tool file not created: %v", err)
@@ -805,7 +805,7 @@ done
 echo "$ai_flag" > %q
 echo "{\"action\":\"select-project\",\"name\":\"proj1\",\"path\":\"/tmp/p1\",\"ai_tool\":\"$ai_flag\"}"
 `, argsFile)
-	if err := os.WriteFile(filepath.Join(binDir2, "ghost-tab-tui"), []byte(mockScript), 0755); err != nil {
+	if err := os.WriteFile(filepath.Join(binDir2, "wisp-deck-tui"), []byte(mockScript), 0755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -861,11 +861,11 @@ echo "ai_tool=$_selected_ai_tool"
 
 func TestMenu_persists_ai_tool_on_quit(t *testing.T) {
 	dir := t.TempDir()
-	binDir := mockCommand(t, dir, "ghost-tab-tui", `echo '{"action":"quit","ai_tool":"opencode"}'`)
+	binDir := mockCommand(t, dir, "wisp-deck-tui", `echo '{"action":"quit","ai_tool":"opencode"}'`)
 	projectsFile := writeTempFile(t, dir, "projects", "proj1:/tmp/p1\n")
 
 	// Pre-set ai-tool file to "claude"
-	writeTempFile(t, dir, "config/ghost-tab/ai-tool", "claude")
+	writeTempFile(t, dir, "config/wisp-deck/ai-tool", "claude")
 
 	root := projectRoot(t)
 	env := buildEnv(t, []string{binDir},
@@ -886,7 +886,7 @@ select_project_interactive %q || true
 
 	_, _ = runBashSnippet(t, script, env)
 
-	aiToolFile := filepath.Join(dir, "config", "ghost-tab", "ai-tool")
+	aiToolFile := filepath.Join(dir, "config", "wisp-deck", "ai-tool")
 	data, err := os.ReadFile(aiToolFile)
 	if err != nil {
 		t.Fatalf("ai-tool file not found: %v", err)
@@ -899,7 +899,7 @@ select_project_interactive %q || true
 func TestMenu_passes_sound_name_flag_when_sound_has_name(t *testing.T) {
 	dir := t.TempDir()
 	argsFile := filepath.Join(dir, "captured_args")
-	binDir := mockCommand(t, dir, "ghost-tab-tui", fmt.Sprintf(`
+	binDir := mockCommand(t, dir, "wisp-deck-tui", fmt.Sprintf(`
 echo "$*" > %q
 echo '{"action":"quit"}'
 `, argsFile))
@@ -936,7 +936,7 @@ select_project_interactive %q || true
 func TestMenu_omits_sound_name_flag_when_sound_disabled(t *testing.T) {
 	dir := t.TempDir()
 	argsFile := filepath.Join(dir, "captured_args")
-	binDir := mockCommand(t, dir, "ghost-tab-tui", fmt.Sprintf(`
+	binDir := mockCommand(t, dir, "wisp-deck-tui", fmt.Sprintf(`
 echo "$*" > %q
 echo '{"action":"quit"}'
 `, argsFile))
@@ -973,12 +973,12 @@ select_project_interactive %q || true
 func TestMenu_passes_settings_file_flag(t *testing.T) {
 	dir := t.TempDir()
 	argsFile := filepath.Join(dir, "captured_args")
-	binDir := mockCommand(t, dir, "ghost-tab-tui", fmt.Sprintf(`
+	binDir := mockCommand(t, dir, "wisp-deck-tui", fmt.Sprintf(`
 echo "$*" > %q
 echo '{"action":"quit"}'
 `, argsFile))
 	projectsFile := writeTempFile(t, dir, "projects", "proj1:/tmp/p1\n")
-	settingsDir := filepath.Join(dir, "config", "ghost-tab")
+	settingsDir := filepath.Join(dir, "config", "wisp-deck")
 	os.MkdirAll(settingsDir, 0755)
 	settingsFile := writeTempFile(t, settingsDir, "settings", "ghost_display=animated\n")
 	root := projectRoot(t)
@@ -1012,7 +1012,7 @@ select_project_interactive %q
 func TestMenu_passes_sound_file_flag(t *testing.T) {
 	dir := t.TempDir()
 	argsFile := filepath.Join(dir, "captured_args")
-	binDir := mockCommand(t, dir, "ghost-tab-tui", fmt.Sprintf(`
+	binDir := mockCommand(t, dir, "wisp-deck-tui", fmt.Sprintf(`
 echo "$*" > %q
 echo '{"action":"quit"}'
 `, argsFile))
@@ -1050,8 +1050,8 @@ select_project_interactive %q
 func TestAITools_validate_persists_fallback_to_file(t *testing.T) {
 	dir := t.TempDir()
 	// ai-tool file has "opencode" but opencode is not available
-	writeTempFile(t, dir, "config/ghost-tab/ai-tool", "opencode")
-	aiToolFile := filepath.Join(dir, "config", "ghost-tab", "ai-tool")
+	writeTempFile(t, dir, "config/wisp-deck/ai-tool", "opencode")
+	aiToolFile := filepath.Join(dir, "config", "wisp-deck", "ai-tool")
 
 	root := projectRoot(t)
 	env := buildEnv(t, nil,
@@ -1083,7 +1083,7 @@ echo "tool=$SELECTED_AI_TOOL"
 
 func TestAITools_validate_does_not_write_when_valid(t *testing.T) {
 	dir := t.TempDir()
-	configDir := filepath.Join(dir, "config", "ghost-tab")
+	configDir := filepath.Join(dir, "config", "wisp-deck")
 	if err := os.MkdirAll(configDir, 0755); err != nil {
 		t.Fatal(err)
 	}
@@ -1115,7 +1115,7 @@ echo "tool=$SELECTED_AI_TOOL"
 
 func TestAITools_validate_without_file_arg_does_not_write(t *testing.T) {
 	dir := t.TempDir()
-	configDir := filepath.Join(dir, "config", "ghost-tab")
+	configDir := filepath.Join(dir, "config", "wisp-deck")
 	if err := os.MkdirAll(configDir, 0755); err != nil {
 		t.Fatal(err)
 	}

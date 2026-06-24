@@ -4,7 +4,7 @@
 
 _TAB_TITLE_WATCHER_PID=""
 
-# Read a single key=value line from the Ghost Tab settings file. Echoes the
+# Read a single key=value line from the Wisp Deck settings file. Echoes the
 # value (whitespace stripped), or nothing if the file or key is absent. Used to
 # re-read settings live each poll tick so a mid-session Settings-menu change
 # reaches the running session.
@@ -28,13 +28,13 @@ apply_session_theme() {
   fi
 }
 
-# Repaint EVERY active ghost-tab session's chrome to the theme accent currently
+# Repaint EVERY active wisp-deck session's chrome to the theme accent currently
 # saved in the settings file. The per-session watcher only reaches sessions whose
 # loop was started with the live-theme code, so a theme change misses sessions
 # whose watcher predates the feature. This addresses each running session
-# externally instead: it enumerates tmux sessions, skips non ghost-tab ones (only
-# ghost-tab sessions export GHOST_TAB=1), and resolves each session's accent from
-# its own AI tool (the GHOST_TAB_TOOL env captured at launch) so an "auto"/unset
+# externally instead: it enumerates tmux sessions, skips non wisp-deck ones (only
+# wisp-deck sessions export WISP_DECK=1), and resolves each session's accent from
+# its own AI tool (the WISP_DECK_TOOL env captured at launch) so an "auto"/unset
 # theme still picks the right hue per session.
 # Usage: apply_theme_to_all_sessions <tmux_cmd> <settings_file>
 apply_theme_to_all_sessions() {
@@ -45,9 +45,9 @@ apply_theme_to_all_sessions() {
   # where `< <(...)` is disabled. A subshell is fine — we mutate tmux, not vars.
   "$tmux_cmd" list-sessions -F '#{session_name}' 2>/dev/null | while IFS= read -r session; do
     [ -z "$session" ] && continue
-    "$tmux_cmd" show-environment -t "$session" GHOST_TAB >/dev/null 2>&1 || continue
+    "$tmux_cmd" show-environment -t "$session" WISP_DECK >/dev/null 2>&1 || continue
     local tool accent
-    tool="$("$tmux_cmd" show-environment -t "$session" GHOST_TAB_TOOL 2>/dev/null | cut -d= -f2-)"
+    tool="$("$tmux_cmd" show-environment -t "$session" WISP_DECK_TOOL 2>/dev/null | cut -d= -f2-)"
     accent="$(get_theme_accent "$(gt_resolve_theme "$theme_pref" "$tool")")"
     apply_session_theme "$tmux_cmd" "$session" "$accent"
   done
@@ -106,7 +106,7 @@ apply_session_panel_mode() {
   "$tmux_cmd" set-option -t "$session" @gt_panel_mode "$mode" 2>/dev/null || true
 }
 
-# Propagate every live-applicable setting to ALL active ghost-tab sessions at
+# Propagate every live-applicable setting to ALL active wisp-deck sessions at
 # once — the watcher-age-independent path (a running session's watcher loop is
 # frozen at its launch-time code, so it cannot pick up settings that postdate it).
 # Called when the Settings menu closes so a change reaches every open window, not
@@ -121,7 +121,7 @@ apply_session_panel_mode() {
 # Usage: apply_settings_to_all_sessions <tmux_cmd> <settings_file> [lib_dir] [lazygit_cmd]
 apply_settings_to_all_sessions() {
   local tmux_cmd="$1" settings_file="$2"
-  local lib_dir="${3:-${XDG_CONFIG_HOME:-$HOME/.config}/ghost-tab/lib}"
+  local lib_dir="${3:-${XDG_CONFIG_HOME:-$HOME/.config}/wisp-deck/lib}"
   local lazygit_cmd="${4:-lazygit}"
   local theme_pref panel_mode
   theme_pref="$(read_settings_value "$settings_file" theme)"
@@ -130,10 +130,10 @@ apply_settings_to_all_sessions() {
   # Pipe (not process substitution): wrapper sources libs under bash --posix.
   "$tmux_cmd" list-sessions -F '#{session_name}' 2>/dev/null | while IFS= read -r session; do
     [ -z "$session" ] && continue
-    "$tmux_cmd" show-environment -t "$session" GHOST_TAB >/dev/null 2>&1 || continue
+    "$tmux_cmd" show-environment -t "$session" WISP_DECK >/dev/null 2>&1 || continue
     local tool project_dir accent
-    tool="$("$tmux_cmd" show-environment -t "$session" GHOST_TAB_TOOL 2>/dev/null | cut -d= -f2-)"
-    project_dir="$("$tmux_cmd" show-environment -t "$session" GHOST_TAB_PATH 2>/dev/null | cut -d= -f2-)"
+    tool="$("$tmux_cmd" show-environment -t "$session" WISP_DECK_TOOL 2>/dev/null | cut -d= -f2-)"
+    project_dir="$("$tmux_cmd" show-environment -t "$session" WISP_DECK_PATH 2>/dev/null | cut -d= -f2-)"
     accent="$(get_theme_accent "$(gt_resolve_theme "$theme_pref" "$tool")")"
     apply_session_theme "$tmux_cmd" "$session" "$accent"
     apply_session_panel_mode "$tmux_cmd" "$session" "$panel_mode" "$project_dir" "$lib_dir" "$lazygit_cmd"

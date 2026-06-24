@@ -36,7 +36,7 @@ func TestGhosttyAdapter_get_wrapper_path(t *testing.T) {
 	assertExitCode(t, code, 0)
 	got := strings.TrimSpace(out)
 	home := os.Getenv("HOME")
-	expected := home + "/.config/ghost-tab/wrapper.sh"
+	expected := home + "/.config/wisp-deck/wrapper.sh"
 	if got != expected {
 		t.Errorf("got %q, want %q", got, expected)
 	}
@@ -133,7 +133,7 @@ func TestGhosttyAdapter_setup_config_uses_direct_prefix(t *testing.T) {
 
 func TestGhosttyAdapter_cleanup_config_removes_command_line(t *testing.T) {
 	tmpDir := t.TempDir()
-	configFile := writeTempFile(t, tmpDir, "config", "font-size = 14\ncommand = direct:/bin/bash -l /Users/u/.config/ghost-tab/wrapper.sh\ntheme = dark\n")
+	configFile := writeTempFile(t, tmpDir, "config", "font-size = 14\ncommand = direct:/bin/bash -l /Users/u/.config/wisp-deck/wrapper.sh\ntheme = dark\n")
 
 	snippet := ghosttyAdapterSnippet(t,
 		fmt.Sprintf(`terminal_cleanup_config %q`, configFile))
@@ -153,7 +153,7 @@ func TestGhosttyAdapter_cleanup_config_removes_command_line(t *testing.T) {
 func TestGhosttyAdapter_cleanup_config_removes_pre_direct_format(t *testing.T) {
 	// Versions before the direct: prefix wrote "command = /bin/bash -l <wrapper>".
 	tmpDir := t.TempDir()
-	configFile := writeTempFile(t, tmpDir, "config", "command = /bin/bash -l /Users/u/.config/ghost-tab/wrapper.sh\n")
+	configFile := writeTempFile(t, tmpDir, "config", "command = /bin/bash -l /Users/u/.config/wisp-deck/wrapper.sh\n")
 
 	snippet := ghosttyAdapterSnippet(t,
 		fmt.Sprintf(`terminal_cleanup_config %q`, configFile))
@@ -169,7 +169,7 @@ func TestGhosttyAdapter_cleanup_config_removes_pre_direct_format(t *testing.T) {
 
 func TestGhosttyAdapter_cleanup_config_preserves_user_command_line(t *testing.T) {
 	// A command line the user wrote themselves (Skip path during setup)
-	// must survive cleanup — only ghost-tab's own line may be removed.
+	// must survive cleanup — only wisp-deck's own line may be removed.
 	tmpDir := t.TempDir()
 	configFile := writeTempFile(t, tmpDir, "config", "command = /opt/homebrew/bin/fish\n")
 
@@ -237,7 +237,7 @@ echo "AFTER"
 }
 
 func TestGhosttyAdapter_terminal_install_message_omits_removed_flag(t *testing.T) {
-	// Terminal selection was removed; ghost-tab takes no flags. The
+	// Terminal selection was removed; wisp-deck takes no flags. The
 	// not-found message must not tell users to run a flag that now errors.
 	dir := t.TempDir()
 	fakeApps := filepath.Join(dir, "Applications")
@@ -257,7 +257,7 @@ terminal_install </dev/null || true
 	env := buildEnv(t, []string{binDir})
 	out, _ := runBashSnippet(t, script, env)
 	assertNotContains(t, out, "--terminal")
-	assertContains(t, out, "ghost-tab")
+	assertContains(t, out, "wisp-deck")
 }
 
 func TestGhosttyAdapter_launch_restore(t *testing.T) {

@@ -27,7 +27,7 @@ setup_sound_notification() {
 # Silence Claude Code's own idle notification by setting preferredNotifChannel
 # to terminal_bell directly in settings.json (Claude 2.1.x removed the
 # `claude config` subcommand). Ghostty has no audible bell, so terminal_bell is
-# silent — which leaves ghost-tab's afplay (gated by the sound flag) as the
+# silent — which leaves wisp-deck's afplay (gated by the sound flag) as the
 # single audible source. This is what makes the "off" setting truly silent and
 # also prevents double sounds when sound is on.
 #
@@ -58,7 +58,7 @@ except (OSError, ValueError):
 
 current = settings.get("preferredNotifChannel")
 
-# Already silenced (e.g. by another live ghost-tab session) — don't clobber the
+# Already silenced (e.g. by another live wisp-deck session) — don't clobber the
 # previously-saved value with "terminal_bell".
 if current == "terminal_bell":
     sys.exit(0)

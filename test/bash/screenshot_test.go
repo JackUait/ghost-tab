@@ -75,7 +75,7 @@ func TestAiPane_prefers_marked_pane(t *testing.T) {
 	}
 }
 
-// When no pane is marked (e.g. a session from an older ghost-tab), gt_ai_pane
+// When no pane is marked (e.g. a session from an older wisp-deck), gt_ai_pane
 // must fall back to the full-height pane on the right edge -- where the AI tool
 // lives -- NOT a fixed index. Regression: the old fallback returned index 1
 // (the spare shell), stealing focus from / mis-targeting Claude at index 2.
@@ -247,7 +247,7 @@ func TestScreenshotDir_defaults_to_desktop(t *testing.T) {
 	assertContains(t, out, desktop)
 }
 
-// gt_stash_screenshot copies the screenshot into a STABLE ghost-tab-owned dir
+// gt_stash_screenshot copies the screenshot into a STABLE wisp-deck-owned dir
 // and prints the stable path, leaving the original intact. This is the heart of
 // the fix: the OS drag/temp screenshot file gets deleted by macOS, so we copy it
 // somewhere that persists before handing the path to the AI tool.

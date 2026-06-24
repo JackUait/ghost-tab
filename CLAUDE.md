@@ -113,7 +113,7 @@ Scroll up to "IMMEDIATE COMPLETION CHECKLIST" and verify ALL items before declar
 
 ## Project Overview
 
-Ghost Tab is a terminal + tmux wrapper that launches a three-pane dev session with AI coding tools (Claude Code, OpenCode), lazygit, and a spare terminal. It runs on Ghostty and handles complete process cleanup when windows close (no zombie processes).
+Wisp Deck is a terminal + tmux wrapper that launches a three-pane dev session with AI coding tools (Claude Code, OpenCode), lazygit, and a spare terminal. It runs on Ghostty and handles complete process cleanup when windows close (no zombie processes).
 
 **Key Features:**
 - Interactive project selector with TUI
@@ -129,14 +129,14 @@ Ghost Tab is a terminal + tmux wrapper that launches a three-pane dev session wi
 go test ./test/bash/... -run TestFoo    # Run specific test group
 go test ./test/bash/... -run "test_name" # Filter by name
 go test ./... -v -count=1              # Verbose with no caching
-shellcheck lib/*.sh lib/terminals/*.sh bin/ghost-tab wrapper.sh  # Lint all scripts
-./bin/ghost-tab                         # Run main installer/setup
+shellcheck lib/*.sh lib/terminals/*.sh bin/wisp-deck wrapper.sh  # Lint all scripts
+./bin/wisp-deck                         # Run main installer/setup
 make release                            # Create a new release
 ```
 
 ### Creating Releases
 
-**EVERY release MUST include fresh `ghost-tab-tui` binaries. NO EXCEPTIONS.**
+**EVERY release MUST include fresh `wisp-deck-tui` binaries. NO EXCEPTIONS.**
 - The installer downloads binaries from release assets — missing binaries = 404 on install
 - The developer's local binary MUST be rebuilt — stale local binary = developer sees old UI
 - **NEVER create releases manually via GitHub UI or bare `gh release create`**
@@ -152,10 +152,10 @@ Run `make release` to automate the full release process. Before running:
 The script will:
 - Run preflight checks (clean tree, main branch, valid version, tag doesn't exist, gh auth)
 - Show a confirmation prompt (skip with `--yes` flag)
-- Build `ghost-tab-tui` binaries for darwin/arm64 and darwin/amd64
+- Build `wisp-deck-tui` binaries for darwin/arm64 and darwin/amd64
 - Create annotated git tag `vX.Y.Z` and push
 - Create a GitHub release with binaries attached as assets
-- Rebuild the local `~/.local/bin/ghost-tab-tui` binary so the developer sees changes immediately
+- Rebuild the local `~/.local/bin/wisp-deck-tui` binary so the developer sees changes immediately
 
 ```bash
 make release              # Interactive (with confirmation prompt)
@@ -168,24 +168,24 @@ bash scripts/release.sh --yes  # Non-interactive (skip confirmation)
 ```bash
 # Verify binaries are downloadable (users get 404 if this fails)
 gh release view v$(cat VERSION) --json assets --jq '.assets[].name'
-# Must show: ghost-tab-tui-darwin-arm64, ghost-tab-tui-darwin-amd64
+# Must show: wisp-deck-tui-darwin-arm64, wisp-deck-tui-darwin-amd64
 ```
 
 ## Architecture
 
-Ghost Tab uses a **hybrid architecture** combining Go for interactive TUI and bash for orchestration.
+Wisp Deck uses a **hybrid architecture** combining Go for interactive TUI and bash for orchestration.
 
-**Layer 1: Go TUI Binary (`ghost-tab-tui`)**
+**Layer 1: Go TUI Binary (`wisp-deck-tui`)**
 - Interactive terminal UI components built with Bubbletea
 - Project selector, AI tool selector, terminal selector, settings menu, input forms
 - Outputs structured JSON for bash consumption
-- Binary: `~/.local/bin/ghost-tab-tui`
-- Source: `cmd/ghost-tab-tui/`, `internal/tui/`, `internal/models/`, `internal/util/`
+- Binary: `~/.local/bin/wisp-deck-tui`
+- Source: `cmd/wisp-deck-tui/`, `internal/tui/`, `internal/models/`, `internal/util/`
 
 **Layer 2: Bash Orchestration**
 
 **Entry Points:**
-- `bin/ghost-tab` - Main installer script, sources all modules
+- `bin/wisp-deck` - Main installer script, sources all modules
 - `wrapper.sh` - Terminal-agnostic runtime wrapper
 
 **Module System:**
@@ -211,9 +211,9 @@ All reusable functionality lives in `lib/` as sourced shell scripts:
 - **update.sh**: Self-update functionality
 
 **Data Files:**
-- `~/.config/ghost-tab/projects` - Project list (name:path format)
-- `~/.config/ghost-tab/ai-tool` - Default AI tool preference
-- `~/.config/ghost-tab/*-features.json` - AI tool feature flags
+- `~/.config/wisp-deck/projects` - Project list (name:path format)
+- `~/.config/wisp-deck/ai-tool` - Default AI tool preference
+- `~/.config/wisp-deck/*-features.json` - AI tool feature flags
 - `~/.claude/settings.json` - Claude Code settings
 - `~/.config/ghostty/config` - Ghostty terminal config
 
@@ -371,7 +371,7 @@ done
 
 **Project Structure:**
 ```
-cmd/ghost-tab-tui/     # CLI entry point and subcommands
+cmd/wisp-deck-tui/     # CLI entry point and subcommands
 internal/tui/          # Bubbletea UI components
 internal/models/       # Data types (Project, Config)
 internal/util/         # Utilities (path, JSON)
@@ -610,7 +610,7 @@ If you catch yourself thinking ANY of these, STOP:
 
 ### select-project
 ```json
-{"name": "ghost-tab", "path": "/path/to/ghost-tab", "selected": true}
+{"name": "wisp-deck", "path": "/path/to/wisp-deck", "selected": true}
 {"selected": false}  // Cancelled
 ```
 

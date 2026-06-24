@@ -1,4 +1,4 @@
-// Package opencodeconfig mirrors Ghost Tab subscriptions (custom Claude configs)
+// Package opencodeconfig mirrors Wisp Deck subscriptions (custom Claude configs)
 // into OpenCode's global config as custom providers. MergeSubscriptions is the
 // pure core; Sync (sync.go) wires it to disk.
 package opencodeconfig
@@ -7,12 +7,12 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/jackuait/ghost-tab/internal/claudeconfig"
+	"github.com/jackuait/wisp-deck/internal/claudeconfig"
 )
 
-// ProviderPrefix namespaces every provider Ghost Tab owns in opencode.json, so a
+// ProviderPrefix namespaces every provider Wisp Deck owns in opencode.json, so a
 // rebuild can remove and re-add only these without touching user-authored ones.
-const ProviderPrefix = "ghost-tab-"
+const ProviderPrefix = "wisp-deck-"
 
 const schemaURL = "https://opencode.ai/config.json"
 
@@ -32,7 +32,7 @@ func modelEntry(id string) map[string]any {
 	return entry
 }
 
-// Subscription is the resolved view of a Ghost Tab subscription that OpenCode
+// Subscription is the resolved view of a Wisp Deck subscription that OpenCode
 // needs. BaseURL is pre-resolved by the caller (empty -> not mirrorable).
 type Subscription struct {
 	Name      string
@@ -64,7 +64,7 @@ func (s Subscription) defaultModel() string {
 	return s.providerID() + "/" + model
 }
 
-// MergeSubscriptions rebuilds the ghost-tab-* providers in existing opencode.json
+// MergeSubscriptions rebuilds the wisp-deck-* providers in existing opencode.json
 // bytes from subs, preserving every other key. Returns (nil, false) when existing
 // is non-empty but not valid JSON (e.g. JSONC), meaning the caller must not write.
 func MergeSubscriptions(existing []byte, subs []Subscription) ([]byte, bool) {
@@ -88,7 +88,7 @@ func MergeSubscriptions(existing []byte, subs []Subscription) ([]byte, bool) {
 		}
 	}
 
-	// Clear the model key if it currently points to a ghost-tab provider; it
+	// Clear the model key if it currently points to a wisp-deck provider; it
 	// will be re-set below if an active subscription is still mirrorable.
 	if current, ok := m["model"].(string); ok && strings.HasPrefix(current, ProviderPrefix) {
 		delete(m, "model")

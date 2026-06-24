@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add a `T`-key Stats screen to the Ghost Tab TUI showing per-month token usage (input/output/cache-write/cache-read + total) parsed from Claude Code transcripts, with a table + bar chart, incremental caching, all-time scroll.
+**Goal:** Add a `T`-key Stats screen to the Wisp Deck TUI showing per-month token usage (input/output/cache-write/cache-read + total) parsed from Claude Code transcripts, with a table + bar chart, incremental caching, all-time scroll.
 
-**Architecture:** A pure `internal/usage` package parses `~/.claude/projects/**/*.jsonl`, aggregates by month, and caches per-file results to `~/.config/ghost-tab/usage-cache.json` so only changed files are re-parsed. A Bubbletea `StatsModel` (`internal/tui/stats.go`) loads it async (plain "Crunching…" text while loading) and renders a scrollable table + bars. `mainmenu.go` pushes the screen on `T`.
+**Architecture:** A pure `internal/usage` package parses `~/.claude/projects/**/*.jsonl`, aggregates by month, and caches per-file results to `~/.config/wisp-deck/usage-cache.json` so only changed files are re-parsed. A Bubbletea `StatsModel` (`internal/tui/stats.go`) loads it async (plain "Crunching…" text while loading) and renders a scrollable table + bars. `mainmenu.go` pushes the screen on `T`.
 
 **Tech Stack:** Go 1.25, Bubbletea v1.3.10, Lipgloss v1.1.0, Cobra v1.10.2.
 
@@ -583,7 +583,7 @@ func Aggregate(claudeDir, cachePath string) ([]MonthlyUsage, error) {
 // DefaultPaths returns the production transcript dir and cache file path.
 func DefaultPaths(home string) (claudeDir, cachePath string) {
 	return filepath.Join(home, ".claude", "projects"),
-		filepath.Join(home, ".config", "ghost-tab", "usage-cache.json")
+		filepath.Join(home, ".config", "wisp-deck", "usage-cache.json")
 }
 ```
 
@@ -696,7 +696,7 @@ git commit -m "feat(tui): add token count humanizer"
 import (
 	"strings"
 
-	"github.com/jackuait/ghost-tab/internal/usage"
+	"github.com/jackuait/wisp-deck/internal/usage"
 )
 
 func TestStatsView_rendersMonthRowsHumanizedAndBars(t *testing.T) {
@@ -767,7 +767,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/jackuait/ghost-tab/internal/usage"
+	"github.com/jackuait/wisp-deck/internal/usage"
 )
 
 const (
@@ -1037,7 +1037,7 @@ git commit -m "feat(tui): StatsModel async load, scroll, esc handling"
 ## Task 7: `stats` standalone subcommand
 
 **Files:**
-- Create: `cmd/ghost-tab-tui/stats.go`
+- Create: `cmd/wisp-deck-tui/stats.go`
 - Test: none (thin Cobra wrapper; covered by manual run in Task 9). Verify it builds.
 
 - [ ] **Step 1: Write the implementation**
@@ -1050,8 +1050,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
-	"github.com/jackuait/ghost-tab/internal/tui"
-	"github.com/jackuait/ghost-tab/internal/util"
+	"github.com/jackuait/wisp-deck/internal/tui"
+	"github.com/jackuait/wisp-deck/internal/util"
 )
 
 var statsCmd = &cobra.Command{
@@ -1089,13 +1089,13 @@ func runStats(cmd *cobra.Command, args []string) error {
 
 - [ ] **Step 2: Verify it builds**
 
-Run: `go build ./cmd/ghost-tab-tui/`
+Run: `go build ./cmd/wisp-deck-tui/`
 Expected: builds with no error.
 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add cmd/ghost-tab-tui/stats.go
+git add cmd/wisp-deck-tui/stats.go
 git commit -m "feat(cmd): add stats subcommand"
 ```
 
@@ -1206,13 +1206,13 @@ Expected: all tests pass.
 - [ ] **Step 3: shellcheck (only if any .sh changed)**
 
 This feature is Go-only. If `git diff --name-only origin/main` shows no `.sh` files, skip. Otherwise run:
-Run: `shellcheck lib/*.sh lib/terminals/*.sh bin/ghost-tab wrapper.sh`
+Run: `shellcheck lib/*.sh lib/terminals/*.sh bin/wisp-deck wrapper.sh`
 Expected: clean.
 
 - [ ] **Step 4: Manual smoke test**
 
-Run: `go run ./cmd/ghost-tab-tui/ stats`
-Expected: spinner ("Crunching token usage…") on first run while it parses, then a table of months with bars. Press `↑`/`↓` to scroll, `esc` to exit. Run a second time — it should appear near-instantly (cache hit). Confirm `~/.config/ghost-tab/usage-cache.json` was created.
+Run: `go run ./cmd/wisp-deck-tui/ stats`
+Expected: spinner ("Crunching token usage…") on first run while it parses, then a table of months with bars. Press `↑`/`↓` to scroll, `esc` to exit. Run a second time — it should appear near-instantly (cache hit). Confirm `~/.config/wisp-deck/usage-cache.json` was created.
 
 - [ ] **Step 5: Push**
 

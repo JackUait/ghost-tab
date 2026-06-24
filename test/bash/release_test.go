@@ -278,7 +278,7 @@ func TestRelease_does_not_check_for_formula(t *testing.T) {
 	}
 }
 
-func TestRelease_builds_ghost_tab_tui_binaries(t *testing.T) {
+func TestRelease_builds_wisp_deck_tui_binaries(t *testing.T) {
 	root := projectRoot(t)
 	data, err := os.ReadFile(filepath.Join(root, "scripts", "release.sh"))
 	if err != nil {
@@ -300,10 +300,10 @@ func TestRelease_uploads_binaries_to_gh_release(t *testing.T) {
 		t.Fatalf("failed to read release.sh: %v", err)
 	}
 	content := string(data)
-	if !strings.Contains(content, "ghost-tab-tui-darwin-arm64") {
+	if !strings.Contains(content, "wisp-deck-tui-darwin-arm64") {
 		t.Errorf("release.sh does not upload arm64 binary asset")
 	}
-	if !strings.Contains(content, "ghost-tab-tui-darwin-amd64") {
+	if !strings.Contains(content, "wisp-deck-tui-darwin-amd64") {
 		t.Errorf("release.sh does not upload amd64 binary asset")
 	}
 }
@@ -315,13 +315,13 @@ func TestRelease_builds_to_named_files_not_mktemp(t *testing.T) {
 		t.Fatalf("failed to read release.sh: %v", err)
 	}
 	content := string(data)
-	// go build -o must target a file named ghost-tab-tui-darwin-arm64, not a mktemp path
-	if !strings.Contains(content, `-o "$build_dir/ghost-tab-tui-darwin-arm64"`) &&
-		!strings.Contains(content, `-o "${build_dir}/ghost-tab-tui-darwin-arm64"`) {
+	// go build -o must target a file named wisp-deck-tui-darwin-arm64, not a mktemp path
+	if !strings.Contains(content, `-o "$build_dir/wisp-deck-tui-darwin-arm64"`) &&
+		!strings.Contains(content, `-o "${build_dir}/wisp-deck-tui-darwin-arm64"`) {
 		t.Errorf("release.sh should build arm64 binary to a properly named file, not mktemp")
 	}
-	if !strings.Contains(content, `-o "$build_dir/ghost-tab-tui-darwin-amd64"`) &&
-		!strings.Contains(content, `-o "${build_dir}/ghost-tab-tui-darwin-amd64"`) {
+	if !strings.Contains(content, `-o "$build_dir/wisp-deck-tui-darwin-amd64"`) &&
+		!strings.Contains(content, `-o "${build_dir}/wisp-deck-tui-darwin-amd64"`) {
 		t.Errorf("release.sh should build amd64 binary to a properly named file, not mktemp")
 	}
 }

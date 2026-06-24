@@ -3,13 +3,13 @@
 // isolated by its own CLAUDE_CONFIG_DIR, so they stay logged in simultaneously
 // and are switched between by relaunching `claude` under a different dir.
 //
-// Storage layout (all under the ghost-tab config dir):
+// Storage layout (all under the wisp-deck config dir):
 //   - <accountsDir>/<dir>/          the per-account CLAUDE_CONFIG_DIR (its login)
 //   - <listFile>                    label:dir per line (display label decoupled)
 //   - <pointerFile>                 active dir name, or absent/"default" = the
 //     standard ~/.claude (Keychain) login
 //
-// Both the inline ACCOUNT switcher in the menu and the `ghost-tab-tui
+// Both the inline ACCOUNT switcher in the menu and the `wisp-deck-tui
 // claude-account` CLI call into this package, so the list format and mutation
 // rules live in exactly one place.
 package claudeaccount

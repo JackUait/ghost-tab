@@ -1,13 +1,13 @@
 {
-  "name": "ghost-tab",
+  "name": "wisp-deck",
   "version": "2.14.0",
   "description": "Terminal + tmux wrapper for AI coding tools (Claude Code, OpenCode)",
   "bin": {
-    "ghost-tab": "bin/npx-ghost-tab.js"
+    "wisp-deck": "bin/npx-wisp-deck.js"
   },
   "files": [
-    "bin/ghost-tab",
-    "bin/npx-ghost-tab.js",
+    "bin/wisp-deck",
+    "bin/npx-wisp-deck.js",
     "lib/",
     "templates/",
     "ghostty/",
@@ -19,7 +19,7 @@
     "darwin"
   ],
   "keywords": [
-    "ghost-tab",
+    "wisp-deck",
     "tmux",
     "terminal",
     "claude",
@@ -31,9 +31,9 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/JackUait/ghost-tab.git"
+    "url": "git+https://github.com/JackUait/wisp-deck.git"
   },
-  "homepage": "https://github.com/JackUait/ghost-tab",
+  "homepage": "https://github.com/JackUait/wisp-deck",
   "engines": {
     "node": ">=16"
   }

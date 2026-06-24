@@ -13,7 +13,7 @@ import (
 
 func TestMakefile_build_creates_binary(t *testing.T) {
 	root := projectRoot(t)
-	binPath := filepath.Join(root, "bin", "ghost-tab-tui")
+	binPath := filepath.Join(root, "bin", "wisp-deck-tui")
 
 	// Clean before test
 	runBashSnippet(t, "cd "+root+" && make clean 2>/dev/null || true", nil)
@@ -24,21 +24,21 @@ func TestMakefile_build_creates_binary(t *testing.T) {
 
 	out, code := runBashSnippet(t, "cd "+root+" && make build", nil)
 	assertExitCode(t, code, 0)
-	assertContains(t, out, "Building ghost-tab-tui")
-	assertContains(t, out, "Built bin/ghost-tab-tui")
+	assertContains(t, out, "Building wisp-deck-tui")
+	assertContains(t, out, "Built bin/wisp-deck-tui")
 
 	info, err := os.Stat(binPath)
 	if err != nil {
-		t.Fatalf("expected bin/ghost-tab-tui to exist, got error: %v", err)
+		t.Fatalf("expected bin/wisp-deck-tui to exist, got error: %v", err)
 	}
 	if info.Mode()&0111 == 0 {
-		t.Errorf("expected bin/ghost-tab-tui to be executable, mode=%v", info.Mode())
+		t.Errorf("expected bin/wisp-deck-tui to be executable, mode=%v", info.Mode())
 	}
 }
 
 func TestMakefile_clean_removes_binary(t *testing.T) {
 	root := projectRoot(t)
-	binPath := filepath.Join(root, "bin", "ghost-tab-tui")
+	binPath := filepath.Join(root, "bin", "wisp-deck-tui")
 
 	// Build first
 	_, code := runBashSnippet(t, "cd "+root+" && make build", nil)
@@ -54,7 +54,7 @@ func TestMakefile_clean_removes_binary(t *testing.T) {
 	_ = out
 
 	if _, err := os.Stat(binPath); !os.IsNotExist(err) {
-		t.Errorf("expected bin/ghost-tab-tui to be removed after make clean")
+		t.Errorf("expected bin/wisp-deck-tui to be removed after make clean")
 	}
 }
 
@@ -76,14 +76,14 @@ func TestSetup_resolve_share_dir_returns_brew_share_when_in_brew_prefix(t *testi
 	out, code := runBashFunc(t, "lib/setup.sh", "resolve_share_dir",
 		[]string{"/opt/homebrew/bin", "/opt/homebrew"}, nil)
 	assertExitCode(t, code, 0)
-	if strings.TrimSpace(out) != "/opt/homebrew/share/ghost-tab" {
-		t.Errorf("got %q, want %q", strings.TrimSpace(out), "/opt/homebrew/share/ghost-tab")
+	if strings.TrimSpace(out) != "/opt/homebrew/share/wisp-deck" {
+		t.Errorf("got %q, want %q", strings.TrimSpace(out), "/opt/homebrew/share/wisp-deck")
 	}
 }
 
 func TestSetup_resolve_share_dir_returns_parent_dir_when_not_in_brew_prefix(t *testing.T) {
 	dir := t.TempDir()
-	binDir := filepath.Join(dir, "ghost-tab", "bin")
+	binDir := filepath.Join(dir, "wisp-deck", "bin")
 	if err := os.MkdirAll(binDir, 0755); err != nil {
 		t.Fatalf("mkdir failed: %v", err)
 	}
@@ -91,7 +91,7 @@ func TestSetup_resolve_share_dir_returns_parent_dir_when_not_in_brew_prefix(t *t
 	out, code := runBashFunc(t, "lib/setup.sh", "resolve_share_dir",
 		[]string{binDir, ""}, nil)
 	assertExitCode(t, code, 0)
-	expected := filepath.Join(dir, "ghost-tab")
+	expected := filepath.Join(dir, "wisp-deck")
 	if strings.TrimSpace(out) != expected {
 		t.Errorf("got %q, want %q", strings.TrimSpace(out), expected)
 	}
@@ -99,7 +99,7 @@ func TestSetup_resolve_share_dir_returns_parent_dir_when_not_in_brew_prefix(t *t
 
 func TestSetup_resolve_share_dir_returns_parent_dir_when_brew_prefix_is_empty(t *testing.T) {
 	dir := t.TempDir()
-	binDir := filepath.Join(dir, "ghost-tab", "bin")
+	binDir := filepath.Join(dir, "wisp-deck", "bin")
 	if err := os.MkdirAll(binDir, 0755); err != nil {
 		t.Fatalf("mkdir failed: %v", err)
 	}
@@ -107,7 +107,7 @@ func TestSetup_resolve_share_dir_returns_parent_dir_when_brew_prefix_is_empty(t 
 	out, code := runBashFunc(t, "lib/setup.sh", "resolve_share_dir",
 		[]string{binDir, ""}, nil)
 	assertExitCode(t, code, 0)
-	expected := filepath.Join(dir, "ghost-tab")
+	expected := filepath.Join(dir, "wisp-deck")
 	if strings.TrimSpace(out) != expected {
 		t.Errorf("got %q, want %q", strings.TrimSpace(out), expected)
 	}
@@ -120,5 +120,5 @@ func TestSetup_resolve_share_dir_returns_parent_dir_when_brew_prefix_is_empty(t 
 func TestIntegration_sleep_feature_manual(t *testing.T) {
 	t.Skip("manual test - requires visual inspection")
 	// This test documents the expected behavior.
-	// Actual integration testing requires running ghost-tab.
+	// Actual integration testing requires running wisp-deck.
 }

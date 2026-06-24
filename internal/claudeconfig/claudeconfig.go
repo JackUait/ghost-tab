@@ -1,12 +1,12 @@
 // Package claudeconfig is the single source of truth for managing Claude
 // settings "configs" — settings JSON files launched via `claude --settings <file>`.
 //
-// Storage layout (all under the ghost-tab config dir):
+// Storage layout (all under the wisp-deck config dir):
 //   - <configsDir>/<file>.json     the settings files themselves
 //   - <listFile>                   name:file per line (display name decoupled)
 //   - <pointerFile>                active filename, or absent/"standard" = plain Claude
 //
-// Both the inline TUI panel and the `ghost-tab-tui claude-config` CLI call into
+// Both the inline TUI panel and the `wisp-deck-tui claude-config` CLI call into
 // this package, so the list format and mutation rules live in exactly one place.
 package claudeconfig
 

@@ -4,10 +4,10 @@ docs/plans/
 .DS_Store
 
 # Go artifacts
-bin/ghost-tab-tui
+bin/wisp-deck-tui
 *.test
 *.out
-ghost-tab-tui
+wisp-deck-tui
 .worktrees/
 .env
 

@@ -13,12 +13,12 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/jackuait/ghost-tab/internal/claudeaccount"
-	"github.com/jackuait/ghost-tab/internal/claudeconfig"
-	"github.com/jackuait/ghost-tab/internal/models"
-	"github.com/jackuait/ghost-tab/internal/opencodeconfig"
-	"github.com/jackuait/ghost-tab/internal/usage"
-	"github.com/jackuait/ghost-tab/internal/util"
+	"github.com/jackuait/wisp-deck/internal/claudeaccount"
+	"github.com/jackuait/wisp-deck/internal/claudeconfig"
+	"github.com/jackuait/wisp-deck/internal/models"
+	"github.com/jackuait/wisp-deck/internal/opencodeconfig"
+	"github.com/jackuait/wisp-deck/internal/usage"
+	"github.com/jackuait/wisp-deck/internal/util"
 )
 
 // bobTickMsg is sent on each bob animation tick.
@@ -3170,7 +3170,7 @@ func (m *MainMenuModel) renderInputBox() string {
 
 	lines = append(lines, topBorder)
 
-	title := primaryBoldStyle.Render("Ghost Tab")
+	title := primaryBoldStyle.Render("Wisp Deck")
 	var label string
 	if m.inputMode == "add-project" {
 		label = "Add Project"

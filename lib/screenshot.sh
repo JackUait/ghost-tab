@@ -4,7 +4,7 @@
 #
 # Why this exists: tmux delivers a drag-and-drop's paste to the *active* pane,
 # not the pane the cursor is over (an external file drag never produces a tmux
-# mouse event, so tmux cannot know the target pane). In ghost-tab's multi-pane
+# mouse event, so tmux cannot know the target pane). In wisp-deck's multi-pane
 # layout the active pane is often lazygit or the spare shell, so a screenshot
 # dropped onto the Claude pane lands elsewhere and Claude shows nothing. This
 # lets a tmux binding inject the latest screenshot straight into the AI pane,
@@ -82,7 +82,7 @@ _gt_pick_marked_pane() {
 # gt_ai_pane <tmux_cmd> <session> — print the AI pane index. Prefers the pane
 # marked with @gt_ai=1 (set by wrapper.sh at session creation), so it is robust
 # to tmux pane renumbering and non-default layouts. When no pane is marked (e.g.
-# a session created by an older ghost-tab), falls back to the full-height pane
+# a session created by an older wisp-deck), falls back to the full-height pane
 # on the right edge of the layout — where the AI tool lives — and only then to
 # index 1 as a last resort.
 gt_ai_pane() {
@@ -139,11 +139,11 @@ gt_paste_latest_screenshot() {
 $(gt_screenshot_temp_dirs)
 EOF
   latest="$(gt_latest_screenshot "$dir" "${temp_dirs[@]}")" || {
-    "$tmux_cmd" display-message "ghost-tab: no screenshot found in $dir" 2>/dev/null || true
+    "$tmux_cmd" display-message "wisp-deck: no screenshot found in $dir" 2>/dev/null || true
     return 0
   }
 
-  # Copy to a stable, ghost-tab-owned path first. A just-taken screenshot often
+  # Copy to a stable, wisp-deck-owned path first. A just-taken screenshot often
   # lives in a screencaptureui temp dir that macOS deletes within moments; if we
   # injected that path the AI tool would read a file that has already vanished
   # and silently attach nothing. The stable copy can't disappear out from under it.
@@ -157,11 +157,11 @@ EOF
   "$tmux_cmd" select-pane -t "${session}:0.${pane}" 2>/dev/null || true
 }
 
-# gt_stable_screenshot_dir — print (creating) a stable, ghost-tab-owned directory
+# gt_stable_screenshot_dir — print (creating) a stable, wisp-deck-owned directory
 # screenshots are copied into so their paths survive macOS deleting the original
 # screencaptureui temp file. Overridable via GT_SCREENSHOT_STASH_DIR for tests.
 gt_stable_screenshot_dir() {
-  local d="${GT_SCREENSHOT_STASH_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/ghost-tab/screenshots}"
+  local d="${GT_SCREENSHOT_STASH_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/wisp-deck/screenshots}"
   mkdir -p "$d" 2>/dev/null || true
   printf '%s\n' "$d"
 }

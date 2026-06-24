@@ -338,7 +338,7 @@ git commit -m "feat(tui): show per-model tokens and USD cost on stats screen"
 - [ ] `go build ./...`; `./run-tests.sh` (full suite green).
 - [ ] Ephemeral real-data preview: aggregate `~/.claude/projects`, print the rendered View, eyeball per-model rows + costs; delete the throwaway test.
 - [ ] `git pull --rebase && git push`; `git status` clean.
-- [ ] Rebuild local binary: `go build -ldflags "-X main.Version=$(cat VERSION)" -o "$HOME/.local/bin/ghost-tab-tui" ./cmd/ghost-tab-tui`.
+- [ ] Rebuild local binary: `go build -ldflags "-X main.Version=$(cat VERSION)" -o "$HOME/.local/bin/wisp-deck-tui" ./cmd/wisp-deck-tui`.
 
 ---
 

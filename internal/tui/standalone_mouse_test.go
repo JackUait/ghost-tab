@@ -6,7 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/jackuait/ghost-tab/internal/models"
+	"github.com/jackuait/wisp-deck/internal/models"
 	"github.com/muesli/termenv"
 )
 
@@ -20,7 +20,7 @@ func withTrueColor(t *testing.T) {
 	t.Cleanup(func() { lipgloss.SetColorProfile(prev) })
 }
 
-// --- config menu (top-level "Ghost Tab Configuration") ---
+// --- config menu (top-level "Wisp Deck Configuration") ---
 
 func TestConfigMenu_geometryMatchesRender(t *testing.T) {
 	m := NewConfigMenu(ConfigMenuOptions{})

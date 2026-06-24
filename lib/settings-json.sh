@@ -26,7 +26,7 @@ CSEOF
 }
 
 # Add waiting indicator hooks (Stop + PreToolUse + UserPromptSubmit) to settings.json.
-# Uses $GHOST_TAB_MARKER_FILE env var so hooks are safe outside Ghost Tab.
+# Uses $WISP_DECK_MARKER_FILE env var so hooks are safe outside Wisp Deck.
 # Outputs "added", "upgraded", or "exists".
 add_waiting_indicator_hooks() {
   local path="$1"
@@ -47,12 +47,12 @@ else:
 
 hooks = settings.setdefault("hooks", {})
 
-stop_cmd = 'if [ -n "$GHOST_TAB_MARKER_FILE" ]; then touch "$GHOST_TAB_MARKER_FILE"; fi'
-ask_cmd = 'if [ -n "$GHOST_TAB_MARKER_FILE" ]; then touch "$GHOST_TAB_MARKER_FILE" "${GHOST_TAB_MARKER_FILE}-ask"; fi'
-clear_cmd = 'if [ -n "$GHOST_TAB_MARKER_FILE" ]; then rm -f "$GHOST_TAB_MARKER_FILE" "${GHOST_TAB_MARKER_FILE}-ask"; fi'
-cooldown_cmd = 'if [ -n "$GHOST_TAB_MARKER_FILE" ]; then touch "${GHOST_TAB_MARKER_FILE}-cooldown"; fi'
+stop_cmd = 'if [ -n "$WISP_DECK_MARKER_FILE" ]; then touch "$WISP_DECK_MARKER_FILE"; fi'
+ask_cmd = 'if [ -n "$WISP_DECK_MARKER_FILE" ]; then touch "$WISP_DECK_MARKER_FILE" "${WISP_DECK_MARKER_FILE}-ask"; fi'
+clear_cmd = 'if [ -n "$WISP_DECK_MARKER_FILE" ]; then rm -f "$WISP_DECK_MARKER_FILE" "${WISP_DECK_MARKER_FILE}-ask"; fi'
+cooldown_cmd = 'if [ -n "$WISP_DECK_MARKER_FILE" ]; then touch "${WISP_DECK_MARKER_FILE}-cooldown"; fi'
 
-marker = "GHOST_TAB_MARKER_FILE"
+marker = "WISP_DECK_MARKER_FILE"
 
 # Check if current Stop-based format is already installed
 stop_list = hooks.get("Stop", [])
@@ -104,7 +104,7 @@ if stop_exists and not old_stop_needs_upgrade and not needs_cooldown_upgrade and
     print("exists")
     sys.exit(0)
 elif notif_exists or old_stop_needs_upgrade or needs_cooldown_upgrade or catchall_needs_fix or ask_needs_sidecar:
-    # Old format — remove ghost-tab hooks so they get re-added below
+    # Old format — remove wisp-deck hooks so they get re-added below
     for event in ["Stop", "Notification", "PreToolUse", "PostToolUse", "UserPromptSubmit"]:
         event_list = hooks.get(event, [])
         new_list = [
@@ -166,7 +166,7 @@ remove_waiting_indicator_hooks() {
 import json, sys, os
 
 settings_path = sys.argv[1]
-marker = "GHOST_TAB_MARKER_FILE"
+marker = "WISP_DECK_MARKER_FILE"
 
 try:
     with open(settings_path, "r") as f:

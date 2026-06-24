@@ -4,7 +4,7 @@
 
 **Goal:** Polish the add-project UX: consolidate two inconsistent flows into one two-field inline form with reactive name derivation, add a configurable default projects root directory setting, and warn on stale project paths instead of failing silently.
 
-**Architecture:** All new add-project logic lives in `MainMenuModel` in `internal/tui/mainmenu.go`. The standalone `ghost-tab-tui add-project` subcommand and its bash wrapper are deleted. A `Stale bool` field is added to `models.Project` and populated in `LoadProjects`. A new `projects-root` config file stores the default path pre-fill.
+**Architecture:** All new add-project logic lives in `MainMenuModel` in `internal/tui/mainmenu.go`. The standalone `wisp-deck-tui add-project` subcommand and its bash wrapper are deleted. A `Stale bool` field is added to `models.Project` and populated in `LoadProjects`. A new `projects-root` config file stores the default path pre-fill.
 
 **Tech Stack:** Go 1.21+, Bubbletea, Lipgloss, Cobra; Bash; Go test framework.
 
@@ -25,8 +25,8 @@
 | `test/internal/tui/input_test.go` | Modify | Remove only `TestProjectInput_*` tests (dead code); keep all others |
 | `internal/tui/input.go` | **Delete** | `ProjectInputModel` and `GetPathSuggestions` moved out |
 | `internal/models/project_test.go` | Create | Tests for `LoadProjects` stale field (models layer) |
-| `cmd/ghost-tab-tui/add_project.go` | **Delete** | Standalone subcommand deleted |
-| `cmd/ghost-tab-tui/root.go` | Modify | Remove `add-project` subcommand registration |
+| `cmd/wisp-deck-tui/add_project.go` | **Delete** | Standalone subcommand deleted |
+| `cmd/wisp-deck-tui/root.go` | Modify | Remove `add-project` subcommand registration |
 | `lib/project-actions-tui.sh` | **Delete** | Bash wrapper for deleted subcommand |
 | `wrapper.sh` | Modify | Remove `project-actions-tui` from lib array |
 | `test/bash/entrypoints_test.go` | Modify | Remove `project-actions-tui.sh` from expected-lib-files list |
@@ -42,7 +42,7 @@
 - Modify: `lib/projects.sh`
 - Modify: `test/bash/projects_test.go`
 
-The config file `~/.config/ghost-tab/projects-root` stores a single absolute path (tilde-expanded on write). `get_projects_root` reads it; `set_projects_root` writes (or removes) it.
+The config file `~/.config/wisp-deck/projects-root` stores a single absolute path (tilde-expanded on write). `get_projects_root` reads it; `set_projects_root` writes (or removes) it.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -168,7 +168,7 @@ Add to `test/internal/tui/projectfile_test.go`:
 ```go
 func TestIsDuplicateName(t *testing.T) {
 	projects := []models.Project{
-		{Name: "ghost-tab", Path: "/path/a"},
+		{Name: "wisp-deck", Path: "/path/a"},
 		{Name: "web", Path: "/path/b"},
 	}
 
@@ -176,10 +176,10 @@ func TestIsDuplicateName(t *testing.T) {
 		name string
 		want bool
 	}{
-		{"ghost-tab", true},
+		{"wisp-deck", true},
 		{"web", true},
 		{"api", false},
-		{"Ghost-Tab", false}, // case-sensitive
+		{"Wisp-Deck", false}, // case-sensitive
 		{"", false},
 	}
 	for _, tt := range tests {
@@ -252,7 +252,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/jackuait/ghost-tab/internal/models"
+	"github.com/jackuait/wisp-deck/internal/models"
 )
 
 func TestLoadProjects_StaleField_ExistingPath(t *testing.T) {
@@ -356,9 +356,9 @@ This task removes the standalone add-project subcommand and all dead code. `inpu
 - Modify: `internal/tui/autocomplete.go` — add `GetPathSuggestions`
 - Modify: `test/internal/tui/input_test.go` — remove only `TestProjectInput_*` tests
 - Delete: `internal/tui/input.go`
-- Delete: `cmd/ghost-tab-tui/add_project.go`
+- Delete: `cmd/wisp-deck-tui/add_project.go`
 - Delete: `lib/project-actions-tui.sh`
-- Modify: `cmd/ghost-tab-tui/root.go` — remove `addProjectCmd`
+- Modify: `cmd/wisp-deck-tui/root.go` — remove `addProjectCmd`
 - Modify: `wrapper.sh` — remove `project-actions-tui` from lib array
 - Modify: `test/bash/entrypoints_test.go` — remove `project-actions-tui.sh` from expected list
 - Modify: `test/bash/ai_select_test.go` — delete two tests that source the deleted lib
@@ -396,15 +396,15 @@ go test ./test/internal/tui/... -run "TestConfirmModel|TestPathSuggestions|TestC
 - [ ] **Step 4: Delete dead Go files**
 
 ```bash
-rm internal/tui/input.go cmd/ghost-tab-tui/add_project.go
+rm internal/tui/input.go cmd/wisp-deck-tui/add_project.go
 ```
 
 - [ ] **Step 5: Remove subcommand registration from root.go**
 
-In `cmd/ghost-tab-tui/root.go`, find and remove the line that registers `addProjectCmd`:
+In `cmd/wisp-deck-tui/root.go`, find and remove the line that registers `addProjectCmd`:
 
 ```bash
-grep -n "addProject\|add-project\|add_project" cmd/ghost-tab-tui/root.go
+grep -n "addProject\|add-project\|add_project" cmd/wisp-deck-tui/root.go
 ```
 
 Remove the `rootCmd.AddCommand(addProjectCmd)` line (and any `var addProjectCmd` declaration if it exists in root.go rather than the deleted file).
@@ -1044,7 +1044,7 @@ projectsRoot      string // current value loaded from projectsRootFile; "" = not
 
 ### Load projectsRoot on init
 
-In the caller that sets up `MainMenuModel` (check `cmd/ghost-tab-tui/main_menu.go` or wherever `SetProjectsRootFile` is called), also read and set `projectsRoot`. OR load it lazily in `renderSettingsBox`.
+In the caller that sets up `MainMenuModel` (check `cmd/wisp-deck-tui/main_menu.go` or wherever `SetProjectsRootFile` is called), also read and set `projectsRoot`. OR load it lazily in `renderSettingsBox`.
 
 Simpler approach: add a `LoadProjectsRoot()` method that reads the file and stores in `m.projectsRoot`:
 ```go
@@ -1462,12 +1462,12 @@ git commit -m "feat: show stale path warning and launch confirmation in project 
 ## Task 9: Wire up projectsRootFile in the binary entry point
 
 **Files:**
-- Modify: `cmd/ghost-tab-tui/main_menu.go` (or wherever `NewMainMenu` is set up and file paths are configured)
+- Modify: `cmd/wisp-deck-tui/main_menu.go` (or wherever `NewMainMenu` is set up and file paths are configured)
 
 Find the place where `SetProjectsFile`, `SetAIToolFile`, `SetSettingsFile` are called and add:
 
 ```go
-configDir := filepath.Join(os.Getenv("HOME"), ".config", "ghost-tab")
+configDir := filepath.Join(os.Getenv("HOME"), ".config", "wisp-deck")
 // or use the same XDG_CONFIG_HOME logic already present
 m.SetProjectsRootFile(filepath.Join(configDir, "projects-root"))
 m.LoadProjectsRoot()
@@ -1476,7 +1476,7 @@ m.LoadProjectsRoot()
 - [ ] **Step 1: Find the call site**
 
 ```bash
-grep -n "SetProjectsFile\|SetAIToolFile\|SetSettingsFile" cmd/ghost-tab-tui/*.go
+grep -n "SetProjectsFile\|SetAIToolFile\|SetSettingsFile" cmd/wisp-deck-tui/*.go
 ```
 
 - [ ] **Step 2: Add SetProjectsRootFile and LoadProjectsRoot calls**
@@ -1504,7 +1504,7 @@ shellcheck lib/projects.sh wrapper.sh
 - [ ] **Step 6: Commit**
 
 ```bash
-git add cmd/ghost-tab-tui/
+git add cmd/wisp-deck-tui/
 git commit -m "feat: wire projects root file into main menu binary"
 ```
 
