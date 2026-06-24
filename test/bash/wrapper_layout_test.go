@@ -88,6 +88,57 @@ func recordWrapperNewSession(t *testing.T) string {
 	return string(data)
 }
 
+// recordWrapperNewSessionForTool is like recordWrapperNewSession but launches
+// the wrapper restoring the given AI tool (with a matching mock command), so the
+// recorded chain reflects that tool's theming (e.g. the pane-border accent).
+func recordWrapperNewSessionForTool(t *testing.T, tool string) string {
+	t.Helper()
+	home := t.TempDir()
+	binDir := filepath.Join(home, ".local", "bin")
+	if err := os.MkdirAll(binDir, 0755); err != nil {
+		t.Fatalf("mkdir bin: %v", err)
+	}
+	recPath := filepath.Join(home, "rec")
+	mocks := map[string]string{
+		"tmux":          "#!/bin/bash\nif [ \"$1\" = \"new-session\" ]; then printf '%s\\n' \"$*\" > \"$GT_REC\"; exit 0; fi\nexit 0\n",
+		"lazygit":       "#!/bin/bash\nexit 0\n",
+		"ghost-tab-tui": "#!/bin/bash\nexit 0\n",
+		tool:            "#!/bin/bash\nexit 0\n",
+	}
+	for name, body := range mocks {
+		p := filepath.Join(binDir, name)
+		if err := os.WriteFile(p, []byte(body), 0755); err != nil {
+			t.Fatalf("write mock %s: %v", name, err)
+		}
+	}
+	projDir := filepath.Join(home, "proj")
+	if err := os.MkdirAll(projDir, 0755); err != nil {
+		t.Fatalf("mkdir proj: %v", err)
+	}
+	env := buildEnv(t, nil, "HOME="+home, "GT_REC="+recPath)
+	_, code := runBashScript(t, "wrapper.sh", []string{"--restore", projDir, tool}, env)
+	assertExitCode(t, code, 0)
+	data, err := os.ReadFile(recPath)
+	if err != nil {
+		t.Fatalf("new-session was never invoked (no record): %v", err)
+	}
+	return string(data)
+}
+
+// TestWrapper_active_pane_border_uses_tool_accent verifies the focused-pane
+// border follows the session's tool: purple (colour141) for OpenCode, orange
+// (colour209) for claude.
+func TestWrapper_active_pane_border_uses_tool_accent(t *testing.T) {
+	opencode := recordWrapperNewSessionForTool(t, "opencode")
+	if !strings.Contains(opencode, "pane-active-border-style fg=colour141") {
+		t.Errorf("opencode pane border should be purple (colour141); got:\n%s", opencode)
+	}
+	claude := recordWrapperNewSessionForTool(t, "claude")
+	if !strings.Contains(claude, "pane-active-border-style fg=colour209") {
+		t.Errorf("claude pane border should be orange (colour209); got:\n%s", claude)
+	}
+}
+
 // TestWrapper_default_panel_is_compact verifies that, with no saved panel_mode
 // setting, the left pane runs the compact changeset ledger (the application
 // default) rather than lazygit. recordWrapperNewSession uses a fresh HOME with

@@ -2,6 +2,16 @@
 # Tmux session helpers — build launch command, cleanup.
 # Depends on: process.sh (kill_tree)
 
+# Get the single accent (focus) colour for a tool's tmux chrome — the active pane
+# border and the active spare-tab chip. Mirrors the Go theme's Primary: purple
+# for OpenCode, orange for claude (the default). Prints a 256-colour number.
+get_tool_accent() {
+  case "${1:-}" in
+    opencode) echo "141" ;;   # #af87ff brand purple
+    *)        echo "209" ;;   # orange (claude default)
+  esac
+}
+
 # Build the AI tool launch command string.
 # Usage: build_ai_launch_cmd <tool> <claude_cmd> <opencode_cmd> [extra_args_or_project_dir]
 build_ai_launch_cmd() {

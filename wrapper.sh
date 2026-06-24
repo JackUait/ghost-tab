@@ -307,7 +307,10 @@ _screenshot_bind="bash -c 'source \"$_WRAPPER_DIR/lib/screenshot.sh\" && gt_past
 _spare_label="$(spare_tabs_socket "$SESSION_NAME")"
 mkdir -p "$SHARE_DIR"
 _spare_conf="$SHARE_DIR/spare-${SESSION_NAME}.conf"
-spare_tabs_config "$PROJECT_NAME" "$PROJECT_DIR" "$_WRAPPER_DIR/lib/spare-tabs.sh" "$_spare_label" > "$_spare_conf"
+# Focus accent for the tmux chrome (active pane border + active spare-tab chip):
+# purple for OpenCode, orange for claude. Matches the Go theme's Primary.
+_gt_accent="$(get_tool_accent "$SELECTED_AI_TOOL")"
+spare_tabs_config "$PROJECT_NAME" "$PROJECT_DIR" "$_WRAPPER_DIR/lib/spare-tabs.sh" "$_spare_label" "$_gt_accent" > "$_spare_conf"
 # Minimal cwd-only prompt for the spare shell (drops user@host and conda's
 # "(base)"). Echoes empty for non-zsh shells, leaving them untouched.
 _spare_zdotdir="$(spare_prompt_zdotdir "$SHARE_DIR" "$SESSION_NAME" "$SHELL" "${ZDOTDIR:-$HOME}")"
@@ -323,7 +326,7 @@ _spare_close_bind="bash -c 'source \"$_WRAPPER_DIR/lib/spare-tabs.sh\" && spare_
   set-option set-titles off \; \
   set-option exit-unattached on \; \
   set-option pane-border-style "fg=colour238" \; \
-  set-option pane-active-border-style "fg=colour209" \; \
+  set-option pane-active-border-style "fg=colour${_gt_accent}" \; \
   bind-key i run-shell "$_screenshot_bind" \; \
   bind-key t run-shell "env -u TMUX -u TMUX_PANE tmux -L $_spare_label new-window -c \"$PROJECT_DIR\"" \; \
   bind-key w run-shell "$_spare_close_bind" \; \

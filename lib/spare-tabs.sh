@@ -19,15 +19,17 @@ spare_tabs_socket() {
 }
 
 # Emit the inner tmux config (consumed via `tmux -f`).
-# Args: <project_name> <project_dir> <lib_path> <socket_label>
+# Args: <project_name> <project_dir> <lib_path> <socket_label> [accent_colour]
 # Note: project_dir/lib_path/label are baked in as literals; #{...} stay as
 # tmux formats. The mouse handler's \" are intentional — tmux unescapes them.
+# accent_colour is the 256-colour focus accent (default 209 orange); OpenCode
+# sessions pass 141 (purple) so the tab bar matches the theme.
 spare_tabs_config() {
-  local dir="$2" lib="$3" label="$4"
+  local dir="$2" lib="$3" label="$4" accent="${5:-209}"
 
   # Tab bar styling — deliberately minimal. The selected tab is the only thing
-  # with colour: its number on the orange colour209 accent (the app's focus
-  # colour, matching the pane-active border). Inactive tabs are plain bracketed
+  # with colour: its number on the accent colour (the app's focus colour,
+  # matching the pane-active border). Inactive tabs are plain bracketed
   # labels — [index] for every tab, the first included — no chip, no
   # decoration. The bar itself is transparent (bg=default), so the tabs and the
   # + button float on the terminal background. Closing is keyboard-only
@@ -48,7 +50,7 @@ set -g window-status-style "bg=default"
 # read as argument separators. The auto window list is blanked out to avoid a
 # duplicate. status-left-length is raised so the list is never truncated.
 set -g status-left-length 1000
-set -g status-left "#{W:#[range=user|sel:#{window_id}]#{?window_active,#[fg=colour235#,bg=colour209#,bold]  #{window_index}  #[nobold]#[norange]#[bg=default],#[default fg=colour245][ #{window_index} ]#[norange]} }#[range=user|new]#[fg=colour209,bg=colour236,bold]  +  #[nobold]#[norange]"
+set -g status-left "#{W:#[range=user|sel:#{window_id}]#{?window_active,#[fg=colour235#,bg=colour${accent}#,bold]  #{window_index}  #[nobold]#[norange]#[bg=default],#[default fg=colour245][ #{window_index} ]#[norange]} }#[range=user|new]#[fg=colour${accent},bg=colour236,bold]  +  #[nobold]#[norange]"
 set -g status-right ""
 set -g window-status-separator ""
 set -g window-status-format ""

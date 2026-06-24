@@ -164,6 +164,20 @@ func TestLoading_get_tool_palette_returns_opencode_palette(t *testing.T) {
 	assertContains(t, out, "60 61 62 99 135 141 147 183")
 }
 
+func TestTmuxSession_get_tool_accent_opencode_is_purple(t *testing.T) {
+	out, code := runBashFunc(t, "lib/tmux-session.sh", "get_tool_accent", []string{"opencode"}, nil)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "141")
+}
+
+func TestTmuxSession_get_tool_accent_defaults_to_orange(t *testing.T) {
+	for _, tool := range []string{"claude", "unknown", ""} {
+		out, code := runBashFunc(t, "lib/tmux-session.sh", "get_tool_accent", []string{tool}, nil)
+		assertExitCode(t, code, 0)
+		assertContains(t, out, "209")
+	}
+}
+
 func TestLoading_get_tool_palette_defaults_to_claude_for_unknown(t *testing.T) {
 	out, code := runBashFunc(t, "lib/loading.sh", "get_tool_palette", []string{"unknown"}, nil)
 	assertExitCode(t, code, 0)

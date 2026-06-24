@@ -69,6 +69,30 @@ func TestSpareTabs_config_core(t *testing.T) {
 	assertNotContains(t, out, "ghost-tab")
 }
 
+// The active-tab chip and the + button take their accent from the 5th arg so the
+// tab bar matches the session's tool theme (orange for claude, purple for
+// OpenCode). A purple accent must replace every orange colour209 in the bar.
+func TestSpareTabs_config_uses_accent_colour(t *testing.T) {
+	out, code := runBashFunc(t, "lib/spare-tabs.sh", "spare_tabs_config",
+		[]string{"ghost-tab", "/proj/dir", "/abs/lib/spare-tabs.sh", "gtspare_x", "141"}, nil)
+	assertExitCode(t, code, 0)
+	sl := lineWithPrefix(out, "set -g status-left ", "")
+	if sl == "" {
+		t.Fatalf("could not find status-left line in:\n%s", out)
+	}
+	assertContains(t, sl, "colour141")    // active tab + + button use the tool accent
+	assertNotContains(t, sl, "colour209") // no orange left when a purple accent is passed
+}
+
+// With no accent arg, the bar keeps the claude orange (colour209) default so
+// existing callers are unaffected.
+func TestSpareTabs_config_accent_defaults_to_orange(t *testing.T) {
+	out, code := runBashFunc(t, "lib/spare-tabs.sh", "spare_tabs_config",
+		[]string{"ghost-tab", "/proj/dir", "/abs/lib/spare-tabs.sh", "gtspare_x"}, nil)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "colour209")
+}
+
 // The tab bar must sit flush against the pane's left edge — status-left begins
 // directly with the window-list expansion, so the first tab is at column 0 with
 // no leading padding.
