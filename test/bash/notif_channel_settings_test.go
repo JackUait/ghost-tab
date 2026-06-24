@@ -148,6 +148,65 @@ func TestNotifChannel_set_and_restore_round_trip_present_empty_string(t *testing
 	}
 }
 
+// A corrupt (unparseable) settings.json must never be clobbered. Claude's own
+// settings.json holds the user's entire Claude Code configuration; silently
+// replacing it with {"preferredNotifChannel":"terminal_bell"} on a JSON parse
+// error would destroy all of it. set must fail safe: leave the file untouched
+// and save no prev value (so restore has nothing to wrongly write back).
+func TestNotifChannel_set_does_not_clobber_corrupt_settings(t *testing.T) {
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, "config")
+	os.MkdirAll(configDir, 0755)
+	claudeDir := filepath.Join(tmpDir, "claude")
+	os.MkdirAll(claudeDir, 0755)
+	settingsPath := filepath.Join(claudeDir, "settings.json")
+	corrupt := `{"preferredNotifChannel": "iterm2", "model": "opus",}` // trailing comma → invalid JSON
+	writeTempFile(t, claudeDir, "settings.json", corrupt)
+
+	snippet := notificationSnippet(t,
+		fmt.Sprintf(`set_claude_notif_channel %q %q`, configDir, settingsPath))
+	_, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0) // must not break the wrapper
+
+	got, err := os.ReadFile(settingsPath)
+	if err != nil {
+		t.Fatalf("read settings.json: %v", err)
+	}
+	if string(got) != corrupt {
+		t.Errorf("corrupt settings.json was modified — data loss.\n got: %q\nwant: %q", string(got), corrupt)
+	}
+	if _, err := os.Stat(filepath.Join(configDir, "prev-notif-channel")); !os.IsNotExist(err) {
+		t.Error("prev-notif-channel must not be saved when settings.json could not be parsed")
+	}
+}
+
+// restore must likewise never clobber a corrupt settings.json (else the user's
+// whole config is replaced with just the restored key).
+func TestNotifChannel_restore_does_not_clobber_corrupt_settings(t *testing.T) {
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, "config")
+	os.MkdirAll(configDir, 0755)
+	claudeDir := filepath.Join(tmpDir, "claude")
+	os.MkdirAll(claudeDir, 0755)
+	settingsPath := filepath.Join(claudeDir, "settings.json")
+	corrupt := `{"preferredNotifChannel": "terminal_bell", "model": "opus",}` // invalid JSON
+	writeTempFile(t, claudeDir, "settings.json", corrupt)
+	writeTempFile(t, configDir, "prev-notif-channel", "iterm2")
+
+	snippet := notificationSnippet(t,
+		fmt.Sprintf(`restore_claude_notif_channel %q %q`, configDir, settingsPath))
+	_, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+
+	got, err := os.ReadFile(settingsPath)
+	if err != nil {
+		t.Fatalf("read settings.json: %v", err)
+	}
+	if string(got) != corrupt {
+		t.Errorf("corrupt settings.json was modified on restore — data loss.\n got: %q\nwant: %q", string(got), corrupt)
+	}
+}
+
 func TestNotifChannel_restore_restores_saved_value(t *testing.T) {
 	tmpDir := t.TempDir()
 	configDir := filepath.Join(tmpDir, "config")

@@ -48,8 +48,13 @@ settings_path, prev_path = sys.argv[1], sys.argv[2]
 try:
     with open(settings_path) as f:
         settings = json.load(f)
-except (OSError, ValueError):
+except FileNotFoundError:
     settings = {}
+except (OSError, ValueError):
+    # settings.json exists but is unreadable/invalid JSON — never clobber it
+    # (it holds the user's entire Claude config). Fail safe: leave it untouched
+    # and save no prev value. Claude may chime, but we destroy nothing.
+    sys.exit(0)
 
 current = settings.get("preferredNotifChannel")
 
@@ -92,8 +97,12 @@ with open(prev_path) as f:
 try:
     with open(settings_path) as f:
         settings = json.load(f)
-except (OSError, ValueError):
+except FileNotFoundError:
     settings = {}
+except (OSError, ValueError):
+    # Don't clobber an unreadable/invalid settings.json with just the restored
+    # key — leave the user's file intact.
+    sys.exit(0)
 
 if prev == "__UNSET__":
     settings.pop("preferredNotifChannel", None)
