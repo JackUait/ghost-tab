@@ -186,6 +186,10 @@ GHOST_TAB_MARKER_FILE="/tmp/ghost-tab-waiting-$$"
 if [ "$SELECTED_AI_TOOL" = "claude" ]; then
   _claude_settings="${HOME}/.claude/settings.json"
   add_waiting_indicator_hooks "$_claude_settings" >/dev/null
+  # Silence Claude's own idle notification (preferredNotifChannel=terminal_bell,
+  # silent in Ghostty) so the ghost-tab sound flag — including "off" — is the
+  # single source of truth for the idle sound.
+  setup_sound_notification "${XDG_CONFIG_HOME:-$HOME/.config}/ghost-tab" "$_claude_settings"
 fi
 
 # Background watcher: switch to the AI pane once it's ready. Resolves the AI
@@ -212,6 +216,9 @@ cleanup() {
     done
     if ! ls /tmp/ghost-tab-waiting-* &>/dev/null; then
       remove_waiting_indicator_hooks "${HOME}/.claude/settings.json" >/dev/null 2>&1 || true
+      # Restore the notification channel only when the last session exits, so a
+      # concurrent session keeps Claude silenced.
+      remove_sound_notification "${XDG_CONFIG_HOME:-$HOME/.config}/ghost-tab" "${HOME}/.claude/settings.json" >/dev/null 2>&1 || true
     fi
   fi
   cleanup_tmux_session "$SESSION_NAME" "$WATCHER_PID" "$TMUX_CMD"

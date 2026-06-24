@@ -17,47 +17,93 @@ play_notification_sound() {
 # Set up sound notification for the given AI tool.
 # Manages only the notification channel (to prevent double sounds).
 # Sound playback is handled by the tab-title-watcher.
-# Usage: setup_sound_notification <config_dir>
+# Usage: setup_sound_notification <config_dir> [settings_path]
 setup_sound_notification() {
   local config_dir="$1"
-  set_claude_notif_channel "$config_dir"
+  local settings_path="${2:-$HOME/.claude/settings.json}"
+  set_claude_notif_channel "$config_dir" "$settings_path"
 }
 
-# Set Claude Code's preferredNotifChannel to terminal_bell to prevent
-# double sounds (ghost-tab hook + built-in notification).
-# Saves the previous value to <config_dir>/prev-notif-channel for restoration.
-# Usage: set_claude_notif_channel <config_dir>
+# Silence Claude Code's own idle notification by setting preferredNotifChannel
+# to terminal_bell directly in settings.json (Claude 2.1.x removed the
+# `claude config` subcommand). Ghostty has no audible bell, so terminal_bell is
+# silent — which leaves ghost-tab's afplay (gated by the sound flag) as the
+# single audible source. This is what makes the "off" setting truly silent and
+# also prevents double sounds when sound is on.
+#
+# The prior value is saved to <config_dir>/prev-notif-channel so it can be
+# restored when the last session exits. Idempotent and multi-session safe: if
+# the channel is already terminal_bell (another live session set it), the saved
+# prev value is left untouched so it isn't clobbered with "terminal_bell".
+# Usage: set_claude_notif_channel <config_dir> [settings_path]
 set_claude_notif_channel() {
   local config_dir="$1"
-  if ! command -v claude &>/dev/null; then
-    return 0
-  fi
+  local settings_path="${2:-$HOME/.claude/settings.json}"
   mkdir -p "$config_dir"
-  local prev
-  prev="$(CLAUDECODE="" claude config get preferredNotifChannel 2>/dev/null || true)"
-  echo "$prev" > "$config_dir/prev-notif-channel"
-  CLAUDECODE="" claude config set preferredNotifChannel terminal_bell 2>/dev/null || true
+  python3 - "$settings_path" "$config_dir/prev-notif-channel" << 'PYEOF'
+import json, os, sys
+
+settings_path, prev_path = sys.argv[1], sys.argv[2]
+
+try:
+    with open(settings_path) as f:
+        settings = json.load(f)
+except (OSError, ValueError):
+    settings = {}
+
+current = settings.get("preferredNotifChannel")
+
+# Already silenced (e.g. by another live ghost-tab session) — don't clobber the
+# previously-saved value with "terminal_bell".
+if current == "terminal_bell":
+    sys.exit(0)
+
+# "__UNSET__" sentinel distinguishes "key absent" from an empty-string value so
+# restore can remove the key rather than set it to "".
+with open(prev_path, "w") as f:
+    f.write("__UNSET__" if current is None else str(current))
+
+settings["preferredNotifChannel"] = "terminal_bell"
+os.makedirs(os.path.dirname(settings_path) or ".", exist_ok=True)
+with open(settings_path, "w") as f:
+    json.dump(settings, f, indent=2)
+    f.write("\n")
+PYEOF
 }
 
-# Restore Claude Code's preferredNotifChannel from saved value.
-# If no saved value exists, does nothing.
-# Usage: restore_claude_notif_channel <config_dir>
+# Restore Claude Code's preferredNotifChannel from the saved value (or remove
+# the key when it was previously unset). No-op if no saved value exists.
+# Usage: restore_claude_notif_channel <config_dir> [settings_path]
 restore_claude_notif_channel() {
   local config_dir="$1"
+  local settings_path="${2:-$HOME/.claude/settings.json}"
   local saved_file="$config_dir/prev-notif-channel"
   if [ ! -f "$saved_file" ]; then
     return 0
   fi
-  if ! command -v claude &>/dev/null; then
-    return 0
-  fi
-  local prev
-  prev="$(tr -d '[:space:]' < "$saved_file")"
-  if [[ -n "$prev" ]]; then
-    CLAUDECODE="" claude config set preferredNotifChannel "$prev" 2>/dev/null || true
-  else
-    CLAUDECODE="" claude config set preferredNotifChannel "" 2>/dev/null || true
-  fi
+  python3 - "$settings_path" "$saved_file" << 'PYEOF'
+import json, sys
+
+settings_path, prev_path = sys.argv[1], sys.argv[2]
+
+with open(prev_path) as f:
+    prev = f.read().strip("\n")
+
+try:
+    with open(settings_path) as f:
+        settings = json.load(f)
+except (OSError, ValueError):
+    settings = {}
+
+if prev == "__UNSET__":
+    settings.pop("preferredNotifChannel", None)
+else:
+    settings["preferredNotifChannel"] = prev
+
+with open(settings_path, "w") as f:
+    json.dump(settings, f, indent=2)
+    f.write("\n")
+PYEOF
   rm -f "$saved_file"
 }
 
@@ -150,61 +196,9 @@ with open(path, 'w') as f:
 
 # Remove sound notification setup for the given AI tool.
 # Restores the notification channel.
-# Usage: remove_sound_notification <config_dir>
+# Usage: remove_sound_notification <config_dir> [settings_path]
 remove_sound_notification() {
   local config_dir="$1"
-  restore_claude_notif_channel "$config_dir"
-}
-
-# Toggle sound notification for the given AI tool.
-# Usage: toggle_sound_notification <tool> <config_dir>
-# Reads current state, flips it, applies the change.
-toggle_sound_notification() {
-  local tool="$1" config_dir="$2"
-  local current
-  current="$(is_sound_enabled "$tool" "$config_dir")"
-
-  if [[ "$current" == "true" ]]; then
-    set_sound_feature_flag "$tool" "$config_dir" false
-    case "$tool" in
-      claude)
-        remove_sound_notification "$config_dir"
-        ;;
-    esac
-    success "Sound notifications disabled"
-  else
-    set_sound_feature_flag "$tool" "$config_dir" true
-    case "$tool" in
-      claude)
-        setup_sound_notification "$config_dir"
-        ;;
-    esac
-    success "Sound notifications enabled"
-  fi
-}
-
-# Apply sound notification state for the given AI tool.
-# Usage: apply_sound_notification <tool> <config_dir> <sound_name>
-# If sound_name is empty, disables sound. Otherwise enables with that sound.
-apply_sound_notification() {
-  local tool="$1" config_dir="$2" sound_name="$3"
-
-  if [[ -z "$sound_name" ]]; then
-    set_sound_feature_flag "$tool" "$config_dir" false
-    case "$tool" in
-      claude)
-        remove_sound_notification "$config_dir"
-        ;;
-    esac
-    success "Sound notifications disabled"
-  else
-    set_sound_feature_flag "$tool" "$config_dir" true
-    set_sound_name "$tool" "$config_dir" "$sound_name"
-    case "$tool" in
-      claude)
-        setup_sound_notification "$config_dir"
-        ;;
-    esac
-    success "Sound notifications enabled"
-  fi
+  local settings_path="${2:-$HOME/.claude/settings.json}"
+  restore_claude_notif_channel "$config_dir" "$settings_path"
 }
