@@ -15,7 +15,7 @@ func TestPlanRow_rendersOnSettingsTab(t *testing.T) {
 	m := subTestMenu("claude")
 	m.SetActiveTab(TabSettings)
 	out := stripAnsi(m.renderSettingsBox())
-	if !strings.Contains(out, "PLAN") {
+	if !strings.Contains(out, iconPlan) {
 		t.Errorf("settings box should carry the PLAN switcher row:\n%s", out)
 	}
 }
@@ -24,7 +24,7 @@ func TestPlanRow_rendersOnStatsTab(t *testing.T) {
 	m := subTestMenu("claude")
 	m.SetActiveTab(TabStats)
 	out := stripAnsi(m.renderStatsBox())
-	if !strings.Contains(out, "PLAN") {
+	if !strings.Contains(out, iconPlan) {
 		t.Errorf("stats box should carry the PLAN switcher row:\n%s", out)
 	}
 }
@@ -37,10 +37,10 @@ func TestPlanRow_sitsAboveTabBarOnSettings(t *testing.T) {
 	lines := strings.Split(stripAnsi(m.renderSettingsBox()), "\n")
 	planIdx, agentIdx, tabIdx := -1, -1, -1
 	for i, l := range lines {
-		if strings.Contains(l, "AGENT") {
+		if strings.Contains(l, iconAgent) {
 			agentIdx = i
 		}
-		if strings.Contains(l, "PLAN") {
+		if strings.Contains(l, iconPlan) {
 			planIdx = i
 		}
 		// The tab bar is the row that lists the section names together.

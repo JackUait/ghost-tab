@@ -7,6 +7,24 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+// Header switcher rows (LOGIN / AGENT / PLAN) are captioned with a single
+// nerd-font glyph instead of an all-caps word. The icon reads at a glance and
+// keeps the chevron cluster from feeling noisy and cramped. All three glyphs are
+// 3-byte BMP private-use runes that render one cell wide, so the captions are the
+// same width and the chevrons line up vertically across the rows.
+const (
+	iconLogin = "" // nf-fa-user  — which Claude login is active
+	iconAgent = "" // nf-fa-robot — the AI agent (Claude Code / OpenCode)
+	iconPlan  = "" // nf-fa-crown — the Claude subscription tier
+)
+
+// settingsCaption renders a header-row caption glyph in the neutral label gray.
+// The two trailing spaces separate the icon from the chevron cluster and, being
+// identical across rows, keep the LOGIN/AGENT/PLAN chevrons aligned.
+func settingsCaption(glyph string) string {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Render(glyph + "  ")
+}
+
 // actionBarFor returns the contextual action label text for a selected row type.
 // hasWorktrees is consulted for project rows: the "W Worktrees" action only does
 // something when the project actually has worktrees, so it is hidden otherwise.
@@ -46,7 +64,6 @@ func (m *MainMenuModel) renderActionBar(leftBorder, rightBorder string) string {
 func (m *MainMenuModel) renderTitleRow(leftBorder, rightBorder string) string {
 	primaryStyle := lipgloss.NewStyle().Foreground(m.theme.Primary)
 	primaryBoldStyle := lipgloss.NewStyle().Foreground(m.theme.Primary).Bold(true)
-	labelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245")) // tiny neutral caption
 
 	title := primaryBoldStyle.Render("Ghost Tab")
 	aiDisplay := AIToolDisplayName(m.CurrentAITool())
@@ -59,8 +76,8 @@ func (m *MainMenuModel) renderTitleRow(leftBorder, rightBorder string) string {
 		chevronStyle = lipgloss.NewStyle().Foreground(m.theme.Accent)
 		nameStyle = lipgloss.NewStyle().Foreground(m.theme.Bright).Bold(true)
 	}
-	// "AGENT" caption labels the control so it reads as "this switches the agent".
-	agentLabel := labelStyle.Render("AGENT ")
+	// The robot glyph captions the control so it reads as "this switches the agent".
+	agentLabel := settingsCaption(iconAgent)
 	var aiPart string
 	if len(m.aiTools) > 1 {
 		aiPart = agentLabel + chevronStyle.Render("◂ ") + nameStyle.Render(aiDisplay) + chevronStyle.Render(" ▸")
@@ -99,8 +116,8 @@ func (m *MainMenuModel) accountRowCount() int {
 
 // renderAccountRow renders the active native Claude login, left-aligned at the
 // very top of the header chrome — above the AGENT picker — mirroring the PLAN
-// row's chevron/focus styling. The "LOGIN" caption pads to the width of "AGENT "
-// so the chevrons line up vertically with the rows below.
+// row's chevron/focus styling. The user-glyph caption is the same width as the
+// rows below, so the chevrons line up vertically.
 func (m *MainMenuModel) renderAccountRow(leftBorder, rightBorder string) string {
 	label := m.CurrentClaudeAccountLabel()
 	var valColor lipgloss.Color
@@ -114,8 +131,7 @@ func (m *MainMenuModel) renderAccountRow(leftBorder, rightBorder string) string 
 		nameStyle = lipgloss.NewStyle().Foreground(m.theme.Bright).Bold(true)
 	}
 
-	labelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-	acctLabel := labelStyle.Render("LOGIN ")
+	acctLabel := settingsCaption(iconLogin)
 	// The row only renders when a managed account exists, so there is always a
 	// choice to switch between (Default + the account) — the chevrons always show.
 	chevronStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
@@ -148,10 +164,9 @@ func (m *MainMenuModel) renderSubscriptionRow(leftBorder, rightBorder string) st
 		nameStyle = lipgloss.NewStyle().Foreground(m.theme.Bright).Bold(true)
 	}
 
-	// "PLAN" caption mirrors the AGENT label above it. The extra trailing space
-	// pads it to the width of "AGENT " so the switcher chevrons line up vertically.
-	labelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-	planLabel := labelStyle.Render("PLAN  ")
+	// The crown glyph captions the subscription, mirroring the AGENT/LOGIN icons
+	// above it so the three switcher chevrons line up vertically.
+	planLabel := settingsCaption(iconPlan)
 	// Show cycle chevrons only when there is something to switch to. Idle chevrons
 	// are neutral gray; they brighten only when this row holds focus.
 	var content string

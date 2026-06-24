@@ -44,10 +44,10 @@ func TestMenuBox_AIToolRightAligned(t *testing.T) {
 
 	// Strip ANSI codes to check raw layout
 	raw := stripAnsi(titleRow)
-	agentIdx := strings.Index(raw, "AGENT")
+	agentIdx := strings.Index(raw, iconAgent)
 	ghostIdx := strings.Index(raw, "Ghost Tab")
 	if agentIdx < 0 || ghostIdx < 0 {
-		t.Fatal("could not find AGENT or Ghost Tab in stripped title row")
+		t.Fatal("could not find AGENT icon or Ghost Tab in stripped title row")
 	}
 	// AGENT switcher comes first (left), Ghost Tab after it (right).
 	if agentIdx > ghostIdx {

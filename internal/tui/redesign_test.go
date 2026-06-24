@@ -106,14 +106,18 @@ func TestActionBarFor_usesRealKeyLetters(t *testing.T) {
 	}
 }
 
-// The agent picker gets a tiny AGENT label so the right-hand control reads as
-// "this switches the agent" rather than a cramped, unlabeled chevron cluster.
+// The agent picker is captioned with a single nerd-font glyph (the robot) so the
+// right-hand control reads as "this switches the agent" without the all-caps word
+// adding visual noise to the chevron cluster.
 func TestRenderTitleRow_hasAgentLabel(t *testing.T) {
 	m := NewMainMenu(nil, []string{"claude", "opencode"}, "claude", "none") // 2 tools → chevrons
 	_, _, _, lb, rb := m.boxBorders()
 	row := stripAnsi(m.renderTitleRow(lb, rb))
-	if !strings.Contains(row, "AGENT") {
-		t.Errorf("title row should carry an AGENT label: %q", row)
+	if !strings.Contains(row, iconAgent) {
+		t.Errorf("title row should carry the AGENT icon: %q", row)
+	}
+	if strings.Contains(row, "AGENT") {
+		t.Errorf("title row should no longer carry the all-caps AGENT word: %q", row)
 	}
 	if !strings.Contains(row, "Claude Code") {
 		t.Errorf("title row should still show the agent name: %q", row)
@@ -232,17 +236,21 @@ func TestSettingsRow_keepsWashWhenBodyFocused(t *testing.T) {
 	}
 }
 
-// The subscription picker gets a tiny PLAN label mirroring the AGENT label.
+// The subscription picker is captioned with the crown glyph, mirroring the AGENT
+// row's single-icon caption.
 func TestRenderSubscriptionRow_hasPlanLabel(t *testing.T) {
 	m := subFocusMenu(t, "claude", true)
 	row := stripAnsi(m.renderSubscriptionRow("│", "│"))
-	if !strings.Contains(row, "PLAN") {
-		t.Errorf("subscription row should carry a PLAN label: %q", row)
+	if !strings.Contains(row, iconPlan) {
+		t.Errorf("subscription row should carry the PLAN icon: %q", row)
+	}
+	if strings.Contains(row, "PLAN") {
+		t.Errorf("subscription row should no longer carry the all-caps PLAN word: %q", row)
 	}
 }
 
-// The PLAN label is shorter than AGENT, so it gets extra padding to keep the
-// switcher chevrons vertically aligned between the two rows.
+// Each caption is a single one-cell glyph, so the switcher chevrons stay
+// vertically aligned between the AGENT and PLAN rows.
 func TestRenderSubscriptionRow_chevronAlignsWithAgentRow(t *testing.T) {
 	m := subFocusMenu(t, "claude", true)
 	agentRow := stripAnsi(m.renderTitleRow("│", "│"))

@@ -31,7 +31,7 @@ func TestAccountRow_hiddenWhenOnlyDefault(t *testing.T) {
 		t.Errorf("LOGIN row should not be focusable when hidden")
 	}
 	out := stripAnsi(m.renderMenuBox())
-	if strings.Contains(out, "LOGIN") {
+	if strings.Contains(out, iconLogin) {
 		t.Errorf("LOGIN row should be hidden with a single account:\n%s", out)
 	}
 }
@@ -48,8 +48,8 @@ func TestAccountRow_shownAtTopWhenAccountsExist(t *testing.T) {
 		t.Errorf("LOGIN row should be focusable with a managed account")
 	}
 	out := stripAnsi(m.renderMenuBox())
-	loginIdx := strings.Index(out, "LOGIN")
-	agentIdx := strings.Index(out, "AGENT")
+	loginIdx := strings.Index(out, iconLogin)
+	agentIdx := strings.Index(out, iconAgent)
 	if loginIdx < 0 || agentIdx < 0 {
 		t.Fatalf("LOGIN/AGENT rows missing:\n%s", out)
 	}
