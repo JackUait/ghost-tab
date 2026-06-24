@@ -1,6 +1,6 @@
 {
   "name": "ghost-tab",
-  "version": "2.13.0",
+  "version": "2.14.0",
   "description": "Terminal + tmux wrapper for AI coding tools (Claude Code, OpenCode)",
   "bin": {
     "ghost-tab": "bin/npx-ghost-tab.js"
