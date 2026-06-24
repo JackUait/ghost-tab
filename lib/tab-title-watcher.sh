@@ -90,8 +90,11 @@ apply_session_panel_mode() {
   local ledger
   ledger="$(discover_ledger_pane "$session" "$tmux_cmd")"
   [ -z "$ledger" ] && return 0
-  # Wrap in bash -c so compact_view's bash-isms survive tmux's default shell.
-  "$tmux_cmd" respawn-pane -k -t "$session:0.$ledger" "bash -c '$pane0_cmd'" 2>/dev/null || return 0
+  # Pass the command RAW, exactly as the launch-time new-session does (wrapper.sh).
+  # tmux runs it through the same shell, so compact_view's bash-isms still work —
+  # and, unlike a bash -c '...' wrapper, a single quote in $project_dir/$lib_dir
+  # (e.g. /Users/o'brien) cannot break out and corrupt the command.
+  "$tmux_cmd" respawn-pane -k -t "$session:0.$ledger" "$pane0_cmd" 2>/dev/null || return 0
 
   local ai_pane win_w cells
   ai_pane="$(discover_ai_pane "$session" "$tmux_cmd")"

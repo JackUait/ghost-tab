@@ -249,6 +249,48 @@ func TestLiveSettings_panel_mode_switch_to_compact_uses_compact_view(t *testing.
 	assertNotContains(t, got, "set-option -t dev-x @gt_panel_mode")
 }
 
+// Regression: the ledger respawn must pass the pane command RAW (exactly as the
+// launch-time new-session does), never wrapped in `bash -c '...'`. The single-quote
+// wrapper silently corrupts the command when a project/lib path contains an
+// apostrophe (e.g. /Users/o'brien), collapsing the pane layout. Mock reports the
+// current mode as "full" so requesting "compact" actually respawns.
+const panelModeFullTmux = `#!/bin/bash
+printf '%s\n' "$*" >> "$GT_REC"
+case "$1" in
+  show-options)   echo "full" ;;
+  list-panes)     printf '%s\n' "0 0 0" "1 0 20" "2 47 0" ;;
+  display-message) echo "100" ;;
+esac
+exit 0
+`
+
+func TestLiveSettings_panel_mode_respawn_is_raw_not_bash_c(t *testing.T) {
+	dir := t.TempDir()
+	rec := filepath.Join(dir, "rec")
+	binDir := mockCommand(t, dir, "tmux", panelModeFullTmux)
+	env := buildEnv(t, []string{binDir}, "GT_REC="+rec)
+	tmuxPath := filepath.Join(binDir, "tmux")
+
+	root := projectRoot(t)
+	tuiPath := filepath.Join(root, "lib", "tui.sh")
+	watcherPath := filepath.Join(root, "lib", "tab-title-watcher.sh")
+	// A project dir containing an apostrophe — the exact input that breaks a
+	// single-quoted bash -c wrapper.
+	snippet := fmt.Sprintf(
+		"source %q && source %q && apply_session_panel_mode %q dev-x compact \"/Users/o'brien/proj\" /libdir /usr/bin/lazygit",
+		tuiPath, watcherPath, tmuxPath)
+
+	_, code := runBashSnippet(t, snippet, env)
+	assertExitCode(t, code, 0)
+	data, _ := os.ReadFile(rec)
+	got := string(data)
+	// Must respawn with the raw command, no bash -c wrapper.
+	assertContains(t, got, "respawn-pane")
+	assertNotContains(t, got, "bash -c")
+	// The compact command and the apostrophe-bearing path survive intact.
+	assertContains(t, got, "compact_view \"/Users/o'brien/proj\"")
+}
+
 // --- apply_settings_to_all_sessions: theme + panel_mode across every session ---
 
 const allSettingsTmux = `#!/bin/bash
