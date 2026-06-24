@@ -4,6 +4,30 @@
 
 _TAB_TITLE_WATCHER_PID=""
 
+# Read a single key=value line from the Ghost Tab settings file. Echoes the
+# value (whitespace stripped), or nothing if the file or key is absent. Used to
+# re-read settings live each poll tick so a mid-session Settings-menu change
+# reaches the running session.
+# Usage: read_settings_value <settings_file> <key>
+read_settings_value() {
+  local file="$1" key="$2"
+  [ -f "$file" ] || return 0
+  grep "^${key}=" "$file" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '[:space:]'
+}
+
+# Re-apply the theme accent to a running tmux session's chrome so a mid-session
+# theme change takes effect without a relaunch: the outer active-pane border and
+# (when lib/spare-tabs.sh is loaded) the nested spare-pane tab bar.
+# Usage: apply_session_theme <tmux_cmd> <session_name> <accent>
+apply_session_theme() {
+  local tmux_cmd="$1" session_name="$2" accent="$3"
+  [ -z "$accent" ] && return 0
+  "$tmux_cmd" set-option -t "$session_name" pane-active-border-style "fg=colour${accent}" 2>/dev/null || true
+  if declare -f spare_tabs_socket >/dev/null 2>&1 && declare -f spare_tabs_set_accent >/dev/null 2>&1; then
+    spare_tabs_set_accent "$(spare_tabs_socket "$session_name")" "$accent"
+  fi
+}
+
 # Return the age of the marker file in seconds.
 # Usage: marker_age <file>
 # Outputs the number of seconds since the file was last modified.
@@ -144,19 +168,56 @@ start_tab_title_watcher() {
     local host
     host=$(hostname 2>/dev/null)
 
+    # Settings are re-read live each tick (below) so a mid-session change in the
+    # Settings menu reaches THIS running session — and since every session runs
+    # its own watcher, the change lands across all open windows at once. The
+    # launch-time arg is the fallback when a value is unset.
+    local settings_file=""
+    [ -n "$config_dir" ] && settings_file="$config_dir/settings"
+    local cur_tab_title="$tab_title_setting"
+    local last_tab_title="$tab_title_setting"
+    local last_accent=""
+
     local was_waiting=false
     while true; do
       sleep 0.5
+
+      # Live settings re-read: pick up tab-title mode + theme changes mid-session.
+      if [ -n "$settings_file" ] && [ -f "$settings_file" ]; then
+        local _tt
+        _tt=$(read_settings_value "$settings_file" tab_title)
+        [ -n "$_tt" ] && cur_tab_title="$_tt"
+        if declare -f gt_resolve_theme >/dev/null 2>&1; then
+          local _theme _accent
+          _theme=$(read_settings_value "$settings_file" theme)
+          _accent=$(get_theme_accent "$(gt_resolve_theme "$_theme" "$ai_tool")")
+          # Only touch tmux when the accent actually changed, to avoid a
+          # set-option subprocess on every 0.5s tick.
+          if [ "$_accent" != "$last_accent" ]; then
+            apply_session_theme "$tmux_cmd" "$session_name" "$_accent"
+            last_accent="$_accent"
+          fi
+        fi
+      fi
+
       local state
       state=$(check_ai_tool_state "$ai_tool" "$session_name" "$tmux_cmd" "$marker_file" "$ai_pane")
 
       # In model mode the AI tool owns the title: read the AI pane's title each
       # poll and mirror it to the tab (falling back to the project name before
       # the model has set one). The waiting/sound logic below still runs.
-      if [ "$tab_title_setting" = "model" ]; then
+      if [ "$cur_tab_title" = "model" ]; then
         local pane_title
         pane_title=$("$tmux_cmd" display-message -p -t "$session_name:0.$ai_pane" '#{pane_title}' 2>/dev/null)
         set_tab_title "$(model_tab_title "$pane_title" "$host" "$project_name")"
+      fi
+
+      # If the title mode changed mid-session, refresh the tab for the current
+      # state immediately (the waiting/active transitions below only fire on a
+      # state flip, so without this a mode change would not show until then).
+      if [ "$cur_tab_title" != "$last_tab_title" ]; then
+        apply_tab_title "$state" "$cur_tab_title" "$project_name" "$ai_tool"
+        last_tab_title="$cur_tab_title"
       fi
 
       if [ "$state" = "waiting" ] && [ "$was_waiting" = false ]; then
@@ -168,14 +229,14 @@ start_tab_title_watcher() {
         local age
         age=$(marker_age "$marker_file") || continue
         if [ "$age" -ge 1 ]; then
-          apply_tab_title "waiting" "$tab_title_setting" "$project_name" "$ai_tool"
+          apply_tab_title "waiting" "$cur_tab_title" "$project_name" "$ai_tool"
           if [[ -n "$config_dir" ]]; then
             play_notification_sound "$ai_tool" "$config_dir"
           fi
           was_waiting=true
         fi
       elif [ "$state" = "active" ] && [ "$was_waiting" = true ]; then
-        apply_tab_title "active" "$tab_title_setting" "$project_name" "$ai_tool"
+        apply_tab_title "active" "$cur_tab_title" "$project_name" "$ai_tool"
         was_waiting=false
       fi
     done

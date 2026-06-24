@@ -18,6 +18,24 @@ spare_tabs_socket() {
   printf 'gtspare_%s' "$(printf '%s' "$session_name" | tr -c 'A-Za-z0-9_-' '_')"
 }
 
+# Build the inner tmux status-left value (the whole tab bar + [ + ] button).
+# Args: [accent_colour]  — the 256-colour focus accent (default 209 orange).
+# Kept separate so both the launch-time config and the live theme repaint
+# (spare_tabs_set_accent) share one definition. The selected tab and the +
+# button are the only coloured elements; inactive tabs are plain [ N ] labels.
+spare_tabs_status_left() {
+  local accent="${1:-209}"
+  printf '#{W:#[range=user|sel:#{window_id}]#{?window_active,#[fg=colour235#,bg=colour%s#,bold]  #{window_index}  #[nobold]#[norange]#[bg=default],#[default fg=colour245][ #{window_index} ]#[norange]} }#[range=user|new]#[fg=colour%s,bg=colour236,bold]  +  #[nobold]#[norange]' "$accent" "$accent"
+}
+
+# Live-repaint a running inner tmux's tab bar with a new accent colour. Used to
+# propagate a mid-session theme change into every open window's spare pane.
+# Args: <socket_label> <accent_colour>
+spare_tabs_set_accent() {
+  local label="$1" accent="$2"
+  tmux -L "$label" set -g status-left "$(spare_tabs_status_left "$accent")" 2>/dev/null || true
+}
+
 # Emit the inner tmux config (consumed via `tmux -f`).
 # Args: <project_name> <project_dir> <lib_path> <socket_label> [accent_colour]
 # Note: project_dir/lib_path/label are baked in as literals; #{...} stay as
@@ -50,7 +68,7 @@ set -g window-status-style "bg=default"
 # read as argument separators. The auto window list is blanked out to avoid a
 # duplicate. status-left-length is raised so the list is never truncated.
 set -g status-left-length 1000
-set -g status-left "#{W:#[range=user|sel:#{window_id}]#{?window_active,#[fg=colour235#,bg=colour${accent}#,bold]  #{window_index}  #[nobold]#[norange]#[bg=default],#[default fg=colour245][ #{window_index} ]#[norange]} }#[range=user|new]#[fg=colour${accent},bg=colour236,bold]  +  #[nobold]#[norange]"
+set -g status-left "$(spare_tabs_status_left "$accent")"
 set -g status-right ""
 set -g window-status-separator ""
 set -g window-status-format ""
