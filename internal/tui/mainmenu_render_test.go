@@ -73,6 +73,20 @@ func TestMenuBox_AIToolRightAligned(t *testing.T) {
 	}
 }
 
+func TestGhostIconCodepoint(t *testing.T) {
+	// iconGhost must be nf-md-ghost (U+F02A0). The neighbouring MDI code points
+	// are unrelated glyphs — e.g. U+F04EE is md-table_column_remove, which renders
+	// as a box-with-× — so pin the exact rune to guard against a wrong edit.
+	const wantGhost = '\U000F02A0'
+	runes := []rune(iconGhost)
+	if len(runes) != 1 {
+		t.Fatalf("iconGhost should be a single rune, got %d", len(runes))
+	}
+	if runes[0] != wantGhost {
+		t.Errorf("iconGhost = %U, want %U (nf-md-ghost)", runes[0], wantGhost)
+	}
+}
+
 func TestMenuBox_TitleHasGhostIcon(t *testing.T) {
 	m := newTestMenu()
 	box := m.renderMenuBox()
@@ -98,6 +112,37 @@ func TestMenuBox_TitleHasGhostIcon(t *testing.T) {
 	// The title (icon + wordmark) is still right-aligned against the border.
 	borderChar := strings.LastIndex(raw, "│")
 	trailing := raw[ghostIdx+len("Ghost Tab") : borderChar]
+	if len(strings.TrimSpace(trailing)) != 0 || len(trailing) < 1 {
+		t.Errorf("expected only whitespace between 'Ghost Tab' and border, got: %q", trailing)
+	}
+}
+
+func TestMenuBox_TitleOnTopAccountRow(t *testing.T) {
+	// When a managed account row renders at the very top, the "Ghost Tab"
+	// wordmark must sit on THAT top row (beside the login), not on the AGENT row.
+	m := newTestMenu()
+	m.SetClaudeAccounts([]ClaudeAccount{{Label: "Work", Dir: "work"}})
+	box := m.renderMenuBox()
+	lines := strings.Split(box, "\n")
+	if len(lines) < 3 {
+		t.Fatal("renderMenuBox produced fewer than 3 lines")
+	}
+	accountRow := stripAnsi(lines[1]) // top header row, after the top border
+	agentRow := stripAnsi(lines[2])   // AGENT switcher row, below it
+
+	if !strings.Contains(accountRow, "Ghost Tab") {
+		t.Errorf("expected 'Ghost Tab' on the top account row, got: %q", accountRow)
+	}
+	if !strings.Contains(accountRow, iconGhost) {
+		t.Errorf("expected ghost icon on the top account row, got: %q", accountRow)
+	}
+	if strings.Contains(agentRow, "Ghost Tab") {
+		t.Errorf("did not expect 'Ghost Tab' on the AGENT row, got: %q", agentRow)
+	}
+	// Still right-aligned against the border on the account row.
+	ghostIdx := strings.LastIndex(accountRow, "Ghost Tab")
+	borderChar := strings.LastIndex(accountRow, "│")
+	trailing := accountRow[ghostIdx+len("Ghost Tab") : borderChar]
 	if len(strings.TrimSpace(trailing)) != 0 || len(trailing) < 1 {
 		t.Errorf("expected only whitespace between 'Ghost Tab' and border, got: %q", trailing)
 	}

@@ -17,7 +17,7 @@ const (
 	iconLogin = "\U000F0004" // nf-md-account — which Claude login is active
 	iconAgent = "\U000F06A9" // nf-md-robot   — the AI agent (Claude Code / OpenCode)
 	iconPlan  = "\U000F0148" // nf-md-crown   — the Claude subscription tier
-	iconGhost = "\U000F04EE" // nf-md-ghost   — captions the "Ghost Tab" wordmark
+	iconGhost = "\U000F02A0" // nf-md-ghost   — captions the "Ghost Tab" wordmark
 
 	// Switcher prev/next buttons. Material Design chevrons from the same nerd-font
 	// family as the caption icons above; both are one-cell glyphs so the
@@ -74,12 +74,30 @@ func (m *MainMenuModel) renderActionBar(leftBorder, rightBorder string) string {
 	return leftBorder + "  " + rendered + strings.Repeat(" ", gap) + rightBorder
 }
 
-// renderTitleRow renders the left-aligned AGENT tool chooser + right-aligned "Ghost Tab" row.
+// ghostWordmark renders the right-aligned "Ghost Tab" wordmark with its ghost
+// icon. It captions the header's topmost row — the account row when accounts
+// exist, otherwise the AGENT row.
+func (m *MainMenuModel) ghostWordmark() string {
+	return lipgloss.NewStyle().Foreground(m.theme.Primary).Bold(true).Render(iconGhost + " Ghost Tab")
+}
+
+// headerRow assembles a switcher row: left-aligned content, optional
+// right-aligned title, padded to fill the box width. A leading space sits
+// between the left border and the content.
+func (m *MainMenuModel) headerRow(content, title, leftBorder, rightBorder string) string {
+	pad := menuContentWidth - lipgloss.Width(content) - lipgloss.Width(title) - 1 // -1 for leading space
+	if pad < 1 {
+		pad = 1
+	}
+	return leftBorder + " " + content + strings.Repeat(" ", pad) + title + rightBorder
+}
+
+// renderTitleRow renders the left-aligned AGENT tool chooser. It carries the
+// right-aligned "Ghost Tab" wordmark only when no account row sits above it;
+// otherwise the wordmark lives on that top account row.
 func (m *MainMenuModel) renderTitleRow(leftBorder, rightBorder string) string {
 	primaryStyle := lipgloss.NewStyle().Foreground(m.theme.Primary)
-	primaryBoldStyle := lipgloss.NewStyle().Foreground(m.theme.Primary).Bold(true)
 
-	title := primaryBoldStyle.Render(iconGhost + " Ghost Tab")
 	aiDisplay := AIToolDisplayName(m.CurrentAITool())
 	// Idle chevrons are neutral gray so they don't read as another accent. When
 	// the AI switcher holds focus, the chevrons and name brighten so it reads as
@@ -98,12 +116,13 @@ func (m *MainMenuModel) renderTitleRow(leftBorder, rightBorder string) string {
 	} else {
 		aiPart = agentLabel + nameStyle.Render(aiDisplay)
 	}
-	// Switcher on the left, "Ghost Tab" right-aligned: "AGENT ‹chevron› Claude Code ‹chevron›" left, "Ghost Tab" right
-	aiPadding := menuContentWidth - lipgloss.Width(title) - lipgloss.Width(aiPart) - 1 // -1 for leading space
-	if aiPadding < 1 {
-		aiPadding = 1
+	// AGENT switcher on the left; the wordmark right-aligns here only when there
+	// is no account row above to host it.
+	var title string
+	if m.accountRowCount() == 0 {
+		title = m.ghostWordmark()
 	}
-	return leftBorder + " " + aiPart + strings.Repeat(" ", aiPadding) + title + rightBorder
+	return m.headerRow(aiPart, title, leftBorder, rightBorder)
 }
 
 // subscriptionRowCount returns 1 when the PLAN/subscription line is shown, else
@@ -154,11 +173,9 @@ func (m *MainMenuModel) renderAccountRow(leftBorder, rightBorder string) string 
 	}
 	content := acctLabel + chevronStyle.Render(iconChevronLeft+" ") + nameStyle.Render(label) + chevronStyle.Render(" "+iconChevronRight)
 
-	pad := menuContentWidth - lipgloss.Width(content) - 1 // -1 for leading space
-	if pad < 1 {
-		pad = 1
-	}
-	return leftBorder + " " + content + strings.Repeat(" ", pad) + rightBorder
+	// This row only renders when accounts exist, so it is always the topmost
+	// header row — it hosts the right-aligned "Ghost Tab" wordmark.
+	return m.headerRow(content, m.ghostWordmark(), leftBorder, rightBorder)
 }
 
 // renderSubscriptionRow renders the current Claude subscription, left-aligned
