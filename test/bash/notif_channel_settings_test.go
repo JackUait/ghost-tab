@@ -106,6 +106,48 @@ func TestNotifChannel_set_is_idempotent_and_keeps_existing_prev(t *testing.T) {
 	}
 }
 
+// The user's real-world settings.json holds preferredNotifChannel: "" (present
+// but empty). This must be distinguished from an absent key: set saves "" (NOT
+// the __UNSET__ sentinel reserved for absent), and restore writes "" back rather
+// than removing the key. Guards the load-bearing distinction in
+// set_claude_notif_channel (`"__UNSET__" if current is None else str(current)`).
+func TestNotifChannel_set_and_restore_round_trip_present_empty_string(t *testing.T) {
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, "config")
+	os.MkdirAll(configDir, 0755)
+	claudeDir := filepath.Join(tmpDir, "claude")
+	os.MkdirAll(claudeDir, 0755)
+	settingsPath := filepath.Join(claudeDir, "settings.json")
+	writeTempFile(t, claudeDir, "settings.json", `{"preferredNotifChannel": "", "model": "opus"}`)
+
+	// set: silences the channel, saving the empty string (not __UNSET__).
+	snippet := notificationSnippet(t,
+		fmt.Sprintf(`set_claude_notif_channel %q %q`, configDir, settingsPath))
+	_, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+
+	if got := settingsNotifChannel(t, settingsPath); got != "terminal_bell" {
+		t.Errorf("preferredNotifChannel = %q, want terminal_bell", got)
+	}
+	prev, err := os.ReadFile(filepath.Join(configDir, "prev-notif-channel"))
+	if err != nil {
+		t.Fatalf("expected prev-notif-channel saved: %v", err)
+	}
+	if strings.TrimSpace(string(prev)) != "" {
+		t.Errorf("prev = %q, want empty string (present-but-empty must NOT become __UNSET__)", strings.TrimSpace(string(prev)))
+	}
+
+	// restore: writes "" back; the key stays present (not removed).
+	snippet = notificationSnippet(t,
+		fmt.Sprintf(`restore_claude_notif_channel %q %q`, configDir, settingsPath))
+	_, code = runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+
+	if got := settingsNotifChannel(t, settingsPath); got != "" {
+		t.Errorf("preferredNotifChannel = %q, want \"\" (present empty string; key must remain, not be removed)", got)
+	}
+}
+
 func TestNotifChannel_restore_restores_saved_value(t *testing.T) {
 	tmpDir := t.TempDir()
 	configDir := filepath.Join(tmpDir, "config")
