@@ -109,8 +109,8 @@ func TestSettingsItemCount_includesPanelRow(t *testing.T) {
 	m := NewMainMenu(nil, []string{"opencode"}, "opencode", "animated")
 	// The Plan + Login rows are shared across agents, so opencode also has 7 items
 	// (ghost, tab title, sound, panel, projects dir, plan, login).
-	if m.settingsItemCount() != 7 {
-		t.Errorf("settingsItemCount = %d, want 7", m.settingsItemCount())
+	if m.settingsItemCount() != 8 {
+		t.Errorf("settingsItemCount = %d, want 8", m.settingsItemCount())
 	}
 }
 
@@ -119,8 +119,8 @@ func TestSettingsItemCount_withClaudeConfig_includesPanelRow(t *testing.T) {
 	m.SetClaudeConfigs([]ClaudeConfig{{Name: "Pro", File: "pro.json"}})
 	m.SetActiveClaudeConfig("pro.json")
 	// With Claude config: 7 items (incl. Plan + Login)
-	if m.settingsItemCount() != 7 {
-		t.Errorf("settingsItemCount = %d, want 7", m.settingsItemCount())
+	if m.settingsItemCount() != 8 {
+		t.Errorf("settingsItemCount = %d, want 8", m.settingsItemCount())
 	}
 }
 

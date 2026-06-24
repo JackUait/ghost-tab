@@ -71,6 +71,107 @@ var themes = map[string]AIToolTheme{
 	},
 }
 
+// presetThemes maps a user-selectable theme name (chosen in the Settings menu)
+// to its full palette. "orange" and "purple" reuse the per-tool palettes above;
+// the rest are dedicated hues. Each ramp is intentionally fairly uniform in body
+// tone (light crown → mid body → dark feet) so it reads well on BOTH ghost
+// shapes — the claude and opencode mascots assign the Bright/Accent fields with
+// opposite light/dark intent, so a high-contrast ramp would break on one of them.
+var presetThemes = map[string]AIToolTheme{
+	"orange": themes["claude"],
+	"purple": themes["opencode"],
+	"green": {
+		Name:          "green",
+		Primary:       lipgloss.Color("78"),  // #5fd787 — readable green: title, gauge, eye band
+		Dim:           lipgloss.Color("35"),  // #00af5f — stats border, mid body
+		Bright:        lipgloss.Color("114"), // #87d787 — upper body
+		Accent:        lipgloss.Color("29"),  // #00875f — lower band
+		Cap:           lipgloss.Color("157"), // #afffaf — pale crown
+		DarkFeet:      lipgloss.Color("22"),  // #005f00 — feet + smile
+		EyeWhite:      lipgloss.Color("194"), // #d7ffd7 — light eyes (claude ghost)
+		EyePupil:      lipgloss.Color("235"),
+		UIAccent:      lipgloss.Color("78"),
+		SleepPrimary:  lipgloss.Color("65"),  // #5f875f — dim body
+		SleepAccent:   lipgloss.Color("29"),
+		SleepBlush:    lipgloss.Color("174"), // #d78787 — rosy cheeks
+		SleepDim:      lipgloss.Color("22"),
+		SleepDarkFeet: lipgloss.Color("236"),
+		SleepCap:      lipgloss.Color("151"), // #afd7af — dim crown
+		Text:          lipgloss.Color("194"),
+	},
+	"blue": {
+		Name:          "blue",
+		Primary:       lipgloss.Color("75"),  // #5fafff — sky blue
+		Dim:           lipgloss.Color("32"),  // #0087d7
+		Bright:        lipgloss.Color("117"), // #87d7ff — upper body
+		Accent:        lipgloss.Color("25"),  // #005faf — lower band
+		Cap:           lipgloss.Color("153"), // #afd7ff — pale crown
+		DarkFeet:      lipgloss.Color("24"),  // #005f87 — feet
+		EyeWhite:      lipgloss.Color("195"), // #d7ffff
+		EyePupil:      lipgloss.Color("235"),
+		UIAccent:      lipgloss.Color("75"),
+		SleepPrimary:  lipgloss.Color("67"),  // #5f87af — dim body
+		SleepAccent:   lipgloss.Color("25"),
+		SleepBlush:    lipgloss.Color("174"),
+		SleepDim:      lipgloss.Color("24"),
+		SleepDarkFeet: lipgloss.Color("236"),
+		SleepCap:      lipgloss.Color("153"),
+		Text:          lipgloss.Color("195"),
+	},
+	"rose": {
+		Name:          "rose",
+		Primary:       lipgloss.Color("211"), // #ff87af — rose pink
+		Dim:           lipgloss.Color("168"), // #d75f87 — stats border, mid body
+		Bright:        lipgloss.Color("218"), // #ffafd7 — upper body
+		Accent:        lipgloss.Color("125"), // #af005f — lower band
+		Cap:           lipgloss.Color("225"), // #ffd7ff — pale crown
+		DarkFeet:      lipgloss.Color("89"),  // #87005f — feet
+		EyeWhite:      lipgloss.Color("224"), // #ffd7d7
+		EyePupil:      lipgloss.Color("235"),
+		UIAccent:      lipgloss.Color("211"),
+		SleepPrimary:  lipgloss.Color("132"), // #af5f87 — dim body
+		SleepAccent:   lipgloss.Color("96"),  // #875f87 — muted dim band (sleeping)
+		SleepBlush:    lipgloss.Color("174"),
+		SleepDim:      lipgloss.Color("95"),  // #875f5f
+		SleepDarkFeet: lipgloss.Color("236"),
+		SleepCap:      lipgloss.Color("182"), // #d7afd7 — dim crown
+		Text:          lipgloss.Color("225"),
+	},
+	"cyan": {
+		Name:          "cyan",
+		Primary:       lipgloss.Color("80"),  // #5fd7d7 — cyan
+		Dim:           lipgloss.Color("37"),  // #00afaf
+		Bright:        lipgloss.Color("123"), // #87ffff — upper body
+		Accent:        lipgloss.Color("30"),  // #008787 — lower band
+		Cap:           lipgloss.Color("159"), // #afffff — pale crown
+		DarkFeet:      lipgloss.Color("23"),  // #005f5f — feet
+		EyeWhite:      lipgloss.Color("195"), // #d7ffff
+		EyePupil:      lipgloss.Color("235"),
+		UIAccent:      lipgloss.Color("80"),
+		SleepPrimary:  lipgloss.Color("66"),  // #5f8787 — dim body
+		SleepAccent:   lipgloss.Color("30"),
+		SleepBlush:    lipgloss.Color("174"),
+		SleepDim:      lipgloss.Color("23"),
+		SleepDarkFeet: lipgloss.Color("236"),
+		SleepCap:      lipgloss.Color("152"), // #afd7d7 — dim crown
+		Text:          lipgloss.Color("195"),
+	},
+}
+
+// ThemePresets is the ordered list of theme choices shown in the Settings menu.
+// "auto" follows the active AI tool (claude → orange, opencode → purple); every
+// other entry forces that fixed palette regardless of the tool.
+var ThemePresets = []string{"auto", "orange", "purple", "green", "blue", "rose", "cyan"}
+
+// ResolveTheme returns the palette to use for the given AI tool and user theme
+// preference. A named preset wins; "auto" (or empty/unknown) follows the tool.
+func ResolveTheme(tool, pref string) AIToolTheme {
+	if theme, ok := presetThemes[pref]; ok {
+		return theme
+	}
+	return ThemeForTool(tool)
+}
+
 // currentTheme is the palette last applied via ApplyTheme. Components that need
 // the full palette (not just the package-level title/selected styles) read this.
 // Defaults to claude so rendering works even before ApplyTheme is called (tests).

@@ -84,6 +84,7 @@ func runMainMenu(cmd *cobra.Command, args []string) error {
 	}
 
 	model := tui.NewMainMenu(projects, aiTools, mainMenuAITool, mainMenuGhostDisplay)
+	model.SetThemePref(effectiveThemePref())
 	model.SetPanelMode(mainMenuPanelMode)
 	model.SetTabTitle(mainMenuTabTitle)
 	model.SetSoundName(mainMenuSoundName)

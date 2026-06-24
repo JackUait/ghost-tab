@@ -213,6 +213,9 @@ type MainMenuModel struct {
 	panelMode           string // "lazygit" or "compact"
 	initialPanelMode    string
 	panelModeChanged    bool
+	themePref           string // "auto" (follow tool) or a preset name
+	initialThemePref    string
+	themePrefChanged    bool
 	zzz                 *ZzzAnimation
 	centerOffsetY       int
 
@@ -373,6 +376,8 @@ func NewMainMenu(projects []models.Project, aiTools []string, currentAI string, 
 		initialGhostDisplay:       ghostDisplay,
 		panelMode:                 "compact",
 		initialPanelMode:          "compact",
+		themePref:                 "auto",
+		initialThemePref:          "auto",
 		theme:                     ThemeForTool(currentAI),
 		zzz:                       NewZzzAnimation(),
 		expandedWorktrees:         make(map[int]bool),
@@ -593,8 +598,54 @@ func (m *MainMenuModel) CycleAITool(direction string) {
 	} else {
 		m.selectedAI = (m.selectedAI - 1 + n) % n
 	}
-	m.theme = ThemeForTool(m.aiTools[m.selectedAI])
+	m.theme = ResolveTheme(m.aiTools[m.selectedAI], m.themePref)
 	m.persistAITool()
+}
+
+// SetThemePref sets the user's theme preference ("auto" or a preset name) and
+// resolves the live palette. Called from the cmd layer with the persisted value.
+func (m *MainMenuModel) SetThemePref(pref string) {
+	if pref == "" {
+		pref = "auto"
+	}
+	m.themePref = pref
+	m.initialThemePref = pref
+	m.theme = ResolveTheme(m.CurrentAITool(), pref)
+}
+
+// CycleTheme advances the theme preference through ThemePresets (auto → orange →
+// … → cyan → auto), recolors the live menu, and persists the choice.
+func (m *MainMenuModel) CycleTheme() {
+	m.stepTheme(1)
+}
+
+// CycleThemeReverse steps the theme preference backwards.
+func (m *MainMenuModel) CycleThemeReverse() {
+	m.stepTheme(-1)
+}
+
+func (m *MainMenuModel) stepTheme(delta int) {
+	n := len(ThemePresets)
+	idx := 0
+	for i, p := range ThemePresets {
+		if p == m.themePref {
+			idx = i
+			break
+		}
+	}
+	idx = (idx + delta + n) % n
+	m.themePref = ThemePresets[idx]
+	m.theme = ResolveTheme(m.CurrentAITool(), m.themePref)
+	m.themePrefChanged = m.themePref != m.initialThemePref
+	m.persistSetting("theme", m.themePref)
+}
+
+// themeLabel returns the display label for a theme preset (e.g. "auto" → "Auto").
+func themeLabel(pref string) string {
+	if pref == "" {
+		pref = "auto"
+	}
+	return strings.ToUpper(pref[:1]) + pref[1:]
 }
 
 // persistAITool writes the current AI tool to the preference file if set.
@@ -1178,11 +1229,11 @@ func (m *MainMenuModel) CycleTab(direction string) {
 	}
 }
 
-// settingsItemCount returns the number of settings rows: 5 base (Ghost, Tab,
-// Sound, Panel, Dir) + the Plan row when the Claude config control is visible +
-// the always-present Login row (the account-management entry point).
+// settingsItemCount returns the number of settings rows: 6 base (Ghost, Tab,
+// Sound, Panel, Theme, Dir) + the Plan row when the Claude config control is
+// visible + the always-present Login row (the account-management entry point).
 func (m *MainMenuModel) settingsItemCount() int {
-	n := 5
+	n := 6
 	if m.ClaudeConfigVisible() {
 		n++ // Plan
 	}
@@ -2225,6 +2276,8 @@ func (m *MainMenuModel) settingsEnter() (tea.Model, tea.Cmd) {
 	case 3:
 		m.CyclePanelMode()
 	case 4:
+		m.CycleTheme()
+	case 5:
 		// Open text input for projects root
 		m.settingsInputMode = true
 		si := textinput.New()
@@ -2235,11 +2288,11 @@ func (m *MainMenuModel) settingsEnter() (tea.Model, tea.Cmd) {
 		m.settingsInput = si
 		m.settingsInputErr = nil
 		return m, textinput.Blink
-	case 5:
+	case 6:
 		if m.selectedConfig > 0 {
 			m.openModelMap()
 		}
-	case 6:
+	case 7:
 		// Open the login-management panel (switch / add / remove logins).
 		m.openAccountMenu()
 		return m, nil
@@ -2258,9 +2311,11 @@ func (m *MainMenuModel) settingsValueRight() {
 		m.CycleSoundName()
 	case 3:
 		m.CyclePanelMode()
-	case 5:
-		m.CycleClaudeConfig("next")
+	case 4:
+		m.CycleTheme()
 	case 6:
+		m.CycleClaudeConfig("next")
+	case 7:
 		m.CycleAccount("next")
 	}
 }
@@ -2276,9 +2331,11 @@ func (m *MainMenuModel) settingsValueLeft() {
 		m.CycleSoundNameReverse()
 	case 3:
 		m.CyclePanelModeReverse()
-	case 5:
-		m.CycleClaudeConfig("prev")
+	case 4:
+		m.CycleThemeReverse()
 	case 6:
+		m.CycleClaudeConfig("prev")
+	case 7:
 		m.CycleAccount("prev")
 	}
 }

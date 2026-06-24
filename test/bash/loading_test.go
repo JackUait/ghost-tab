@@ -202,6 +202,19 @@ func TestLoading_render_loading_frame_uses_tool_palette(t *testing.T) {
 	assertContains(t, out, "38;5;60m")
 }
 
+func TestLoading_render_loading_frame_honors_palette_override(t *testing.T) {
+	root := projectRoot(t)
+	// A 5th arg overrides the tool palette so a chosen theme preset colours the
+	// splash — here a green ramp; its colour 78 must appear, the tool's not.
+	script := fmt.Sprintf(
+		`source %q/lib/loading.sh && render_loading_frame claude 0 90 24 "22 28 34 35 41 77 78 120"`,
+		root)
+	out, code := runBashSnippet(t, script, nil)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "38;5;78m")
+	assertNotContains(t, out, "38;5;208m") // claude orange must not leak through
+}
+
 func TestLoading_render_loading_frame_shifts_colors_between_frames(t *testing.T) {
 	root := projectRoot(t)
 	script0 := fmt.Sprintf(

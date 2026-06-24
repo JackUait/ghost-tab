@@ -23,7 +23,7 @@ func init() {
 }
 
 func runSelectAITool(cmd *cobra.Command, args []string) error {
-	tui.ApplyTheme(tui.ThemeForTool(aiToolFlag))
+	tui.ApplyTheme(effectiveTheme(aiToolFlag))
 
 	tools := models.DetectAITools()
 

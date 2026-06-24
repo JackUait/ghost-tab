@@ -144,6 +144,12 @@ func (m *MainMenuModel) renderSettingsBox() string {
 	panelState := "[" + panelModeLabel(m.panelMode) + "]"
 	lines = append(lines, m.renderSettingsItem(3, panelLabel, panelState, panelStyle, primaryBoldStyle, leftBorder, rightBorder))
 
+	// Theme item — the state swatch is painted in the live (resolved) accent so
+	// the row previews the chosen palette's color.
+	themeStyle := lipgloss.NewStyle().Foreground(m.theme.Primary)
+	themeState := "[" + themeLabel(m.themePref) + "]"
+	lines = append(lines, m.renderSettingsItem(4, "Theme", themeState, themeStyle, primaryBoldStyle, leftBorder, rightBorder))
+
 	// Default projects dir item
 	var rootState string
 	if m.projectsRoot == "" {
@@ -156,7 +162,7 @@ func (m *MainMenuModel) renderSettingsBox() string {
 		rootColor = lipgloss.Color("114") // green when set
 	}
 	rootStyle := lipgloss.NewStyle().Foreground(rootColor)
-	if m.settingsInputMode && m.settingsSelected == 4 {
+	if m.settingsInputMode && m.settingsSelected == 5 {
 		// Render inline text input
 		inputView := m.settingsInput.View()
 		inputWidth := lipgloss.Width(inputView)
@@ -176,7 +182,7 @@ func (m *MainMenuModel) renderSettingsBox() string {
 			lines = append(lines, errRow)
 		}
 	} else {
-		lines = append(lines, m.renderSettingsItem(4, "Default projects dir", rootState, rootStyle, primaryBoldStyle, leftBorder, rightBorder))
+		lines = append(lines, m.renderSettingsItem(5, "Default projects dir", rootState, rootStyle, primaryBoldStyle, leftBorder, rightBorder))
 	}
 
 	// Claude Config item (only for the claude tool)
@@ -196,7 +202,7 @@ func (m *MainMenuModel) renderSettingsBox() string {
 			dimIndicator := lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Render(" " + indicator)
 			state = state + dimIndicator
 		}
-		lines = append(lines, m.renderSettingsItem(5, "Plan", state, cfgStyle, primaryBoldStyle, leftBorder, rightBorder))
+		lines = append(lines, m.renderSettingsItem(6, "Plan", state, cfgStyle, primaryBoldStyle, leftBorder, rightBorder))
 	}
 
 	// Login item: the active native Claude account (manage logins here — ←→
@@ -210,7 +216,8 @@ func (m *MainMenuModel) renderSettingsBox() string {
 		loginColor = lipgloss.Color("241") // gray for Default
 	}
 	loginStyle := lipgloss.NewStyle().Foreground(loginColor)
-	lines = append(lines, m.renderSettingsItem(6, "Login", "["+loginLabel+"]", loginStyle, primaryBoldStyle, leftBorder, rightBorder))
+	// Login is always the last row; its index shifts with the optional Plan row.
+	lines = append(lines, m.renderSettingsItem(m.settingsItemCount()-1, "Login", "["+loginLabel+"]", loginStyle, primaryBoldStyle, leftBorder, rightBorder))
 
 	// Empty row
 	lines = append(lines, emptyRow)
@@ -218,19 +225,20 @@ func (m *MainMenuModel) renderSettingsBox() string {
 	// Separator before help
 	lines = append(lines, separator)
 
-	// Help row — show ⏎ edit hint for item 3 (projects dir), ← → cycle for others
+	// Help row — show ⏎ edit hint for the projects dir row, manage hints for the
+	// Login row, ← → cycle for everything else (Theme, Ghost, Tab, etc.).
 	sep := dimStyle.Render(" · ")
 	var cycleOrEdit string
-	switch m.settingsSelected {
-	case 4:
+	switch {
+	case m.settingsSelected == 5:
 		cycleOrEdit = helpStyle.Render("⏎ edit")
-	case 5:
+	case m.settingsSelected == 6 && m.ClaudeConfigVisible():
 		if m.selectedConfig > 0 {
 			cycleOrEdit = helpStyle.Render("←→ cycle") + sep + helpStyle.Render("⏎ map models")
 		} else {
 			cycleOrEdit = helpStyle.Render("←→ cycle")
 		}
-	case 6:
+	case m.settingsSelected == m.settingsItemCount()-1:
 		if m.accountFocusable() {
 			cycleOrEdit = helpStyle.Render("←→ switch") + sep + helpStyle.Render("⏎ manage")
 		} else {

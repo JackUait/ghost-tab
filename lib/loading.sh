@@ -29,10 +29,13 @@ get_tool_palette() {
 }
 
 # Render a single frame of the loading screen.
-# Args: tool_name frame_number term_cols term_rows
+# Args: tool_name frame_number term_cols term_rows [palette_override]
+# palette_override is a space-separated 256-colour ramp; when given it wins over
+# the tool's default (so a user-chosen theme preset colours the splash).
 render_loading_frame() {
   local tool="$1" frame="$2"
   local cols="${3:-80}" rows="${4:-24}"
+  local palette_override="${5:-}"
 
   # Get art lines into array
   local art
@@ -44,7 +47,7 @@ render_loading_frame() {
 
   # Get palette
   local -a palette
-  read -ra palette <<< "$(get_tool_palette "$tool")"
+  read -ra palette <<< "${palette_override:-$(get_tool_palette "$tool")}"
   local pal_len=${#palette[@]}
 
   # Calculate art dimensions
@@ -114,10 +117,12 @@ _detect_term_size() {
 }
 
 # Show animated loading screen with tool-specific colors.
-# Args: [tool_name] — defaults to claude if omitted.
+# Args: [tool_name] [palette_override] — tool defaults to claude; palette_override
+# (a space-separated ramp) lets a user-chosen theme preset colour the splash.
 # Sets _LOADING_SCREEN_PID for the caller to stop later.
 show_loading_screen() {
   local tool="${1:-claude}"
+  local _pal_override="${2:-}"
 
   # Clear screen, hide cursor (instant dark feedback)
   printf '\033[2J\033[H\033[?25l'
@@ -126,7 +131,7 @@ show_loading_screen() {
   # even if stop_loading_screen is called before the background loop starts.
   local _init_rows _init_cols
   read -r _init_rows _init_cols <<< "$(_detect_term_size)"
-  render_loading_frame "$tool" 0 "$_init_cols" "$_init_rows"
+  render_loading_frame "$tool" 0 "$_init_cols" "$_init_rows" "$_pal_override"
 
   # First-frame race-condition fix: the PTY may not have reported its final
   # window size when we queried above (returning the fallback 24×80 or a stale
@@ -138,7 +143,7 @@ show_loading_screen() {
   read -r _recheck_rows _recheck_cols <<< "$(_detect_term_size)"
   if (( _recheck_rows != _init_rows || _recheck_cols != _init_cols )); then
     printf '\033[2J'
-    render_loading_frame "$tool" 0 "$_recheck_cols" "$_recheck_rows"
+    render_loading_frame "$tool" 0 "$_recheck_cols" "$_recheck_rows" "$_pal_override"
   fi
 
   # Symbols for floating particles
@@ -166,7 +171,7 @@ show_loading_screen() {
       fi
 
       # Redraw art with shifted colors
-      render_loading_frame "$tool" "$frame" "$cols" "$rows"
+      render_loading_frame "$tool" "$frame" "$cols" "$rows" "$_pal_override"
 
       # Clear previous floating symbols
       for pos in "${prev_sym_positions[@]}"; do
@@ -178,7 +183,7 @@ show_loading_screen() {
 
       # Draw new floating symbols
       local -a palette
-      read -ra palette <<< "$(get_tool_palette "$tool")"
+      read -ra palette <<< "${_pal_override:-$(get_tool_palette "$tool")}"
       local pal_len=${#palette[@]}
       local _s
       for _s in 0 1 2; do

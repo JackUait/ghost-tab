@@ -28,7 +28,7 @@ func init() {
 }
 
 func runSelectBranch(cmd *cobra.Command, args []string) error {
-	theme := tui.ThemeForTool(aiToolFlag)
+	theme := effectiveTheme(aiToolFlag)
 	tui.ApplyTheme(theme)
 
 	// Get main branch name from worktree porcelain output

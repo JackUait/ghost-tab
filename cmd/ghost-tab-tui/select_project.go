@@ -27,7 +27,7 @@ func init() {
 }
 
 func runSelectProject(cmd *cobra.Command, args []string) error {
-	tui.ApplyTheme(tui.ThemeForTool(aiToolFlag))
+	tui.ApplyTheme(effectiveTheme(aiToolFlag))
 
 	projects, err := models.LoadProjects(projectsFile)
 	if err != nil {

@@ -14,9 +14,16 @@ _wrapper_dir_early="$(cd "$(dirname "$0")" && pwd)"
 if [ -z "$1" ] && [ -f "$_wrapper_dir_early/lib/loading.sh" ]; then
   # shellcheck disable=SC1091  # Dynamic path
   source "$_wrapper_dir_early/lib/loading.sh"
+  # shellcheck disable=SC1091  # Dynamic path
+  [ -f "$_wrapper_dir_early/lib/theme.sh" ] && source "$_wrapper_dir_early/lib/theme.sh"
   # Mirrors AI_TOOL_PREF_FILE (defined after libs load); duplicated here because loading.sh runs before modules
   _ai_tool="$(cat "${XDG_CONFIG_HOME:-$HOME/.config}/ghost-tab/ai-tool" 2>/dev/null | tr -d '[:space:]')"
-  show_loading_screen "${_ai_tool:-}"
+  # Honor a user-chosen theme preset for the splash (falls back to the tool hue).
+  _theme_pref="$(grep '^theme=' "${XDG_CONFIG_HOME:-$HOME/.config}/ghost-tab/settings" 2>/dev/null | cut -d= -f2 | tr -d '[:space:]')"
+  if declare -f gt_resolve_theme >/dev/null 2>&1; then
+    _splash_palette="$(get_theme_palette "$(gt_resolve_theme "$_theme_pref" "${_ai_tool:-}")")"
+  fi
+  show_loading_screen "${_ai_tool:-}" "${_splash_palette:-}"
 fi
 
 # Check if ghost-tab-tui binary is available
@@ -39,7 +46,7 @@ if [ ! -d "$_WRAPPER_DIR/lib" ]; then
   exit 1
 fi
 
-_gt_libs=(ai-tools projects process input tui menu-tui project-actions tmux-session settings-json notification-setup tab-title-watcher terminals/ghostty session-restore claude-configs claude-accounts compact-view screenshot spare-tabs)
+_gt_libs=(theme ai-tools projects process input tui menu-tui project-actions tmux-session settings-json notification-setup tab-title-watcher terminals/ghostty session-restore claude-configs claude-accounts compact-view screenshot spare-tabs)
 for _gt_lib in "${_gt_libs[@]}"; do
   if [ ! -f "$_WRAPPER_DIR/lib/${_gt_lib}.sh" ]; then
     printf '\033[31mError:\033[0m Missing library %s/lib/%s.sh\n' "$_WRAPPER_DIR" "$_gt_lib" >&2
@@ -307,9 +314,11 @@ _screenshot_bind="bash -c 'source \"$_WRAPPER_DIR/lib/screenshot.sh\" && gt_past
 _spare_label="$(spare_tabs_socket "$SESSION_NAME")"
 mkdir -p "$SHARE_DIR"
 _spare_conf="$SHARE_DIR/spare-${SESSION_NAME}.conf"
-# Focus accent for the tmux chrome (active pane border + active spare-tab chip):
-# purple for OpenCode, orange for claude. Matches the Go theme's Primary.
-_gt_accent="$(get_tool_accent "$SELECTED_AI_TOOL")"
+# Focus accent for the tmux chrome (active pane border + active spare-tab chip).
+# Honor a user-chosen theme preset (Settings menu), falling back to the per-tool
+# hue: purple for OpenCode, orange for claude. Mirrors the Go theme's Primary.
+_gt_theme_pref="$(grep '^theme=' "${XDG_CONFIG_HOME:-$HOME/.config}/ghost-tab/settings" 2>/dev/null | cut -d= -f2 | tr -d '[:space:]')"
+_gt_accent="$(get_theme_accent "$(gt_resolve_theme "$_gt_theme_pref" "$SELECTED_AI_TOOL")")"
 spare_tabs_config "$PROJECT_NAME" "$PROJECT_DIR" "$_WRAPPER_DIR/lib/spare-tabs.sh" "$_spare_label" "$_gt_accent" > "$_spare_conf"
 # Minimal cwd-only prompt for the spare shell (drops user@host and conda's
 # "(base)"). Echoes empty for non-zsh shells, leaving them untouched.

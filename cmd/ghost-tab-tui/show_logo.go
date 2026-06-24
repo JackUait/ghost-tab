@@ -21,7 +21,7 @@ func init() {
 }
 
 func runShowLogo(cmd *cobra.Command, args []string) error {
-	tui.ApplyTheme(tui.ThemeForTool(aiToolFlag))
+	tui.ApplyTheme(effectiveTheme(aiToolFlag))
 
 	model := tui.NewLogo(aiToolFlag)
 

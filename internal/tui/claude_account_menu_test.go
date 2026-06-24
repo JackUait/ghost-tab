@@ -29,7 +29,7 @@ func TestAccountMenu_enterOnLoginRowOpensPanel(t *testing.T) {
 func TestAccountMenu_settingsEnterOpensPanel(t *testing.T) {
 	m := acctTestMenu("claude")
 	m.SetActiveTab(TabSettings)
-	m.settingsSelected = 6
+	m.settingsSelected = 7
 	m.settingsEnter()
 	if !m.accountMenuOpen {
 		t.Fatalf("Enter on Settings Login row should open the login panel")

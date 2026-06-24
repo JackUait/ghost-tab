@@ -189,7 +189,7 @@ func TestSettingsLoginRow_shown(t *testing.T) {
 func TestSettingsLoginRow_enterOpensPanel(t *testing.T) {
 	m := acctTestMenu("claude")
 	m.SetActiveTab(TabSettings)
-	m.settingsSelected = 6
+	m.settingsSelected = 7
 	m.settingsEnter()
 	if !m.accountMenuOpen {
 		t.Fatalf("Enter on Login settings row should open the login panel")
@@ -201,7 +201,7 @@ func TestSettingsLoginRow_cyclesAccount(t *testing.T) {
 	m := acctTestMenu("claude")
 	m.SetClaudeAccounts([]ClaudeAccount{{Label: "Work", Dir: "work"}})
 	m.SetActiveTab(TabSettings)
-	m.settingsSelected = 6
+	m.settingsSelected = 7
 	m.settingsValueRight()
 	if m.CurrentClaudeAccountDir() != "work" {
 		t.Errorf("→ on Login row should switch to work, got %q", m.CurrentClaudeAccountDir())

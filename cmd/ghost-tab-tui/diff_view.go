@@ -38,7 +38,7 @@ func runDiffView(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to read diff: %w", err)
 	}
 
-	tui.ApplyTheme(tui.ThemeForTool(aiToolFlag))
+	tui.ApplyTheme(effectiveTheme(aiToolFlag))
 	model := tui.NewDiffView(diffViewTitle, string(data))
 	// Show the screen behind the (full-screen) popup dimmed in the margin. Best
 	// effort: an unreadable/missing backdrop file just leaves the margin blank.

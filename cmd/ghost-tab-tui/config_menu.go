@@ -25,7 +25,7 @@ func init() {
 }
 
 func runConfigMenu(cmd *cobra.Command, args []string) error {
-	tui.ApplyTheme(tui.ThemeForTool(aiToolFlag))
+	tui.ApplyTheme(effectiveTheme(aiToolFlag))
 
 	model := tui.NewConfigMenu(tui.ConfigMenuOptions{
 		Version: configVersion,
