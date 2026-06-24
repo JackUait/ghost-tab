@@ -1,6 +1,6 @@
 # Ghost Tab
 
-A **`Ghostty`** + **`tmux`** wrapper that launches a three-pane dev session with an AI coding tool (**`Claude Code`** or **`OpenCode`**), **`lazygit`**, and a spare terminal. Automatically cleans up all processes when the window is closed — no zombie processes.
+Launch a ready-to-go AI coding session in one command. Ghost Tab opens a three-pane terminal workspace — your AI assistant, a live view of your git changes, and a spare terminal — and cleans everything up the moment you close the window.
 
 <p>
   <img src="docs/screenshot-selector.png" width="49%" />
@@ -15,15 +15,30 @@ A **`Ghostty`** + **`tmux`** wrapper that launches a three-pane dev session with
 npx ghost-tab
 ```
 
-That's it — only requirements are **`macOS`** and **`Node.js 16+`**. Everything (**`Ghostty`**, **`tmux`**, **`lazygit`**, and your chosen AI tool) is installed automatically.
+That's it. The only requirements are **macOS** and **Node.js 16+**. Everything else — the terminal, your AI tool, and the supporting tools — is installed for you automatically the first time you run it.
+
+On first launch you'll pick your AI assistant and add your projects. After that, opening a session is a couple of keystrokes.
 
 ---
 
-## Usage
+## What You Get
 
-**Step 1.** Open a new **`Ghostty`** window (`Cmd+N`)
+Pick a project and Ghost Tab drops you into a three-pane workspace:
 
-**Step 2.** Use the interactive project selector:
+- **AI assistant** — Claude Code or OpenCode, focused and ready. Just start typing your prompt.
+- **Changes view** — a live, auto-refreshing summary of what's changed in your branch (added/removed lines per file), or the full **lazygit** interface if you prefer.
+- **Spare terminal** — a tabbed shell for running commands, with its own tab bar so you can open as many as you need.
+
+Close the window and Ghost Tab shuts down every process it started — no leftover AI processes quietly running in the background.
+
+> [!CAUTION]
+> Closing the window force-stops everything in the session. Save your work first.
+
+---
+
+## Using the Project Selector
+
+Open a new window and you're greeted by the selector:
 
 ```
 ⬡  Ghost Tab
@@ -38,117 +53,113 @@ That's it — only requirements are **`macOS`** and **`Node.js 16+`**. Everythin
   D Delete a project or a worktree
   O Open once
   P Plain terminal
+  S Settings        T Stats
 ──────────────────────────────────────
   ↑↓ navigate  ⏎ select
 ```
 
-- **Arrow keys** or **mouse click** to navigate
-- **Number keys** (1-9) to jump directly to a project
-- **Letter keys** — **A** add, **D** delete, **O** open once, **P** plain terminal
-- **Enter** to select
-- **Path autocomplete** when adding projects (with Tab completion)
-- **Plain terminal** opens a bare shell with no tmux overhead
+- **Arrow keys or mouse** to move, **Enter** or **click** to open
+- **Number keys (1–9)** jump straight to a project
+- **A** — add a project (with path autocomplete as you type)
+- **D** — remove a project or one of its worktrees
+- **O** — open a folder once without saving it to your list
+- **P** — open a plain shell with no panes, just a terminal
+- **S** — open Settings
+- **T** — open Stats
 
-**Step 3.** The three-pane **`tmux`** session launches automatically with **`Claude Code`** already focused — start typing your prompt right away.
+### Git worktrees
 
-> [!TIP]
-> You can also open a specific project directly from the terminal:
-> ```sh
-> ~/.config/ghostty/claude-wrapper.sh /path/to/project
-> ```
+Projects can expand to show their git worktrees. From the selector you can open a worktree like any project, create a new one from a branch picker (type `/` to search branches), or delete worktrees you're done with.
 
 ---
 
-## Hotkeys
+## Settings
 
-| Shortcut | Action |
-|---|---|
-| `Cmd+T` | New tab |
-| `Cmd+Shift+Left` | Previous tab |
-| `Cmd+Shift+Right` | Next tab |
-| `Left Option` | Acts as `Alt` instead of typing special characters |
+Press **S** in the selector to open Settings. Changes apply immediately and reach every open session — no restart needed.
+
+- **Theme** — Auto (matches your AI tool's colors) or a preset accent: Purple, Green, Blue, Rose, Orange.
+- **Ghost** — show the animated mascot, a static one, or hide it.
+- **Sound** — play a chime when the AI finishes and is waiting on you. Off by default; choose from the built-in macOS sounds.
+- **Panel** — use the lightweight live **Changes** view or the full **lazygit** interface.
+- **Tab title** — what the window tab shows: the project name, the AI tool's own title, or both.
+- **Default projects folder** — the folder Ghost Tab starts in when you add a new project.
+- **AI tool** — switch between Claude Code and OpenCode.
 
 ---
 
-## What `ghost-tab` Does
+## Claude Accounts & Plans
 
-1. Downloads **`tmux`**, **`lazygit`**, and **`jq`** natively (no package manager required)
-2. Installs **`Claude Code`** via native installer (auto-updates)
-3. Prompts to install **`Ghostty`** from ghostty.org if not already installed
-4. Sets up the **`Ghostty`** config (with merge option if you have an existing one)
-5. Walks you through adding your **project directories**
-6. Installs **`Node.js`** LTS (if needed) and sets up **Claude Code status line** showing git info and context usage
-7. Auto-updates automatically — just run `npx ghost-tab` again to get the latest version
+If you use Claude Code, Settings also lets you manage **multiple logins** — keep separate work and personal accounts and switch between them without logging in and out each time. The active account is shown at the top of the menu; from the Login row you can add, rename, remove, and switch accounts.
+
+You can also keep several **Claude configurations** and switch the active one per session.
+
+---
+
+## Stats
+
+Press **T** in the selector for a usage dashboard. It breaks down your Claude usage by month — tokens used, a per-model breakdown, and estimated cost in USD — with a running total across everything. Handy for keeping an eye on what you're spending.
+
+---
+
+## Dropping Screenshots & Videos into the AI
+
+Drag a screenshot or video from Finder or your desktop onto the AI pane and Ghost Tab hands it straight to your assistant — no copying paths by hand.
+
+If a drag doesn't land where you expect, press **`Ctrl+b` then `i`** inside the session to inject your most recent screenshot directly into the AI pane.
 
 ---
 
 ## Status Line
 
-The `ghost-tab` command configures a custom **Claude Code** status line based on [Matt Pocock's guide](https://www.aihero.dev/creating-the-perfect-claude-code-status-line):
+For Claude Code, Ghost Tab sets up a compact status line so you always know where you stand:
 
 ```
 my-project | main | S: 0 | U: 2 | A: 1 | 23.5%
 ```
 
-- **Repository name** — current project
-- **Branch** — current git branch
-- **S** — staged files count
-- **U** — unstaged files count
-- **A** — untracked (added) files count
-- **Context %** — how much of Claude's context window is used
+- **Project** and **branch** you're on
+- **S / U / A** — staged, unstaged, and newly added file counts
+- **Context %** — how full Claude's context window is
 
 > [!TIP]
-> Monitor context usage to know when to start a new conversation. Lower is better.
+> Watch the context percentage — when it climbs high, it's a good time to start a fresh conversation.
 
 ---
 
-## Process Cleanup
+## Hotkeys
 
-> [!CAUTION]
-> When you close the **`Ghostty`** window, **all processes are force-terminated** — make sure your work is saved.
+**In the terminal window:**
 
-The wrapper automatically:
+| Shortcut | Action |
+|---|---|
+| `Cmd+N` | New window (opens the selector) |
+| `Cmd+T` | New tab |
+| `Cmd+Shift+Left` | Previous tab |
+| `Cmd+Shift+Right` | Next tab |
+| `Left Option` | Acts as `Alt` instead of typing special characters |
 
-1. **Recursively kills** the full process tree of every **`tmux`** pane (including deeply nested subprocesses spawned by **`Claude Code`**, **`lazygit`**, etc.)
-2. **Force-kills** (`SIGKILL`) any processes that ignored the initial `SIGTERM` after a brief grace period
-3. **Destroys** the **`tmux`** session
-4. **Self-destructs** the session via `destroy-unattached` if the **`tmux`** client disconnects without triggering cleanup
+**Inside a session** (press `Ctrl+b`, then the key):
 
-This prevents zombie **`Claude Code`** processes from accumulating.
+| Shortcut | Action |
+|---|---|
+| `Ctrl+b` then `i` | Drop your latest screenshot into the AI pane |
+| `Ctrl+b` then `t` | New tab in the spare terminal |
+| `Ctrl+b` then `Tab` | Next spare-terminal tab |
+| `Ctrl+b` then `Shift+Tab` | Previous spare-terminal tab |
+| `Ctrl+b` then `w` | Close the current spare-terminal tab |
 
 ---
 
-## Architecture
+## Picking Up Where You Left Off
 
-Ghost Tab uses a **hybrid architecture**:
+Reopen a project that's still running and Ghost Tab continues your last conversation instead of starting over. And after a reboot, the first time you launch it offers to bring back the projects you had open before — so a restart doesn't cost you your workspace.
 
-**Layer 1: Go TUI Binary (`ghost-tab-tui`)**
-- Interactive terminal UI components built with Bubbletea
-- Project selector, AI tool selector, settings menu, input forms
-- Outputs structured JSON for bash consumption
-- Binary: `~/.local/bin/ghost-tab-tui`
+---
 
-**Layer 2: Bash Orchestration (`ghost-tab`)**
-- Entry point and session orchestration
-- Process management, config file operations
-- Calls ghost-tab-tui for interactive parts
-- Parses JSON responses with jq
-- Script: `~/.local/bin/ghost-tab`
+## Staying Up to Date
 
-**Dependencies:**
-- Go 1.21+ (for building)
-- jq (for JSON parsing)
-- tmux (session management)
-- Ghostty (terminal emulator)
+Ghost Tab quietly checks for new versions and lets you know when one is available. To update, just run it again:
 
-**Communication:**
-```bash
-# Bash calls Go with subcommand
-result=$(ghost-tab-tui select-project --projects-file ~/.config/ghost-tab/projects)
-
-# Go returns JSON
-{"name": "my-project", "path": "/home/user/code/my-project", "selected": true}
-
-# Bash parses with jq
-project_name=$(echo "$result" | jq -r '.name')
+```sh
+npx ghost-tab
 ```
