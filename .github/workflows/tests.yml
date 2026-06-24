@@ -8,6 +8,7 @@ on:
 
 jobs:
   go-tests:
+    name: Go tests (TUI + units)
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -72,6 +73,7 @@ jobs:
           fi
 
   bash-tests:
+    name: Bash tests (shell libs via run-tests.sh)
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
