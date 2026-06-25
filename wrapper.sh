@@ -46,7 +46,7 @@ if [ ! -d "$_WRAPPER_DIR/lib" ]; then
   exit 1
 fi
 
-_gt_libs=(theme ai-tools projects process input tui menu-tui project-actions tmux-session settings-json notification-setup tab-title-watcher terminals/ghostty session-restore claude-configs claude-accounts compact-view screenshot spare-tabs)
+_gt_libs=(theme ai-tools projects process input tui menu-tui project-actions tmux-session settings-json notification-setup tab-title-watcher terminals/ghostty session-restore claude-configs claude-accounts claude-shared-settings compact-view screenshot spare-tabs)
 for _gt_lib in "${_gt_libs[@]}"; do
   if [ ! -f "$_WRAPPER_DIR/lib/${_gt_lib}.sh" ]; then
     printf '\033[31mError:\033[0m Missing library %s/lib/%s.sh\n' "$_WRAPPER_DIR" "$_gt_lib" >&2
@@ -248,6 +248,14 @@ export WISP_DECK_CLAUDE_SETTINGS
 WISP_DECK_CLAUDE_ACCOUNT_DIR=""
 if [ "$SELECTED_AI_TOOL" = "claude" ]; then
   WISP_DECK_CLAUDE_ACCOUNT_DIR="$(resolve_claude_account_dir "$_gt_cfg_root/claude-accounts" "$_gt_cfg_root/claude-account")"
+  # A non-Default account has its own isolated CLAUDE_CONFIG_DIR, which otherwise
+  # starts blank — no status line, permission mode, skills, hooks, model, etc.
+  # Link the standard login's settings into it so every login shares one set of
+  # settings while keeping its own credentials/session state. Self-heals drift on
+  # each launch (Claude may rewrite a settings file in place, severing the link).
+  if [ -n "$WISP_DECK_CLAUDE_ACCOUNT_DIR" ]; then
+    sync_claude_shared_settings "$HOME/.claude" "$WISP_DECK_CLAUDE_ACCOUNT_DIR"
+  fi
 fi
 export WISP_DECK_CLAUDE_ACCOUNT_DIR
 
