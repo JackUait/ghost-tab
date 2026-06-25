@@ -217,8 +217,14 @@ func TestDiffView_View_is_rounded_border_box(t *testing.T) {
 // ANSI color after the gutter is preserved.
 func TestNumberLines_numbers_nonremoved_blank_for_removed(t *testing.T) {
 	content := " ctx\n+add\n-del\n ctx2\n"
-	out := diffAnsiSeq.ReplaceAllString(numberLines(content), "")
+	out := diffAnsiSeq.ReplaceAllString(numberLines(content, 80), "")
 	lines := strings.Split(out, "\n")
+	// Trim trailing spaces: tinted rows (add/del) are padded to the full width, so
+	// after stripping ANSI the padding spaces appear. TrimRight makes the check
+	// width-independent.
+	for i := range lines {
+		lines[i] = strings.TrimRight(lines[i], " ")
+	}
 	want := []string{
 		"1 │  ctx",
 		"2 │ +add",
@@ -241,7 +247,7 @@ func TestNumberLines_pads_gutter_to_widest_number(t *testing.T) {
 	for i := 0; i < 12; i++ { // 12 lines -> 2-digit gutter
 		b.WriteString(" x\n")
 	}
-	out := diffAnsiSeq.ReplaceAllString(numberLines(b.String()), "")
+	out := diffAnsiSeq.ReplaceAllString(numberLines(b.String(), 80), "")
 	first := strings.SplitN(out, "\n", 2)[0]
 	if first != " 1 │  x" { // right-aligned in a 2-wide gutter
 		t.Errorf("first line gutter should be 2-wide right-aligned, got %q", first)
@@ -722,7 +728,7 @@ func TestHasCollapsibleContext(t *testing.T) {
 // the new-file line counter by N so the numbers after the gap stay correct.
 func TestNumberLines_gap_advances_line_numbers(t *testing.T) {
 	content := " l1\n" + gapLine(5) + "\n l7\n"
-	out := stripA(numberLines(content))
+	out := stripA(numberLines(content, 80))
 	lines := strings.Split(out, "\n")
 	if !strings.Contains(lines[0], "1 │") || !strings.Contains(lines[0], "l1") {
 		t.Errorf("first line should be numbered 1, got %q", lines[0])
@@ -943,5 +949,48 @@ func TestNewDiffView_highlights_body_but_keeps_content_raw(t *testing.T) {
 	}
 	if !strings.Contains(m.View(), "\x1b[38;2;") {
 		t.Errorf("rendered body should be syntax-highlighted (truecolor fg), got:\n%s", m.View())
+	}
+}
+
+// An added line carries the green background tint; a removed line the red tint;
+// a context line carries neither.
+func TestNumberLines_tints_changed_rows(t *testing.T) {
+	out := numberLines(" ctx\n+add\n-del\n", 40)
+	lines := strings.Split(out, "\n")
+	if strings.Contains(lines[0], diffAddBgSeq) || strings.Contains(lines[0], diffDelBgSeq) {
+		t.Errorf("context row must not be tinted, got %q", lines[0])
+	}
+	if !strings.Contains(lines[1], diffAddBgSeq) {
+		t.Errorf("added row should carry the green bg tint, got %q", lines[1])
+	}
+	if !strings.Contains(lines[2], diffDelBgSeq) {
+		t.Errorf("removed row should carry the red bg tint, got %q", lines[2])
+	}
+}
+
+// The tint spans the full row width (padded to width), so the highlight reads as
+// a full-row band rather than stopping at the end of the text.
+func TestTintColumn_pads_to_width(t *testing.T) {
+	got := tintColumn("ab", 6, diffAddBgSeq)
+	if !strings.HasPrefix(got, diffAddBgSeq) {
+		t.Errorf("tint should open with the bg sequence, got %q", got)
+	}
+	if !strings.HasSuffix(got, "\x1b[0m") {
+		t.Errorf("tint should end with a full reset, got %q", got)
+	}
+	if w := lipgloss.Width(got); w != 6 {
+		t.Errorf("tinted column visible width = %d, want 6", w)
+	}
+}
+
+// Side-by-side: the removed cell (left) is red-tinted and the added cell (right)
+// is green-tinted.
+func TestRenderSideBySide_tints_change_cells(t *testing.T) {
+	out := renderSideBySide(" ctx\n-del\n+add\n", 120)
+	if !strings.Contains(out, diffDelBgSeq) {
+		t.Errorf("a removed cell should carry the red bg tint, got:\n%s", out)
+	}
+	if !strings.Contains(out, diffAddBgSeq) {
+		t.Errorf("an added cell should carry the green bg tint, got:\n%s", out)
 	}
 }

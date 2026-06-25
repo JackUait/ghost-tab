@@ -195,6 +195,52 @@ var diffAnsiSeq = regexp.MustCompile("\x1b\\[[0-9;]*m")
 // the code without competing with the diff's own green/red.
 var diffGutterStyle = lipgloss.NewStyle().Faint(true).Foreground(lipgloss.Color("240"))
 
+// Fixed semantic background tints for changed rows: a dark green band behind
+// added lines, dark red behind removed. Truecolor (Ghostty); foreground syntax
+// color shows on top. Emitted as raw SGR rather than a lipgloss style so they
+// compose with the foreground-only syntax escapes without an intervening reset.
+const (
+	diffAddBgSeq = "\x1b[48;2;20;38;27m"
+	diffDelBgSeq = "\x1b[48;2;46;20;24m"
+)
+
+// tintColumn paints a full-width background band behind fg-only content s: it
+// fits/truncates s to width visible columns (copying ANSI escapes verbatim, not
+// counting them toward width), pads the remainder with spaces, and wraps the
+// whole thing in bgSeq … reset so the band spans the row. s must carry only
+// foreground SGR (no \x1b[0m), so the band isn't cleared mid-line.
+func tintColumn(s string, width int, bgSeq string) string {
+	if width < 0 {
+		width = 0
+	}
+	rs := []rune(s)
+	var b strings.Builder
+	b.WriteString(bgSeq)
+	vis := 0
+	for i := 0; i < len(rs) && vis < width; {
+		if rs[i] == '\x1b' {
+			j := i
+			for j < len(rs) && rs[j] != 'm' {
+				j++
+			}
+			if j < len(rs) {
+				j++
+			}
+			b.WriteString(string(rs[i:j]))
+			i = j
+			continue
+		}
+		b.WriteRune(rs[i])
+		vis++
+		i++
+	}
+	if vis < width {
+		b.WriteString(strings.Repeat(" ", width-vis))
+	}
+	b.WriteString("\x1b[0m")
+	return b.String()
+}
+
 // diffGapRowStyle renders the "⋯ N unchanged lines" divider shown where the
 // changes-only view has collapsed a run of context.
 var diffGapRowStyle = lipgloss.NewStyle().Faint(true).Foreground(lipgloss.Color("244"))
@@ -211,22 +257,23 @@ func isRemovedLine(line string) bool {
 // gutter ("<n> │ "). Context and added (+) lines advance the counter and show
 // their number; removed (-) lines aren't in the current file, so their gutter is
 // blank. The gutter is dim; the line's own ANSI color (after it) is preserved. A
-// trailing empty line (from a final newline) gets no gutter.
-func numberLines(content string) string {
+// trailing empty line (from a final newline) gets no gutter. Changed rows are
+// tinted with a full-width background band out to width.
+func numberLines(content string, width int) string {
 	lines := strings.Split(content, "\n")
 	maxNo := 0
 	for _, ln := range lines {
 		if cnt, ok := isGapLine(ln); ok {
-			maxNo += cnt // hidden context lines still occupy new-file numbers
+			maxNo += cnt
 			continue
 		}
 		if ln != "" && !isRemovedLine(ln) {
 			maxNo++
 		}
 	}
-	width := len(itoa(maxNo))
-	if width < 1 {
-		width = 1
+	w := len(itoa(maxNo))
+	if w < 1 {
+		w = 1
 	}
 	var b strings.Builder
 	n := 0
@@ -236,22 +283,32 @@ func numberLines(content string) string {
 		}
 		if cnt, ok := isGapLine(ln); ok {
 			n += cnt
-			b.WriteString(diffGutterStyle.Render(strings.Repeat(" ", width) + " │ "))
+			b.WriteString(diffGutterStyle.Render(strings.Repeat(" ", w) + " │ "))
 			b.WriteString(diffGapRowStyle.Render("⋯ " + itoa(cnt) + " unchanged lines"))
 			continue
 		}
 		if ln == "" {
 			continue
 		}
+		kind, _ := classifyDiffLine(ln)
 		var num string
-		if isRemovedLine(ln) {
-			num = strings.Repeat(" ", width)
+		if kind == diffDel {
+			num = strings.Repeat(" ", w)
 		} else {
 			n++
-			num = fmt.Sprintf("%*d", width, n)
+			num = fmt.Sprintf("%*d", w, n)
 		}
-		b.WriteString(diffGutterStyle.Render(num + " │ "))
-		b.WriteString(ln)
+		gutter := diffGutterStyle.Render(num + " │ ")
+		b.WriteString(gutter)
+		codeW := width - lipgloss.Width(gutter)
+		switch kind {
+		case diffAdd:
+			b.WriteString(tintColumn(ln, codeW, diffAddBgSeq))
+		case diffDel:
+			b.WriteString(tintColumn(ln, codeW, diffDelBgSeq))
+		default:
+			b.WriteString(ln)
+		}
 	}
 	return b.String()
 }
@@ -477,7 +534,7 @@ func renderBodyMode(content string, cw, mode int) string {
 	if mode == diffModeSideBySide {
 		return renderSideBySide(content, cw)
 	}
-	return numberLines(content)
+	return numberLines(content, cw)
 }
 
 // renderDiffBody renders in whichever mode the width suggests (used when the
@@ -610,21 +667,24 @@ func renderSideBySide(content string, cw int) string {
 	}
 
 	var rows []string
-	emit := func(l, r sbsCell) {
-		rows = append(rows, sbsCellStr(l, gw, textW)+diffGutterStyle.Render(" │ ")+sbsCellStr(r, gw, textW))
+	emit := func(l, r sbsCell, lbg, rbg string) {
+		rows = append(rows, sbsCellStr(l, gw, textW, lbg)+diffGutterStyle.Render(" │ ")+sbsCellStr(r, gw, textW, rbg))
 	}
 	var dels, adds []sbsCell
 	flush := func() {
 		n := maxInt(len(dels), len(adds))
 		for i := 0; i < n; i++ {
 			var l, r sbsCell
+			lbg, rbg := "", ""
 			if i < len(dels) {
 				l = dels[i]
+				lbg = diffDelBgSeq
 			}
 			if i < len(adds) {
 				r = adds[i]
+				rbg = diffAddBgSeq
 			}
-			emit(l, r)
+			emit(l, r, lbg, rbg)
 		}
 		dels, adds = nil, nil
 	}
@@ -646,7 +706,7 @@ func renderSideBySide(content string, cw int) string {
 			flush()
 			oldNo++
 			newNo++
-			emit(sbsCell{oldNo, text}, sbsCell{newNo, text})
+			emit(sbsCell{oldNo, text}, sbsCell{newNo, text}, "", "")
 		case diffDel:
 			oldNo++
 			dels = append(dels, sbsCell{oldNo, text})
@@ -660,12 +720,17 @@ func renderSideBySide(content string, cw int) string {
 }
 
 // sbsCellStr renders one column: a dim right-aligned line-number gutter then the
-// fitted text. A blank cell (no == 0) yields an all-space gutter and text.
-func sbsCellStr(c sbsCell, gw, textW int) string {
+// fitted text. A blank cell (no == 0) yields an all-space gutter and text. When
+// bgSeq != "" the text area is painted with that background band.
+func sbsCellStr(c sbsCell, gw, textW int, bgSeq string) string {
+	gutter := diffGutterStyle.Render(fmt.Sprintf("%*d ", gw, c.no))
 	if c.no == 0 {
-		return diffGutterStyle.Render(strings.Repeat(" ", gw)+" ") + fitColumn("", textW)
+		gutter = diffGutterStyle.Render(strings.Repeat(" ", gw) + " ")
 	}
-	return diffGutterStyle.Render(fmt.Sprintf("%*d ", gw, c.no)) + fitColumn(c.text, textW)
+	if bgSeq == "" {
+		return gutter + fitColumn(c.text, textW)
+	}
+	return gutter + tintColumn(c.text, textW, bgSeq)
 }
 
 // countDiffLines tallies the added (+) and deleted (-) lines of the diff body.
