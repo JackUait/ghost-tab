@@ -388,6 +388,149 @@ func TestSettingsJson_add_waiting_indicator_hooks_upgrades_catchall_without_matc
 	assertContains(t, content, `"UserPromptSubmit"`)
 }
 
+// --- legacy GHOST_TAB_MARKER_FILE cleanup (Ghost Tab → Wisp Deck rename) ---
+
+// Upgraded-from-Ghost-Tab users keep an orphaned GHOST_TAB_MARKER_FILE Stop hook
+// in settings.json. It is never the marker wisp-deck watches, but a still-running
+// legacy ghost-tab session polls it and plays an UNGATED sound — ignoring the
+// wisp-deck Sound=off setting. add_waiting_indicator_hooks must strip it.
+//
+// This case is also the fast-path trap: the file ALREADY has the full current
+// wisp-deck format (-cooldown, -ask, negative lookahead), so the cheap grep
+// short-circuit would wrongly report "exists" and leave the legacy hook behind.
+func TestSettingsJson_add_waiting_indicator_hooks_removes_legacy_ghost_tab_hooks(t *testing.T) {
+	tmpDir := t.TempDir()
+	settingsFile := writeTempFile(t, tmpDir, "settings.json", `{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then touch \"$GHOST_TAB_MARKER_FILE\"; fi"}]
+      },
+      {
+        "hooks": [{"type": "command", "command": "if [ -n \"$WISP_DECK_MARKER_FILE\" ]; then touch \"$WISP_DECK_MARKER_FILE\"; fi"}]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "AskUserQuestion",
+        "hooks": [{"type": "command", "command": "if [ -n \"$WISP_DECK_MARKER_FILE\" ]; then touch \"$WISP_DECK_MARKER_FILE\" \"${WISP_DECK_MARKER_FILE}-ask\"; fi"}]
+      },
+      {
+        "matcher": "^(?!AskUserQuestion$)",
+        "hooks": [{"type": "command", "command": "if [ -n \"$WISP_DECK_MARKER_FILE\" ]; then rm -f \"$WISP_DECK_MARKER_FILE\" \"${WISP_DECK_MARKER_FILE}-ask\"; fi"}]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [{"type": "command", "command": "if [ -n \"$WISP_DECK_MARKER_FILE\" ]; then touch \"${WISP_DECK_MARKER_FILE}-cooldown\"; fi"}]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [{"type": "command", "command": "if [ -n \"$WISP_DECK_MARKER_FILE\" ]; then rm -f \"$WISP_DECK_MARKER_FILE\" \"${WISP_DECK_MARKER_FILE}-ask\"; fi"}]
+      }
+    ]
+  }
+}
+`)
+
+	snippet := settingsJsonSnippet(t,
+		fmt.Sprintf(`add_waiting_indicator_hooks %q`, settingsFile))
+
+	out, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+	// Must NOT short-circuit to "exists" — the legacy hook needs removing
+	assertContains(t, out, "upgraded")
+
+	data, err := os.ReadFile(settingsFile)
+	if err != nil {
+		t.Fatalf("failed to read settings.json: %v", err)
+	}
+	content := string(data)
+	// The orphaned legacy hook must be gone
+	assertNotContains(t, content, "GHOST_TAB_MARKER_FILE")
+	// The current wisp-deck hooks must remain intact
+	assertContains(t, content, "WISP_DECK_MARKER_FILE")
+	assertContains(t, content, `"Stop"`)
+	assertContains(t, content, `"PreToolUse"`)
+	assertContains(t, content, `"PostToolUse"`)
+	assertContains(t, content, `"UserPromptSubmit"`)
+	assertContains(t, content, "cooldown")
+}
+
+// Other plugins' hooks must survive the legacy cleanup untouched.
+func TestSettingsJson_add_waiting_indicator_hooks_legacy_cleanup_preserves_other_hooks(t *testing.T) {
+	tmpDir := t.TempDir()
+	settingsFile := writeTempFile(t, tmpDir, "settings.json", `{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [{"type": "command", "command": "afplay /System/Library/Sounds/Glass.aiff &"}]
+      },
+      {
+        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then touch \"$GHOST_TAB_MARKER_FILE\"; fi"}]
+      }
+    ]
+  }
+}
+`)
+
+	snippet := settingsJsonSnippet(t,
+		fmt.Sprintf(`add_waiting_indicator_hooks %q`, settingsFile))
+
+	out, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "upgraded")
+
+	data, err := os.ReadFile(settingsFile)
+	if err != nil {
+		t.Fatalf("failed to read settings.json: %v", err)
+	}
+	content := string(data)
+	assertNotContains(t, content, "GHOST_TAB_MARKER_FILE")
+	// Unrelated plugin hook preserved
+	assertContains(t, content, "afplay")
+	// wisp-deck hooks installed
+	assertContains(t, content, "WISP_DECK_MARKER_FILE")
+}
+
+func TestSettingsJson_remove_waiting_indicator_hooks_removes_legacy_ghost_tab_hooks(t *testing.T) {
+	tmpDir := t.TempDir()
+	settingsFile := writeTempFile(t, tmpDir, "settings.json", `{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then touch \"$GHOST_TAB_MARKER_FILE\"; fi"}]
+      },
+      {
+        "hooks": [{"type": "command", "command": "if [ -n \"$WISP_DECK_MARKER_FILE\" ]; then touch \"$WISP_DECK_MARKER_FILE\"; fi"}]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [{"type": "command", "command": "if [ -n \"$GHOST_TAB_MARKER_FILE\" ]; then rm -f \"$GHOST_TAB_MARKER_FILE\"; fi"}]
+      }
+    ]
+  }
+}
+`)
+
+	snippet := settingsJsonSnippet(t,
+		fmt.Sprintf(`remove_waiting_indicator_hooks %q`, settingsFile))
+
+	out, code := runBashSnippet(t, snippet, nil)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, "removed")
+
+	data, err := os.ReadFile(settingsFile)
+	if err != nil {
+		t.Fatalf("failed to read settings.json: %v", err)
+	}
+	content := string(data)
+	assertNotContains(t, content, "GHOST_TAB_MARKER_FILE")
+	assertNotContains(t, content, "WISP_DECK_MARKER_FILE")
+}
+
 // --- add_waiting_indicator_hooks: safe exit code format ---
 
 func TestSettingsJson_add_waiting_indicator_hooks_uses_if_then_fi_not_and_operator(t *testing.T) {

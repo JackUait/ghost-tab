@@ -39,10 +39,16 @@ add_waiting_indicator_hooks() {
   # conservative subset of python's "exists" condition: no older format has all of
   # them. Skip the spawn (and the mkdir/dirname subshells) entirely in that common
   # case. Runs before mkdir because the check only reads an existing file.
+  # The GHOST_TAB_MARKER_FILE exclusion is the Ghost Tab → Wisp Deck rename
+  # cleanup: an upgraded user keeps an orphaned legacy Stop hook that a still-
+  # running ghost-tab session polls to play an ungated sound. When that legacy
+  # marker is present the file is NOT up to date — fall through to the python so
+  # it gets stripped, even if all three current-format markers are also present.
   if [ -f "$path" ] \
     && grep -q -- '-cooldown' "$path" \
     && grep -q -- '-ask' "$path" \
-    && grep -qF '(?!AskUserQuestion$)' "$path"; then
+    && grep -qF '(?!AskUserQuestion$)' "$path" \
+    && ! grep -q 'GHOST_TAB_MARKER_FILE' "$path"; then
     echo "exists"
     return 0
   fi
@@ -69,6 +75,22 @@ clear_cmd = 'if [ -n "$WISP_DECK_MARKER_FILE" ]; then rm -f "$WISP_DECK_MARKER_F
 cooldown_cmd = 'if [ -n "$WISP_DECK_MARKER_FILE" ]; then touch "${WISP_DECK_MARKER_FILE}-cooldown"; fi'
 
 marker = "WISP_DECK_MARKER_FILE"
+# Legacy marker from before the Ghost Tab → Wisp Deck rename. Orphaned hooks
+# carrying it are never what wisp-deck watches, but a still-running ghost-tab
+# session polls the marker they touch and plays an ungated sound, defeating the
+# Sound=off setting. Always strip them.
+legacy_markers = ("GHOST_TAB_MARKER_FILE",)
+
+def _has_any_marker(command):
+    return marker in command or any(m in command for m in legacy_markers)
+
+# Any orphaned legacy-marker hook present means the file needs cleanup.
+legacy_exists = any(
+    any(m in h.get("command", "") for m in legacy_markers)
+    for event_list in hooks.values()
+    for entry in event_list
+    for h in entry.get("hooks", [])
+)
 
 # Check if current Stop-based format is already installed
 stop_list = hooks.get("Stop", [])
@@ -115,17 +137,18 @@ ask_needs_sidecar = stop_exists and not old_stop_needs_upgrade and not needs_coo
     for entry in pre_list
 )
 
-if stop_exists and not old_stop_needs_upgrade and not needs_cooldown_upgrade and not catchall_needs_fix and not ask_needs_sidecar:
+if stop_exists and not old_stop_needs_upgrade and not needs_cooldown_upgrade and not catchall_needs_fix and not ask_needs_sidecar and not legacy_exists:
     # Current format already installed (including PostToolUse cooldown)
     print("exists")
     sys.exit(0)
-elif notif_exists or old_stop_needs_upgrade or needs_cooldown_upgrade or catchall_needs_fix or ask_needs_sidecar:
-    # Old format — remove wisp-deck hooks so they get re-added below
+elif notif_exists or old_stop_needs_upgrade or needs_cooldown_upgrade or catchall_needs_fix or ask_needs_sidecar or legacy_exists:
+    # Old format (or orphaned legacy markers) — remove wisp-deck and legacy
+    # hooks so the current wisp-deck hooks get re-added cleanly below.
     for event in ["Stop", "Notification", "PreToolUse", "PostToolUse", "UserPromptSubmit"]:
         event_list = hooks.get(event, [])
         new_list = [
             entry for entry in event_list
-            if not any(marker in h.get("command", "") for h in entry.get("hooks", []))
+            if not any(_has_any_marker(h.get("command", "")) for h in entry.get("hooks", []))
         ]
         if new_list:
             hooks[event] = new_list
@@ -182,7 +205,9 @@ remove_waiting_indicator_hooks() {
 import json, sys, os
 
 settings_path = sys.argv[1]
-marker = "WISP_DECK_MARKER_FILE"
+# Also strip the legacy GHOST_TAB_MARKER_FILE hooks left behind by the
+# Ghost Tab → Wisp Deck rename (see add_waiting_indicator_hooks).
+markers = ("WISP_DECK_MARKER_FILE", "GHOST_TAB_MARKER_FILE")
 
 try:
     with open(settings_path, "r") as f:
@@ -198,7 +223,7 @@ for event in ["Stop", "Notification", "PreToolUse", "PostToolUse", "UserPromptSu
     event_list = hooks.get(event, [])
     new_list = [
         entry for entry in event_list
-        if not any(marker in h.get("command", "") for h in entry.get("hooks", []))
+        if not any(m in h.get("command", "") for h in entry.get("hooks", []) for m in markers)
     ]
     if len(new_list) != len(event_list):
         found = True
