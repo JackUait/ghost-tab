@@ -1157,3 +1157,77 @@ func TestTruncatePath_keeps_tail_behind_ellipsis(t *testing.T) {
 		})
 	}
 }
+
+// ── Display-width fidelity (border alignment) ────────────────────────────────
+// Regression: the side-by-side layout fits each column with a hand-rolled width
+// counter. It must count DISPLAY columns, not runes — a double-width rune (CJK,
+// emoji) or a tab must not let the left column overrun its slot and shove the
+// " │ " divider (and the whole right column) rightward, breaking the border.
+
+// assertRowsAligned checks that every change/context row (those carrying the
+// " │ " divider) renders to the SAME display width and never exceeds cw. A wide
+// rune or stray tab that overran a column would make some rows wider than the
+// rest, shoving the divider off its column — that's the border break.
+func assertRowsAligned(t *testing.T, out string, cw int) {
+	t.Helper()
+	want := -1
+	for i, ln := range strings.Split(out, "\n") {
+		if !strings.Contains(stripA(ln), "│") { // gap dividers etc. aren't two-column rows
+			continue
+		}
+		w := lipgloss.Width(ln)
+		if w > cw {
+			t.Errorf("row %d display width = %d exceeds the %d-col box (overflow):\n%s", i, w, cw, stripA(out))
+		}
+		if want == -1 {
+			want = w
+		} else if w != want {
+			t.Errorf("row %d display width = %d, but earlier rows were %d (divider misaligned):\n%s",
+				i, w, want, stripA(out))
+		}
+	}
+	if want == -1 {
+		t.Fatalf("no two-column rows found in:\n%s", stripA(out))
+	}
+}
+
+func TestRenderSideBySide_wide_runes_keep_row_width(t *testing.T) {
+	// A context line and a change block whose text carries double-width CJK runes.
+	out := renderSideBySide(" 日本語 comment\n-古いコード\n+新しいコード here\n", 80)
+	assertRowsAligned(t, out, 80)
+}
+
+// Tab-indented code (common) is expanded to spaces by NewDiffView before layout,
+// so the rendered side-by-side rows stay aligned. (renderSideBySide alone can't
+// fix a literal tab: the terminal renders it to a tab stop, but lipgloss.Width
+// counts it as 0 — only expansion makes the on-screen width match the math.)
+func TestRenderSideBySide_tabs_keep_row_width(t *testing.T) {
+	m := NewDiffView("f.go", " \tindented context\n-\told value\n+\tnew value here\n")
+	out := renderSideBySide(m.bodyContent(), 80)
+	if strings.Contains(out, "\t") {
+		t.Fatalf("tab survived into the laid-out body:\n%q", out)
+	}
+	assertRowsAligned(t, out, 80)
+}
+
+func TestFitColumn_wide_rune_does_not_exceed_width(t *testing.T) {
+	// 三 (U+4E09) is two columns wide; padding/truncation must use that, not 1.
+	if w := lipgloss.Width(fitColumn("三三三", 5)); w != 5 {
+		t.Errorf("fitColumn display width = %d, want 5", w)
+	}
+}
+
+func TestTintColumn_wide_rune_does_not_exceed_width(t *testing.T) {
+	if w := lipgloss.Width(tintColumn("三三三", 5, diffAddBgSeq)); w != 5 {
+		t.Errorf("tintColumn display width = %d, want 5", w)
+	}
+}
+
+// Tabs in the diff body are expanded to spaces before rendering, so no tab
+// survives into the laid-out body (where it would desync column widths).
+func TestNewDiffView_expands_tabs(t *testing.T) {
+	m := NewDiffView("f.go", " \tcode\n-\told\n+\tnew\n")
+	if strings.Contains(m.bodyContent(), "\t") {
+		t.Errorf("rendered body still contains a tab:\n%q", m.bodyContent())
+	}
+}

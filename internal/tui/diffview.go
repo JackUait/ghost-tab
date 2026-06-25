@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/mattn/go-runewidth"
 )
 
 // DiffViewModel is a scrollable pager for a structural (uncolored) git diff,
@@ -96,6 +97,54 @@ const (
 // diffContextLines is how many unchanged lines the changes-only view keeps
 // around each change (git's own default), the rest collapsed into a marker.
 const diffContextLines = 3
+
+// diffTabWidth is how many columns a tab expands to in the rendered diff. Tabs
+// are expanded to spaces before layout (see expandTabs) so the fixed-width
+// columns line up: a literal tab's on-screen width depends on the terminal's
+// tab stops, which the column-fitting math can't know, so a surviving tab would
+// desync the column widths and shove the side-by-side divider off its column.
+const diffTabWidth = 4
+
+// expandTabs replaces tabs with spaces in a raw (un-highlighted) diff body so no
+// tab survives into the laid-out columns. Each line is expanded from its own
+// column 0; a leading diff marker (+/-/space) is kept verbatim and the code
+// after it is expanded from column 0, matching how the marker is later dropped
+// and the code placed at the cell's left edge. Runs are advanced by display
+// width so a wide rune before a tab still lands the tab on the right stop.
+func expandTabs(content string, tabWidth int) string {
+	if !strings.Contains(content, "\t") {
+		return content
+	}
+	lines := strings.Split(content, "\n")
+	for i, ln := range lines {
+		lines[i] = expandTabsLine(ln, tabWidth)
+	}
+	return strings.Join(lines, "\n")
+}
+
+// expandTabsLine expands the tabs in one raw diff line (see expandTabs).
+func expandTabsLine(line string, tabWidth int) string {
+	if line == "" || !strings.ContainsRune(line, '\t') {
+		return line
+	}
+	marker, code := "", line
+	if c := line[0]; c == '+' || c == '-' || c == ' ' {
+		marker, code = line[:1], line[1:]
+	}
+	var b strings.Builder
+	col := 0
+	for _, r := range code {
+		if r == '\t' {
+			n := tabWidth - col%tabWidth
+			b.WriteString(strings.Repeat(" ", n))
+			col += n
+			continue
+		}
+		b.WriteRune(r)
+		col += runewidth.RuneWidth(r)
+	}
+	return marker + b.String()
+}
 
 var (
 	diffTitleStyle = lipgloss.NewStyle().
@@ -232,10 +281,11 @@ const (
 )
 
 // tintColumn paints a full-width background band behind fg-only content s: it
-// fits/truncates s to width visible columns (copying ANSI escapes verbatim, not
-// counting them toward width), pads the remainder with spaces, and wraps the
-// whole thing in bgSeq … reset so the band spans the row. s must carry only
-// foreground SGR (no \x1b[0m), so the band isn't cleared mid-line.
+// fits/truncates s to width DISPLAY columns (copying ANSI escapes verbatim, not
+// counting them toward width; counting each rune by its terminal cell width so a
+// double-width glyph can't overrun the band), pads the remainder with spaces,
+// and wraps the whole thing in bgSeq … reset so the band spans the row. s must
+// carry only foreground SGR (no \x1b[0m), so the band isn't cleared mid-line.
 func tintColumn(s string, width int, bgSeq string) string {
 	if width < 0 {
 		width = 0
@@ -257,8 +307,12 @@ func tintColumn(s string, width int, bgSeq string) string {
 			i = j
 			continue
 		}
+		rw := runewidth.RuneWidth(rs[i])
+		if vis+rw > width { // a wide rune that won't fit the last cell
+			break
+		}
 		b.WriteRune(rs[i])
-		vis++
+		vis += rw
 		i++
 	}
 	if vis < width {
@@ -513,8 +567,9 @@ func collapseContext(content string, ctx int) string {
 }
 
 // fitColumn truncates or space-pads a possibly ANSI-colored string to exactly
-// width visible columns (escape sequences don't count toward width), ending in a
-// reset so color can't bleed into the next column.
+// width DISPLAY columns (escape sequences don't count toward width; each rune
+// counts by its terminal cell width so a double-width glyph can't overrun),
+// ending in a reset so color can't bleed into the next column.
 func fitColumn(s string, width int) string {
 	if width < 0 {
 		width = 0
@@ -535,8 +590,12 @@ func fitColumn(s string, width int) string {
 			i = j
 			continue
 		}
+		rw := runewidth.RuneWidth(rs[i])
+		if vis+rw > width { // a wide rune that won't fit the last cell
+			break
+		}
 		b.WriteRune(rs[i])
-		vis++
+		vis += rw
 		i++
 	}
 	b.WriteString("\x1b[0m")
@@ -832,10 +891,13 @@ func diffStatus(content string) string {
 func NewDiffView(title, content string) DiffViewModel {
 	added, deleted := countDiffLines(content)
 	single := isSingleSided(content)
+	// Expand tabs before highlighting so no tab reaches the column layout; the
+	// raw content is kept for the line counts/status (tabs don't affect those).
+	expanded := expandTabs(content, diffTabWidth)
 	return DiffViewModel{
 		title:       title,
 		content:     content,
-		highlighted: highlightDiff(content, title),
+		highlighted: highlightDiff(expanded, title),
 		added:       added,
 		deleted:     deleted,
 		status:      diffStatus(content),
