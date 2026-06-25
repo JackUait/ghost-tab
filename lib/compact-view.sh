@@ -431,6 +431,22 @@ compact_view() {
     fi
   }
 
+  # set_hover_from_row maps a mouse report's screen <row> to the body line of the
+  # file currently under the cursor (against the live scroll offset) and stores it
+  # in hover_line — or 0 when the cursor isn't over a file row. BOTH wheel and
+  # motion reports call it so the selection bar tracks the cursor consistently: a
+  # wheel report carries its own cursor row, so re-deriving the hover on every
+  # scroll step keeps the highlight ON the row under the cursor instead of blanking
+  # it. Without this the bar flipped off on each wheel frame and back on at the
+  # next motion frame — a visible blink while scrolling. Reads the loop-scope
+  # scroll/avail/body_total/header_rows/body_map via dynamic scope.
+  set_hover_from_row() {
+    local b
+    b=$(body_line_for_click "$1" "$scroll" "$avail" "$body_total" "$header_rows")
+    nth_line "$body_map" "$b"
+    if [ "$b" != 0 ] && [ -n "$NTH_LINE" ]; then hover_line="$b"; else hover_line=0; fi
+  }
+
   # ANSI helpers
   local dim="\033[90m"
   local bold="\033[1m"
@@ -469,7 +485,7 @@ compact_view() {
   local w h content header body body_total avail mbtn draw_body frame
   local header_rows=2
   local staged unstaged body_map
-  local mterm mrest mrow bl cpath hv prev_hover
+  local mterm mrest mrow bl cpath prev_hover
   # Frame-erase helpers, built ONCE: $nl is a literal newline (the match), $rowend
   # is "erase-to-end-of-line + newline" (the replacement). The flicker-free redraw
   # swaps every newline in the composed frame for $rowend so each row scrubs the
@@ -745,31 +761,38 @@ compact_view() {
                   *) mbtn="$mbtn$KEY" ;;
                 esac
               done
+              # Cursor row from "btn;col;row" — every position-bearing report
+              # (wheel and motion alike) carries it, so extract it once.
+              mrest="${mbtn#*;}"; mrow="${mrest#*;}"
               case "${mbtn%%;*}" in
-                64) scroll=$((scroll - 3)) ;;
-                65) scroll=$((scroll + 3)) ;;
+                64|65)
+                  # Wheel up=64 / down=65. Adjust and clamp the scroll, then
+                  # re-derive the hover from THIS report's cursor row so the
+                  # selection bar stays on the file under the cursor across the
+                  # scroll (clamping first keeps the highlight aligned with the
+                  # row that will actually be on screen). Without re-deriving, the
+                  # bar blanked on every wheel frame and the list blinked.
+                  if [ "${mbtn%%;*}" = 64 ]; then
+                    scroll=$((scroll - 3))
+                  else
+                    scroll=$((scroll + 3))
+                  fi
+                  scroll=$(clamp_scroll "$scroll" "$body_total" "$avail")
+                  set_hover_from_row "$mrow"
+                  ;;
                 32|33|34|35)
                   # Mouse motion (hover/drag, SGR adds 32 to the button code):
                   # highlight the file row under the cursor. Only real file rows
                   # highlight; if the hovered row didn't change, skip the redraw
                   # so the screen doesn't flicker on every motion event.
-                  mrest="${mbtn#*;}"; mrow="${mrest#*;}"
-                  bl=$(body_line_for_click "$mrow" "$scroll" "$avail" "$body_total" "$header_rows")
-                  hv=0
-                  nth_line "$body_map" "$bl"
-                  if [ "$bl" != 0 ] && [ -n "$NTH_LINE" ]; then
-                    hv="$bl"
-                  fi
-                  hover_line="$hv"
-                  [ "$hv" = "$prev_hover" ] && need_draw=0
+                  set_hover_from_row "$mrow"
+                  [ "$hover_line" = "$prev_hover" ] && need_draw=0
                   ;;
                 0)
                   # Left-click: map the report's row (the 3rd ";"-field of
                   # "btn;col;row") to a body line, then to a path, and float the
                   # whole-file diff over the window.
                   if [ "$mterm" = M ]; then
-                    mrest="${mbtn#*;}"          # "col;row"
-                    mrow="${mrest#*;}"          # "row"
                     bl=$(body_line_for_click "$mrow" "$scroll" "$avail" "$body_total" "$header_rows")
                     if [ "$bl" != 0 ]; then
                       nth_line "$body_map" "$bl"; cpath="$NTH_LINE"

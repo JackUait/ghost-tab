@@ -263,6 +263,124 @@ func TestCompactView_does_not_blank_screen_on_scroll(t *testing.T) {
 	}
 }
 
+// Regression: the hovered-row highlight must not BLINK while the list scrolls.
+// The loop cleared the hover on every keystroke (hover_line=0) and only a mouse
+// MOTION report re-set it. A scroll gesture interleaves wheel reports with the
+// incidental motion reports a trackpad/mouse emits as the cursor drifts, so the
+// selection bar flipped off (wheel frame) then on (motion frame) on every step —
+// a visible blink. The fix re-derives the hover from the wheel report's own
+// cursor row, so a wheel frame keeps the highlight on the file under the cursor.
+// This drives the real loop under zsh, interleaves motion+wheel like a real
+// scroll, and asserts the highlight never drops out once it has appeared.
+func TestCompactView_hover_highlight_does_not_blink_on_scroll(t *testing.T) {
+	zsh, err := exec.LookPath("zsh")
+	if err != nil {
+		t.Skip("zsh not available")
+	}
+	module := filepath.Join(projectRoot(t), "lib", "compact-view.sh")
+
+	dir := t.TempDir()
+	git := func(args ...string) {
+		t.Helper()
+		c := exec.Command("git", append([]string{"-C", dir}, args...)...)
+		c.Env = append(os.Environ(),
+			"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t",
+			"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@t")
+		if out, err := c.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	git("init", "-q")
+	writeTempFile(t, dir, "seed.txt", "x\n")
+	git("add", "seed.txt")
+	git("commit", "-q", "-m", "init")
+	for i := 0; i < 60; i++ {
+		writeTempFile(t, dir, fmt.Sprintf("f%02d.txt", i), "x\n")
+	}
+	git("add", ".")
+
+	cmd := exec.Command(zsh, "-c", "source "+module+" && compact_view "+dir)
+	env := []string{}
+	for _, e := range os.Environ() {
+		if strings.HasPrefix(e, "TMUX=") {
+			continue
+		}
+		env = append(env, e)
+	}
+	// Long interval so the timed rebuild never interleaves with the scroll burst.
+	cmd.Env = append(env, "COMPACT_VIEW_INTERVAL=5", "TERM=xterm")
+
+	ptmx, err := pty.StartWithSize(cmd, &pty.Winsize{Rows: 12, Cols: 60})
+	if err != nil {
+		t.Fatalf("start pty: %v", err)
+	}
+	defer func() { _ = ptmx.Close() }()
+
+	var mu sync.Mutex
+	var out bytes.Buffer
+	go func() {
+		b := make([]byte, 4096)
+		for {
+			n, err := ptmx.Read(b)
+			if n > 0 {
+				mu.Lock()
+				out.Write(b[:n])
+				mu.Unlock()
+			}
+			if err != nil {
+				return
+			}
+		}
+	}()
+
+	time.Sleep(600 * time.Millisecond) // first frame
+	mu.Lock()
+	out.Reset() // capture only the scroll frames
+	mu.Unlock()
+
+	// A scroll gesture: hover-motion (cursor over row 5) interleaved with
+	// wheel-down, both carrying the cursor position. Row 5 sits over a file row
+	// for the whole scroll, so the highlight should persist on every frame.
+	for i := 0; i < 6; i++ {
+		_, _ = ptmx.Write([]byte("\x1b[<35;12;5M")) // motion (hover)
+		time.Sleep(25 * time.Millisecond)
+		_, _ = ptmx.Write([]byte("\x1b[<65;12;5M")) // wheel down
+		time.Sleep(25 * time.Millisecond)
+	}
+	time.Sleep(300 * time.Millisecond)
+	_, _ = ptmx.Write([]byte{0x03}) // Ctrl-C
+	time.Sleep(300 * time.Millisecond)
+
+	mu.Lock()
+	got := out.String()
+	mu.Unlock()
+
+	// The hover highlight is an SGR background (48;5;238). Walk the scroll frames
+	// (split at each cursor-home) and, once the highlight has appeared, assert no
+	// later frame drops it — a drop-then-return is the blink.
+	frames := strings.Split(got, "\x1b[H")
+	seen := false
+	blinks := 0
+	for _, f := range frames {
+		if f == "" {
+			continue
+		}
+		hl := strings.Contains(f, "48;5;238")
+		if hl {
+			seen = true
+		} else if seen {
+			blinks++ // highlight was on, this scroll frame has it off -> blink
+		}
+	}
+	if !seen {
+		t.Fatalf("hover highlight never appeared; test cannot assess blinking")
+	}
+	if blinks > 0 {
+		t.Errorf("hover highlight blinked off on %d scroll frame(s); it must stay on the "+
+			"file under the cursor while scrolling", blinks)
+	}
+}
+
 // stripANSI removes CSI escape sequences so frame content can be asserted on.
 var ansiRE = regexp.MustCompile(`\x1b\[[0-9;?]*[a-zA-Z]`)
 
