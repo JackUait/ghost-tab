@@ -34,6 +34,27 @@ fi
 	assertContains(t, out, "macOS")
 }
 
+// TestWrapper_tab_title_uses_nerd_font_ghost_icon asserts the initial Ghostty
+// tab title set by wrapper.sh uses the same nerd-font ghost glyph as the TUI
+// header wordmark (iconGhost = "\U000F02A0" in render_projects.go), not the
+// emoji 👻, so the tab icon matches the in-app branding.
+func TestWrapper_tab_title_uses_nerd_font_ghost_icon(t *testing.T) {
+	root := projectRoot(t)
+	data, err := os.ReadFile(filepath.Join(root, "wrapper.sh"))
+	if err != nil {
+		t.Fatalf("failed to read wrapper.sh: %v", err)
+	}
+	content := string(data)
+
+	const nerdGhost = "\U000F02A0" // nf-md-ghost — must match iconGhost in render_projects.go
+	if !strings.Contains(content, nerdGhost+" Wisp Deck") {
+		t.Errorf("wrapper.sh tab title should use the nerd-font ghost glyph %q before \"Wisp Deck\"", nerdGhost)
+	}
+	if strings.Contains(content, "👻") {
+		t.Error("wrapper.sh should not use the 👻 emoji for the tab title; use the nerd-font ghost glyph to match the header")
+	}
+}
+
 // ---------- Section 2: Supporting Files Validation ----------
 
 func TestWispDeck_SupportingFiles_fails_when_files_missing(t *testing.T) {

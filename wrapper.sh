@@ -111,7 +111,7 @@ elif [ -z "$1" ]; then
   maybe_restore_session "$SHARE_DIR" "$WISP_DECK_BOOT_ID" "$0"
 
   # Use TUI for project selection
-  printf '\033]0;👻 Wisp Deck\007'
+  printf '\033]0;󰊠 Wisp Deck\007'
 
   # Stop loading animation before TUI takes over
   type stop_loading_screen &>/dev/null && stop_loading_screen
