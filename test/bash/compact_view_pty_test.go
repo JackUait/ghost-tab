@@ -179,13 +179,98 @@ func TestCompactView_zsh_ctrlc_exits(t *testing.T) {
 	}
 }
 
+// Regression: scrolling the file list must not BLINK. The redraw used to begin
+// every frame with a full-screen erase (\033[2J), which blanks the whole pane
+// for one frame before the content is reprinted — a visible flicker on every
+// scroll step. The flicker-free redraw homes the cursor (\033[H) and overwrites
+// each row in place (\033[K per line, \033[J to drop trailing rows), so the
+// screen is never blanked. This drives the real loop, scrolls a tall list, and
+// asserts the session never emits a single \033[2J.
+func TestCompactView_does_not_blank_screen_on_scroll(t *testing.T) {
+	module := filepath.Join(projectRoot(t), "lib", "compact-view.sh")
+
+	dir := t.TempDir()
+	git := func(args ...string) {
+		t.Helper()
+		c := exec.Command("git", append([]string{"-C", dir}, args...)...)
+		c.Env = append(os.Environ(),
+			"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t",
+			"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@t")
+		if out, err := c.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	git("init", "-q")
+	writeTempFile(t, dir, "seed.txt", "x\n")
+	git("add", "seed.txt")
+	git("commit", "-q", "-m", "init")
+	// Many staged files so the ledger overflows a short pane and scrolls.
+	for i := 0; i < 60; i++ {
+		writeTempFile(t, dir, fmt.Sprintf("f%02d.txt", i), "x\n")
+	}
+	git("add", ".")
+
+	cmd := exec.Command("bash", "-c", "source "+module+" && compact_view "+dir)
+	env := []string{}
+	for _, e := range os.Environ() {
+		if len(e) >= 5 && e[:5] == "TMUX=" {
+			continue
+		}
+		env = append(env, e)
+	}
+	cmd.Env = append(env, "COMPACT_VIEW_INTERVAL=2", "TERM=xterm")
+
+	ptmx, err := pty.StartWithSize(cmd, &pty.Winsize{Rows: 12, Cols: 60})
+	if err != nil {
+		t.Fatalf("start pty: %v", err)
+	}
+	defer func() { _ = ptmx.Close() }()
+
+	var mu sync.Mutex
+	var out bytes.Buffer
+	go func() {
+		b := make([]byte, 4096)
+		for {
+			n, err := ptmx.Read(b)
+			if n > 0 {
+				mu.Lock()
+				out.Write(b[:n])
+				mu.Unlock()
+			}
+			if err != nil {
+				return
+			}
+		}
+	}()
+
+	time.Sleep(600 * time.Millisecond) // first frame
+	// Scroll down a handful of steps, each forcing a redraw.
+	for i := 0; i < 8; i++ {
+		_, _ = ptmx.Write([]byte("j"))
+		time.Sleep(40 * time.Millisecond)
+	}
+	time.Sleep(300 * time.Millisecond)
+	_, _ = ptmx.Write([]byte{0x03}) // Ctrl-C
+	time.Sleep(300 * time.Millisecond)
+
+	mu.Lock()
+	got := out.String()
+	mu.Unlock()
+
+	if n := strings.Count(got, "\x1b[2J"); n > 0 {
+		t.Errorf("redraw emitted full-screen erase \\033[2J %d time(s); the list blinks on every scroll. "+
+			"Home the cursor and overwrite in place instead.", n)
+	}
+}
+
 // stripANSI removes CSI escape sequences so frame content can be asserted on.
 var ansiRE = regexp.MustCompile(`\x1b\[[0-9;?]*[a-zA-Z]`)
 
 func lastFrame(s string) string {
-	// Frames are separated by the screen-clear \033[2J. The pinned header is
-	// redrawn at the top of every frame, so the last frame is what's on screen.
-	if i := strings.LastIndex(s, "\x1b[2J"); i >= 0 {
+	// Every frame begins by homing the cursor (\033[H) and overwriting in place
+	// (no \033[2J — that would blink the screen). The pinned header is redrawn at
+	// the top of every frame, so the slice from the last home is what's on screen.
+	if i := strings.LastIndex(s, "\x1b[H"); i >= 0 {
 		s = s[i:]
 	}
 	return ansiRE.ReplaceAllString(s, "")
