@@ -122,7 +122,7 @@ func TestDiffView_View_shows_title_controls_and_content(t *testing.T) {
 	if !strings.Contains(out, "lib/x.sh") {
 		t.Error("view should show the title (filename)")
 	}
-	if !strings.Contains(out, "unique-marker") {
+	if !strings.Contains(stripA(out), "unique-marker") {
 		t.Error("view should show the diff content")
 	}
 	// A control bar advertising how to scroll and close.
@@ -929,5 +929,19 @@ func TestDiffView_scrolls_with_keys(t *testing.T) {
 	m, _ = runeDiff(m, 'g')
 	if !m.viewport.AtTop() {
 		t.Error("g should jump back to the top")
+	}
+}
+
+// NewDiffView keeps m.content raw but renders a syntax-highlighted body for a
+// recognized language, so the on-screen code carries truecolor fg escapes while
+// the stored content stays uncolored.
+func TestNewDiffView_highlights_body_but_keeps_content_raw(t *testing.T) {
+	raw := " package main\n+var x = 1\n"
+	m := sizeDiff(NewDiffView("main.go", raw), 120, 30)
+	if m.content != raw {
+		t.Errorf("m.content should stay raw, got %q", m.content)
+	}
+	if !strings.Contains(m.View(), "\x1b[38;2;") {
+		t.Errorf("rendered body should be syntax-highlighted (truecolor fg), got:\n%s", m.View())
 	}
 }

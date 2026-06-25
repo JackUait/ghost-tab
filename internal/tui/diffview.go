@@ -17,9 +17,10 @@ import (
 // bubble handles scrolling (↑↓/j/k, space/b page, u/d half-page, mouse wheel);
 // g/G jump to the top/bottom. ANSI color in the content is preserved.
 type DiffViewModel struct {
-	title    string
-	content  string
-	status   string // "added" | "deleted" | "modified", derived from the diff
+	title       string
+	content     string
+	highlighted string // syntax-highlighted body; m.content stays raw
+	status      string // "added" | "deleted" | "modified", derived from the diff
 	added    int
 	deleted  int
 	width       int // full popup (window) size; the box floats centered within it
@@ -740,6 +741,7 @@ func NewDiffView(title, content string) DiffViewModel {
 	return DiffViewModel{
 		title:       title,
 		content:     content,
+		highlighted: highlightDiff(content, title),
 		added:       added,
 		deleted:     deleted,
 		status:      diffStatus(content),
@@ -755,9 +757,9 @@ func NewDiffView(title, content string) DiffViewModel {
 // is compact and there's context worth hiding, otherwise the full file.
 func (m DiffViewModel) bodyContent() string {
 	if m.compact && m.collapsible {
-		return collapseContext(m.content, diffContextLines)
+		return collapseContext(m.highlighted, diffContextLines)
 	}
-	return m.content
+	return m.highlighted
 }
 
 // WithBackdrop sets the dimmed screen snapshot shown behind the floating box
