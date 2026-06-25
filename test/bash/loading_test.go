@@ -26,6 +26,16 @@ func TestLoading_get_loading_art_contains_wisp_deck_box(t *testing.T) {
 	assertContains(t, out, "d8888b")
 }
 
+func TestLoading_get_loading_art_renders_wisp_deck_wordmark(t *testing.T) {
+	out, code := runBashFunc(t, "lib/loading.sh", "get_loading_art", nil, nil)
+	assertExitCode(t, code, 0)
+	// The loader shows the "Wisp Deck" wordmark, not the old "Ghost Tab" art.
+	// `d888b` is the peak of the colossal "W" (only in "Wisp"); `d88""88b` is the
+	// rounded "o" glyph that only appears in "Ghost".
+	assertContains(t, out, `d888b`)
+	assertNotContains(t, out, `d88""88b`)
+}
+
 func TestLoading_get_loading_art_meets_minimum_size(t *testing.T) {
 	out, code := runBashFunc(t, "lib/loading.sh", "get_loading_art", nil, nil)
 	assertExitCode(t, code, 0)
