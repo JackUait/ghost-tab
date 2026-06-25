@@ -68,7 +68,8 @@ resolve_claude_account_dir() {
   [ -d "$path" ] && printf '%s\n' "$path"
 }
 
-# Account registration, login, rename, and removal all live in the Go TUI (the
-# single source of truth): the login panel runs `claude auth login` in place via
-# tea.ExecProcess, so no bash helper drops out of the menu to do it. See
+# Account registration, rename, and removal all live in the Go TUI (the single
+# source of truth). Adding a login only registers its isolated CLAUDE_CONFIG_DIR;
+# no `claude auth login` is run there — the account starts empty and Claude logs
+# the user in on first launch under that config dir. See
 # internal/tui/claude_account_menu.go and internal/claudeaccount.

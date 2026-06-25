@@ -3,9 +3,6 @@ package tui
 import (
 	"errors"
 	"fmt"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -178,18 +175,11 @@ func (m *MainMenuModel) submitAccountInput() (tea.Model, tea.Cmd) {
 	return m.submitAccountAdd(label)
 }
 
-// accountLoginDoneMsg is delivered after the interactive `claude auth login`
-// (run via tea.ExecProcess) returns, so the panel can activate the new login and
-// stay put.
-type accountLoginDoneMsg struct {
-	dir string
-	err error
-}
-
 // submitAccountAdd registers the new login in-process (config dir + registry
-// entry), then runs the interactive browser `claude auth login` in place via
-// tea.ExecProcess so the user returns to this panel when it finishes — no drop
-// out to the bash menu loop.
+// entry) and makes it active, staying in the panel. It deliberately does NOT run
+// `claude auth login`: the account's isolated CLAUDE_CONFIG_DIR starts empty, so
+// the system logs the user in on first launch under that account — no
+// interactive auth here, no drop out to the bash menu loop.
 func (m *MainMenuModel) submitAccountAdd(label string) (tea.Model, tea.Cmd) {
 	if m.claudeAccountsList == "" || m.claudeAccountsDir == "" {
 		m.accountMenuErr = errors.New("login storage is not configured")
@@ -202,65 +192,13 @@ func (m *MainMenuModel) submitAccountAdd(label string) (tea.Model, tea.Cmd) {
 		m.accountMenuInputMode = false
 		return m, nil
 	}
-	// Show the new login in the list immediately; leave input mode but keep the
-	// panel open so it's there when the login returns.
+	// Show the new login, make it active, and stay in the panel. Login happens
+	// later, the first time Claude runs under this account's config dir.
 	m.SetClaudeAccounts(LoadClaudeAccountsList(m.claudeAccountsList))
 	m.accountMenuInputMode = false
 	m.accountMenuRenameRow = -1
 	m.accountMenuErr = nil
-	return m, m.beginAccountLogin(dir)
-}
-
-// newClaudeLoginCmd builds the `claude auth login` command for an account's
-// isolated CLAUDE_CONFIG_DIR, with its stdio pinned to the inherited controlling
-// terminal (os.Stdin / fd 0).
-//
-// This pinning is the fix for a hard crash: `claude` is a Bun-compiled binary
-// that dies on startup with "EINVAL: invalid argument, kqueue" (then
-// "process.stdout.isTTY undefined") when its stdout is a freshly-opened /dev/tty
-// fd. tea.ExecProcess, left to its defaults, hands the child the program's
-// WithOutput tty — which util.TUITeaOptions opens fresh via open("/dev/tty") —
-// so the login would crash before it could read the pasted OAuth code, showing
-// up as "login didn't finish". fd 0 is the read/write pane tty inherited at
-// launch, which Bun accepts; menu-tui.sh captures only stdout (fd 1), leaving
-// fd 0 free, so reusing it for the child's write streams is safe here.
-func newClaudeLoginCmd(bin, configDir string) *exec.Cmd {
-	c := exec.Command(bin, "auth", "login")
-	c.Env = append(os.Environ(), "CLAUDE_CONFIG_DIR="+configDir)
-	c.Stdin = os.Stdin
-	c.Stdout = os.Stdin
-	c.Stderr = os.Stdin
-	return c
-}
-
-// beginAccountLogin returns a command that runs `claude auth login` under the new
-// account's isolated CLAUDE_CONFIG_DIR. tea.ExecProcess releases the alt-screen
-// for the interactive OAuth and restores the TUI afterward. If `claude` isn't on
-// PATH the account is still registered (it will prompt for login on first use).
-func (m *MainMenuModel) beginAccountLogin(dir string) tea.Cmd {
-	bin, err := exec.LookPath("claude")
-	if err != nil {
-		return func() tea.Msg { return accountLoginDoneMsg{dir: dir, err: err} }
-	}
-	c := newClaudeLoginCmd(bin, filepath.Join(m.claudeAccountsDir, dir))
-	return tea.ExecProcess(c, func(err error) tea.Msg {
-		return accountLoginDoneMsg{dir: dir, err: err}
-	})
-}
-
-// handleAccountLoginDone keeps the panel open after the interactive login. On
-// success it switches to the new login; on failure it leaves the active login
-// untouched (the account is still registered, so the user can switch to it to
-// retry) and shows a note.
-func (m *MainMenuModel) handleAccountLoginDone(msg accountLoginDoneMsg) (tea.Model, tea.Cmd) {
-	m.SetClaudeAccounts(LoadClaudeAccountsList(m.claudeAccountsList))
-	m.accountMenuOpen = true
-	m.accountMenuInputMode = false
-	if msg.err != nil {
-		m.accountMenuErr = errors.New("login didn't finish — switch to this login to retry")
-		return m, nil
-	}
-	m.SetActiveClaudeAccount(msg.dir)
+	m.SetActiveClaudeAccount(dir)
 	m.persistClaudeAccount()
 	return m, nil
 }

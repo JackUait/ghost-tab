@@ -1776,8 +1776,6 @@ func (m *MainMenuModel) Init() tea.Cmd {
 // Update implements tea.Model. Handles key bindings, window resize, and animation ticks.
 func (m *MainMenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case accountLoginDoneMsg:
-		return m.handleAccountLoginDone(msg)
 	case bobTickMsg:
 		if m.ghostDisplay == "animated" {
 			m.bobPhase += bobPhaseStep

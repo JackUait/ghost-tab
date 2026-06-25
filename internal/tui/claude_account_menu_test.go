@@ -3,49 +3,11 @@ package tui
 import (
 	"os"
 	"path/filepath"
-	"reflect"
 	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
-
-// Regression: `claude` is a Bun-compiled binary that crashes on startup with
-// "EINVAL: invalid argument, kqueue" (then "process.stdout.isTTY undefined")
-// whenever its stdout is a freshly-opened /dev/tty fd — which is exactly what
-// tea.ExecProcess hands a child via the program's WithOutput tty. The new login
-// then dies before it can read the pasted OAuth code, surfacing as "login didn't
-// finish". newClaudeLoginCmd must pin the child to the inherited controlling
-// terminal (os.Stdin / fd 0, the rw pane tty), which Bun accepts. Leaving the
-// streams nil reintroduces the crash, so the nil-ness is the thing under test.
-func TestNewClaudeLoginCmd_pinsStdioToInheritedTerminal(t *testing.T) {
-	c := newClaudeLoginCmd("/usr/local/bin/claude", "/tmp/cfg/work")
-
-	wantArgs := []string{"/usr/local/bin/claude", "auth", "login"}
-	if !reflect.DeepEqual(c.Args, wantArgs) {
-		t.Errorf("Args = %v, want %v", c.Args, wantArgs)
-	}
-
-	foundEnv := false
-	for _, e := range c.Env {
-		if e == "CLAUDE_CONFIG_DIR=/tmp/cfg/work" {
-			foundEnv = true
-		}
-	}
-	if !foundEnv {
-		t.Errorf("CLAUDE_CONFIG_DIR=/tmp/cfg/work not found in env %v", c.Env)
-	}
-
-	if c.Stdin != os.Stdin {
-		t.Errorf("Stdin = %v, want os.Stdin (inherited controlling terminal)", c.Stdin)
-	}
-	if c.Stdout != os.Stdin {
-		t.Errorf("Stdout = %v, want os.Stdin (fd 0 is the rw pane tty; a fresh /dev/tty crashes Bun)", c.Stdout)
-	}
-	if c.Stderr != os.Stdin {
-		t.Errorf("Stderr = %v, want os.Stdin", c.Stderr)
-	}
-}
 
 // Enter on the focused LOGIN row opens the inline login-management panel (the
 // view mirroring Plan's model-map panel), rather than bouncing straight out to
@@ -160,9 +122,10 @@ func TestAccountMenu_aKeyOpensInlineInput(t *testing.T) {
 }
 
 // Typing a label and pressing Enter registers the login in-process (dir + list
-// entry) and returns a command to run the interactive login in place — it stays
-// in the panel rather than exiting the menu.
-func TestAccountMenu_inlineSubmitRegistersAndStaysInPanel(t *testing.T) {
+// entry) and makes it active WITHOUT running `claude auth login` — the system
+// logs the user in later, on first launch under the account's isolated
+// CLAUDE_CONFIG_DIR. It stays in the panel rather than exiting the menu.
+func TestAccountMenu_inlineSubmitRegistersAndActivatesWithoutLogin(t *testing.T) {
 	dir := t.TempDir()
 	accountsDir := filepath.Join(dir, "claude-accounts")
 	listFile := filepath.Join(accountsDir, "claude-accounts.list")
@@ -179,11 +142,11 @@ func TestAccountMenu_inlineSubmitRegistersAndStaysInPanel(t *testing.T) {
 	if r := m.Result(); r != nil {
 		t.Fatalf("submit must not exit the menu, got result %+v", r)
 	}
-	if cmd == nil {
-		t.Errorf("submit should return a command to run the inline login")
+	if cmd != nil {
+		t.Errorf("submit must not run an interactive login; the system logs in later")
 	}
 	if !m.accountMenuOpen {
-		t.Errorf("the panel should stay open during/after login")
+		t.Errorf("the panel should stay open after registering")
 	}
 	if m.accountMenuInputMode {
 		t.Errorf("the label input should be dismissed after submit")
@@ -194,41 +157,15 @@ func TestAccountMenu_inlineSubmitRegistersAndStaysInPanel(t *testing.T) {
 	if b, _ := os.ReadFile(listFile); !strings.Contains(string(b), "Work:work") {
 		t.Errorf("registry should list the new login, got %q", string(b))
 	}
-	// The new login already appears in the list, ready to become active when the
-	// login finishes.
 	if len(m.claudeAccounts) != 1 || m.claudeAccounts[0].Dir != "work" {
 		t.Errorf("new login should show in the list immediately, got %+v", m.claudeAccounts)
 	}
-}
-
-// When the interactive login finishes, the new account becomes active and the
-// panel stays open.
-func TestAccountMenu_loginDoneActivatesAndStays(t *testing.T) {
-	dir := t.TempDir()
-	accountsDir := filepath.Join(dir, "claude-accounts")
-	listFile := filepath.Join(accountsDir, "claude-accounts.list")
-	ptr := filepath.Join(dir, "claude-account")
-	if err := os.MkdirAll(filepath.Join(accountsDir, "work"), 0700); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(listFile, []byte("Work:work\n"), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	m := acctTestMenu("claude")
-	m.SetClaudeAccountPaths(listFile, accountsDir)
-	m.SetClaudeAccountFile(ptr)
-	m.openAccountMenu()
-	m.Update(accountLoginDoneMsg{dir: "work"})
-
+	// The new login becomes active straight away, with no interactive login step.
 	if m.CurrentClaudeAccountDir() != "work" {
-		t.Errorf("finished login should be active, got %q", m.CurrentClaudeAccountDir())
-	}
-	if !m.accountMenuOpen {
-		t.Errorf("panel should stay open after login")
+		t.Errorf("new login should become active, got %q", m.CurrentClaudeAccountDir())
 	}
 	if b, _ := os.ReadFile(ptr); strings.TrimSpace(string(b)) != "work" {
-		t.Errorf("active login should persist, got %q", string(b))
+		t.Errorf("active login should persist to the pointer, got %q", string(b))
 	}
 }
 
