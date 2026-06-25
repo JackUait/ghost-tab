@@ -441,9 +441,16 @@ compact_view() {
   # under zsh, where `local NAME` (no assignment) on an already-set variable is
   # a *display* command that prints "NAME=value" to stdout. Re-declaring `local
   # w` each iteration flashed "w=141" on screen until the next refresh.
-  local w h content header body body_total avail mbtn draw_body
+  local w h content header body body_total avail mbtn draw_body frame
   local staged unstaged body_map
   local mterm mrest mrow bl cpath hv prev_hover
+  # Frame-erase helpers, built ONCE: $nl is a literal newline (the match), $rowend
+  # is "erase-to-end-of-line + newline" (the replacement). The flicker-free redraw
+  # swaps every newline in the composed frame for $rowend so each row scrubs the
+  # previous frame's trailing text without a full-screen clear. Kept as variables
+  # because zsh won't expand a $'...' escape in the replacement half of ${//}.
+  local nl=$'\n'
+  local rowend=$'\033[K\n'
   local scroll=0
   local need_build=1
   local need_draw=1
@@ -621,14 +628,25 @@ compact_view() {
     # lands on the same row leaves need_draw=0, so the screen doesn't flicker.
     if [ "$need_draw" = 1 ]; then
       draw_body=$(highlight_body_line "$body" "$hover_line" "$hover_style" "$w")
-      printf '\033[2J\033[H'
-      printf '%s\n' "$header"
-      if [ "$body_total" -le "$body_rows" ]; then
-        printf '%s' "$draw_body"
-      else
-        printf '%s\n' "$draw_body" | viewport_slice "$scroll" "$avail"
-        scroll_status "$scroll" "$avail" "$body_total"
-      fi
+      frame=$(
+        printf '%s\n' "$header"
+        if [ "$body_total" -le "$body_rows" ]; then
+          printf '%s' "$draw_body"
+        else
+          printf '%s\n' "$draw_body" | viewport_slice "$scroll" "$avail"
+          scroll_status "$scroll" "$avail" "$body_total"
+        fi
+      )
+      # Home the cursor and overwrite the frame IN PLACE — never a full-screen
+      # \033[2J, which blanks the pane for one frame and makes the list blink on
+      # every scroll. Each row ends with \033[K (erase to end of line) to scrub
+      # leftover characters from a previous, longer frame; the trailing \033[J
+      # erases any rows below when the new frame is shorter. The whole frame is
+      # one printf (one write) so the terminal never shows a half-drawn screen.
+      # The newline and erase codes live in variables: zsh does not expand a
+      # $'...' literal in the replacement half of ${var//pat/repl} (see
+      # highlight_body_line), so an inline escape there would leak as text.
+      printf '\033[H%s\033[K\033[J' "${frame//${nl}/${rowend}}"
       need_draw=0
     fi
 
