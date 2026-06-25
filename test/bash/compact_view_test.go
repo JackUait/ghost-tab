@@ -457,6 +457,95 @@ func TestBodyLineForClick_status_row_yields_zero(t *testing.T) {
 	}
 }
 
+// When the branch+plan heading is wider than the pane it WRAPS to extra screen
+// rows, pushing the body down. body_line_for_click takes the actual header
+// height (5th arg) so the click→row mapping stays correct; omitting it keeps the
+// historical 2-row assumption for existing callers/tests.
+func TestBodyLineForClick_wrapped_header_offsets_body(t *testing.T) {
+	// header_rows=3 (heading wrapped onto 2 rows + separator): screen rows 1-3
+	// are the header, so row 3 is still header (0) and row 4 is body line 1.
+	out, _ := runBashFunc(t, "lib/compact-view.sh", "body_line_for_click",
+		[]string{"3", "0", "10", "5", "3"}, nil)
+	if got := strings.TrimSpace(out); got != "0" {
+		t.Errorf("row 3 with a 3-row header should yield 0, got %q", got)
+	}
+	out, _ = runBashFunc(t, "lib/compact-view.sh", "body_line_for_click",
+		[]string{"4", "0", "10", "5", "3"}, nil)
+	if got := strings.TrimSpace(out); got != "1" {
+		t.Errorf("row 4 with a 3-row header should map to body line 1, got %q", got)
+	}
+}
+
+func TestBodyLineForClick_two_wrapped_header_rows(t *testing.T) {
+	// header_rows=4 (heading wrapped onto 3 rows + separator): row 4 is still
+	// header (0), row 5 is body line 1.
+	out, _ := runBashFunc(t, "lib/compact-view.sh", "body_line_for_click",
+		[]string{"4", "0", "10", "5", "4"}, nil)
+	if got := strings.TrimSpace(out); got != "0" {
+		t.Errorf("row 4 with a 4-row header should yield 0, got %q", got)
+	}
+	out, _ = runBashFunc(t, "lib/compact-view.sh", "body_line_for_click",
+		[]string{"5", "0", "10", "5", "4"}, nil)
+	if got := strings.TrimSpace(out); got != "1" {
+		t.Errorf("row 5 with a 4-row header should map to body line 1, got %q", got)
+	}
+}
+
+func TestBodyLineForClick_omitted_header_rows_defaults_to_two(t *testing.T) {
+	// Backward compatibility: with no 5th arg the body starts at screen row 3.
+	out, _ := runBashFunc(t, "lib/compact-view.sh", "body_line_for_click",
+		[]string{"3", "0", "10", "5"}, nil)
+	if got := strings.TrimSpace(out); got != "1" {
+		t.Errorf("row 3 with no header arg should map to body line 1, got %q", got)
+	}
+}
+
+// header_rows_for converts the heading's visible column width and the pane width
+// into the number of SCREEN rows the pinned header occupies: ceil(vis/w) wrapped
+// heading rows plus the one-row separator. It is the single source of truth for
+// the body's vertical offset once the heading can wrap.
+func TestHeaderRowsFor_fits_one_row(t *testing.T) {
+	out, code := runBashFunc(t, "lib/compact-view.sh", "header_rows_for",
+		[]string{"40", "80"}, nil)
+	assertExitCode(t, code, 0)
+	if got := strings.TrimSpace(out); got != "2" {
+		t.Errorf("vis 40 in width 80 should be 2 rows, got %q", got)
+	}
+}
+
+func TestHeaderRowsFor_exact_width_stays_one_row(t *testing.T) {
+	// A heading exactly as wide as the pane does NOT wrap (pending-wrap margin).
+	out, _ := runBashFunc(t, "lib/compact-view.sh", "header_rows_for",
+		[]string{"80", "80"}, nil)
+	if got := strings.TrimSpace(out); got != "2" {
+		t.Errorf("vis 80 in width 80 should be 2 rows, got %q", got)
+	}
+}
+
+func TestHeaderRowsFor_overflow_adds_a_row(t *testing.T) {
+	out, _ := runBashFunc(t, "lib/compact-view.sh", "header_rows_for",
+		[]string{"81", "80"}, nil)
+	if got := strings.TrimSpace(out); got != "3" {
+		t.Errorf("vis 81 in width 80 should be 3 rows, got %q", got)
+	}
+}
+
+func TestHeaderRowsFor_double_overflow_adds_two_rows(t *testing.T) {
+	out, _ := runBashFunc(t, "lib/compact-view.sh", "header_rows_for",
+		[]string{"161", "80"}, nil)
+	if got := strings.TrimSpace(out); got != "4" {
+		t.Errorf("vis 161 in width 80 should be 4 rows, got %q", got)
+	}
+}
+
+func TestHeaderRowsFor_empty_heading_is_two_rows(t *testing.T) {
+	out, _ := runBashFunc(t, "lib/compact-view.sh", "header_rows_for",
+		[]string{"0", "80"}, nil)
+	if got := strings.TrimSpace(out); got != "2" {
+		t.Errorf("vis 0 in width 80 should be 2 rows, got %q", got)
+	}
+}
+
 // open_diff_popup floats a whole-window tmux popup running the full-file diff
 // for the clicked path, piped through less. It builds the popup command; the
 // actual rendering is tmux's job (mocked here).
@@ -790,7 +879,7 @@ func runSplitContent(t *testing.T, sh, content string) string {
 	t.Helper()
 	root := projectRoot(t)
 	module := filepath.Join(root, "lib", "compact-view.sh")
-	script := `source "$0" && split_content "$1" && printf 'H<%s>B<%s>T<%s>' "$HEADER" "$BODY" "$BODY_TOTAL"`
+	script := `source "$0" && split_content "$1" && printf 'R<%s>H<%s>B<%s>T<%s>' "$HEADER_ROWS" "$HEADER" "$BODY" "$BODY_TOTAL"`
 	cmd := exec.Command(sh, "-c", script, module, content)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -803,10 +892,13 @@ func TestSplitContent_splits_and_counts_under_both_shells(t *testing.T) {
 	cases := []struct {
 		name, content, want string
 	}{
-		{"basic", "branch\n────\nA\nB\nC", "H<branch\n────>B<A\nB\nC>T<3>"},
-		{"internal blank preserved", "h1\nh2\nA\n\nB", "H<h1\nh2>B<A\n\nB>T<3>"},
-		{"single body line", "h1\nh2\nonly", "H<h1\nh2>B<only>T<1>"},
-		{"path with spaces in body", "h1\nh2\napp x.sh", "H<h1\nh2>B<app x.sh>T<1>"},
+		// Line 1 is the header-row count metadata; lines 2-3 are the pinned
+		// heading + separator; the rest is the scrollable body.
+		{"basic", "2\nbranch\n────\nA\nB\nC", "R<2>H<branch\n────>B<A\nB\nC>T<3>"},
+		{"internal blank preserved", "2\nh1\nh2\nA\n\nB", "R<2>H<h1\nh2>B<A\n\nB>T<3>"},
+		{"single body line", "2\nh1\nh2\nonly", "R<2>H<h1\nh2>B<only>T<1>"},
+		{"path with spaces in body", "2\nh1\nh2\napp x.sh", "R<2>H<h1\nh2>B<app x.sh>T<1>"},
+		{"wrapped heading reports three rows", "3\nh1\nh2\nA\nB", "R<3>H<h1\nh2>B<A\nB>T<2>"},
 	}
 	for _, sh := range []string{"bash", "zsh"} {
 		if _, err := exec.LookPath(sh); err != nil {

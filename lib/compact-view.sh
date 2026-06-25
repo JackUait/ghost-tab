@@ -159,14 +159,33 @@ body_path_map() {
   fi
 }
 
+# header_rows_for converts the heading's visible column <width> and the pane
+# <pane_width> into the number of SCREEN rows the pinned header occupies: the
+# wrapped heading rows — ceil(width / pane_width), at least one — plus the
+# one-row separator beneath it. A heading exactly as wide as the pane does NOT
+# wrap (terminals park the cursor at the pending-wrap margin), so it stays one
+# row. This is the single source of truth for the body's vertical offset once a
+# long branch+plan heading can overflow a narrow pane.
+# Usage: header_rows_for <visible_width> <pane_width>
+header_rows_for() {
+  local vis="$1" pw="$2"
+  [ "$pw" -lt 1 ] && pw=1
+  local wrapped=$(( (vis + pw - 1) / pw ))
+  [ "$wrapped" -lt 1 ] && wrapped=1
+  printf '%d' $((wrapped + 1))
+}
+
 # body_line_for_click maps a clicked SCREEN row to a 1-based body-line index, or
-# 0 when the click landed on the pinned 2-row header, the bottom scroll-status
-# row, or past the end of the content. The body viewport starts at screen row 3,
-# so view-row = row - 2; with overflow the scroll offset is added.
-# Usage: body_line_for_click <row> <scroll> <avail> <total>
+# 0 when the click landed on the pinned header, the bottom scroll-status row, or
+# past the end of the content. The header occupies <header_rows> screen rows (2
+# when the heading fits one line; more when a long branch+plan heading wraps), so
+# the body viewport starts at screen row header_rows+1 and view-row = row -
+# header_rows; with overflow the scroll offset is added. header_rows defaults to
+# 2 for callers that predate wrap-aware headers.
+# Usage: body_line_for_click <row> <scroll> <avail> <total> [header_rows]
 body_line_for_click() {
-  local row="$1" scroll="$2" avail="$3" total="$4"
-  local vr=$((row - 2))                 # 1-based row within the body viewport
+  local row="$1" scroll="$2" avail="$3" total="$4" header_rows="${5:-2}"
+  local vr=$((row - header_rows))       # 1-based row within the body viewport
   { [ "$vr" -lt 1 ] || [ "$vr" -gt "$avail" ]; } && { printf 0; return; }
   local line=$((scroll + vr))
   { [ "$line" -lt 1 ] || [ "$line" -gt "$total" ]; } && { printf 0; return; }
@@ -191,21 +210,27 @@ nth_line() {
   return 0
 }
 
-# split_content splits the rendered ledger <content> into the 2-line pinned
-# HEADER (branch heading + separator) and the scrollable BODY, and counts the
-# body lines into BODY_TOTAL — all via globals, WITHOUT forking (no `sed`/`wc`).
+# split_content splits the rendered ledger <content> into the pinned HEADER
+# (branch heading + separator) and the scrollable BODY, and counts the body
+# lines into BODY_TOTAL — all via globals, WITHOUT forking (no `sed`/`wc`). The
+# content's FIRST line is metadata: the number of SCREEN rows the header occupies
+# once the heading's wrapping is accounted for (see header_rows_for), captured
+# into HEADER_ROWS so the body's vertical offset tracks a wrapped heading. Lines
+# 2-3 are the two pinned visual lines (heading + separator); the rest is body.
 # The refresh loop used to derive these with two `sed` calls plus `wc | tr` on
 # EVERY iteration — including every mouse-motion event under any-motion tracking
 # (~31ms/event) — so this is gated behind a build tick AND kept fork-free. The
 # content is captured via $() upstream, so it carries no trailing blank line.
-# Usage: split_content <content>   -> $HEADER, $BODY, $BODY_TOTAL
+# Usage: split_content <content>   -> $HEADER, $BODY, $BODY_TOTAL, $HEADER_ROWS
 split_content() {
-  HEADER=""; BODY=""; BODY_TOTAL=0
+  HEADER=""; BODY=""; BODY_TOTAL=0; HEADER_ROWS=2
   local i=0 line
   while IFS= read -r line; do
     i=$((i + 1))
-    if [ "$i" -le 2 ]; then
-      if [ "$i" -eq 1 ]; then HEADER="$line"; else HEADER="${HEADER}"$'\n'"${line}"; fi
+    if [ "$i" -eq 1 ]; then
+      HEADER_ROWS="$line"
+    elif [ "$i" -le 3 ]; then
+      if [ "$i" -eq 2 ]; then HEADER="$line"; else HEADER="${HEADER}"$'\n'"${line}"; fi
     else
       if [ "$BODY_TOTAL" -eq 0 ]; then BODY="$line"; else BODY="${BODY}"$'\n'"${line}"; fi
       BODY_TOTAL=$((BODY_TOTAL + 1))
@@ -442,6 +467,7 @@ compact_view() {
   # a *display* command that prints "NAME=value" to stdout. Re-declaring `local
   # w` each iteration flashed "w=141" on screen until the next refresh.
   local w h content header body body_total avail mbtn draw_body
+  local header_rows=2
   local staged unstaged body_map
   local mterm mrest mrow bl cpath hv prev_hover
   local scroll=0
@@ -496,8 +522,10 @@ compact_view() {
       local iw=$((w - 4))
       [ "$iw" -lt 20 ] && iw=20
 
-      # Branch + ahead/behind
-      local branch ahead_behind=""
+      # Branch + ahead/behind. ab_vis tracks the marker's VISIBLE width (the ANSI
+      # colors don't take columns) so the heading's wrap height can be computed:
+      # " ↑N" / " ↓M" each span a space + a 1-column arrow + the digit count.
+      local branch ahead_behind="" ab_vis=0
       branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "detached")
       if git rev-parse '@{u}' &>/dev/null 2>&1; then
         local counts ahead behind
@@ -505,8 +533,8 @@ compact_view() {
         if [ -n "$counts" ]; then
           ahead=$(echo "$counts" | cut -f1)
           behind=$(echo "$counts" | cut -f2)
-          [ "$ahead" -gt 0 ] && ahead_behind=" ${cyan}↑${ahead}${reset}"
-          [ "$behind" -gt 0 ] && ahead_behind="${ahead_behind} ${yellow}↓${behind}${reset}"
+          [ "$ahead" -gt 0 ] && { ahead_behind=" ${cyan}↑${ahead}${reset}"; ab_vis=$((ab_vis + 2 + ${#ahead})); }
+          [ "$behind" -gt 0 ] && { ahead_behind="${ahead_behind} ${yellow}↓${behind}${reset}"; ab_vis=$((ab_vis + 2 + ${#behind})); }
         fi
       fi
 
@@ -548,6 +576,23 @@ compact_view() {
       # Right-align the stamp on the heading line when it fits.
       local headtext="${ns}${leaf}"
       local pad=$((iw - ${#headtext} - plan_w - ${#stamp}))
+
+      # How many SCREEN rows will the heading line occupy? It is emitted with a
+      # single leading space, then ns+leaf, the ahead/behind marker, the inline
+      # plan, and — only when it fits (pad ≥ 1) — the right-aligned stamp. When
+      # the stamp shows, the line fills the inner width plus the marker; when it
+      # doesn't, only the left run is printed. A heading wider than the pane wraps
+      # onto extra rows, which the pinned-header offset must account for so mouse
+      # clicks/hover map to the right file row. Emit the row count as the content's
+      # first line for split_content; the renderer/click math read it from there.
+      local head_vis
+      if [ -n "$stamp" ] && [ "$pad" -ge 1 ]; then
+        head_vis=$((1 + iw + ab_vis))
+      else
+        head_vis=$((1 + ${#headtext} + ab_vis + plan_w))
+      fi
+      printf '%s\n' "$(header_rows_for "$head_vis" "$w")"
+
       printf " ${dim}%s${reset}${bold}${bright}%s${reset}" "$ns" "$leaf"
       # %b (not %s): ahead_behind carries the literal "\033[..." color escapes,
       # which printf only interprets in a format string / via %b — a plain %s
@@ -588,16 +633,18 @@ compact_view() {
         printf " ${dim}no changes${reset}\n\n"
       fi
     )
-    # The header is the first 2 lines (branch heading + separator); it is PINNED
-    # — always drawn at the top, never part of the scroll region. Only the body
-    # (the file groups) scrolls beneath it. Derived ONCE per build (fork-free, via
-    # split_content) — NOT per keystroke: the old per-iteration `sed`×2 + `wc|tr`
-    # cost ~31ms on every mouse-motion event and helped the hover highlight crawl.
+    # The header is the branch heading + separator; it is PINNED — always drawn
+    # at the top, never part of the scroll region. Only the body (the file groups)
+    # scrolls beneath it. A long branch+plan heading can WRAP onto extra screen
+    # rows, so header_rows (≥2) — not a fixed 2 — is the body's vertical offset.
+    # Derived ONCE per build (fork-free, via split_content) — NOT per keystroke:
+    # the old per-iteration `sed`×2 + `wc|tr` cost ~31ms on every mouse-motion
+    # event and helped the hover highlight crawl.
     split_content "$content"
-    header="$HEADER"; body="$BODY"; body_total="$BODY_TOTAL"
+    header="$HEADER"; body="$BODY"; body_total="$BODY_TOTAL"; header_rows="$HEADER_ROWS"
     fi
 
-    local body_rows=$((h - 2))
+    local body_rows=$((h - header_rows))
     [ "$body_rows" -lt 1 ] && body_rows=1
     # Reserve the last row for the position indicator when the body overflows.
     if [ "$body_total" -gt "$body_rows" ]; then
@@ -689,7 +736,7 @@ compact_view() {
                   # highlight; if the hovered row didn't change, skip the redraw
                   # so the screen doesn't flicker on every motion event.
                   mrest="${mbtn#*;}"; mrow="${mrest#*;}"
-                  bl=$(body_line_for_click "$mrow" "$scroll" "$avail" "$body_total")
+                  bl=$(body_line_for_click "$mrow" "$scroll" "$avail" "$body_total" "$header_rows")
                   hv=0
                   nth_line "$body_map" "$bl"
                   if [ "$bl" != 0 ] && [ -n "$NTH_LINE" ]; then
@@ -705,7 +752,7 @@ compact_view() {
                   if [ "$mterm" = M ]; then
                     mrest="${mbtn#*;}"          # "col;row"
                     mrow="${mrest#*;}"          # "row"
-                    bl=$(body_line_for_click "$mrow" "$scroll" "$avail" "$body_total")
+                    bl=$(body_line_for_click "$mrow" "$scroll" "$avail" "$body_total" "$header_rows")
                     if [ "$bl" != 0 ]; then
                       nth_line "$body_map" "$bl"; cpath="$NTH_LINE"
                       if [ -n "$cpath" ]; then
