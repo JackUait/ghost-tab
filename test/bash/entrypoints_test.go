@@ -47,8 +47,8 @@ func TestWrapper_tab_title_uses_nerd_font_ghost_icon(t *testing.T) {
 	content := string(data)
 
 	const nerdGhost = "\U000F02A0" // nf-md-ghost — must match iconGhost in render_projects.go
-	if !strings.Contains(content, nerdGhost+" Wisp Deck") {
-		t.Errorf("wrapper.sh tab title should use the nerd-font ghost glyph %q before \"Wisp Deck\"", nerdGhost)
+	if !strings.Contains(content, nerdGhost+"  Wisp Deck") {
+		t.Errorf("wrapper.sh tab title should use the nerd-font ghost glyph %q followed by two spaces before \"Wisp Deck\" (the glyph hugs the text with only one)", nerdGhost)
 	}
 	if strings.Contains(content, "👻") {
 		t.Error("wrapper.sh should not use the 👻 emoji for the tab title; use the nerd-font ghost glyph to match the header")
