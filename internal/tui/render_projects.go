@@ -606,14 +606,23 @@ func (m *MainMenuModel) renderHelpRow() string {
 	} else {
 		helpContent = helpStyle.Render(m.focusHint())
 	}
-	// Center within the full box width (inner + 2 border columns).
+	// Center within the full box width (inner + 2 border columns), padding the
+	// line out to that width on both sides. Right-padding matters: the help row
+	// is centered by lipgloss.Place against the widest content line (the box
+	// border). A short line gets extra left margin (short/2), shifting the hints
+	// right of box-center when no ghost pads the row. A full-width line keeps it
+	// centered relative to the box.
 	boxWidth := menuInnerWidth + 2
 	helpWidth := lipgloss.Width(helpContent)
 	helpLeft := (boxWidth - helpWidth) / 2
 	if helpLeft < 0 {
 		helpLeft = 0
 	}
-	return strings.Repeat(" ", helpLeft) + helpContent
+	helpRight := boxWidth - helpLeft - helpWidth
+	if helpRight < 0 {
+		helpRight = 0
+	}
+	return strings.Repeat(" ", helpLeft) + helpContent + strings.Repeat(" ", helpRight)
 }
 
 // focusHint returns the footer hint line for the current focus region and tab.
