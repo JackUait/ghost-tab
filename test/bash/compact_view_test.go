@@ -1523,3 +1523,97 @@ func TestDiscardWorktreeFile_keeps_staged_change(t *testing.T) {
 		t.Errorf("staged copy should be intact: got %q, want %q", string(staged), "staged\n")
 	}
 }
+
+// extractBashFunc returns the source of a bash function `name` (from its
+// `name() {` to the matching closing brace) by brace-matching. Group-command
+// braces inside the body balance out, so a simple depth counter is enough for
+// these functions. Returns "" if the definition isn't found.
+func extractBashFunc(src, name string) string {
+	start := strings.Index(src, name+"() {")
+	if start < 0 {
+		return ""
+	}
+	depth := 0
+	for i := start; i < len(src); i++ {
+		switch src[i] {
+		case '{':
+			depth++
+		case '}':
+			depth--
+			if depth == 0 {
+				return src[start : i+1]
+			}
+		}
+	}
+	return ""
+}
+
+// stripBashComments removes whole-line and trailing `#` comments so a fork
+// regression check sees only EXECUTED code — a comment may legitimately mention
+// `$(` or `sed` while explaining why the code avoids them.
+func stripBashComments(body string) string {
+	var b strings.Builder
+	for _, line := range strings.Split(body, "\n") {
+		if strings.HasPrefix(strings.TrimSpace(line), "#") {
+			continue
+		}
+		if idx := strings.Index(line, " #"); idx >= 0 {
+			line = line[:idx]
+		}
+		b.WriteString(line)
+		b.WriteString("\n")
+	}
+	return b.String()
+}
+
+// A $() command substitution: a `$(` NOT part of `$((` arithmetic expansion
+// (which is fork-free). Arithmetic `$((x + y))` must not trip the tripwire.
+var cmdSubRE = regexp.MustCompile(`\$\([^(]`)
+
+// The hover/scroll hot path runs ONCE PER buffered mouse report, and under
+// any-motion tracking (?1003h) a single fast cursor sweep floods dozens of
+// reports at once. The original lag bug was that each event forked a $()
+// subshell (~8ms under load) to map the cursor row and to slice the Nth body
+// line, so the selection bar crawled a long backlog behind the cursor. These
+// three functions were rewritten fork-free — results return via the BODY_LINE /
+// NTH_LINE globals, read through a >/dev/null redirect, with no subshell. This
+// tripwire fails the instant any of them regains a $() or backtick command
+// substitution, which is the precise change that brings the crawl back. It is a
+// deterministic guard (no PTY, no timing) so it can never be flaky-disabled.
+func TestCompactView_hover_hotpath_stays_fork_free(t *testing.T) {
+	srcBytes, err := os.ReadFile(filepath.Join(projectRoot(t), "lib", "compact-view.sh"))
+	if err != nil {
+		t.Fatalf("read compact-view.sh: %v", err)
+	}
+	src := string(srcBytes)
+
+	for _, fn := range []string{"body_line_for_click", "nth_line", "set_hover_from_row"} {
+		body := extractBashFunc(src, fn)
+		if body == "" {
+			t.Fatalf("could not locate %q in compact-view.sh; if the per-event hover "+
+				"function was renamed, point this fork-free tripwire at the new name", fn)
+		}
+		code := stripBashComments(body)
+		if cmdSubRE.MatchString(code) {
+			t.Errorf("%s contains a $() command substitution: that forks a subshell on "+
+				"EVERY mouse-motion event (~8ms under load) and is exactly what made the "+
+				"changeset file list crawl behind the cursor. Keep the hot path fork-free "+
+				"— return via a global and read it with a >/dev/null redirect.", fn)
+		}
+		if strings.Contains(code, "`") {
+			t.Errorf("%s contains a backtick command substitution: that forks a subshell "+
+				"per mouse event and reintroduces the hover lag. Keep the hot path "+
+				"fork-free.", fn)
+		}
+	}
+
+	// The fork-free contract is more than "no $()": set_hover_from_row must read
+	// body_line_for_click's result from the BODY_LINE global via a >/dev/null
+	// redirect. If those markers disappear the function is being rewired in a way
+	// that almost certainly forks again.
+	hover := extractBashFunc(src, "set_hover_from_row")
+	if !strings.Contains(hover, "BODY_LINE") || !strings.Contains(hover, ">/dev/null") {
+		t.Errorf("set_hover_from_row no longer maps the row via $BODY_LINE + a >/dev/null "+
+			"redirect; that fork-free pattern is what keeps the per-event hover cheap.")
+	}
+}
