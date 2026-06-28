@@ -28,6 +28,8 @@ WISP_DECK_CLAUDE_SHARED_ITEMS=(
   statusline-wrapper.sh  # status line entrypoint referenced by settings.json
   statusline-command.sh  # status line helpers
   statusline-helpers.sh
+  subagent-statusline.sh         # subagent panel row entrypoint (settings.json)
+  subagent-statusline-helpers.sh # subagent panel row renderer
   tab-spinner-start.sh   # notification/tab hooks referenced by settings.json
   tab-spinner-stop.sh
 )

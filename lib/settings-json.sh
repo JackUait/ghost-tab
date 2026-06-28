@@ -25,6 +25,33 @@ CSEOF
   fi
 }
 
+# Merge subagentStatusLine into Claude settings.json (create if missing).
+# Claude renders one agent-panel row per subagent through this command, so the
+# row for whichever subagent the user is on shows that subagent's own info.
+# Mirrors merge_claude_settings: idempotent, appends before the final brace.
+merge_subagent_statusline() {
+  local path="$1"
+  mkdir -p "$(dirname "$path")"
+  if [ -f "$path" ]; then
+    if grep -q '"subagentStatusLine"' "$path"; then
+      success "Claude subagent status line already configured"
+    else
+      sed -i '' '$ s/}$/,\n  "subagentStatusLine": {\n    "type": "command",\n    "command": "bash ~\/.claude\/subagent-statusline.sh"\n  }\n}/' "$path"
+      success "Added subagent status line to Claude settings"
+    fi
+  else
+    cat > "$path" << 'CSEOF'
+{
+  "subagentStatusLine": {
+    "type": "command",
+    "command": "bash ~/.claude/subagent-statusline.sh"
+  }
+}
+CSEOF
+    success "Created Claude settings with subagent status line"
+  fi
+}
+
 # Add waiting indicator hooks (Stop + PreToolUse + UserPromptSubmit) to settings.json.
 # Uses $WISP_DECK_MARKER_FILE env var so hooks are safe outside Wisp Deck.
 # Outputs "added", "upgraded", or "exists".

@@ -79,11 +79,15 @@ setup_statusline() {
     cp "$share_dir/templates/statusline-command.sh" "$home_dir/.claude/statusline-command.sh"
     cp "$share_dir/templates/statusline-wrapper.sh" "$home_dir/.claude/statusline-wrapper.sh"
     cp "$share_dir/lib/statusline.sh" "$home_dir/.claude/statusline-helpers.sh"
+    cp "$share_dir/templates/subagent-statusline.sh" "$home_dir/.claude/subagent-statusline.sh"
+    cp "$share_dir/lib/subagent-statusline.sh" "$home_dir/.claude/subagent-statusline-helpers.sh"
     chmod +x "$home_dir/.claude/statusline-command.sh"
     chmod +x "$home_dir/.claude/statusline-wrapper.sh"
+    chmod +x "$home_dir/.claude/subagent-statusline.sh"
     success "Created statusline scripts"
 
     # Update Claude settings.json
     merge_claude_settings "$claude_settings_path"
+    merge_subagent_statusline "$claude_settings_path"
   fi
 }
