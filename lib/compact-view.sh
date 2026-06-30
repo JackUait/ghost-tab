@@ -896,8 +896,16 @@ compact_view() {
     prev_scroll="$scroll"
     need_build=0
     while true; do
-      hover_keep="$hover_line" # restored if this event is a malformed mouse report
-      hover_line=0             # most keys clear the hover; mouse motion re-sets it
+      # Do NOT blanket-clear the hover here. A mouse motion/wheel report fully
+      # re-derives it (set_hover_from_row sets the file under the cursor, or 0
+      # when off a file); a scroll KEY must PRESERVE it. The terminal can deliver
+      # one wheel scroll as arrow-key sequences (common in the alt screen)
+      # interleaved with the incidental motion reports the cursor emits, so
+      # clearing the hover per token flipped the highlight off (arrow token) then
+      # on (motion token) on every step — a constant blink, most visible when the
+      # list is not scrollable (the scroll does nothing, so the blink is the only
+      # effect). hover_keep restores the hover if a mouse report arrives malformed.
+      hover_keep="$hover_line"
       handle_key
       [ "$need_build" = 1 ] && break   # popup opened / rebuild -> stop draining
       read_key 0.006 || break          # no more buffered input -> flood settled

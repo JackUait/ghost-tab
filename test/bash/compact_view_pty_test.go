@@ -641,3 +641,144 @@ func TestCompactView_header_stays_pinned_when_scrolled(t *testing.T) {
 		t.Errorf("top file (f00.txt) should have scrolled away after G; frame:\n%s", frame)
 	}
 }
+
+// Regression: scrolling a list that DOES NOT overflow (nothing to scroll) must
+// not BLINK the hovered-row highlight. A terminal commonly delivers a mouse
+// wheel as arrow-key sequences in the alternate screen, interleaved with the
+// incidental motion reports the cursor emits. The drain loop cleared the hover
+// (hover_line=0) before EACH buffered token and relied on a motion report to
+// re-set it; the arrow-key (and j/k/page/g/G) scroll handlers never re-derive or
+// preserve it, so the highlight flipped off (arrow token) then on (motion token)
+// on every wheel step — a constant blink. It is most visible when the list is
+// not scrollable, because then the scroll does nothing and the blink is the only
+// effect. The fix stops blanket-clearing the hover: motion/wheel fully re-derive
+// it, scroll keys preserve it. This drives the real loop under zsh over a SHORT
+// (non-overflowing) list, scrolls with arrow-keys interleaved with same-row
+// motion, and asserts the highlight never drops out once it has appeared.
+func TestCompactView_hover_does_not_blink_on_nonscrollable_scroll(t *testing.T) {
+	zsh, err := exec.LookPath("zsh")
+	if err != nil {
+		t.Skip("zsh not available")
+	}
+	module := filepath.Join(projectRoot(t), "lib", "compact-view.sh")
+
+	dir := t.TempDir()
+	git := func(args ...string) {
+		t.Helper()
+		c := exec.Command("git", append([]string{"-C", dir}, args...)...)
+		c.Env = append(os.Environ(),
+			"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t",
+			"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@t")
+		if out, err := c.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	git("init", "-q")
+	writeTempFile(t, dir, "seed.txt", "x\n")
+	git("add", "seed.txt")
+	git("commit", "-q", "-m", "init")
+	// Only a FEW files so the list fits the pane -> NOT scrollable.
+	for i := 0; i < 3; i++ {
+		writeTempFile(t, dir, fmt.Sprintf("f%02d.txt", i), "x\n")
+	}
+	git("add", ".")
+
+	cmd := exec.Command(zsh, "-c", "source "+module+" && compact_view "+dir)
+	env := []string{}
+	for _, e := range os.Environ() {
+		if strings.HasPrefix(e, "TMUX=") {
+			continue
+		}
+		env = append(env, e)
+	}
+	// Long interval so the timed rebuild never interleaves with the scroll burst.
+	cmd.Env = append(env, "COMPACT_VIEW_INTERVAL=5", "TERM=xterm")
+
+	ptmx, err := pty.StartWithSize(cmd, &pty.Winsize{Rows: 12, Cols: 60})
+	if err != nil {
+		t.Fatalf("start pty: %v", err)
+	}
+	defer func() { _ = ptmx.Close() }()
+
+	var mu sync.Mutex
+	var out bytes.Buffer
+	go func() {
+		b := make([]byte, 4096)
+		for {
+			n, err := ptmx.Read(b)
+			if n > 0 {
+				mu.Lock()
+				out.Write(b[:n])
+				mu.Unlock()
+			}
+			if err != nil {
+				return
+			}
+		}
+	}()
+
+	contains := func(sub string) bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return strings.Contains(out.String(), sub)
+	}
+	for i := 0; i < 40 && !contains("staged"); i++ {
+		time.Sleep(50 * time.Millisecond)
+	}
+	mu.Lock()
+	out.Reset() // capture only the scroll frames
+	mu.Unlock()
+
+	// Establish the hover on the first file row (screen row 4), then "scroll" with
+	// arrow-key-down tokens interleaved with same-row motion reports — exactly how
+	// a wheel gesture can arrive in the alt screen. The cursor never leaves row 4,
+	// so the highlight should persist on every frame.
+	_, _ = ptmx.Write([]byte("\x1b[<35;12;4M")) // motion: hover row 4
+	time.Sleep(120 * time.Millisecond)
+	for i := 0; i < 8; i++ {
+		_, _ = ptmx.Write([]byte("\x1b[B"))         // arrow-down (wheel-as-arrow)
+		time.Sleep(25 * time.Millisecond)
+		_, _ = ptmx.Write([]byte("\x1b[<35;12;4M")) // incidental motion, same row
+		time.Sleep(25 * time.Millisecond)
+	}
+
+	outLen := func() int { mu.Lock(); defer mu.Unlock(); return out.Len() }
+	prev, stable := -1, 0
+	for i := 0; i < 40 && stable < 3; i++ {
+		time.Sleep(50 * time.Millisecond)
+		if n := outLen(); n == prev {
+			stable++
+		} else {
+			prev, stable = n, 0
+		}
+	}
+	_, _ = ptmx.Write([]byte{0x03}) // Ctrl-C
+	time.Sleep(300 * time.Millisecond)
+
+	mu.Lock()
+	got := out.String()
+	mu.Unlock()
+
+	// Walk the scroll frames; once the highlight (SGR 48;5;238) has appeared,
+	// assert no later frame drops it — a drop-then-return is the blink.
+	frames := strings.Split(got, "\x1b[H")
+	seen := false
+	blinks := 0
+	for _, f := range frames {
+		if f == "" {
+			continue
+		}
+		if strings.Contains(f, "48;5;238") {
+			seen = true
+		} else if seen {
+			blinks++
+		}
+	}
+	if !seen {
+		t.Fatalf("hover highlight never appeared; test cannot assess blinking")
+	}
+	if blinks > 0 {
+		t.Errorf("hover highlight blinked off on %d frame(s) while scrolling a non-scrollable "+
+			"list; a scroll that changes nothing must not disturb the highlight", blinks)
+	}
+}
