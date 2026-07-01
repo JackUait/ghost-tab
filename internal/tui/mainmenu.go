@@ -1236,21 +1236,21 @@ func (m *MainMenuModel) CycleTab(direction string) {
 
 // settingsItemCount returns the number of settings rows: 6 base (Ghost, Tab,
 // Sound, Panel, Theme, Dir) + the Plan row when the Claude config control is
-// visible + the always-present Login row + the Account-switching toggle.
+// visible + the always-present Login row + the Auto-switch toggle.
 func (m *MainMenuModel) settingsItemCount() int {
 	n := 6
 	if m.ClaudeConfigVisible() {
 		n++ // Plan
 	}
 	n++ // Login
-	n++ // Account switching
+	n++ // Auto-switch accounts
 	return n
 }
 
 // loginRowIndex is the fixed index of the Login row (Plan is always present).
 func (m *MainMenuModel) loginRowIndex() int { return m.settingsItemCount() - 2 }
 
-// autoSwitchRowIndex is the index of the Account-switching toggle (last row).
+// autoSwitchRowIndex is the index of the Auto-switch toggle (last row).
 func (m *MainMenuModel) autoSwitchRowIndex() int { return m.settingsItemCount() - 1 }
 
 // SetAutoSwitchFile records the on/off flag file and loads its current value.

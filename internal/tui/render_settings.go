@@ -218,7 +218,8 @@ func (m *MainMenuModel) renderSettingsBox() string {
 	loginStyle := lipgloss.NewStyle().Foreground(loginColor)
 	lines = append(lines, m.renderSettingsItem(m.loginRowIndex(), "Login", "["+loginLabel+"]", loginStyle, primaryBoldStyle, leftBorder, rightBorder))
 
-	// Account switching item: toggles the automatic account-rotation proxy.
+	// Auto-switch accounts item: toggles the automatic account-rotation proxy
+	// (distinct from the Login row above, which switches the active login by hand).
 	var autoColor lipgloss.Color
 	autoState := "[Off]"
 	if m.AutoSwitchEnabled() {
@@ -228,7 +229,7 @@ func (m *MainMenuModel) renderSettingsBox() string {
 		autoColor = lipgloss.Color("241") // gray when off
 	}
 	autoStyle := lipgloss.NewStyle().Foreground(autoColor)
-	lines = append(lines, m.renderSettingsItem(m.autoSwitchRowIndex(), "Account switching", autoState, autoStyle, primaryBoldStyle, leftBorder, rightBorder))
+	lines = append(lines, m.renderSettingsItem(m.autoSwitchRowIndex(), "Auto-switch accounts", autoState, autoStyle, primaryBoldStyle, leftBorder, rightBorder))
 
 	// Empty row
 	lines = append(lines, emptyRow)

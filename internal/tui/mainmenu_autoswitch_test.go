@@ -11,8 +11,8 @@ func TestSettings_showsAccountSwitchingRow(t *testing.T) {
 	m := NewMainMenu(nil, []string{"claude"}, "claude", "animated")
 	m.SetActiveTab(TabSettings)
 	out := m.renderSettingsForTest()
-	if !strings.Contains(out, "Account switching") {
-		t.Fatalf("settings panel should show an Account switching row:\n%s", out)
+	if !strings.Contains(out, "Auto-switch accounts") {
+		t.Fatalf("settings panel should show an Auto-switch accounts row:\n%s", out)
 	}
 }
 
@@ -67,9 +67,9 @@ func TestSettings_accountSwitchingClickToggles(t *testing.T) {
 	m := NewMainMenu(nil, []string{"claude"}, "claude", "animated")
 	m.SetAutoSwitchFile(filepath.Join(dir, "auto-switch-accounts"))
 	m.SetActiveTab(TabSettings)
-	// A click on the Account-switching row toggles it (not the Login action).
+	// A click on the Auto-switch row toggles it (not the Login action).
 	if _, _ = m.clickSettings(m.autoSwitchRowIndex()); !m.AutoSwitchEnabled() {
-		t.Error("clicking the Account switching row should toggle it on")
+		t.Error("clicking the Auto-switch accounts row should toggle it on")
 	}
 }
 

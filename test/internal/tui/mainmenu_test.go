@@ -1503,7 +1503,7 @@ func TestMainMenu_SettingsNavigationKeys(t *testing.T) {
 }
 
 func TestMainMenu_SettingsNavigationWraps(t *testing.T) {
-	const numItems = 9 // claude tool has 9 settings items (incl. Theme, Panel, Plan, Login, Account switching rows)
+	const numItems = 9 // claude tool has 9 settings items (incl. Theme, Panel, Plan, Login, Auto-switch accounts rows)
 
 	jKey := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}}
 	kKey := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}}
