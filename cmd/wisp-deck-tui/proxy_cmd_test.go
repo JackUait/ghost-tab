@@ -6,20 +6,28 @@ import (
 	"testing"
 )
 
-func TestProxyStartupJSON_reportsPortAndKey(t *testing.T) {
-	out := proxyStartupJSON(54321, "secret-key")
+func TestProxyStartupJSON_reportsPortKeyAndCA(t *testing.T) {
+	out := proxyStartupJSON(54321, "secret-key", "/tmp/ca.pem")
 	var got struct {
 		Port int    `json:"port"`
 		Key  string `json:"key"`
+		CA   string `json:"ca"`
 	}
 	if err := json.Unmarshal([]byte(out), &got); err != nil {
 		t.Fatalf("not valid JSON: %v (%q)", err, out)
 	}
-	if got.Port != 54321 || got.Key != "secret-key" {
+	if got.Port != 54321 || got.Key != "secret-key" || got.CA != "/tmp/ca.pem" {
 		t.Errorf("got %+v", got)
 	}
 	if !strings.HasSuffix(out, "\n") {
 		t.Errorf("startup line should end with newline for line-buffered readers")
+	}
+}
+
+func TestProxyStartupJSON_omitsCAWhenEmpty(t *testing.T) {
+	out := proxyStartupJSON(1, "k", "")
+	if strings.Contains(out, `"ca"`) {
+		t.Errorf("ca should be omitted when empty, got %q", out)
 	}
 }
 

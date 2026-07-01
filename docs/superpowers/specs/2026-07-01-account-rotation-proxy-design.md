@@ -87,10 +87,12 @@ Components (each independently testable):
   settings menu, persisting the flag. Disabled/no-op unless ≥2 accounts exist.
 - **Launch wiring (`wrapper.sh` + `lib/tmux-session.sh`):** when the flag is
   `on` and ≥2 accounts are configured, before building the claude launch command:
-  1. Start `wisp-deck-tui proxy ...` in the background, capture its `port`+`key`.
-  2. Export `ANTHROPIC_BASE_URL=http://127.0.0.1:<port>` and
-     `ANTHROPIC_API_KEY=<key>` for the claude pane; do **not** set a per-account
-     `CLAUDE_CONFIG_DIR` (claude uses one config dir; rotation is upstream).
+  1. Start `wisp-deck-tui proxy ...` in the background, capture its `port`, `key`,
+     and (MITM mode) `ca` cert path from the startup JSON.
+  2. Export into the claude pane — MITM (default): `HTTPS_PROXY`/`HTTP_PROXY` +
+     `NODE_EXTRA_CA_CERTS=<ca>`; base-URL (`--mitm=false`): `ANTHROPIC_BASE_URL` +
+     `ANTHROPIC_API_KEY=<key>`. Do **not** set a per-account `CLAUDE_CONFIG_DIR`
+     (claude uses one config dir; rotation is upstream).
   3. The existing process-tree cleanup already kills the child on window close.
 - When off (or <2 accounts), behavior is exactly as today (manual account
   selection via `CLAUDE_CONFIG_DIR`).
@@ -142,7 +144,9 @@ Components (each independently testable):
 
 ## Out of scope for v1 (future extensions)
 
-sx.org residential proxy, MITM/CA mode, the interactive TUI dashboard, request
-logging, priority ordering CLI, per-account disable/enable, persisted-quota state
-file, and the passive `/api/oauth/usage` probe. All present in teamclaude; none
-needed for the core "keep working past one account's limit" behavior.
+sx.org residential proxy, the interactive TUI dashboard, request logging, priority
+ordering CLI, per-account disable/enable, persisted-quota state file, the passive
+`/api/oauth/usage` probe, HTTP/2 relay (we present HTTP/1.1 ALPN to the client;
+upstream still uses HTTP/2), and the `account_uuid` body rewrite. All present in
+teamclaude; none needed for the core "keep working past one account's limit"
+behavior. (MITM/CA mode is now implemented — see the forward-proxy section.)

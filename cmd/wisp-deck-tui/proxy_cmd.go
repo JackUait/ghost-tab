@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -21,6 +22,8 @@ var (
 	proxyThreshold   float64
 	proxyPort        int
 	proxyUpstream    string
+	proxyMITM        bool
+	proxyCertDir     string
 )
 
 var proxyCmd = &cobra.Command{
@@ -37,15 +40,19 @@ func init() {
 	proxyCmd.Flags().Float64Var(&proxyThreshold, "threshold", 0.98, "utilization (0-1) at which to switch accounts")
 	proxyCmd.Flags().IntVar(&proxyPort, "port", 0, "listen port (0 picks a free port)")
 	proxyCmd.Flags().StringVar(&proxyUpstream, "upstream", "https://api.anthropic.com", "upstream Anthropic base URL")
+	proxyCmd.Flags().BoolVar(&proxyMITM, "mitm", true, "enable the CONNECT/MITM forward proxy (like teamclaude's default); --mitm=false uses base-URL mode only")
+	proxyCmd.Flags().StringVar(&proxyCertDir, "cert-dir", "", "directory for the MITM CA/leaf certs (defaults to the accounts dir's parent)")
 	rootCmd.AddCommand(proxyCmd)
 }
 
-// proxyStartupJSON renders the startup line bash reads to learn the port + key.
-func proxyStartupJSON(port int, key string) string {
+// proxyStartupJSON renders the startup line bash reads to learn the port, key,
+// and (in MITM mode) the CA cert path clients trust via NODE_EXTRA_CA_CERTS.
+func proxyStartupJSON(port int, key, ca string) string {
 	b, _ := json.Marshal(struct {
 		Port int    `json:"port"`
 		Key  string `json:"key"`
-	}{port, key})
+		CA   string `json:"ca,omitempty"`
+	}{port, key, ca})
 	return string(b) + "\n"
 }
 
@@ -70,14 +77,30 @@ func runProxy(cmd *cobra.Command, args []string) error {
 	key := generateProxyKey()
 	srv := proxy.NewServer(mgr, key, proxyUpstream, proxy.WithAccountsDir(proxyAccountsDir))
 
+	// Enable the CONNECT/MITM forward proxy by default (teamclaude's default
+	// mode), so even hardcoded api.anthropic.com endpoints get the injected
+	// token. The CA is trusted per-process via NODE_EXTRA_CA_CERTS.
+	caPath := ""
+	if proxyMITM {
+		certDir := proxyCertDir
+		if certDir == "" {
+			certDir = filepath.Dir(proxyAccountsDir)
+		}
+		var err error
+		caPath, err = srv.EnableMITM(certDir)
+		if err != nil {
+			return fmt.Errorf("enable mitm: %w", err)
+		}
+	}
+
 	ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", proxyPort))
 	if err != nil {
 		return fmt.Errorf("listen: %w", err)
 	}
 	port := ln.Addr().(*net.TCPAddr).Port
 
-	// Announce the port + key so the launcher can point claude at us, then serve.
-	fmt.Fprint(os.Stdout, proxyStartupJSON(port, key))
+	// Announce the port + key (+ CA path) so the launcher can point claude at us.
+	fmt.Fprint(os.Stdout, proxyStartupJSON(port, key, caPath))
 	os.Stdout.Sync()
 
 	httpSrv := &http.Server{Handler: srv}

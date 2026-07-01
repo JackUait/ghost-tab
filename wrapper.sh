@@ -275,6 +275,7 @@ fi
 PROXY_PID=""
 WISP_DECK_PROXY_PORT=""
 WISP_DECK_PROXY_KEY=""
+WISP_DECK_PROXY_CA=""
 if [ "$SELECTED_AI_TOOL" = "claude" ] \
    && is_auto_switch_enabled "$_gt_cfg_root/auto-switch-accounts" \
    && auto_switch_eligible "$_gt_cfg_root/claude-accounts.list" \
@@ -296,6 +297,7 @@ if [ "$SELECTED_AI_TOOL" = "claude" ] \
   done
   WISP_DECK_PROXY_PORT="$(proxy_startup_port "$_proxy_line")"
   WISP_DECK_PROXY_KEY="$(proxy_startup_key "$_proxy_line")"
+  WISP_DECK_PROXY_CA="$(proxy_startup_ca "$_proxy_line")"
   if [ -n "$WISP_DECK_PROXY_PORT" ] && [ -n "$WISP_DECK_PROXY_KEY" ]; then
     # Rotation is upstream in the proxy, so claude uses its standard (Default)
     # config dir rather than any single account's isolated dir.
@@ -306,7 +308,7 @@ if [ "$SELECTED_AI_TOOL" = "claude" ] \
     PROXY_PID=""
   fi
 fi
-export WISP_DECK_CLAUDE_ACCOUNT_DIR WISP_DECK_PROXY_PORT WISP_DECK_PROXY_KEY
+export WISP_DECK_CLAUDE_ACCOUNT_DIR WISP_DECK_PROXY_PORT WISP_DECK_PROXY_KEY WISP_DECK_PROXY_CA
 
 # Resolve the active subscription/plan display name for the compact-view ledger.
 # Subscriptions are shared across agents, so this is resolved for every tool.

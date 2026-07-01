@@ -36,12 +36,21 @@ build_ai_launch_cmd() {
   fi
 
   # Claude-only: when the account-rotation proxy is active, wrapper.sh exports the
-  # local proxy port + key. Prefix ANTHROPIC_BASE_URL/ANTHROPIC_API_KEY so claude
-  # authenticates to the proxy, which injects the currently-active pooled
-  # account's token and switches accounts as quota is exhausted. Claude keeps its
-  # own single config dir, so the conversation is continuous across switches.
+  # local proxy port (+ key, + CA path in MITM mode). The proxy injects the
+  # currently-active pooled account's token and switches accounts as quota is
+  # exhausted; claude keeps its own single config dir, so the conversation is
+  # continuous across switches. Two routing modes mirror teamclaude:
+  #   - MITM (default, CA present): route via HTTPS_PROXY + NODE_EXTRA_CA_CERTS so
+  #     even hardcoded api.anthropic.com endpoints get the injected token. Claude
+  #     keeps its own token; the proxy accepts it from localhost and rewrites it.
+  #   - base-URL (--mitm=false, no CA): ANTHROPIC_BASE_URL + ANTHROPIC_API_KEY.
   if [ -n "${WISP_DECK_PROXY_PORT:-}" ] && [ -n "${WISP_DECK_PROXY_KEY:-}" ]; then
-    claude_account="${claude_account}ANTHROPIC_BASE_URL=\"http://127.0.0.1:${WISP_DECK_PROXY_PORT}\" ANTHROPIC_API_KEY=\"${WISP_DECK_PROXY_KEY}\" "
+    if [ -n "${WISP_DECK_PROXY_CA:-}" ]; then
+      local _proxy_url="http://127.0.0.1:${WISP_DECK_PROXY_PORT}"
+      claude_account="${claude_account}HTTPS_PROXY=\"${_proxy_url}\" HTTP_PROXY=\"${_proxy_url}\" https_proxy=\"${_proxy_url}\" http_proxy=\"${_proxy_url}\" NO_PROXY=\"\" no_proxy=\"\" NODE_EXTRA_CA_CERTS=\"${WISP_DECK_PROXY_CA}\" "
+    else
+      claude_account="${claude_account}ANTHROPIC_BASE_URL=\"http://127.0.0.1:${WISP_DECK_PROXY_PORT}\" ANTHROPIC_API_KEY=\"${WISP_DECK_PROXY_KEY}\" "
+    fi
   fi
 
   # Claude-only: a launch prefix that runs Claude behind the screenshot-drag

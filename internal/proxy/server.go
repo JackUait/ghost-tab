@@ -2,11 +2,14 @@ package proxy
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -38,6 +41,10 @@ type Server struct {
 	client        *http.Client
 	now           func() time.Time
 	sleep         func(time.Duration)
+
+	mitmHost string      // upstream hostname intercepted on CONNECT
+	certs    *Certs      // non-nil when MITM forward-proxy mode is enabled
+	tlsConf  *tls.Config // leaf config presented to intercepted clients
 }
 
 // Option configures a Server.
@@ -72,17 +79,61 @@ func NewServer(mgr *Manager, proxyKey, upstream string, opts ...Option) *Server 
 		now:   time.Now,
 		sleep: time.Sleep,
 	}
+	if h, err := hostOf(s.upstream); err == nil {
+		s.mitmHost = h
+	}
 	for _, o := range opts {
 		o(s)
 	}
 	return s
 }
 
+// EnableMITM turns on the CONNECT/MITM forward-proxy mode using a CA + leaf cert
+// cached in dir. Returns the CA cert path clients should trust via
+// NODE_EXTRA_CA_CERTS. Mirrors teamclaude's forward-proxy (default) mode.
+func (s *Server) EnableMITM(dir string) (string, error) {
+	certs, err := EnsureCerts(dir, s.mitmHost)
+	if err != nil {
+		return "", err
+	}
+	s.certs = &certs
+	s.tlsConf = &tls.Config{
+		Certificates: []tls.Certificate{certs.Leaf},
+		// Offer HTTP/1.1 only so the decrypted stream can be served by the
+		// standard net/http server (upstream still uses HTTP/2 transparently).
+		NextProtos: []string{"http/1.1"},
+	}
+	return certs.CACertPath, nil
+}
+
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// Forward-proxy CONNECT (HTTPS_PROXY mode) — transparent MITM for the
+	// upstream host, local answer for the test host, blind tunnel otherwise.
+	if r.Method == http.MethodConnect {
+		s.handleConnect(w, r)
+		return
+	}
+
 	// Authenticate the local client. Claude Code sends the proxy key as x-api-key
-	// (and/or Authorization: Bearer <key>); either is accepted.
-	if !s.authorized(r) {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	// (and/or Authorization: Bearer <key>); either is accepted. Loopback clients
+	// are trusted without the key (teamclaude's isLocal skip), which also covers
+	// requests arriving over the MITM tunnel.
+	if !s.authorized(r) && !isLoopback(r.RemoteAddr) {
+		s.writeError(w, http.StatusUnauthorized, "authentication_error", "Invalid proxy API key")
+		return
+	}
+	s.proxyRequest(w, r)
+}
+
+// proxyRequest runs the account-rotation forwarding loop for one request. It is
+// the shared core used by both direct (ANTHROPIC_BASE_URL) requests and requests
+// decrypted from the MITM tunnel.
+func (s *Server) proxyRequest(w http.ResponseWriter, r *http.Request) {
+	// Let the client's own OAuth token-refresh pass through untouched — the proxy
+	// manages account tokens itself, and rewriting a client refresh would cause
+	// token conflicts (teamclaude relays /v1/oauth/token raw).
+	if r.Method == http.MethodPost && r.URL.Path == "/v1/oauth/token" {
+		s.relayRaw(w, r)
 		return
 	}
 
@@ -274,6 +325,58 @@ func (s *Server) relay(w http.ResponseWriter, resp *http.Response) {
 			break
 		}
 	}
+}
+
+// relayRaw forwards a request to the upstream with no token rewriting — a pure
+// passthrough (e.g. the client's own /v1/oauth/token refresh).
+func (s *Server) relayRaw(w http.ResponseWriter, r *http.Request) {
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "read body: "+err.Error(), http.StatusBadGateway)
+		return
+	}
+	r.Body.Close()
+	req, err := http.NewRequestWithContext(r.Context(), r.Method, s.upstream+r.URL.RequestURI(), bytes.NewReader(body))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadGateway)
+		return
+	}
+	for k, vv := range r.Header {
+		lk := strings.ToLower(k)
+		if hopByHopHeaders[lk] || lk == "host" {
+			continue
+		}
+		for _, v := range vv {
+			req.Header.Add(k, v)
+		}
+	}
+	resp, err := s.client.Do(req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadGateway)
+		return
+	}
+	s.relay(w, resp)
+}
+
+// hostOf returns the hostname of a base URL (e.g. https://api.anthropic.com →
+// api.anthropic.com).
+func hostOf(base string) (string, error) {
+	u, err := url.Parse(base)
+	if err != nil {
+		return "", err
+	}
+	return u.Hostname(), nil
+}
+
+// isLoopback reports whether a RemoteAddr is a loopback client (trusted without
+// the proxy key, mirroring teamclaude's isLocal check).
+func isLoopback(remoteAddr string) bool {
+	host, _, err := net.SplitHostPort(remoteAddr)
+	if err != nil {
+		host = remoteAddr
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
 
 // clampRetryAfter parses a Retry-After header (seconds) and bounds it to

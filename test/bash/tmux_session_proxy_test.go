@@ -9,13 +9,29 @@ import (
 // the claude launch — routing claude through the proxy, which injects the active
 // account's token. No per-account CLAUDE_CONFIG_DIR is set (rotation is upstream).
 
-func TestBuildAILaunchCmd_prefixes_proxy_env_for_claude(t *testing.T) {
+func TestBuildAILaunchCmd_mitm_uses_https_proxy_and_ca(t *testing.T) {
+	// MITM mode (teamclaude default): route via HTTPS_PROXY + NODE_EXTRA_CA_CERTS,
+	// and NOT ANTHROPIC_BASE_URL/API_KEY (claude keeps its own token; the proxy
+	// injects the account token upstream).
+	env := []string{"WISP_DECK_PROXY_PORT=54321", "WISP_DECK_PROXY_KEY=wd-abc", "WISP_DECK_PROXY_CA=/cfg/ca.pem"}
+	out, code := runBashFunc(t, "lib/tmux-session.sh", "build_ai_launch_cmd",
+		[]string{"claude", "claude", "opencode", "/proj"}, env)
+	assertExitCode(t, code, 0)
+	assertContains(t, out, `HTTPS_PROXY="http://127.0.0.1:54321"`)
+	assertContains(t, out, `NODE_EXTRA_CA_CERTS="/cfg/ca.pem"`)
+	assertNotContains(t, out, "ANTHROPIC_BASE_URL")
+	assertContains(t, out, "claude /proj")
+}
+
+func TestBuildAILaunchCmd_baseurl_mode_when_no_ca(t *testing.T) {
+	// Without a CA (--mitm=false), fall back to base-URL mode.
 	env := []string{"WISP_DECK_PROXY_PORT=54321", "WISP_DECK_PROXY_KEY=wd-abc"}
 	out, code := runBashFunc(t, "lib/tmux-session.sh", "build_ai_launch_cmd",
 		[]string{"claude", "claude", "opencode", "/proj"}, env)
 	assertExitCode(t, code, 0)
 	assertContains(t, out, `ANTHROPIC_BASE_URL="http://127.0.0.1:54321"`)
 	assertContains(t, out, `ANTHROPIC_API_KEY="wd-abc"`)
+	assertNotContains(t, out, "HTTPS_PROXY")
 	assertContains(t, out, "claude /proj")
 }
 

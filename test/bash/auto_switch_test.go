@@ -69,6 +69,20 @@ func TestProxyStartupParse_empty_on_garbage(t *testing.T) {
 	}
 }
 
+func TestProxyStartupParse_extracts_ca_path(t *testing.T) {
+	line := `{"port":54321,"key":"wd-abc","ca":"/cfg/wisp-deck/wisp-deck-ca.pem"}`
+	out, code := runBashFunc(t, "lib/auto-switch.sh", "proxy_startup_ca", []string{line}, nil)
+	assertExitCode(t, code, 0)
+	if strings.TrimSpace(out) != "/cfg/wisp-deck/wisp-deck-ca.pem" {
+		t.Errorf("ca = %q", strings.TrimSpace(out))
+	}
+	// base-URL mode omits ca → empty.
+	out, _ = runBashFunc(t, "lib/auto-switch.sh", "proxy_startup_ca", []string{`{"port":1,"key":"k"}`}, nil)
+	if strings.TrimSpace(out) != "" {
+		t.Errorf("missing ca should be empty, got %q", strings.TrimSpace(out))
+	}
+}
+
 func TestAutoSwitchEligible_needs_two_accounts(t *testing.T) {
 	dir := t.TempDir()
 	list := filepath.Join(dir, "claude-accounts.list")

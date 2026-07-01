@@ -44,6 +44,12 @@ proxy_startup_key() {
   printf '%s' "$1" | sed -n 's/.*"key"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p'
 }
 
+# proxy_startup_ca <json_line> — extracts the "ca" cert path from the proxy's
+# startup JSON (present only in MITM mode), or empty if absent.
+proxy_startup_ca() {
+  printf '%s' "$1" | sed -n 's/.*"ca"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p'
+}
+
 # is_auto_switch_enabled <flag_file> — exit 0 when the setting is on.
 is_auto_switch_enabled() {
   [ "$(get_auto_switch "$1")" = "on" ]
