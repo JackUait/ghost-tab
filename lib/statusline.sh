@@ -114,3 +114,18 @@ get_tree_cpu_pct() {
     END { printf "%d\n", total + 0.5 }
   '
 }
+
+# Stamp the current Claude conversation id into the enclosing tmux session's
+# environment (WISP_DECK_CLAUDE_SESSION). The statusline runs as a child of
+# claude inside the tmux pane, so this is the only reliable place where "this
+# tab" and "this conversation" are known together. The session snapshot picks
+# the id up so a restored tab reopens its own conversation (`claude --resume`)
+# instead of the project's most recent one.
+# Usage: gt_stamp_claude_session <statusline_json>
+gt_stamp_claude_session() {
+  [ -n "${TMUX:-}" ] || return 0
+  local sid
+  sid="$(echo "$1" | sed -n 's/.*"session_id":"\([^"]*\)".*/\1/p')"
+  [ -n "$sid" ] || return 0
+  tmux set-environment WISP_DECK_CLAUDE_SESSION "$sid" 2>/dev/null || true
+}

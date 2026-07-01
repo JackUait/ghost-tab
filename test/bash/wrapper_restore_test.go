@@ -49,7 +49,7 @@ func TestWrapperInteractive_pops_restore_queue_into_current_window(t *testing.T)
 	// Queue for the current boot with one pending entry; the restore gate has
 	// already run this boot (marker matches), so only the pop path is active.
 	if err := os.WriteFile(filepath.Join(confDir, "restore-queue"),
-		[]byte("12345|"+projDir+"|claude\n"), 0644); err != nil {
+		[]byte("12345|"+projDir+"|claude|sid-42\n"), 0644); err != nil {
 		t.Fatalf("write queue: %v", err)
 	}
 	if err := os.WriteFile(filepath.Join(confDir, "last-restore-boot"),
@@ -70,7 +70,9 @@ func TestWrapperInteractive_pops_restore_queue_into_current_window(t *testing.T)
 	assertContains(t, got, "WISP_DECK=1")
 	assertContains(t, got, "WISP_DECK_TOOL=claude")
 	assertContains(t, got, "WISP_DECK_PATH="+projDir)
-	assertContains(t, got, "claude -c")
+	// The entry's own conversation is resumed — not `claude -c`, which would
+	// open the same (most recent) conversation in every tab of the project.
+	assertContains(t, got, "claude --resume sid-42")
 
 	if _, err := os.Stat(filepath.Join(confDir, "restore-queue")); err == nil {
 		t.Error("queue entry must be consumed exactly once (file should be gone)")

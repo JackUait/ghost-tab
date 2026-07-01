@@ -8,12 +8,12 @@ import (
 func aiCmd(t *testing.T, tool string, resume bool) string {
 	t.Helper()
 	var env []string
+	// WISP_DECK_RESUME_SESSION is force-cleared to stay hermetic when the test
+	// itself runs inside a restored Wisp Deck session (which exports both).
 	if resume {
-		env = buildEnv(t, nil, "WISP_DECK_RESUME=1")
+		env = buildEnv(t, nil, "WISP_DECK_RESUME=1", "WISP_DECK_RESUME_SESSION=")
 	} else {
-		// Stay hermetic when the test itself runs inside a restored
-		// Wisp Deck session (which exports WISP_DECK_RESUME=1).
-		env = buildEnv(t, nil, "WISP_DECK_RESUME=0")
+		env = buildEnv(t, nil, "WISP_DECK_RESUME=0", "WISP_DECK_RESUME_SESSION=")
 	}
 	out, code := runBashFunc(t, "lib/tmux-session.sh", "build_ai_launch_cmd",
 		[]string{tool, "claude", "npx opencode-ai@latest", "/p/app"}, env)
@@ -33,6 +33,28 @@ func TestBuildAiLaunchCmd_resume_flags(t *testing.T) {
 		if got := aiCmd(t, c.tool, true); got != c.want {
 			t.Errorf("resume %s: got %q, want %q", c.tool, got, c.want)
 		}
+	}
+}
+
+func TestBuildAiLaunchCmd_resumes_specific_claude_session(t *testing.T) {
+	// Each restored tab must reopen ITS conversation: two tabs of the same
+	// project resumed with plain `claude -c` would both open the project's
+	// most recent conversation.
+	env := buildEnv(t, nil, "WISP_DECK_RESUME=1", "WISP_DECK_RESUME_SESSION=sid-42")
+	out, code := runBashFunc(t, "lib/tmux-session.sh", "build_ai_launch_cmd",
+		[]string{"claude", "claude", "npx opencode-ai@latest", "/p/app"}, env)
+	assertExitCode(t, code, 0)
+	if got := strings.TrimSpace(out); got != "claude --resume sid-42" {
+		t.Errorf("got %q, want %q", got, "claude --resume sid-42")
+	}
+
+	// OpenCode has its own continue semantics; the Claude session id must
+	// not leak into its command.
+	out, code = runBashFunc(t, "lib/tmux-session.sh", "build_ai_launch_cmd",
+		[]string{"opencode", "claude", "npx opencode-ai@latest", "/p/app"}, env)
+	assertExitCode(t, code, 0)
+	if got := strings.TrimSpace(out); got != "npx opencode-ai@latest --continue" {
+		t.Errorf("opencode got %q, want %q", got, "npx opencode-ai@latest --continue")
 	}
 }
 

@@ -54,8 +54,10 @@ maybe_restore_session ` + quote(configDir) + ` ` + quote(curBoot) + ` "/w/wrappe
 
 func TestMaybeRestore_writes_ordered_queue_and_marker(t *testing.T) {
 	dir := t.TempDir()
+	// First line carries a Claude conversation id (6th field); second is an
+	// old-format 5-field line — its queue entry gets an empty id.
 	writeTempFile(t, dir, "last-session",
-		"111|app|/p/app|claude|ghostty\n111|web|/p/web|opencode|ghostty\n")
+		"111|app|/p/app|claude|ghostty|sid-a\n111|web|/p/web|opencode|ghostty\n")
 	rec := filepath.Join(dir, "rec")
 	_, code := runMaybeRestore(t, dir, "222", rec)
 	assertExitCode(t, code, 0)
@@ -69,7 +71,7 @@ func TestMaybeRestore_writes_ordered_queue_and_marker(t *testing.T) {
 		t.Fatalf("restore-queue not written: %v", err)
 	}
 	got := strings.TrimSpace(string(queue))
-	want := "222|/p/app|claude\n222|/p/web|opencode"
+	want := "222|/p/app|claude|sid-a\n222|/p/web|opencode|"
 	if got != want {
 		t.Errorf("queue:\n got %q\nwant %q", got, want)
 	}
@@ -160,7 +162,37 @@ esac
 		t.Fatalf("snapshot not written: %v", err)
 	}
 	got := strings.TrimSpace(string(data))
-	want := "111|app|/p/app|claude|ghostty"
+	want := "111|app|/p/app|claude|ghostty|"
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestWriteSessionSnapshot_includes_claude_session_id(t *testing.T) {
+	// The statusline stamps WISP_DECK_CLAUDE_SESSION into the tmux session
+	// env; the snapshot must carry it (6th field) so restore can reopen each
+	// tab's own conversation instead of `claude -c` (which resumes the same,
+	// most recent one for every tab of a project).
+	dir := t.TempDir()
+	tmuxBody := `
+case "$1" in
+  list-sessions) echo "100 dev-app-1" ;;
+  show-environment)
+    printf 'WISP_DECK=1\nWISP_DECK_BOOT=111\nWISP_DECK_PROJECT=app\nWISP_DECK_PATH=/p/app\nWISP_DECK_TOOL=claude\nWISP_DECK_TERMINAL=ghostty\nWISP_DECK_CLAUDE_SESSION=sid-42\n' ;;
+esac
+`
+	binDir := mockCommand(t, dir, "tmux", tmuxBody)
+	env := buildEnv(t, []string{binDir})
+	snap := filepath.Join(dir, "last-session")
+	_, code := runBashFunc(t, "lib/session-restore.sh", "write_session_snapshot",
+		[]string{"tmux", snap}, env)
+	assertExitCode(t, code, 0)
+	data, err := os.ReadFile(snap)
+	if err != nil {
+		t.Fatalf("snapshot not written: %v", err)
+	}
+	got := strings.TrimSpace(string(data))
+	want := "111|app|/p/app|claude|ghostty|sid-42"
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}
@@ -194,12 +226,12 @@ esac
 func TestRestoreQueuePop_pops_first_line_and_keeps_rest(t *testing.T) {
 	dir := t.TempDir()
 	writeTempFile(t, dir, "restore-queue",
-		"222|/p/app|claude\n222|/p/web|opencode\n")
+		"222|/p/app|claude|sid-a\n222|/p/web|opencode\n")
 	out, code := runBashFunc(t, "lib/session-restore.sh", "restore_queue_pop",
 		[]string{dir, "222"}, nil)
 	assertExitCode(t, code, 0)
-	if strings.TrimSpace(out) != "/p/app|claude" {
-		t.Errorf("pop = %q, want %q", strings.TrimSpace(out), "/p/app|claude")
+	if strings.TrimSpace(out) != "/p/app|claude|sid-a" {
+		t.Errorf("pop = %q, want %q", strings.TrimSpace(out), "/p/app|claude|sid-a")
 	}
 	rest, _ := os.ReadFile(filepath.Join(dir, "restore-queue"))
 	if strings.TrimSpace(string(rest)) != "222|/p/web|opencode" {
@@ -393,7 +425,7 @@ esac
 		t.Fatalf("snapshot not written: %v", err)
 	}
 	got := strings.TrimSpace(string(data))
-	want := "111|b|/p/b|claude|ghostty\n111|a|/p/a|claude|ghostty"
+	want := "111|b|/p/b|claude|ghostty|\n111|a|/p/a|claude|ghostty|"
 	if got != want {
 		t.Errorf("snapshot order:\n got %q\nwant %q", got, want)
 	}
@@ -425,7 +457,7 @@ esac
 		t.Fatalf("snapshot not written: %v", err)
 	}
 	got := strings.TrimSpace(string(data))
-	want := "111|My Project|/p/app|claude|ghostty"
+	want := "111|My Project|/p/app|claude|ghostty|"
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}

@@ -20,7 +20,9 @@ current_boot_id() {
 # Sessions are ordered by creation time (tmux lists them alphabetically) so
 # the snapshot's line order reproduces the order the tabs were opened in.
 # Writes atomically (temp + mv). One line per session:
-#   boot_id|project|path|tool|terminal
+#   boot_id|project|path|tool|terminal|claude_session_id
+# claude_session_id (stamped by the statusline, may be empty) lets restore
+# reopen each tab's own conversation instead of the project's most recent one.
 # Field delimiter is '|' — project paths containing '|' are not supported.
 write_session_snapshot() {
   local tmux_cmd="$1" snap_file="$2"
@@ -30,7 +32,7 @@ write_session_snapshot() {
   sessions="$("$tmux_cmd" list-sessions -F '#{session_created} #{session_name}' 2>/dev/null)" || return 0
   local tmp="${snap_file}.tmp.$$"
   : > "$tmp"
-  local s env boot proj path tool term
+  local s env boot proj path tool term sid
   # shellcheck disable=SC2034  # _created only orders the list; the name field is what's consumed
   local _created
   while read -r _created s; do
@@ -42,15 +44,17 @@ write_session_snapshot() {
     path="$(echo "$env" | sed -n 's/^WISP_DECK_PATH=//p')"
     tool="$(echo "$env" | sed -n 's/^WISP_DECK_TOOL=//p')"
     term="$(echo "$env" | sed -n 's/^WISP_DECK_TERMINAL=//p')"
-    echo "${boot}|${proj}|${path}|${tool}|${term}" >> "$tmp"
+    sid="$(echo "$env" | sed -n 's/^WISP_DECK_CLAUDE_SESSION=//p')"
+    echo "${boot}|${proj}|${path}|${tool}|${term}|${sid}" >> "$tmp"
   done <<< "$(echo "$sessions" | sort -sn)"
   mv "$tmp" "$snap_file"
 }
 
 # Once-per-boot restore gate. Call only on interactive launch, before the
-# picker. Builds the restore queue (one boot_id|path|tool line per prior-boot
-# snapshot entry, in snapshot order) and stamps last-restore-boot. Spawns
-# nothing itself — consumers pop entries via restore_queue_pop.
+# picker. Builds the restore queue (one boot_id|path|tool|claude_session_id
+# line per prior-boot snapshot entry, in snapshot order) and stamps
+# last-restore-boot. Spawns nothing itself — consumers pop entries via
+# restore_queue_pop.
 # Usage: maybe_restore_session <config_dir> <current_boot_id>
 maybe_restore_session() {
   local config_dir="$1" cur_boot="$2"
@@ -80,11 +84,11 @@ maybe_restore_session() {
 
   local tmp="$queue.tmp.$$"
   : > "$tmp"
-  local queued=0 b proj path tool term
-  while IFS='|' read -r b proj path tool term; do
+  local queued=0 b proj path tool term sid
+  while IFS='|' read -r b proj path tool term sid; do
     [ -n "$b" ] || continue
     [ "$b" = "$cur_boot" ] && continue
-    echo "${cur_boot}|${path}|${tool}" >> "$tmp"
+    echo "${cur_boot}|${path}|${tool}|${sid}" >> "$tmp"
     queued=1
   done < "$snap"
   if [ "$queued" -eq 1 ]; then
@@ -98,7 +102,8 @@ maybe_restore_session() {
 
 # Atomically pop the first pending entry from the restore queue.
 # Usage: restore_queue_pop <config_dir> <current_boot_id>
-# Echoes "path|tool", or nothing when there is no consumable entry. A queue
+# Echoes "path|tool|claude_session_id" (id may be empty), or nothing when
+# there is no consumable entry. A queue
 # from another boot, or one older than 5 minutes (a chain that broke), is
 # discarded so it can never hijack a tab the user opens later.
 restore_queue_pop() {

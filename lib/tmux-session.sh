@@ -64,11 +64,19 @@ build_ai_launch_cmd() {
   # Claude reads it (macOS deletes the temp file moments after the drop).
   local claude_filter="${WISP_DECK_CLAUDE_FILTER:-}"
 
-  # Resume mode: relaunch into the most recent (cwd-scoped) conversation.
+  # Resume mode: reopen this tab's own conversation when its id was captured
+  # (WISP_DECK_RESUME_SESSION, stamped by the statusline before the reboot);
+  # otherwise fall back to the most recent cwd-scoped conversation. The
+  # specific id matters when several tabs of one project are restored — `-c`
+  # would open the same conversation in all of them.
   if [ "${WISP_DECK_RESUME:-0}" = "1" ]; then
+    local claude_resume="-c"
+    if [ -n "${WISP_DECK_RESUME_SESSION:-}" ]; then
+      claude_resume="--resume ${WISP_DECK_RESUME_SESSION}"
+    fi
     case "$tool" in
       opencode) echo "$opencode_cmd --continue" ;;
-      *)        echo "${claude_account}${claude_filter}$claude_cmd -c${claude_settings}" ;;
+      *)        echo "${claude_account}${claude_filter}$claude_cmd ${claude_resume}${claude_settings}" ;;
     esac
     return 0
   fi

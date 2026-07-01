@@ -111,9 +111,13 @@ else
     # window continues its own setup.
     restore_advance "$SHARE_DIR"
     RESTORE_MODE=1
-    cd "${_queue_entry%%|*}" || exit 1
-    PROJECT_NAME="$(basename "${_queue_entry%%|*}")"
-    SELECTED_AI_TOOL="${_queue_entry##*|}"
+    IFS='|' read -r _q_path _q_tool _q_sid <<< "$_queue_entry"
+    cd "$_q_path" || exit 1
+    PROJECT_NAME="$(basename "$_q_path")"
+    SELECTED_AI_TOOL="$_q_tool"
+    # This tab's own conversation id (may be empty on old snapshots);
+    # build_ai_launch_cmd resumes it specifically instead of `claude -c`.
+    export WISP_DECK_RESUME_SESSION="$_q_sid"
     type stop_loading_screen &>/dev/null && stop_loading_screen
   else
 
