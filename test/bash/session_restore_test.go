@@ -223,6 +223,133 @@ esac
 	}
 }
 
+// runMaybeRestoreHome is runMaybeRestore with a HOME override so the
+// transcript lookup under ~/.claude/projects/ can be faked.
+func runMaybeRestoreHome(t *testing.T, configDir, curBoot, home string) (string, int) {
+	t.Helper()
+	root := projectRoot(t)
+	mod := filepath.Join(root, "lib", "session-restore.sh")
+	script := `
+source ` + quote(mod) + `
+maybe_restore_session ` + quote(configDir) + ` ` + quote(curBoot) + `
+`
+	return runBashSnippet(t, script, buildEnv(t, nil, "HOME="+home))
+}
+
+// writeTranscript creates a fake Claude conversation transcript for a project
+// path (munged as Claude does: every non-alphanumeric byte becomes '-') with
+// the given mtime age.
+func writeTranscript(t *testing.T, home, projPath, sid string, age time.Duration) {
+	t.Helper()
+	munged := ""
+	for _, r := range projPath {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') {
+			munged += string(r)
+		} else {
+			munged += "-"
+		}
+	}
+	dir := filepath.Join(home, ".claude", "projects", munged)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		t.Fatalf("mkdir transcripts: %v", err)
+	}
+	f := filepath.Join(dir, sid+".jsonl")
+	if err := os.WriteFile(f, []byte("{}\n"), 0644); err != nil {
+		t.Fatalf("write transcript: %v", err)
+	}
+	ts := time.Now().Add(-age)
+	if err := os.Chtimes(f, ts, ts); err != nil {
+		t.Fatalf("chtimes: %v", err)
+	}
+}
+
+func TestMaybeRestore_assigns_distinct_transcripts_to_unstamped_duplicates(t *testing.T) {
+	// Two tabs of the same project whose conversation ids were never stamped
+	// (e.g. claude launched before the stamping update and sat idle). Plain
+	// `-c` would open the SAME most-recent conversation in both. The queue
+	// builder must pin each to a distinct recent transcript instead.
+	dir := t.TempDir()
+	home := t.TempDir()
+	writeTranscript(t, home, "/p/app", "sid-new", 1*time.Hour)
+	writeTranscript(t, home, "/p/app", "sid-old", 2*time.Hour)
+	writeTempFile(t, dir, "last-session",
+		"111|app|/p/app|claude|ghostty|\n111|app|/p/app|claude|ghostty|\n")
+	_, code := runMaybeRestoreHome(t, dir, "222", home)
+	assertExitCode(t, code, 0)
+	queue, err := os.ReadFile(filepath.Join(dir, "restore-queue"))
+	if err != nil {
+		t.Fatalf("restore-queue not written: %v", err)
+	}
+	got := strings.TrimSpace(string(queue))
+	want := "222|/p/app|claude|sid-new\n222|/p/app|claude|sid-old"
+	if got != want {
+		t.Errorf("queue:\n got %q\nwant %q", got, want)
+	}
+}
+
+func TestMaybeRestore_duplicate_fill_skips_stamped_sids(t *testing.T) {
+	// One tab of the pair did stamp its id (the most recent transcript);
+	// the unstamped one must get the NEXT transcript, not the same one.
+	dir := t.TempDir()
+	home := t.TempDir()
+	writeTranscript(t, home, "/p/app", "sid-new", 1*time.Hour)
+	writeTranscript(t, home, "/p/app", "sid-old", 2*time.Hour)
+	writeTempFile(t, dir, "last-session",
+		"111|app|/p/app|claude|ghostty|sid-new\n111|app|/p/app|claude|ghostty|\n")
+	_, code := runMaybeRestoreHome(t, dir, "222", home)
+	assertExitCode(t, code, 0)
+	queue, err := os.ReadFile(filepath.Join(dir, "restore-queue"))
+	if err != nil {
+		t.Fatalf("restore-queue not written: %v", err)
+	}
+	got := strings.TrimSpace(string(queue))
+	want := "222|/p/app|claude|sid-new\n222|/p/app|claude|sid-old"
+	if got != want {
+		t.Errorf("queue:\n got %q\nwant %q", got, want)
+	}
+}
+
+func TestMaybeRestore_single_unstamped_entry_keeps_c_fallback(t *testing.T) {
+	// A lone tab of a project needs no pinning — `claude -c` already reopens
+	// its most recent conversation, and guessing a transcript adds risk.
+	dir := t.TempDir()
+	home := t.TempDir()
+	writeTranscript(t, home, "/p/app", "sid-new", 1*time.Hour)
+	writeTempFile(t, dir, "last-session",
+		"111|app|/p/app|claude|ghostty|\n")
+	_, code := runMaybeRestoreHome(t, dir, "222", home)
+	assertExitCode(t, code, 0)
+	queue, err := os.ReadFile(filepath.Join(dir, "restore-queue"))
+	if err != nil {
+		t.Fatalf("restore-queue not written: %v", err)
+	}
+	got := strings.TrimSpace(string(queue))
+	want := "222|/p/app|claude|"
+	if got != want {
+		t.Errorf("queue:\n got %q\nwant %q", got, want)
+	}
+}
+
+func TestMaybeRestore_duplicate_fill_survives_missing_transcript_dir(t *testing.T) {
+	// No transcript store for the project (e.g. brand-new install): the
+	// duplicates keep the empty id and both fall back to `claude -c`.
+	dir := t.TempDir()
+	home := t.TempDir()
+	writeTempFile(t, dir, "last-session",
+		"111|app|/p/app|claude|ghostty|\n111|app|/p/app|claude|ghostty|\n")
+	_, code := runMaybeRestoreHome(t, dir, "222", home)
+	assertExitCode(t, code, 0)
+	queue, err := os.ReadFile(filepath.Join(dir, "restore-queue"))
+	if err != nil {
+		t.Fatalf("restore-queue not written: %v", err)
+	}
+	got := strings.TrimSpace(string(queue))
+	want := "222|/p/app|claude|\n222|/p/app|claude|"
+	if got != want {
+		t.Errorf("queue:\n got %q\nwant %q", got, want)
+	}
+}
+
 func TestRestoreQueuePop_pops_first_line_and_keeps_rest(t *testing.T) {
 	dir := t.TempDir()
 	writeTempFile(t, dir, "restore-queue",

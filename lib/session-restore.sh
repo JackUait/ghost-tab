@@ -85,12 +85,41 @@ maybe_restore_session() {
   local tmp="$queue.tmp.$$"
   : > "$tmp"
   local queued=0 b proj path tool term sid
+  local entries=()
   while IFS='|' read -r b proj path tool term sid; do
     [ -n "$b" ] || continue
     [ "$b" = "$cur_boot" ] && continue
+    entries+=("${path}|${tool}|${sid}")
+  done < "$snap"
+
+  # Unstamped duplicates: when several tabs of one project lack a conversation
+  # id (claude never rendered a statusline after the id-stamping update), the
+  # `claude -c` fallback would open the SAME most-recent conversation in all
+  # of them. Pin each such tab to a distinct recent transcript instead,
+  # skipping ids already claimed by stamped tabs of the same project. A lone
+  # tab keeps the plain `-c` fallback — no guessing needed.
+  local n=${#entries[@]} i j path2 tool2 sid2 dupes used
+  for ((i = 0; i < n; i++)); do
+    IFS='|' read -r path tool sid <<< "${entries[$i]}"
+    if [ "$tool" = "claude" ] && [ -z "$sid" ]; then
+      dupes=0
+      used=""
+      for ((j = 0; j < n; j++)); do
+        [ "$j" -eq "$i" ] && continue
+        IFS='|' read -r path2 tool2 sid2 <<< "${entries[$j]}"
+        [ "$tool2" = "claude" ] && [ "$path2" = "$path" ] || continue
+        dupes=1
+        [ -n "$sid2" ] && used="${used}${sid2}"$'\n'
+      done
+      if [ "$dupes" -eq 1 ]; then
+        sid="$(claude_pick_transcript "$path" "$used")"
+        # Record the pick so the path's next duplicate skips it.
+        entries[i]="${path}|${tool}|${sid}"
+      fi
+    fi
     echo "${cur_boot}|${path}|${tool}|${sid}" >> "$tmp"
     queued=1
-  done < "$snap"
+  done
   if [ "$queued" -eq 1 ]; then
     echo "$cur_boot" > "$marker"
     mv "$tmp" "$queue"
@@ -143,6 +172,33 @@ restore_queue_pop() {
   fi
   rmdir "$lock" 2>/dev/null
   echo "${line#*|}"
+}
+
+# Claude's per-project transcript directory: the project path with every
+# non-alphanumeric byte replaced by '-', under ~/.claude/projects/.
+claude_project_dir() {
+  echo "$HOME/.claude/projects/${1//[^A-Za-z0-9]/-}"
+}
+
+# Print the most recently used conversation id for <path> that is not in
+# <used> (a newline-separated id list). Prints nothing when the project has
+# no transcript store or every transcript is taken.
+# Usage: claude_pick_transcript <path> <used>
+claude_pick_transcript() {
+  local path="$1" used="$2"
+  local dir f sid
+  dir="$(claude_project_dir "$path")"
+  [ -d "$dir" ] || return 0
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    sid="${f##*/}"
+    sid="${sid%.jsonl}"
+    if ! printf '%s\n' "$used" | grep -qxF "$sid"; then
+      echo "$sid"
+      return 0
+    fi
+  done <<< "$(ls -t "$dir"/*.jsonl 2>/dev/null)"
+  return 0
 }
 
 # Continue the restore chain: when entries remain, open the next tab of this
