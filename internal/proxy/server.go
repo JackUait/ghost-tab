@@ -198,15 +198,27 @@ func (s *Server) proxyRequest(w http.ResponseWriter, r *http.Request) {
 			retryAfter := clampRetryAfter(resp.Header.Get("retry-after"))
 			io.Copy(io.Discard, resp.Body)
 			resp.Body.Close()
-			if retryCount >= maxRetries {
-				// Persistent 429: throttle this account and re-dispatch so the next
-				// iteration picks another account (or reports all exhausted).
-				log.Printf("[wisp-deck-proxy] persistent 429 on %q — throttling %s and re-dispatching", acct.Label, retryAfter)
-				s.mgr.MarkThrottled(idx, now.Add(retryAfter))
+			// A 429 means this account is out of quota right now. Sideline it for
+			// the retry-after window IMMEDIATELY, before any wait — this is what
+			// makes the switch stick: even if the client gives up mid-request the
+			// account stays throttled, so the next request fails over instead of
+			// re-hitting the same exhausted account (the reported "didn't switch"
+			// bug came from only throttling after poolSize same-account retries).
+			s.mgr.MarkThrottled(idx, now.Add(retryAfter))
+			if s.mgr.HasAvailable(now) {
+				// Another account can serve this request — switch to it now, with
+				// no wait, so the session keeps working seamlessly.
+				log.Printf("[wisp-deck-proxy] 429 on %q — throttling %s and switching accounts", acct.Label, retryAfter)
 				continue
 			}
-			// Transient 429: wait the retry-after and retry the SAME account.
-			log.Printf("[wisp-deck-proxy] 429 on %q — waiting %s before retry", acct.Label, retryAfter)
+			// No other account is available. Wait out a bounded retry-after on the
+			// sole/last account (a genuine transient limit) and try once more; if
+			// the retry budget is spent, report all accounts exhausted.
+			if retryCount >= maxRetries {
+				s.writeExhausted(w)
+				return
+			}
+			log.Printf("[wisp-deck-proxy] 429 on %q (no other account free) — waiting %s before retry", acct.Label, retryAfter)
 			s.sleep(retryAfter)
 			if r.Context().Err() != nil { // client disconnected during the wait
 				return

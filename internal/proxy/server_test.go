@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -109,9 +110,9 @@ func TestServer_connectRequiresProxyAuth(t *testing.T) {
 	}
 }
 
-func TestServer_retriesSameAccountOnTransient429(t *testing.T) {
-	// teamclaude pattern: a transient 429 waits retry-after and retries the SAME
-	// account rather than immediately switching.
+func TestServer_waitsAndRetriesSameAccountWhenNoneOtherAvailable(t *testing.T) {
+	// When there is no other account to fail over to, a transient 429 waits out
+	// retry-after and retries the SAME (sole) account rather than giving up.
 	var calls int
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls++
@@ -125,15 +126,93 @@ func TestServer_retriesSameAccountOnTransient429(t *testing.T) {
 	}))
 	defer upstream.Close()
 
-	mgr := NewManager([]Account{{Label: "A", AccessToken: "tok-A"}, {Label: "B", AccessToken: "tok-B"}}, 0.98)
-	srv := newTestServer(t, mgr, upstream.URL)
+	// A mutable clock the sleep hook advances, so the sole account's throttle
+	// window elapses during the (no-op) wait and it becomes retryable again.
+	clk := time.Unix(1_700_000_000, 0)
+	mgr := NewManager([]Account{{Label: "A", AccessToken: "tok-A"}}, 0.98)
+	srv := NewServer(mgr, "proxy-key", upstream.URL,
+		WithNow(func() time.Time { return clk }),
+		WithSleep(func(d time.Duration) { clk = clk.Add(d) }))
 
 	rec := doRequest(t, srv, "proxy-key", `{}`)
 	if rec.Code != 200 || rec.Body.String() != "ok-after-wait" {
 		t.Fatalf("got (%d, %q), want (200, ok-after-wait)", rec.Code, rec.Body.String())
 	}
 	if mgr.ActiveIndex() != 0 {
-		t.Errorf("active = %d, want 0 (stayed on A after transient 429)", mgr.ActiveIndex())
+		t.Errorf("active = %d, want 0 (retried the sole account)", mgr.ActiveIndex())
+	}
+}
+
+func TestServer_failsOverImmediatelyWithoutWaitingOnRateLimit(t *testing.T) {
+	// Regression: hitting an account's limit must switch to another available
+	// account WITHOUT first waiting out retry-after on the exhausted one. The
+	// old code slept retry-after and retried the SAME account for poolSize
+	// attempts before failing over — up to poolSize*300s of hanging on a dead
+	// account — which read as "it didn't switch".
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") == "Bearer tok-A" {
+			w.Header().Set("retry-after", "300")
+			w.WriteHeader(429)
+			return
+		}
+		w.WriteHeader(200)
+		io.WriteString(w, "ok-from-B")
+	}))
+	defer upstream.Close()
+
+	var slept []time.Duration
+	mgr := NewManager([]Account{{Label: "A", AccessToken: "tok-A"}, {Label: "B", AccessToken: "tok-B"}}, 0.98)
+	srv := NewServer(mgr, "proxy-key", upstream.URL, WithSleep(func(d time.Duration) { slept = append(slept, d) }))
+
+	rec := doRequest(t, srv, "proxy-key", `{}`)
+	if rec.Code != 200 || rec.Body.String() != "ok-from-B" {
+		t.Fatalf("got (%d, %q), want (200, ok-from-B) after immediate failover", rec.Code, rec.Body.String())
+	}
+	if mgr.ActiveIndex() != 1 {
+		t.Errorf("active = %d, want 1 (switched to B)", mgr.ActiveIndex())
+	}
+	if len(slept) != 0 {
+		t.Errorf("must not wait on the exhausted account when another is free; slept %v", slept)
+	}
+}
+
+func TestServer_sidelinesRateLimitedAccountEvenIfClientAbandonsMidWait(t *testing.T) {
+	// Regression for the reported "didn't switch" bug: a 429 must sideline the
+	// account immediately, before any wait. The old code only marked the account
+	// throttled after poolSize retries, and checked for client disconnect only
+	// AFTER the retry-after sleep — so a client that gave up during the wait left
+	// the account fully "available". Every later request then re-selected the
+	// same exhausted account and never switched.
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Both accounts are out of quota this request; the point is the account
+		// must be sidelined even when the client goes away mid-request.
+		w.Header().Set("retry-after", "300")
+		w.WriteHeader(429)
+	}))
+	defer upstream.Close()
+
+	base := time.Unix(1_700_000_000, 0)
+	mgr := NewManager([]Account{{Label: "A", AccessToken: "tok-A"}, {Label: "B", AccessToken: "tok-B"}}, 0.98)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	// Simulate the client giving up during the very first retry-after wait.
+	srv := NewServer(mgr, "proxy-key", upstream.URL,
+		WithSleep(func(time.Duration) { cancel() }),
+		WithNow(func() time.Time { return base }))
+
+	req := httptest.NewRequestWithContext(ctx, http.MethodPost, "/v1/messages", strings.NewReader("{}"))
+	req.Header.Set("x-api-key", "proxy-key")
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+
+	// The current account must be sidelined for the retry-after window even
+	// though the client abandoned the request — otherwise the next request just
+	// hits the same exhausted account again.
+	if mgr.isAvailable(0, base) {
+		t.Error("rate-limited account should be sidelined immediately, but it is still available after the client abandoned the request")
+	}
+	if !mgr.isAvailable(0, base.Add(301*time.Second)) {
+		t.Error("account should recover once retry-after elapses")
 	}
 }
 

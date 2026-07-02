@@ -110,11 +110,15 @@ Components (each independently testable):
   the account whose **weekly window resets soonest** (that quota is closest to
   refreshing, so spending it first preserves later-resetting accounts). Ties
   break by index.
-- On `429`: parse `retry-after`, clamp to `[1, 300]s` (default 60). While retries
-  remain (`retryCount < poolSize`), **wait and retry the same account** (a
-  transient limit). Once retries are exhausted, mark the account throttled until
-  its reset and re-dispatch, which picks another account. When every account is
-  exhausted, return a structured `rate_limit_error` (429) with a `retry-after`.
+- On `429`: parse `retry-after`, clamp to `[1, 300]s` (default 60). Mark the
+  account throttled for that window **immediately** — before any wait — so the
+  sideline sticks even if the client abandons the request mid-wait (otherwise
+  every later request just re-hits the same exhausted account and never
+  switches). Then, if any other account is available, **switch to it at once,
+  with no wait**, so the session keeps working seamlessly. Only when no other
+  account is available do we wait out the (bounded) `retry-after` on the sole
+  account and retry it. When every account is exhausted, return a structured
+  `rate_limit_error` (429) with a `retry-after`.
 - Header hygiene mirrors teamclaude: strip `accept-encoding` from the forwarded
   request and `content-encoding`/`content-length` from the relayed response
   (the transport may auto-decompress), and do not follow upstream redirects
