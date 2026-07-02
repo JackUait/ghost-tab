@@ -278,55 +278,26 @@ func TestGhosttyAdapter_apply_config_repairs_legacy_ghost_tab_line_even_on_skip(
 	assertNotContains(t, content, "ghost-tab")
 }
 
-// --- multi-location repair: Ghostty also reads the macOS Application Support
-// config, which the primary flow never creates or edits. A stale wisp-deck
-// command line there must still be repaired. ---
-
-func TestGhosttyAdapter_get_config_paths_includes_macos_location(t *testing.T) {
+// TestGhosttyAdapter_config_path_is_the_only_default_location documents and
+// guards a verified fact about Ghostty, not an assumption: its own --docs
+// output states "the default configuration file paths are currently only the
+// XDG config path", and a real-launch test confirmed a working command placed
+// ONLY at ~/Library/Application Support/com.mitchellh.ghostty/config does not
+// launch. A prior version of this fix wrongly assumed Ghostty also read that
+// Application Support path and added dead repair logic for it; this test
+// exists so nobody reintroduces that assumption without re-verifying it via
+// TestGhosttyRealLaunch_config_path_is_the_only_default_location_for_real
+// (ghostty_real_launch_test.go), which checks it against the real binary.
+func TestGhosttyAdapter_config_path_is_the_only_default_location(t *testing.T) {
 	home := t.TempDir()
-	snippet := ghosttyAdapterSnippet(t, `terminal_get_config_paths`)
+	snippet := ghosttyAdapterSnippet(t, `terminal_get_config_path`)
 	env := buildEnv(t, nil, fmt.Sprintf("HOME=%s", home))
 	out, code := runBashSnippet(t, snippet, env)
 	assertExitCode(t, code, 0)
-	assertContains(t, out, home+"/.config/ghostty/config")
-	assertContains(t, out, home+"/Library/Application Support/com.mitchellh.ghostty/config")
-}
-
-func TestGhosttyAdapter_repair_all_locations_fixes_macos_config(t *testing.T) {
-	home := t.TempDir()
-	libCfg := filepath.Join(home, "Library/Application Support/com.mitchellh.ghostty/config")
-	if err := os.MkdirAll(filepath.Dir(libCfg), 0755); err != nil {
-		t.Fatalf("mkdir failed: %v", err)
-	}
-	// The user's only Ghostty config is the macOS one, with a broken legacy line.
-	if err := os.WriteFile(libCfg, []byte("command = ~/.config/ghost-tab/wrapper.sh\n"), 0644); err != nil {
-		t.Fatalf("write failed: %v", err)
-	}
-	wrapperPath := filepath.Join(home, ".config/wisp-deck/wrapper.sh")
-
-	snippet := ghosttyAdapterSnippet(t,
-		fmt.Sprintf(`terminal_repair_all_config_locations %q`, wrapperPath))
-	env := buildEnv(t, nil, fmt.Sprintf("HOME=%s", home))
-	_, code := runBashSnippet(t, snippet, env)
-	assertExitCode(t, code, 0)
-
-	data, err := os.ReadFile(libCfg)
-	if err != nil {
-		t.Fatalf("failed to read macos config: %v", err)
-	}
-	content := string(data)
-	assertContains(t, content, "command = direct:/bin/bash -l "+wrapperPath)
-	assertNotContains(t, content, "ghost-tab")
-}
-
-func TestWispDeck_repairs_all_ghostty_config_locations(t *testing.T) {
-	root := projectRoot(t)
-	data, err := os.ReadFile(filepath.Join(root, "bin", "wisp-deck"))
-	if err != nil {
-		t.Fatalf("failed to read bin/wisp-deck: %v", err)
-	}
-	if !strings.Contains(string(data), "terminal_repair_all_config_locations") {
-		t.Errorf("bin/wisp-deck must repair every Ghostty config location so a stale command line in the macOS Application Support config is fixed too")
+	got := strings.TrimSpace(out)
+	want := home + "/.config/ghostty/config"
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
 	}
 }
 

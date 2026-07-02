@@ -1,18 +1,16 @@
 #!/bin/bash
 # Ghostty terminal adapter.
 
-# Return the primary Ghostty config file path (created if none exists).
+# Return Ghostty's config file path. Per Ghostty's own docs ("the default
+# configuration file paths are currently only the XDG config path"), this is
+# the ONLY file Ghostty reads by default — verified directly by real-launch
+# testing (a working command placed only in ~/Library/Application
+# Support/com.mitchellh.ghostty/config does NOT launch). Do not add a second
+# location here without re-verifying against a real Ghostty launch first: an
+# earlier version of this fix assumed Ghostty also read the Application
+# Support path and added unused repair logic for it.
 terminal_get_config_path() {
   echo "$HOME/.config/ghostty/config"
-}
-
-# Return EVERY Ghostty config location Ghostty reads on macOS, one per line.
-# Ghostty loads ~/.config/ghostty/config and also the Application Support path;
-# a stale wisp-deck command line in either breaks "failed to launch", so the
-# installer must be able to repair both — not just the primary.
-terminal_get_config_paths() {
-  echo "$HOME/.config/ghostty/config"
-  echo "$HOME/Library/Application Support/com.mitchellh.ghostty/config"
 }
 
 # Return the path where the wrapper script should be.
@@ -79,21 +77,6 @@ terminal_config_has_wisp_command() {
   local config_path="$1"
   [ -f "$config_path" ] || return 1
   grep -Eq "$_WISP_MANAGED_COMMAND_RE" "$config_path"
-}
-
-# Repair a stale wisp-deck command line in EVERY Ghostty config location that
-# has one — including the macOS Application Support config the primary setup
-# never creates or edits. Rewrites it to the current correct absolute form so an
-# old tilde/relative/legacy-named path can't survive to break the launch.
-# Args: wrapper_path
-terminal_repair_all_config_locations() {
-  local wrapper_path="$1"
-  local cfg
-  while IFS= read -r cfg; do
-    if terminal_config_has_wisp_command "$cfg"; then
-      terminal_setup_config "$cfg" "$wrapper_path"
-    fi
-  done < <(terminal_get_config_paths)
 }
 
 # Decide-and-apply the wrapper command line into the Ghostty config.
